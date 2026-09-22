@@ -74,7 +74,7 @@
         // 结构：顶栏贴安全区（不留空隙），底栏避让底部小白条；可用下面两个变量 DIY
         '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;}' +
         '.multi-select-bar{top:var(--safe-top,0px) !important;}' +
-        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,calc(14px + var(--safe-bottom,env(safe-area-inset-bottom,0px)))) !important;}';
+        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,max(8px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) - 26px))) !important;}';
 
     function applyChatCss(css) {
         // 聊天 CSS 仅作用于单聊/群聊内页（额外的聊天专用覆盖）
@@ -105,14 +105,46 @@
         } catch (e) { return ''; }
     }
 
-    // 旧版全局模板把底栏排成 space-between（胶囊靠左、电话靠右），这里做一次就地修正
+    // 旧版全局模板的两处安全区问题，就地修正已保存的 CSS：
+    //   1) 底栏写死 bottom:28px，iOS 上离底部过高 → 改成随安全区自适应
+    //   2) 顶栏 padding 未包含安全区，按钮被灵动岛遮住 → 补上 safe-inset-top
     function migrateGlobalCss(css) {
-        if (!css || css.indexOf('.bottom-actions') === -1 || css.indexOf('justify-content: space-between') === -1) return css;
-        var fixed = css.replace(/(\.bottom-actions\s*\{[^}]*?)justify-content:\s*space-between;/m, '$1justify-content: center;');
+        if (!css) return css;
+        var fixed = css;
+        if (fixed.indexOf('.bottom-actions') !== -1 && fixed.indexOf('justify-content: space-between') !== -1) {
+            fixed = fixed.replace(/(\.bottom-actions\s*\{[^}]*?)justify-content:\s*space-between;/m, '$1justify-content: center;');
+        }
+        if (fixed.indexOf('.bottom-actions') !== -1) {
+            fixed = fixed.replace(/(\.bottom-actions\s*\{[^}]*?)bottom\s*:\s*28px\s*;/m, '$1bottom: max(8px, calc(var(--safe-inset-bottom, 0px) - 26px));');
+        }
+        if (fixed.indexOf('.overlay-header') !== -1) {
+            fixed = fixed.replace(/(\.overlay-header\s*\{[^}]*?)padding\s*:\s*14px\s+0\s+12px\s+0\s*;/m, '$1padding: calc(14px + var(--safe-inset-top, 0px)) 0 12px 0;');
+        }
         if (fixed !== css) {
             try {
                 localStorage.setItem('beautify_global_v2', fixed);
                 localStorage.setItem('beautify_global', fixed);
+            } catch (e) {}
+        }
+        return fixed;
+    }
+
+    // 旧版聊天模板：气泡偏大偏宽、底栏底部留白过多，就地修正已保存的聊天 CSS
+    function migrateChatCss(css) {
+        if (!css) return css;
+        var fixed = css;
+        if (fixed.indexOf('.nano-chat-inner .bubble') !== -1) {
+            fixed = fixed.replace(/(\.nano-chat-inner\s+\.bubble\s*\{[^}]*?)padding\s*:\s*7px\s+16px\s*;/m, '$1padding: 6px 11px;');
+            fixed = fixed.replace(/(\.nano-chat-inner\s+\.bubble\s*\{[^}]*?)border-radius\s*:\s*22px\s*;/m, '$1border-radius: 15px;');
+            fixed = fixed.replace(/(\.nano-chat-inner\s+\.bubble\s*\{[^}]*?)font-size\s*:\s*15px\s*;/m, '$1font-size: 14px;');
+        }
+        if (fixed.indexOf('.nano-chat-inner .message-content') !== -1) {
+            fixed = fixed.replace(/(\.nano-chat-inner\s+\.message-content\s*\{[^}]*?)max-width\s*:\s*78%\s*;/m, '$1max-width: 64%;');
+        }
+        if (fixed !== css) {
+            try {
+                localStorage.setItem('beautify_chat_v2', fixed);
+                localStorage.setItem('beautify_chat', fixed);
             } catch (e) {}
         }
         return fixed;
@@ -253,7 +285,7 @@
     function applySaved() {
         // 先聊天后全局：全局样式永远最后注入，保证“全局”能覆盖所有页面（含聊天）
         try {
-            applyChatCss(readCss('beautify_chat_v2'));
+            applyChatCss(migrateChatCss(readCss('beautify_chat_v2')));
         } catch (e) {}
         try {
             applyChatAvatarCss(readCss('beautify_chat_avatar'));

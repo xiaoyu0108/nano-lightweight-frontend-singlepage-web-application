@@ -222,11 +222,11 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 .nano-chat-inner .message-row.left .message-avatar { margin-right: 8px; }
 .nano-chat-inner .message-row.right .message-avatar { margin-left: 8px; order: 2; }
 .nano-chat-inner .message-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.nano-chat-inner .message-content { max-width: 78%; min-width: 0; display: flex; flex-direction: column; position: relative; }
+.nano-chat-inner .message-content { max-width: 64%; min-width: 0; display: flex; flex-direction: column; position: relative; }
 .nano-chat-inner .message-row.right .message-content { align-items: flex-end; }
 .nano-chat-inner .bubble {
-  position: relative; width: max-content; padding: 7px 16px; border-radius: 22px;
-  font-size: 15px; line-height: 1.25; overflow-wrap: break-word; word-wrap: break-word;
+  position: relative; width: max-content; padding: 6px 11px; border-radius: 15px;
+  font-size: 14px; line-height: 1.3; overflow-wrap: break-word; word-wrap: break-word;
   word-break: break-word; overflow-wrap: anywhere; white-space: pre-wrap;
 }
 .nano-chat-inner .bubble.other { background: var(--bubble-other); color: var(--bubble-other-text); }
@@ -367,7 +367,7 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
        （.disabled 置灰 / .reply-mode 绿色=回复）；.voice-btn.active 录音中。 */
 .nano-chat-inner .bottom-bar {
   position: relative; z-index: 30; width: 100%; flex-shrink: 0;
-  padding: var(--chat-bottombar-pad, 6px 14px calc(8px + var(--safe-bottom, env(safe-area-inset-bottom, 0px))));
+  padding: var(--chat-bottombar-pad, 6px 14px max(8px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) - 26px)));
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .nano-chat-inner .more-btn { width: 42px; height: 42px; border: none; border-radius: 50%; background: var(--chat-glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; border: 0.5px solid var(--chat-glass-line); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6); color: var(--chat-text); transition: all 0.15s; }
@@ -511,7 +511,7 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 .nano-groups .bubble-card.chain .chain-btn:disabled { background: #c7c7cc; }
 
 /* 3.5 底部 dock（群聊） */
-.nano-groups .bottom-bar { position: relative; z-index: 30; width: 100%; flex-shrink: 0; padding: var(--chat-bottombar-pad, 8px 12px calc(8px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))); display: flex; align-items: center; gap: 8px; background: transparent; }
+.nano-groups .bottom-bar { position: relative; z-index: 30; width: 100%; flex-shrink: 0; padding: var(--chat-bottombar-pad, 8px 12px max(8px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) - 26px))); display: flex; align-items: center; gap: 8px; background: transparent; }
 .nano-groups .more-btn { width: 42px; height: 42px; border: none; border-radius: 50%; background: rgba(255, 255, 255, 0.95); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; color: var(--chat-text); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08); }
 .nano-groups .more-btn:active { transform: scale(0.92); background: #f0f0f3; }
 .nano-groups .more-btn svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2; fill: none; }
