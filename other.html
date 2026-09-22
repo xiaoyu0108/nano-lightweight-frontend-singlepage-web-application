@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>其他</title>
+    <link rel="stylesheet" href="css/other.css">
+    <script src="js/appearance.js"></script>
+    <script src="js/nano-notify.js"></script>
+</head>
+<body>
+    <div class="top-bar">
+        <button class="top-back" id="backBtn" aria-label="返回" data-back>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <span class="top-bar-title">其他</span>
+    </div>
+
+    <div class="container">
+
+        <section class="card-group">
+            <div class="group-title">后台</div>
+            <div class="list-group">
+                <div class="list-item switch-row">
+                    <div class="item-info">
+                        <span class="item-title">保活</span>
+                        <span class="item-desc">开启后软件切到后台也能继续生成与回复</span>
+                    </div>
+                    <label class="ios-switch"><input type="checkbox" id="keepAliveToggle"><span class="ios-switch-track"></span></label>
+                </div>
+                <div class="list-item switch-row">
+                    <div class="item-info">
+                        <span class="item-title">通知</span>
+                        <span class="item-desc">开启后角色回复会弹出通知（线上/线下/单聊/群聊/音乐）</span>
+                    </div>
+                    <label class="ios-switch"><input type="checkbox" id="notifyToggle"><span class="ios-switch-track"></span></label>
+                </div>
+                <div class="list-item">
+                    <div class="item-info">
+                        <span class="item-title">后台运行状态</span>
+                        <span class="item-desc" id="bgStatus">—</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card-group">
+            <div class="group-title">通知声音</div>
+            <div class="list-group" id="soundGroup">
+                <div class="list-item sound-row">
+                    <span class="item-title">提示音</span>
+                    <div class="sound-controls">
+                        <select class="sound-select" id="soundSelect"></select>
+                        <button class="preview-btn" id="soundPreview">试听</button>
+                    </div>
+                </div>
+            </div>
+            <div class="group-title" style="margin-top:12px;">分应用提示音</div>
+            <div class="list-group" id="channelSoundList"></div>
+        </section>
+
+        <section class="card-group">
+            <div class="group-title">API 悬浮球</div>
+            <div class="list-group">
+                <div class="list-item switch-row">
+                    <div class="item-info">
+                        <span class="item-title">显示悬浮球</span>
+                        <span class="item-desc">全局悬浮，点击可切换预设与模型</span>
+                    </div>
+                    <label class="ios-switch"><input type="checkbox" id="apiBallToggle"><span class="ios-switch-track"></span></label>
+                </div>
+                <div class="list-item slider-row">
+                    <span class="item-title">大小</span>
+                    <div class="slider-control">
+                        <input type="range" class="ball-range" id="apiBallSize" min="36" max="80" step="2" value="52">
+                    </div>
+                    <span class="slider-value" id="apiBallSizeVal">52</span>
+                </div>
+                <div class="list-item tap-row" id="apiBallResetPos">
+                    <span class="item-title">重置悬浮球位置</span>
+                    <svg class="row-chevron" viewBox="0 0 8 13" width="8" height="13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </div>
+        </section>
+
+        <section class="card-group">
+            <div class="group-title">悬浮球外观</div>
+            <div class="list-group">
+                <div class="list-item tap-row" id="apiBallPickImage">
+                    <div class="item-info">
+                        <span class="item-title">自定义图片</span>
+                        <span class="item-desc" id="apiBallImageDesc">未设置 · 使用默认 iOS 圆环</span>
+                    </div>
+                    <span class="ball-thumb" id="apiBallThumb"></span>
+                </div>
+                <div class="list-item tap-row" id="apiBallClearImage" style="display:none;">
+                    <span class="item-title danger">恢复默认外观</span>
+                </div>
+            </div>
+        </section>
+
+        <div class="hint">提示：通知需要浏览器授权；保活会尝试保持屏幕常亮，尽量让后台回复不中断。</div>
+    </div>
+
+    <input type="file" accept="image/*" id="apiBallImageInput" hidden>
+
+    <script src="js/other.js"></script>
+<script src="js/api-float.js"></script>
+<script src="swipe-back.js"></script>
+</body>
+</html>

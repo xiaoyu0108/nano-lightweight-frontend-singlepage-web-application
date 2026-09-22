@@ -1,0 +1,2543 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>Nano</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="common.css">
+    <style>
+        :root {
+            --safe-inset-top: env(safe-area-inset-top, 0px);
+            --safe-inset-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: transparent;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        .app-container {
+            width: 100%;
+            height: 100%;
+            max-width: 430px;
+            margin: 0 auto;
+            background: transparent;
+            padding: 0 16px 0 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: none;
+            position: relative;
+        }
+
+        .app-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+            padding-top: 0;
+            padding-bottom: 80px;
+        }
+
+        .top-bar {
+            position: absolute;
+            top: 14px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .top-bar.hidden {
+            display: none !important;
+        }
+        .top-bar>* {
+            pointer-events: auto;
+        }
+        .top-bar .spacer {
+            flex: 1;
+        }
+
+        .menu-btn, .add-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 38px;
+            background: rgba(0, 0, 0, 0.03);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+            border: 0.5px solid rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            color: #1c1c1e;
+            cursor: pointer;
+            transition: all 0.15s;
+            flex-shrink: 0;
+            background: #ffffff;
+        }
+        .menu-btn:active, .add-btn:active {
+            transform: scale(0.88);
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .add-btn {
+            color: #007aff;
+            font-size: 20px;
+        }
+
+        .iframe-container {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+            border-radius: 16px;
+            background: transparent;
+            position: relative;
+        }
+        .iframe-container.active {
+            display: flex;
+        }
+        .iframe-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+        }
+
+        .bottom-actions {
+            position: absolute;
+            bottom: 28px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            z-index: 20;
+            pointer-events: none;
+            background: transparent;
+        }
+        .bottom-actions.hidden {
+            display: none !important;
+        }
+        .bottom-actions>* {
+            pointer-events: auto;
+        }
+
+        .capsule-group {
+            display: flex;
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(30px) saturate(240%);
+            -webkit-backdrop-filter: blur(30px) saturate(240%);
+            border-radius: 50px;
+            padding: 5px 8px;
+            border: 0.5px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            gap: 2px;
+        }
+
+        .capsule-btn {
+            width: 50px;
+            height: 40px;
+            border-radius: 40px;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #8e8e93;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .capsule-btn:active {
+            transform: scale(0.88);
+            background: rgba(0, 122, 255, 0.08);
+        }
+        .capsule-btn.active-btn {
+            background: rgba(0, 122, 255, 0.15);
+            color: #007aff;
+            box-shadow: none;
+        }
+
+        .circle-more {
+            width: 52px;
+            height: 52px;
+            border-radius: 52px;
+            background: #ffffff;
+            border: 0.5px solid rgba(0, 0, 0, 0.04);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #8e8e93;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .circle-more:active {
+            transform: scale(0.88);
+            background: rgba(0, 122, 255, 0.08);
+        }
+        .circle-more.active-btn {
+            background: rgba(0, 122, 255, 0.15);
+            color: #007aff;
+            box-shadow: none;
+        }
+
+        .fullscreen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            border: none;
+            padding: 0 16px 0 16px;
+        }
+        .fullscreen-overlay.active {
+            display: flex;
+        }
+        .fullscreen-overlay.no-header .overlay-header {
+            display: none;
+        }
+
+        .overlay-inner {
+            width: 100%;
+            max-width: 430px;
+            margin: 0 auto;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .overlay-header {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            padding: 14px 0 12px 0;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .overlay-header .back-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 38px;
+            background: rgba(0, 0, 0, 0.03);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+            border: 0.5px solid rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            color: #1c1c1e;
+            cursor: pointer;
+            transition: all 0.15s;
+            background: #ffffff;
+            flex-shrink: 0;
+        }
+        .overlay-header .back-btn:active {
+            transform: scale(0.88);
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .overlay-header .back-btn.hidden {
+            display: none !important;
+        }
+        .overlay-header .overlay-title {
+            flex: 1;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 600;
+            color: #1c1c1e;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .overlay-header .placeholder {
+            width: 38px;
+            flex-shrink: 0;
+        }
+
+        .overlay-content {
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+            border-radius: 16px;
+            background: transparent;
+            position: relative;
+        }
+        .overlay-content iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+        }
+        #voiceCallFrame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            display: none;
+        }
+        #chatInnerFrame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            display: none;
+        }
+        #musicFrame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            display: none;
+        }
+        #momentsFrame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            display: none;
+        }
+        #insFrame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+            display: none;
+        }
+
+        #voiceCallFrame,
+        #musicFrame {
+            top: calc(-1 * env(safe-area-inset-top, 0px));
+            height: calc(100% + env(safe-area-inset-top, 0px));
+        }
+
+        .voice-float-ball {
+            position: absolute;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+            cursor: grab;
+            z-index: 99999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .voice-float-ball:active {
+            cursor: grabbing;
+            transform: scale(0.92);
+        }
+
+        .voice-float-ball .ball-icon {
+            width: 24px;
+            height: 24px;
+            stroke: #34c759;
+            stroke-width: 2.5;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            pointer-events: none;
+        }
+
+        .voice-float-ball .ball-time {
+            font-size: 10px;
+            color: #1c1c1e;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-top: 1px;
+            pointer-events: none;
+        }
+
+        .voice-float-ball.dragging {
+            transition: none;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
+        }
+
+        .app-notify {
+            position: absolute;
+            left: 50%;
+            top: 10px;
+            transform: translate(-50%, -140%);
+            z-index: 100000;
+            width: min(92vw, 420px);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(28, 28, 30, 0.96);
+            color: #fff;
+            box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.32s;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .app-notify.show { transform: translate(-50%, 0); opacity: 1; }
+        .app-notify .an-icon { font-size: 18px; line-height: 1.2; }
+        .app-notify .an-main { min-width: 0; flex: 1; }
+        .app-notify .an-title { font-size: 13px; font-weight: 700; }
+        .app-notify .an-body {
+            font-size: 12px;
+            color: #d2d2d6;
+            margin-top: 3px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .app-notify .an-actions { margin-top: 8px; }
+        .app-notify .an-action {
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.22);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .app-notify .an-action:active { background: rgba(255, 255, 255, 0.36); }
+
+        .music-float-ball {
+            position: absolute;
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            z-index: 99998;
+            display: none;
+            align-items: center; justify-content: center;
+            cursor: grab;
+            user-select: none; -webkit-user-select: none;
+            touch-action: none;
+            transition: width 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+                        height 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+                        border-radius 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+                        transform 0.2s,
+                        box-shadow 0.2s;
+            overflow: hidden;
+            background: linear-gradient(145deg, #2a2a2e 0%, #1a1a1e 100%);
+            box-shadow:
+                0 5px 18px rgba(0, 0, 0, 0.24),
+                0 2px 6px rgba(0, 0, 0, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            border: 1.5px solid rgba(255, 255, 255, 0.85);
+        }
+        .music-float-ball.show { display: flex; }
+        .music-float-ball:active { cursor: grabbing; }
+
+        .music-float-ball.expanded {
+            width: 210px;
+            height: 74px;
+            border-radius: 20px;
+            cursor: default;
+            padding: 8px;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            background: linear-gradient(145deg, #2a2a2e 0%, #1a1a1e 100%);
+            box-shadow:
+                0 10px 32px rgba(0, 0, 0, 0.28),
+                0 2px 6px rgba(0, 0, 0, 0.16),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            position: absolute;
+        }
+
+        .music-float-ball .ball-cover {
+            width: 100%; height: 100%;
+            object-fit: cover; border-radius: 50%;
+            animation: ballRotate 16s linear infinite;
+            animation-play-state: paused;
+            flex-shrink: 0;
+            display: block;
+        }
+        .music-float-ball.playing .ball-cover { animation-play-state: running; }
+        .music-float-ball.expanded .ball-cover {
+            width: 46px; height: 46px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+            border-radius: 50%;
+            overflow: hidden;
+        }
+        .music-float-ball .ball-placeholder {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            color: rgba(255, 255, 255, 0.5);
+            flex-shrink: 0;
+        }
+        .music-float-ball .ball-placeholder svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.8; fill: none; }
+        .music-float-ball.expanded .ball-placeholder {
+            width: 46px; height: 46px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+        }
+        @keyframes ballRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .ball-expand-content {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            min-width: 0;
+            justify-content: center;
+            gap: 4px;
+            height: 100%;
+            padding-right: 38px;
+        }
+        .music-float-ball.expanded .ball-expand-content { display: flex; }
+        .ball-expand-title {
+            font-size: 11.5px; font-weight: 600; color: #fff;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            line-height: 1.2;
+        }
+        .ball-expand-artist {
+            font-size: 9.5px; color: rgba(255,255,255,0.55);
+            margin-top: 1px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .ball-expand-buttons { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+        .ball-expand-btn {
+            width: 22px; height: 22px;
+            border: none; background: transparent;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: rgba(255,255,255,0.9);
+            border-radius: 50%; padding: 0;
+        }
+        .ball-expand-btn:active { background: rgba(255,255,255,0.1); }
+        .ball-expand-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .ball-expand-btn.play { width: 26px; height: 26px; background: rgba(255,255,255,0.15); }
+        .ball-expand-btn.play svg { width: 14px; height: 14px; fill: #fff; stroke: none; }
+
+        .ball-off-btn {
+            position: absolute;
+            top: 6px; right: 6px;
+            padding: 2px 6px;
+            background: #fff;
+            color: #ff3b30;
+            border: 1px solid #ff3b30;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            display: none;
+            line-height: 1.4;
+        }
+        .music-float-ball.expanded .ball-off-btn { display: block; }
+
+        @media (max-width: 520px) {
+            .app-container {
+                padding: 0;
+            }
+            .fullscreen-overlay {
+                padding: 0;
+            }
+            .overlay-inner {
+                max-width: none;
+            }
+            .overlay-content {
+                border-radius: 0;
+            }
+        }
+    </style>
+
+    <!-- ============================================================
+         开场动画样式（原 开场.html 的 <style>，已内联）
+         ============================================================ -->
+    <style>
+        :root { --ink: #090909; }
+
+        #nano-opening {
+            position: fixed; inset: 0; z-index: 99999; background: #fff;
+            display: flex; justify-content: center; align-items: center;
+            overflow: hidden; isolation: isolate;
+            transition: opacity 0.6s ease-in-out;
+            cursor: pointer;
+        }
+        #nano-opening.fade-out { opacity: 0; pointer-events: none; }
+
+        #nano-opening .scene {
+            position: relative;
+            width: min(100vw, 100vh);
+            height: min(100vw, 100vh);
+            max-width: 1100px; max-height: 1100px;
+        }
+
+        #nano-opening svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+        #nano-opening .orbits { opacity: 0; animation: orbitsIn 0.8s cubic-bezier(.16,1,.3,1) 0.1s forwards; }
+        #nano-opening .orbit { fill: none; stroke: var(--ink); stroke-linecap: round; }
+        #nano-opening .orbit.back  { stroke-width: 1;    opacity: .15; stroke-dasharray: 2 12; }
+        #nano-opening .orbit.mid   { stroke-width: 1.15; opacity: .5;  stroke-dasharray: 380 1000; }
+        #nano-opening .orbit.front { stroke-width: 1.25; opacity: .75; stroke-dasharray: 480 1100; }
+        #nano-opening .o1 { animation: orbitFlow1 5s  linear 0.8s infinite; }
+        #nano-opening .o2 { animation: orbitFlow2 6s  linear 0.8s infinite; }
+        #nano-opening .o3 { animation: orbitFlow3 7s  linear 0.9s infinite; }
+        #nano-opening .o4 { animation: orbitFlow4 5.5s linear 1s   infinite; }
+
+        #nano-opening .planet {
+            fill: var(--ink); transform-box: fill-box; transform-origin: center;
+            opacity: 0;
+            animation: planetIn .5s cubic-bezier(.16,1,.3,1) var(--d) forwards,
+                       planetPulse 2.5s ease-in-out var(--p) infinite;
+        }
+        #nano-opening .planet.glow { filter: url(#planetGlow); }
+
+        #nano-opening .star {
+            fill: var(--ink); opacity: 0; transform-box: fill-box; transform-origin: center;
+            animation: starIn .5s cubic-bezier(.16,1,.3,1) var(--d) forwards,
+                       starPulse 3s ease-in-out var(--p) infinite;
+        }
+
+        #nano-opening .dust {
+            fill: var(--ink); opacity: 0;
+            animation: dustIn .6s ease-out var(--d) forwards;
+        }
+
+        #nano-opening .axis { stroke: var(--ink); stroke-width: 1; opacity: .7; stroke-linecap: round; }
+        #nano-opening .axis.top    { stroke-dasharray: 7 18; animation: axisTop    1.2s cubic-bezier(.16,1,.3,1) 0.05s both; }
+        #nano-opening .axis.bottom { stroke-dasharray: 7 18; animation: axisBottom 1.2s cubic-bezier(.16,1,.3,1) 0.05s both; }
+        #nano-opening .diamond { fill: var(--ink); transform-box: fill-box; transform-origin: center;
+                     animation: diamondIn .4s cubic-bezier(.16,1,.3,1) var(--d) both; }
+
+        #nano-opening .brand-container {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) skewX(-8deg);
+            display: flex; align-items: baseline;
+            z-index: 20;
+            white-space: nowrap;
+        }
+
+        #nano-opening .letter {
+            display: inline-block;
+            font-family: "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 170px;
+            font-weight: 800;
+            letter-spacing: -6px;
+            color: var(--ink);
+            line-height: 1;
+            opacity: 0;
+            filter: blur(10px);
+            animation: letterReveal 0.8s cubic-bezier(.16,1,.3,1) forwards;
+            text-shadow: 0 4px 20px rgba(0,0,0,.08);
+        }
+
+        #nano-opening .letter:nth-child(1) { animation-delay: 0.60s; }
+        #nano-opening .letter:nth-child(2) { animation-delay: 0.85s; }
+        #nano-opening .letter:nth-child(3) { animation-delay: 1.10s; }
+        #nano-opening .letter:nth-child(4) { animation-delay: 1.35s; margin-left: -2px; }
+
+        #nano-opening .letter.o {
+            position: relative;
+            width: 150px; height: 150px;
+            display: flex; justify-content: center; align-items: center;
+            border: 14px solid var(--ink);
+            border-radius: 50%;
+            box-sizing: border-box;
+            margin-left: 6px;
+            font-size: 0;
+            text-shadow: none;
+            animation: letterReveal 0.8s cubic-bezier(.16,1,.3,1) 1.35s forwards,
+                       oBreath 3s ease-in-out 2.2s infinite;
+        }
+
+        #nano-opening .o-planet-system {
+            width: 110%;
+            height: 110%;
+            position: absolute;
+            top: -5%;
+            left: -5%;
+            overflow: visible;
+        }
+
+        #nano-opening .o-center-planet {
+            fill: var(--ink);
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: oCenterPulse 2s ease-in-out infinite;
+        }
+
+        #nano-opening .o-orbit {
+            fill: none;
+            stroke: var(--ink);
+            stroke-width: 1.2;
+            opacity: 0.55;
+        }
+        #nano-opening .o-orbit-1 { animation: oOrbitSpin1 4s linear infinite; transform-origin: 50px 50px; }
+        #nano-opening .o-orbit-2 { animation: oOrbitSpin2 6s linear infinite reverse; transform-origin: 50px 50px; }
+
+        #nano-opening .o-mini-planet {
+            fill: var(--ink);
+            transform-box: fill-box;
+            transform-origin: center;
+        }
+
+        @keyframes letterReveal {
+            0%   { opacity: 0; filter: blur(10px); transform: translateY(24px); }
+            100% { opacity: 1; filter: blur(0);    transform: translateY(0); }
+        }
+
+        @keyframes oBreath {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.05); }
+        }
+
+        @keyframes oCenterPulse {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.3); }
+        }
+
+        @keyframes oOrbitSpin1 {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes oOrbitSpin2 {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes orbitsIn { from { opacity: 0; transform: scale(.85) rotate(-3deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+        @keyframes orbitFlow1 { to { stroke-dashoffset: -1330; } }
+        @keyframes orbitFlow2 { to { stroke-dashoffset:  1520; } }
+        @keyframes orbitFlow3 { to { stroke-dashoffset: -1750; } }
+        @keyframes orbitFlow4 { to { stroke-dashoffset:  1450; } }
+
+        @keyframes axisTop    { from { stroke-dashoffset:  80; opacity: 0; } to { stroke-dashoffset: 0; opacity: .7; } }
+        @keyframes axisBottom { from { stroke-dashoffset: -80; opacity: 0; } to { stroke-dashoffset: 0; opacity: .7; } }
+        @keyframes diamondIn  { from { opacity: 0; transform: scale(0) rotate(45deg); } to { opacity: 1; transform: scale(1) rotate(45deg); } }
+
+        @keyframes planetIn    { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+        @keyframes planetPulse { 0%,100% { filter: brightness(1); transform: scale(1); } 50% { filter: brightness(.78); transform: scale(1.07); } }
+        @keyframes starIn      { from { opacity: 0; transform: scale(0) rotate(45deg); } to { opacity: .8; transform: scale(1) rotate(45deg); } }
+        @keyframes starPulse   { 0%,100% { opacity: .5; } 50% { opacity: .95; } }
+        @keyframes dustIn      { from { opacity: 0; } to { opacity: .55; } }
+
+        @media (max-width: 768px) {
+            #nano-opening .letter { font-size: 88px; letter-spacing: -3px; }
+            #nano-opening .letter.o { width: 78px; height: 78px; border-width: 8px; margin-left: 3px; }
+            #nano-opening .o-planet-system { width: 110%; height: 110%; top: -5%; left: -5%; }
+            #nano-opening .scene { width: 130vw; height: 130vw; }
+        }
+    </style>
+    <!-- 开场动画样式结束 -->
+
+    <script src="js/appearance.js"></script>
+</head>
+<body class="nano-index">
+<div class="bg"></div>
+<script src="bg.js"></script>
+
+<!-- ============================================================
+     开场动画（原 开场.html 的 <body>，已内联）
+     ============================================================ -->
+<div id="nano-opening">
+  <div class="scene">
+    <svg viewBox="0 0 1000 1000" aria-hidden="true">
+      <defs>
+        <filter id="planetGlow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="1.8" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <g>
+        <line class="axis top"    x1="500" y1="105" x2="500" y2="370"/>
+        <line class="axis bottom" x1="500" y1="630" x2="500" y2="895"/>
+        <rect class="diamond" style="--d:.1s"  x="496.5" y="104"  width="7" height="7" transform="rotate(45 500 107.5)"/>
+        <rect class="diamond" style="--d:.2s"  x="497.5" y="160"  width="5" height="5" transform="rotate(45 500 162.5)"/>
+        <rect class="diamond" style="--d:.8s"  x="497"   y="837"  width="6" height="6" transform="rotate(45 500 840)"/>
+        <rect class="diamond" style="--d:.95s" x="497"   y="891"  width="6" height="6" transform="rotate(45 500 894)"/>
+      </g>
+
+      <g class="orbits">
+        <path class="orbit back  o1" d="M85 590 C210 300, 445 235, 660 330 C785 385, 855 455, 940 390"/>
+        <path class="orbit mid   o2" d="M65 565 C250 720, 430 695, 605 520 C735 390, 820 320, 948 455"/>
+        <path class="orbit front o3" d="M25 635 C170 420, 380 400, 565 500 C725 585, 810 650, 968 540"/>
+        <path class="orbit mid   o4" d="M110 505 C290 690, 470 625, 620 470 C735 350, 850 410, 930 520"/>
+        <path class="orbit back  o1" d="M145 690 C280 510, 425 470, 575 555 C700 625, 790 610, 875 500"/>
+      </g>
+
+      <g>
+        <circle class="planet glow" style="--d:.45s;--p:1.8s" cx="145" cy="505" r="9"/>
+        <circle class="planet"      style="--d:.55s;--p:2.1s" cx="320" cy="372" r="3.5"/>
+        <circle class="planet"      style="--d:.65s;--p:1.7s" cx="635" cy="376" r="4"/>
+        <circle class="planet glow" style="--d:.75s;--p:2.3s" cx="747" cy="574" r="14"/>
+        <circle class="planet"      style="--d:.85s;--p:2s"   cx="864" cy="448" r="3"/>
+        <circle class="planet"      style="--d:.95s;--p:2.5s" cx="195" cy="658" r="4"/>
+        <circle class="planet"      style="--d:1.05s;--p:2.2s" cx="875" cy="585" r="2.5"/>
+      </g>
+
+      <g>
+        <g class="star" style="--d:.55s;--p:1.6s" transform="translate(125 445)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+        <g class="star" style="--d:.7s;--p:1.9s" transform="translate(800 350) scale(.75)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+        <g class="star" style="--d:.8s;--p:2.2s" transform="translate(855 610) scale(.9)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+        <g class="star" style="--d:.65s;--p:2s" transform="translate(500 315) scale(1.15)">
+          <path d="M0-30 C-2-9 -9-2 -30 0 C-9 2 -2 9 0 30 C2 9 9 2 30 0 C9-2 2-9 0-30Z"/>
+        </g>
+        <g class="star" style="--d:.9s;--p:1.7s" transform="translate(500 690) scale(.9)">
+          <path d="M0-28 C-2-8 -8-2 -28 0 C-8 2 -2 8 0 28 C2 8 8 2 28 0 C8-2 2-8 0-28Z"/>
+        </g>
+      </g>
+
+      <g>
+        <g class="star" style="--d:.7s;--p:1.8s" transform="translate(250 250) scale(.55)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+        <g class="star" style="--d:.75s;--p:2s" transform="translate(700 200) scale(.65)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+        <g class="star" style="--d:.8s;--p:2.1s" transform="translate(180 780) scale(.6)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+        <g class="star" style="--d:.85s;--p:1.9s" transform="translate(780 800) scale(.55)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+        <g class="star" style="--d:.95s;--p:2.3s" transform="translate(870 250) scale(.5)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+        <g class="star" style="--d:1s;--p:2s" transform="translate(300 850) scale(.5)">
+          <path d="M0-22 C-2-6 -6-2 -22 0 C-6 2 -2 6 0 22 C2 6 6 2 22 0 C6-2 2-6 0-22Z"/>
+        </g>
+
+        <circle class="dust" style="--d:.4s" cx="80"  cy="350" r="1.8"/>
+        <circle class="dust" style="--d:.5s" cx="220" cy="180" r="1.5"/>
+        <circle class="dust" style="--d:.6s" cx="400" cy="120" r="2"/>
+        <circle class="dust" style="--d:.7s" cx="620" cy="150" r="1.6"/>
+        <circle class="dust" style="--d:.8s" cx="880" cy="320" r="1.8"/>
+        <circle class="dust" style="--d:.9s" cx="920" cy="620" r="1.5"/>
+        <circle class="dust" style="--d:1s"  cx="700" cy="880" r="2"/>
+        <circle class="dust" style="--d:1.1s" cx="400" cy="920" r="1.7"/>
+        <circle class="dust" style="--d:1.2s" cx="120" cy="820" r="1.5"/>
+        <circle class="dust" style="--d:1.3s" cx="60"  cy="600" r="1.8"/>
+        <circle class="dust" style="--d:1.4s" cx="950" cy="480" r="1.6"/>
+        <circle class="dust" style="--d:1.5s" cx="330" cy="620" r="1.4"/>
+        <circle class="dust" style="--d:1.6s" cx="680" cy="480" r="1.5"/>
+      </g>
+    </svg>
+
+    <div class="brand-container">
+      <span class="letter">N</span>
+      <span class="letter">a</span>
+      <span class="letter">n</span>
+      <span class="letter o">
+        <svg class="o-planet-system" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <ellipse class="o-orbit o-orbit-1" cx="50" cy="50" rx="38" ry="20" transform="rotate(-25 50 50)"/>
+          <ellipse class="o-orbit o-orbit-2" cx="50" cy="50" rx="32" ry="16" transform="rotate(35 50 50)"/>
+          <circle class="o-center-planet" cx="50" cy="50" r="4"/>
+          <g class="o-orbit-1">
+            <circle class="o-mini-planet" cx="88" cy="50" r="2.5"/>
+          </g>
+          <g class="o-orbit-2">
+            <circle class="o-mini-planet" cx="82" cy="50" r="2"/>
+          </g>
+        </svg>
+      </span>
+    </div>
+  </div>
+</div>
+<!-- 开场动画结束 -->
+
+<div class="app">
+<div class="app-container">
+    <div class="top-bar" id="topBar"></div>
+
+    <div class="app-content" id="appContent">
+        <div class="iframe-container active" id="iframeChat">
+            <iframe src="chat.html"></iframe>
+        </div>
+        <div class="iframe-container" id="iframeApi">
+            <iframe src="api.html"></iframe>
+        </div>
+        <div class="iframe-container" id="iframeMore">
+            <iframe src="more.html"></iframe>
+        </div>
+        <div class="iframe-container" id="iframeDiscover">
+            <iframe src="discover.html"></iframe>
+        </div>
+    </div>
+
+    <div class="bottom-actions" id="bottomBar">
+        <div class="capsule-group">
+            <button class="capsule-btn active-btn" data-page="chat" id="navChat"><i class="fas fa-comment-dots"></i></button>
+            <button class="capsule-btn" data-page="api" id="navApi"><i class="fas fa-sliders-h"></i></button>
+            <button class="capsule-btn" data-page="discover" id="navDiscover"><i class="fas fa-compass"></i></button>
+            <button class="capsule-btn" data-page="more" id="navMore"><i class="fas fa-map-marked-alt"></i></button>
+        </div>
+        <div class="circle-more" id="circleMore"><i class="fas fa-phone"></i></div>
+    </div>
+</div>
+
+<div class="fullscreen-overlay" id="fullscreenOverlay">
+    <div class="overlay-inner">
+        <div class="overlay-header">
+            <button class="back-btn" id="overlayBack" data-back><i class="fas fa-chevron-left"></i></button>
+            <span class="overlay-title" id="overlayTitle"></span>
+            <div class="placeholder"></div>
+        </div>
+        <div class="overlay-content">
+            <iframe id="overlayFrame" src="about:blank"></iframe>
+            <iframe id="voiceCallFrame" src="about:blank"></iframe>
+            <iframe id="chatInnerFrame" src="about:blank"></iframe>
+            <iframe id="musicFrame" src="about:blank"></iframe>
+            <iframe id="momentsFrame" src="about:blank"></iframe>
+            <iframe id="insFrame" src="about:blank"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const topBar = document.getElementById('topBar');
+        const bottomBar = document.getElementById('bottomBar');
+        const appContent = document.getElementById('appContent');
+        const circleMoreBtn = document.getElementById('circleMore');
+
+        const overlay = document.getElementById('fullscreenOverlay');
+        const overlayFrame = document.getElementById('overlayFrame');
+        const voiceCallFrame = document.getElementById('voiceCallFrame');
+        const chatInnerFrame = document.getElementById('chatInnerFrame');
+        const musicFrame = document.getElementById('musicFrame');
+        const momentsFrame = document.getElementById('momentsFrame');
+        const insFrame = document.getElementById('insFrame');
+        const overlayBack = document.getElementById('overlayBack');
+        const overlayTitle = document.getElementById('overlayTitle');
+
+        const pageConfig = {
+            'chat': { mode: 'home', title: '', container: 'iframeChat' },
+            'api': { mode: 'api', title: 'API', container: 'iframeApi' },
+            'discover': { mode: 'more', title: '发现', container: 'iframeDiscover' },
+            'more': { mode: 'more', title: '更多', container: 'iframeMore' }
+        };
+
+        let currentPage = 'chat';
+        let overlayActive = false;
+        let isChatInnerActive = false;
+        let currentOverlaySource = null;
+        let pendingJumpMsgId = null;
+        let voiceCallKeptAlive = false;
+        let isMusicFrameActive = false;
+        let lastGroupUrl = null;
+        let lastGroupTitle = '';
+        const groupApiInFlight = {};
+
+        function getChatInnerIframe() {
+            const chatContainer = document.getElementById('iframeChat');
+            if (chatContainer) {
+                return chatContainer.querySelector('iframe');
+            }
+            return null;
+        }
+
+        function restoreTopBar() {
+            const config = pageConfig[currentPage];
+            if (config && config.mode === 'home') {
+                topBar.classList.remove('hidden');
+                appContent.style.paddingTop = '0';
+            } else {
+                topBar.classList.add('hidden');
+                appContent.style.paddingTop = '0';
+            }
+        }
+
+        function restoreBottomBar() {
+            bottomBar.classList.remove('hidden');
+        }
+
+        function switchPage(page) {
+            if (currentPage === page) return;
+            const config = pageConfig[page];
+            if (!config) return;
+
+            document.querySelectorAll('.iframe-container').forEach(el => {
+                el.classList.remove('active');
+            });
+            const target = document.getElementById(config.container);
+            if (target) target.classList.add('active');
+
+            currentPage = page;
+
+            document.querySelectorAll('.capsule-btn').forEach(btn => {
+                btn.classList.remove('active-btn');
+                if (btn.dataset.page === page) {
+                    btn.classList.add('active-btn');
+                }
+            });
+
+            circleMoreBtn.classList.remove('active-btn');
+
+            if (!overlayActive) {
+                restoreTopBar();
+                restoreBottomBar();
+            }
+        }
+
+        function showChatInnerFrame() {
+            chatInnerFrame.style.display = 'block';
+            overlayFrame.style.display = 'none';
+            voiceCallFrame.style.display = 'none';
+            musicFrame.style.display = 'none';
+            insFrame.style.display = 'none';
+            isMusicFrameActive = false;
+        }
+        function showInsFrame() {
+            insFrame.style.display = 'block';
+            overlayFrame.style.display = 'none';
+            chatInnerFrame.style.display = 'none';
+            voiceCallFrame.style.display = 'none';
+            musicFrame.style.display = 'none';
+            momentsFrame.style.display = 'none';
+            isMusicFrameActive = false;
+            try { insFrame.contentWindow.postMessage({ type: 'nano:insShown' }, '*'); } catch (e) {}
+        }
+        function showOverlayFrame() {
+            overlayFrame.style.display = 'block';
+            chatInnerFrame.style.display = 'none';
+            voiceCallFrame.style.display = 'none';
+            musicFrame.style.display = 'none';
+            momentsFrame.style.display = 'none';
+            insFrame.style.display = 'none';
+            isMusicFrameActive = false;
+        }
+        function showVoiceFrame() {
+            voiceCallFrame.style.display = 'block';
+            overlayFrame.style.display = 'none';
+            chatInnerFrame.style.display = 'none';
+            musicFrame.style.display = 'none';
+            momentsFrame.style.display = 'none';
+            insFrame.style.display = 'none';
+            isMusicFrameActive = false;
+        }
+        function showMusicFrame() {
+            musicFrame.style.display = 'block';
+            overlayFrame.style.display = 'none';
+            chatInnerFrame.style.display = 'none';
+            voiceCallFrame.style.display = 'none';
+            momentsFrame.style.display = 'none';
+            insFrame.style.display = 'none';
+            isMusicFrameActive = true;
+            try { syncMusicBall(); } catch (e) {}
+        }
+        function showMomentsFrame() {
+            momentsFrame.style.display = 'block';
+            overlayFrame.style.display = 'none';
+            chatInnerFrame.style.display = 'none';
+            voiceCallFrame.style.display = 'none';
+            musicFrame.style.display = 'none';
+            insFrame.style.display = 'none';
+            isMusicFrameActive = false;
+        }
+
+        const OVERLAY_FRAME_IDS = ['overlayFrame', 'chatInnerFrame', 'voiceCallFrame', 'musicFrame', 'momentsFrame', 'insFrame'];
+        function getSafeTopFrames() {
+            const frames = [];
+            OVERLAY_FRAME_IDS.forEach(function(id) {
+                const f = document.getElementById(id);
+                if (f) frames.push(f);
+            });
+            document.querySelectorAll('.iframe-container iframe').forEach(function(f) {
+                if (f) frames.push(f);
+            });
+            return frames;
+        }
+        function setSafeVars(f, top, bot) {
+            try {
+                if (f && f.contentDocument && f.contentDocument.documentElement) {
+                    const de = f.contentDocument.documentElement;
+                    de.style.setProperty('--safe-top', top);
+                    de.style.setProperty('--safe-bottom', bot);
+                }
+            } catch (e) {}
+        }
+        function applySafeTopToFrames() {
+            var standalone = false;
+            try { standalone = !!window.navigator.standalone; } catch (e) {}
+            try {
+                if (!standalone && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) standalone = true;
+            } catch (e) {}
+            if (!standalone) return;
+            try {
+                const rootStyle = getComputedStyle(document.documentElement);
+                const botPx = parseFloat(rootStyle.getPropertyValue('--safe-inset-bottom')) || 0;
+                const botVal = botPx ? (botPx + 'px') : '0px';
+                getSafeTopFrames().forEach(function(f) {
+                    setSafeVars(f, '0px', botVal);
+                });
+            } catch (e) {}
+        }
+        getSafeTopFrames().forEach(function(f) {
+            if (f) f.addEventListener('load', applySafeTopToFrames);
+        });
+        window.addEventListener('load', applySafeTopToFrames);
+        window.addEventListener('resize', applySafeTopToFrames);
+        setTimeout(applySafeTopToFrames, 300);
+
+        function openFullscreen(url, title, showBack, source) {
+            voiceCallKeptAlive = false;
+            try { urlSourceMap[baseName(url)] = source || ''; } catch (e) {}
+            if (url.indexOf('voice-call.html') === 0) {
+                showVoiceFrame();
+                voiceCallFrame.src = url;
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+            } else if (url.indexOf('music.html') === 0) {
+                showMusicFrame();
+                if (!musicFrame.src || musicFrame.src === 'about:blank' || musicFrame.src.indexOf('music.html') === -1) {
+                    musicFrame.src = url;
+                }
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+            } else if (url.includes('chat_inner.html')) {
+                showChatInnerFrame();
+                chatInnerFrame.src = url;
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+            } else if (url.includes('memory.html')) {
+                showOverlayFrame();
+                overlayFrame.src = url;
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+            } else if (url.indexOf('moments.html') === 0) {
+                showMomentsFrame();
+                if (!momentsFrame.src || momentsFrame.src === 'about:blank' || momentsFrame.src.indexOf('moments.html') === -1) {
+                    momentsFrame.src = url;
+                } else {
+                    try { momentsFrame.contentWindow.postMessage({ type: 'nano:momentsShown' }, '*'); } catch (e) {}
+                }
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+            } else if (url.indexOf('ins.html') === 0) {
+                showInsFrame();
+                if (!insFrame.src || insFrame.src === 'about:blank' || insFrame.src.indexOf('ins.html') === -1) {
+                    insFrame.src = url;
+                } else {
+                    try { insFrame.contentWindow.postMessage({ type: 'nano:insShown' }, '*'); } catch (e) {}
+                }
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+            } else {
+                showOverlayFrame();
+                overlayFrame.src = url;
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html'];
+                const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
+                const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
+                if (noOuterHeader) {
+                    overlay.classList.add('no-header');
+                    overlayTitle.textContent = '';
+                    overlayBack.classList.add('hidden');
+                } else {
+                    overlay.classList.remove('no-header');
+                    if (source === 'chat_inner') {
+                        overlayTitle.textContent = '';
+                    } else {
+                        overlayTitle.textContent = title || '';
+                    }
+                }
+            }
+            overlay.classList.add('active');
+            overlayActive = true;
+            currentOverlaySource = source || 'main';
+            topBar.classList.add('hidden');
+            bottomBar.classList.add('hidden');
+            appContent.style.paddingTop = '0';
+
+            if (showBack === false) {
+                overlayBack.classList.add('hidden');
+            } else if (!url.includes('chat_inner.html')) {
+                overlayBack.classList.remove('hidden');
+            }
+        }
+
+        function closeFullscreen() {
+            const wasOverlaySource = currentOverlaySource;
+            const hadJump = !!pendingJumpMsgId;
+
+            overlay.classList.remove('active');
+            overlay.classList.remove('no-header');
+            overlayBack.classList.remove('hidden');
+            overlayActive = false;
+            voiceCallKeptAlive = false;
+
+            try {
+                [document.getElementById('chatInnerFrame'), overlayFrame].forEach(function (fr) {
+                    if (fr && fr.contentWindow) fr.contentWindow.postMessage({ type: 'nanoOverlayClosed' }, '*');
+                });
+            } catch (e) {}
+
+            const chatInnerAlive = chatInnerFrame.src && chatInnerFrame.src !== 'about:blank' && chatInnerFrame.src.indexOf('chat_inner.html') !== -1;
+
+            if (voiceCallFrame.src && voiceCallFrame.src !== 'about:blank' && voiceCallFrame.src.indexOf('voice-call.html') !== -1) {
+                voiceCallFrame.style.display = 'none';
+                voiceCallFrame.src = 'about:blank';
+            }
+
+            if (isMusicFrameActive) {
+                musicFrame.style.display = 'none';
+                isMusicFrameActive = false;
+                try { syncMusicBall(); } catch (e) {}
+            }
+
+            if (insFrame && insFrame.style.display !== 'none' && insFrame.src && insFrame.src.indexOf('ins.html') !== -1) {
+                insFrame.style.display = 'none';
+                try { insFrame.contentWindow.postMessage({ type: 'nano:insHidden' }, '*'); } catch (e) {}
+                currentOverlaySource = null;
+                isChatInnerActive = false;
+                restoreBottomBar();
+                if (wasOverlaySource === 'discover' || currentPage === 'discover') {
+                    if (currentPage !== 'discover') {
+                        switchPage('discover');
+                    } else {
+                        topBar.classList.add('hidden');
+                        appContent.style.paddingTop = '0';
+                    }
+                } else {
+                    restoreTopBar();
+                    if (currentPage !== 'chat') switchPage('chat');
+                }
+                return;
+            }
+
+            if (wasOverlaySource === 'chat_inner' && chatInnerAlive) {
+                currentOverlaySource = 'main';
+                isChatInnerActive = true;
+                if (hadJump) {
+                    let chatInfo = null;
+                    try { chatInfo = JSON.parse(sessionStorage.getItem('inner_setting_info') || 'null'); } catch(e){}
+                    if (!chatInfo) { try { chatInfo = JSON.parse(sessionStorage.getItem('last_chat_info') || 'null'); } catch(e){} }
+                    const chatId = chatInfo && chatInfo.chatId ? chatInfo.chatId : 'default';
+                    const chatName = chatInfo && chatInfo.chatName ? chatInfo.chatName : '聊天';
+                    let url = 'chat_inner.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(chatName);
+                    url += '&jump=' + encodeURIComponent(pendingJumpMsgId);
+                    pendingJumpMsgId = null;
+                    showChatInnerFrame();
+                    chatInnerFrame.src = url;
+                    overlay.classList.add('active');
+                    overlay.classList.add('no-header');
+                    overlayTitle.textContent = '';
+                    overlayBack.classList.add('hidden');
+                    overlayActive = true;
+                    topBar.classList.add('hidden');
+                    bottomBar.classList.add('hidden');
+                    appContent.style.paddingTop = '0';
+                    return;
+                }
+                showChatInnerFrame();
+                overlay.classList.add('active');
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+                overlayActive = true;
+                topBar.classList.add('hidden');
+                bottomBar.classList.add('hidden');
+                appContent.style.paddingTop = '0';
+                return;
+            }
+
+            if (wasOverlaySource === 'groups' && lastGroupUrl) {
+                overlayFrame.style.display = 'block';
+                chatInnerFrame.style.display = 'none';
+                voiceCallFrame.style.display = 'none';
+                musicFrame.style.display = 'none';
+                isMusicFrameActive = false;
+                overlayFrame.src = lastGroupUrl;
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+                overlay.classList.add('active');
+                overlayActive = true;
+                currentOverlaySource = null;
+                isChatInnerActive = false;
+                topBar.classList.add('hidden');
+                bottomBar.classList.add('hidden');
+                appContent.style.paddingTop = '0';
+                return;
+            }
+
+            if (wasOverlaySource === 'discover') {
+                overlayFrame.style.display = 'none';
+                retireOverlayFrame();
+                momentsFrame.style.display = 'none';
+                currentOverlaySource = null;
+                isChatInnerActive = false;
+                restoreBottomBar();
+                if (currentPage !== 'discover') {
+                    switchPage('discover');
+                } else {
+                    topBar.classList.add('hidden');
+                    appContent.style.paddingTop = '0';
+                }
+                return;
+            }
+
+            if (wasOverlaySource === 'more') {
+                overlayFrame.style.display = 'none';
+                retireOverlayFrame();
+                currentOverlaySource = null;
+                isChatInnerActive = false;
+                restoreBottomBar();
+                if (currentPage !== 'more') {
+                    switchPage('more');
+                } else {
+                    topBar.classList.add('hidden');
+                    appContent.style.paddingTop = '0';
+                }
+                return;
+            }
+
+            if (wasOverlaySource === 'moments') {
+                momentsFrame.style.display = 'none';
+                currentOverlaySource = null;
+                isChatInnerActive = false;
+                restoreBottomBar();
+                restoreTopBar();
+                return;
+            }
+
+            chatInnerFrame.style.display = 'none';
+            momentsFrame.style.display = 'none';
+            overlayFrame.style.display = 'block';
+            retireOverlayFrame();
+            currentOverlaySource = null;
+            isChatInnerActive = false;
+            restoreBottomBar();
+            if (currentPage !== 'chat') {
+                switchPage('chat');
+            } else {
+                topBar.classList.remove('hidden');
+                appContent.style.paddingTop = '0';
+            }
+        }
+
+        overlayBack.addEventListener('click', closeFullscreen);
+
+        document.querySelectorAll('.capsule-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const page = this.dataset.page;
+                if (page === 'moments') {
+                    openFullscreen('moments.html', 'Moments', false, 'moments');
+                    document.querySelectorAll('.capsule-btn').forEach(b => b.classList.remove('active-btn'));
+                    circleMoreBtn.classList.add('active-btn');
+                    return;
+                }
+                if (page && pageConfig[page]) {
+                    switchPage(page);
+                }
+            });
+        });
+
+        circleMoreBtn.addEventListener('click', function() {
+            openFullscreen('phone.html', '手机', false, 'more');
+            document.querySelectorAll('.capsule-btn').forEach(b => b.classList.remove('active-btn'));
+            circleMoreBtn.classList.add('active-btn');
+        });
+
+        let musicBallEl = null;
+        let musicBallState = { visible: false, playing: false, cover: '', title: '', artist: '', mode: '' };
+        let isMusicBallDragging = false;
+
+        function createMusicBall() {
+            if (musicBallEl) return;
+            musicBallEl = document.createElement('div');
+            musicBallEl.className = 'music-float-ball';
+            musicBallEl.innerHTML =
+                '<img class="ball-cover" src="" style="display:none;" alt="">' +
+                '<div class="ball-placeholder">' +
+                '  <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' +
+                '</div>' +
+                '<div class="ball-expand-content">' +
+                '  <div>' +
+                '    <div class="ball-expand-title">未选择歌曲</div>' +
+                '    <div class="ball-expand-artist">点击播放</div>' +
+                '  </div>' +
+                '  <div class="ball-expand-buttons">' +
+                '    <button class="ball-expand-btn" data-mball="mode" aria-label="播放模式"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>' +
+                '    <button class="ball-expand-btn" data-mball="prev" aria-label="上一首"><svg viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20" fill="currentColor" stroke="none"/><line x1="5" y1="19" x2="5" y2="5"/></svg></button>' +
+                '    <button class="ball-expand-btn play" data-mball="play" aria-label="播放"><svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg></button>' +
+                '    <button class="ball-expand-btn" data-mball="next" aria-label="下一首"><svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor" stroke="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg></button>' +
+                '    <button class="ball-expand-btn" data-mball="list" aria-label="歌单"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg></button>' +
+                '  </div>' +
+                '</div>' +
+                '<button class="ball-off-btn" type="button">OFF</button>';
+
+            musicBallEl.querySelectorAll('.ball-expand-btn').forEach(function (btn) {
+                btn.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+                btn.addEventListener('touchstart', function (e) { e.stopPropagation(); }, { passive: true });
+                btn.addEventListener('click', function (e) {
+                    e.stopPropagation(); e.preventDefault();
+                    var act = btn.getAttribute('data-mball');
+                    if (act === 'list') { openMusicFromBall(); return; }
+                    postToMusic({ type: 'musicBallCmd', cmd: act });
+                });
+            });
+            var offBtn = musicBallEl.querySelector('.ball-off-btn');
+            offBtn.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+            offBtn.addEventListener('touchstart', function (e) { e.stopPropagation(); }, { passive: true });
+            offBtn.addEventListener('click', function (e) {
+                e.stopPropagation(); e.preventDefault();
+                postToMusic({ type: 'musicBallCmd', cmd: 'off' });
+            });
+
+            var saved = null;
+            try { saved = JSON.parse(localStorage.getItem('nano_music_ball_pos') || 'null'); } catch (e) {}
+            if (saved && typeof saved.x === 'number') {
+                musicBallEl.style.left = saved.x + 'px';
+                musicBallEl.style.top = saved.y + 'px';
+            } else {
+                musicBallEl.style.right = '16px';
+                musicBallEl.style.top = '58%';
+            }
+
+            var startX = 0, startY = 0, offX = 0, offY = 0, moved = false, clickTimer = null;
+
+            function down(cx, cy) {
+                isMusicBallDragging = true; moved = false;
+                startX = cx; startY = cy;
+                var r = musicBallEl.getBoundingClientRect();
+                offX = cx - r.left; offY = cy - r.top;
+                musicBallEl.classList.add('dragging');
+            }
+            function move(cx, cy) {
+                if (!isMusicBallDragging) return;
+                if (Math.abs(cx - startX) > 4 || Math.abs(cy - startY) > 4) moved = true;
+                var bw = musicBallEl.classList.contains('expanded') ? 210 : 42;
+                var bh = musicBallEl.classList.contains('expanded') ? 74 : 42;
+                var x = Math.max(0, Math.min(window.innerWidth - bw, cx - offX));
+                var y = Math.max(0, Math.min(window.innerHeight - bh, cy - offY));
+                musicBallEl.style.left = x + 'px';
+                musicBallEl.style.top = y + 'px';
+                musicBallEl.style.right = 'auto';
+            }
+            function up() {
+                if (!isMusicBallDragging) return;
+                isMusicBallDragging = false;
+                musicBallEl.classList.remove('dragging');
+                if (moved) {
+                    try {
+                        var r = musicBallEl.getBoundingClientRect();
+                        localStorage.setItem('nano_music_ball_pos', JSON.stringify({ x: r.left, y: r.top }));
+                    } catch (e) {}
+                    return;
+                }
+                if (clickTimer) {
+                    clearTimeout(clickTimer); clickTimer = null;
+                    openMusicFromBall();
+                } else {
+                    clickTimer = setTimeout(function () {
+                        clickTimer = null;
+                        toggleMusicBallExpand();
+                    }, 250);
+                }
+            }
+
+            musicBallEl.addEventListener('mousedown', function (e) { e.preventDefault(); down(e.clientX, e.clientY); });
+            document.addEventListener('mousemove', function (e) { if (isMusicBallDragging) move(e.clientX, e.clientY); });
+            document.addEventListener('mouseup', up);
+            musicBallEl.addEventListener('touchstart', function (e) {
+                var t = e.touches[0]; down(t.clientX, t.clientY);
+            }, { passive: true });
+            document.addEventListener('touchmove', function (e) {
+                if (isMusicBallDragging && e.touches.length === 1) move(e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: true });
+            document.addEventListener('touchend', up);
+
+            document.addEventListener('click', function (e) {
+                if (!musicBallEl || !musicBallEl.classList.contains('expanded')) return;
+                if (musicBallEl.contains(e.target)) return;
+                musicBallEl.classList.remove('expanded');
+            });
+
+            document.body.appendChild(musicBallEl);
+        }
+
+        let appNotifyTimer = null;
+        function escapeNotifyHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        function hideAppNotify() {
+            const el = document.getElementById('appNotify');
+            if (el) el.classList.remove('show');
+        }
+        function showAppNotify(title, body, app, opts) {
+            opts = opts || {};
+            let el = document.getElementById('appNotify');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'appNotify';
+                el.className = 'app-notify';
+                el.addEventListener('click', function () {
+                    if (el._action && el._action.url) { openAppFromNotify(el._action); hideAppNotify(); return; }
+                    if (el._app === 'music') openMusicFromBall();
+                    hideAppNotify();
+                });
+                document.body.appendChild(el);
+            }
+            el._app = app || '';
+            el._action = (opts.action && opts.url) ? { label: opts.action, url: opts.url, title: opts.title || '' } : null;
+            el.innerHTML = '<div class="an-icon">' + escapeNotifyHtml(opts.icon || ((app === 'music') ? '🎧' : '🔔')) + '</div>' +
+                '<div class="an-main"><div class="an-title">' + escapeNotifyHtml(title) + '</div>' +
+                '<div class="an-body">' + escapeNotifyHtml(body) + '</div>' +
+                (el._action ? '<div class="an-actions"><span class="an-action">' + escapeNotifyHtml(el._action.label) + '</span></div>' : '') +
+                '</div>';
+            el.classList.add('show');
+            clearTimeout(appNotifyTimer);
+            appNotifyTimer = setTimeout(hideAppNotify, el._action ? 9000 : 5200);
+        }
+
+        const refreshState = {};
+        const urlSourceMap = {};
+        function baseName(p) { try { return String(p || '').split('?')[0].split('/').pop(); } catch (e) { return ''; } }
+        function frameForWindow(win) {
+            if (!win) return null;
+            for (let i = 0; i < OVERLAY_FRAME_IDS.length; i++) {
+                const f = document.getElementById(OVERLAY_FRAME_IDS[i]);
+                if (f && f.contentWindow === win) return f;
+            }
+            const tabs = document.querySelectorAll('.iframe-container iframe');
+            for (let j = 0; j < tabs.length; j++) {
+                if (tabs[j].contentWindow === win) return tabs[j];
+            }
+            return null;
+        }
+        function isAppForeground(url) {
+            const want = baseName(url);
+            if (!want) return false;
+            const matches = function (f) { return !!(f && baseName(f.getAttribute('src')) === want); };
+            if (overlayActive) {
+                for (let i = 0; i < OVERLAY_FRAME_IDS.length; i++) {
+                    const f = document.getElementById(OVERLAY_FRAME_IDS[i]);
+                    if (f && f.style.display !== 'none' && matches(f)) return true;
+                }
+                return false;
+            }
+            return matches(document.querySelector('.iframe-container.active iframe'));
+        }
+        function hasActiveRefreshForFrame(f) {
+            if (!f) return false;
+            let win = null;
+            try { win = f.contentWindow; } catch (e) { return false; }
+            for (const k in refreshState) {
+                const r = refreshState[k];
+                if (r && r.active && r.win && r.win === win) return true;
+            }
+            return false;
+        }
+        function retireOverlayFrame() {
+            try {
+                if (overlayFrame && hasActiveRefreshForFrame(overlayFrame)) {
+                    overlayFrame.style.display = 'none';
+                    return;
+                }
+            } catch (e) {}
+            overlayFrame.style.display = 'none';
+            overlayFrame.setAttribute('src', 'about:blank');
+        }
+        function handleNanoRefresh(data, fromWin) {
+            const id = data.id || '';
+            const key = id + '|' + (data.key || 'main');
+            const meta = {
+                id: id,
+                key: data.key || 'main',
+                name: data.name || id || '内容',
+                label: data.label || '',
+                url: data.url || '',
+                title: data.title || data.name || '',
+                chat: !!data.chat
+            };
+            if (data.phase === 'start') {
+                refreshState[key] = { meta: meta, win: fromWin || null, active: true };
+                return;
+            }
+            const rec = refreshState[key];
+            if (rec) {
+                rec.active = false;
+                meta.label = meta.label || rec.meta.label || '';
+                meta.chat = meta.chat || rec.meta.chat;
+                meta.url = meta.url || rec.meta.url;
+                meta.name = meta.name || rec.meta.name;
+                meta.title = meta.title || rec.meta.title;
+            }
+            const name = meta.name || '内容';
+            const label = meta.label ? (' · ' + meta.label) : '';
+            if (data.phase === 'fail') {
+                showAppNotify(name + label + '刷新失败', data.body || '生成失败，请稍后重试。', meta.id,
+                    { action: '去看看', url: meta.url, title: meta.title });
+                return;
+            }
+            if (data.phase === 'success') {
+                if (meta.chat) return;
+                if (isAppForeground(meta.url)) return;
+                showAppNotify(name + label + '刷新成功', data.body || '内容已更新，点「去看看」查看。', meta.id,
+                    { action: '去看看', url: meta.url, title: meta.title });
+            }
+        }
+        function openAppFromNotify(action) {
+            const url = action && action.url;
+            if (!url) return;
+            const source = urlSourceMap[baseName(url)] || 'more';
+            try {
+                if (overlayFrame && baseName(overlayFrame.getAttribute('src')) === baseName(url) && overlayFrame.style.display === 'none') {
+                    showOverlayFrame();
+                    overlayActive = true;
+                    currentOverlaySource = source;
+                    overlay.classList.add('active');
+                    overlay.classList.add('no-header');
+                    topBar.classList.add('hidden');
+                    bottomBar.classList.add('hidden');
+                    appContent.style.paddingTop = '0';
+                    overlayBack.classList.add('hidden');
+                    return;
+                }
+            } catch (e) {}
+            openFullscreen(url, action.title || '', false, source);
+        }
+        function openNotifyTarget(target) {
+            target = String(target || '');
+            if (!target) return;
+            if (target === 'moments') { openFullscreen('moments.html', 'Moments', false, 'discover'); return; }
+            if (target === 'ins') { openFullscreen('ins.html?v=14', 'Instagram', false, 'discover'); return; }
+            if (target === 'halo') { openFullscreen('halo.html', 'Halo', false, 'discover'); return; }
+            if (target === 'music') { openMusicFromBall(); return; }
+            if (target === 'books') { openFullscreen('books.html', 'Books', false, 'discover'); return; }
+            if (target.indexOf('chat:') === 0) {
+                const chatId = target.slice(5);
+                let info = null;
+                try { info = JSON.parse(sessionStorage.getItem('last_chat_info') || 'null'); } catch (e) {}
+                const same = !!(info && String(info.chatId) === String(chatId));
+                const name = same ? (info.chatName || '') : '';
+                try {
+                    sessionStorage.setItem('last_chat_info', JSON.stringify({
+                        chatId: chatId,
+                        chatName: name,
+                        chatAvatar: same ? (info.chatAvatar || '') : ''
+                    }));
+                } catch (e) {}
+                openFullscreen('chat_inner.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(name || '聊天'), '', false, 'main');
+            }
+        }
+
+        function postToMusic(msg) {
+            try {
+                if (musicFrame && musicFrame.contentWindow && musicFrame.src && musicFrame.src.indexOf('music.html') !== -1) {
+                    musicFrame.contentWindow.postMessage(msg, '*');
+                }
+            } catch (e) {}
+        }
+
+        function openMusicFromBall() {
+            if (musicBallEl) musicBallEl.classList.remove('expanded');
+            var src = (currentPage === 'discover') ? 'discover' : 'more';
+            openFullscreen('music.html', '', false, src);
+        }
+
+        function toggleMusicBallExpand() {
+            if (!musicBallEl) return;
+            var expanded = musicBallEl.classList.toggle('expanded');
+            if (expanded) {
+                musicBallEl.style.right = 'auto';
+                var r = musicBallEl.getBoundingClientRect();
+                if (r.right > window.innerWidth - 8) {
+                    musicBallEl.style.left = Math.max(8, window.innerWidth - 210 - 8) + 'px';
+                }
+                if (r.bottom > window.innerHeight - 8) {
+                    musicBallEl.style.top = Math.max(8, window.innerHeight - 74 - 8) + 'px';
+                }
+                updateMusicBall();
+            }
+        }
+
+        function updateMusicBall() {
+            if (!musicBallEl) return;
+            var cover = musicBallEl.querySelector('.ball-cover');
+            var ph = musicBallEl.querySelector('.ball-placeholder');
+            if (musicBallState.cover) {
+                cover.src = musicBallState.cover; cover.style.display = 'block'; ph.style.display = 'none';
+            } else {
+                cover.style.display = 'none'; ph.style.display = 'flex';
+            }
+            musicBallEl.querySelector('.ball-expand-title').textContent = musicBallState.title || '未选择歌曲';
+            musicBallEl.querySelector('.ball-expand-artist').textContent =
+                musicBallState.artist || (musicBallState.title ? '' : '点击播放');
+            var playEl = musicBallEl.querySelector('.ball-expand-btn.play');
+            if (playEl) {
+                playEl.innerHTML = musicBallState.playing
+                    ? '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>'
+                    : '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
+            }
+            musicBallEl.classList.toggle('playing', !!musicBallState.playing);
+        }
+
+        function syncMusicBall() {
+            var shouldShow = musicBallState.visible && !isMusicFrameActive;
+            if (shouldShow) {
+                createMusicBall();
+                updateMusicBall();
+                musicBallEl.classList.add('show');
+            } else if (musicBallEl) {
+                musicBallEl.classList.remove('show');
+                musicBallEl.classList.remove('expanded');
+            }
+        }
+
+        (function() {
+            let floatBall = null;
+            let isDragging = false;
+            let dragOffsetX = 0;
+            let dragOffsetY = 0;
+            let callTimer = null;
+            let callSeconds = 0;
+            let isClick = false;
+            let isFloatBallVisible = false;
+
+            function savePosition(x, y) {
+                try {
+                    localStorage.setItem('voice_float_ball_pos', JSON.stringify({ x: x, y: y }));
+                } catch (e) {}
+            }
+
+            function loadPosition() {
+                try {
+                    const raw = localStorage.getItem('voice_float_ball_pos');
+                    if (raw) {
+                        const pos = JSON.parse(raw);
+                        return pos;
+                    }
+                } catch (e) {}
+                return null;
+            }
+
+            function createFloatBall() {
+                if (floatBall) return;
+
+                floatBall = document.createElement('div');
+                floatBall.className = 'voice-float-ball';
+                floatBall.innerHTML = `
+                    <svg class="ball-icon" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                    </svg>
+                    <span class="ball-time" id="ballTime">00:00</span>
+                `;
+
+                const savedPos = loadPosition();
+                if (savedPos) {
+                    floatBall.style.left = savedPos.x + 'px';
+                    floatBall.style.top = savedPos.y + 'px';
+                } else {
+                    floatBall.style.right = '20px';
+                    floatBall.style.bottom = '120px';
+                }
+
+                floatBall.addEventListener('mousedown', function(e) {
+                    if (e.button !== 0) return;
+                    isClick = true;
+                    startDrag(e.clientX, e.clientY);
+                    e.preventDefault();
+                });
+
+                document.addEventListener('mousemove', function(e) {
+                    if (!isDragging) return;
+                    isClick = false;
+                    moveDrag(e.clientX, e.clientY);
+                });
+
+                document.addEventListener('mouseup', function(e) {
+                    if (!isDragging) return;
+                    endDrag();
+                    if (isClick) {
+                        restoreVoiceCall();
+                    }
+                    isClick = false;
+                });
+
+                floatBall.addEventListener('touchstart', function(e) {
+                    const touch = e.touches[0];
+                    isClick = true;
+                    startDrag(touch.clientX, touch.clientY);
+                    e.preventDefault();
+                }, { passive: false });
+
+                document.addEventListener('touchmove', function(e) {
+                    if (!isDragging) return;
+                    isClick = false;
+                    const touch = e.touches[0];
+                    moveDrag(touch.clientX, touch.clientY);
+                    e.preventDefault();
+                }, { passive: false });
+
+                document.addEventListener('touchend', function(e) {
+                    if (!isDragging) return;
+                    endDrag();
+                    if (isClick) {
+                        restoreVoiceCall();
+                    }
+                    isClick = false;
+                });
+
+                document.body.appendChild(floatBall);
+            }
+
+            function startDrag(clientX, clientY) {
+                if (!floatBall) return;
+                const rect = floatBall.getBoundingClientRect();
+                dragOffsetX = clientX - rect.left;
+                dragOffsetY = clientY - rect.top;
+                isDragging = true;
+                floatBall.classList.add('dragging');
+            }
+
+            function moveDrag(clientX, clientY) {
+                if (!floatBall || !isDragging) return;
+                let x = clientX - dragOffsetX;
+                let y = clientY - dragOffsetY;
+                const maxX = window.innerWidth - 64;
+                const maxY = window.innerHeight - 64;
+                x = Math.max(0, Math.min(maxX, x));
+                y = Math.max(0, Math.min(maxY, y));
+                floatBall.style.left = x + 'px';
+                floatBall.style.top = y + 'px';
+                floatBall.style.right = 'auto';
+                floatBall.style.bottom = 'auto';
+            }
+
+            function endDrag() {
+                if (!floatBall) return;
+                isDragging = false;
+                floatBall.classList.remove('dragging');
+                const rect = floatBall.getBoundingClientRect();
+                savePosition(rect.left, rect.top);
+            }
+
+            function startCallTimer() {
+                if (callTimer) clearInterval(callTimer);
+                callTimer = setInterval(function() {
+                    callSeconds++;
+                    const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+                    const s = String(callSeconds % 60).padStart(2, '0');
+                    const timeEl = document.getElementById('ballTime');
+                    if (timeEl) timeEl.textContent = m + ':' + s;
+                }, 1000);
+            }
+
+            function stopCallTimer() {
+                if (callTimer) {
+                    clearInterval(callTimer);
+                    callTimer = null;
+                }
+            }
+
+            function showFloatBall(seconds) {
+                if (seconds !== undefined && seconds > 0) {
+                    callSeconds = seconds;
+                }
+                const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+                const s = String(callSeconds % 60).padStart(2, '0');
+                const timeEl = document.getElementById('ballTime');
+                if (timeEl) timeEl.textContent = m + ':' + s;
+
+                if (!floatBall) createFloatBall();
+                if (floatBall) {
+                    floatBall.style.display = 'flex';
+                    isFloatBallVisible = true;
+                }
+                startCallTimer();
+            }
+
+            function hideFloatBall() {
+                if (floatBall) {
+                    floatBall.style.display = 'none';
+                    isFloatBallVisible = false;
+                }
+                stopCallTimer();
+            }
+
+            function removeFloatBall() {
+                if (floatBall) {
+                    floatBall.remove();
+                    floatBall = null;
+                    isFloatBallVisible = false;
+                }
+                stopCallTimer();
+                callSeconds = 0;
+            }
+
+            function restoreVoiceCall() {
+                const currentSeconds = callSeconds;
+                hideFloatBall();
+                const frame = document.getElementById('voiceCallFrame');
+                if (voiceCallKeptAlive && frame && frame.src && frame.src.indexOf('voice-call.html') !== -1) {
+                    overlayFrame.style.display = 'none';
+                    chatInnerFrame.style.display = 'none';
+                    musicFrame.style.display = 'none';
+                    isMusicFrameActive = false;
+                    voiceCallFrame.style.display = 'block';
+                    overlay.classList.add('active');
+                    overlay.classList.add('no-header');
+                    overlayActive = true;
+                    currentOverlaySource = 'voice-call';
+                    topBar.classList.add('hidden');
+                    bottomBar.classList.add('hidden');
+                    appContent.style.paddingTop = '0';
+                    if (frame.contentWindow) {
+                        frame.contentWindow.postMessage({
+                            type: 'restoreVoiceCall',
+                            seconds: currentSeconds
+                        }, '*');
+                    }
+                    return;
+                }
+                const url = 'voice-call.html?chat=' + encodeURIComponent(getChatId()) + '&name=' + encodeURIComponent(getContactName());
+                openFullscreen(url, '语音电话', false);
+                setTimeout(function() {
+                    const f = document.getElementById('voiceCallFrame');
+                    if (f && f.contentWindow) {
+                        f.contentWindow.postMessage({
+                            type: 'restoreVoiceCall',
+                            seconds: currentSeconds
+                        }, '*');
+                    }
+                }, 400);
+            }
+
+            function getChatId() {
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    return urlParams.get('chat') || 'default';
+                } catch (e) { return 'default'; }
+            }
+
+            function getContactName() {
+                try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    return urlParams.get('name') || 'AI 助手';
+                } catch (e) { return 'AI 助手'; }
+            }
+
+            window.__voiceFloatBall = {
+                show: showFloatBall,
+                hide: hideFloatBall,
+                remove: removeFloatBall,
+                getTime: function() { return callSeconds; },
+                setTime: function(seconds) { callSeconds = seconds; },
+                isVisible: function() { return isFloatBallVisible; }
+            };
+        })();
+
+        function openChatInnerPage() {
+            let chatInfo = null;
+            try {
+                chatInfo = JSON.parse(sessionStorage.getItem('last_chat_info') || 'null');
+            } catch(e) {}
+            const chatId = chatInfo && chatInfo.chatId ? chatInfo.chatId : 'default';
+            const chatName = chatInfo && chatInfo.chatName ? chatInfo.chatName : '聊天';
+            const url = 'chat_inner.html?chat=' + encodeURIComponent(chatId) +
+                        '&name=' + encodeURIComponent(chatName);
+            isChatInnerActive = true;
+            currentOverlaySource = 'main';
+            openFullscreen(url, '', false, 'main');
+        }
+
+        window.addEventListener('message', function(event) {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === 'groupApiFetch' || data.type === 'chatApiFetch') {
+                const isChat = (data.type === 'chatApiFetch');
+                const token = data.token;
+                if (!token) return;
+                if (groupApiInFlight[token]) return;
+                groupApiInFlight[token] = true;
+                const resultKey = data.resultKey || ((isChat ? 'chat_api_result_' : 'group_api_result_') + token);
+                const doneType = isChat ? 'chatApiDone' : 'groupApiDone';
+                const storeResult = function(result) {
+                    try { localStorage.setItem(resultKey, JSON.stringify(result)); } catch (e) {}
+                    delete groupApiInFlight[token];
+                    [overlayFrame, chatInnerFrame].forEach(function(fr) {
+                        try { if (fr && fr.contentWindow) fr.contentWindow.postMessage({ type: doneType, token: token }, '*'); } catch (e) {}
+                    });
+                };
+                try {
+                    fetch(data.url, { method: data.method || 'POST', headers: data.headers || {}, body: data.body })
+                        .then(function(resp) {
+                            return resp.text().then(function(t) { return { ok: resp.ok, status: resp.status, text: t }; });
+                        })
+                        .catch(function(err) {
+                            return { ok: false, status: 0, error: String((err && err.message) || err) };
+                        })
+                        .then(storeResult);
+                } catch (err) {
+                    storeResult({ ok: false, status: 0, error: String((err && err.message) || err) });
+                }
+                return;
+            }
+
+            if (data.type === 'swipeBack') {
+                try {
+                    const ob = document.getElementById('overlayBack');
+                    if (ob && overlay.classList.contains('active') && ob.getBoundingClientRect().height > 0) ob.click();
+                } catch (e) {}
+                return;
+            }
+
+            if (data.type === 'navigate') {
+                const page = data.page;
+                if (page && pageConfig[page]) {
+                    switchPage(page);
+                }
+            }
+
+            if (data.type === 'currentMaskChanged' || data.type === 'homeDataUpdated' || data.type === 'contactsDataUpdated') {
+                document.querySelectorAll('.iframe-container iframe').forEach(function(t) {
+                    if (t && t.contentWindow) {
+                        try { t.contentWindow.postMessage(data, '*'); } catch(e) {}
+                    }
+                });
+                const c = document.getElementById('chatInnerFrame');
+                if (c && c.contentWindow && c.src && c.src.indexOf('chat_inner.html') !== -1) {
+                    try { c.contentWindow.postMessage(data, '*'); } catch(e) {}
+                }
+                const mf = document.getElementById('momentsFrame');
+                if (mf && mf.contentWindow && mf.src && mf.src.indexOf('moments.html') !== -1) {
+                    try { mf.contentWindow.postMessage(data, '*'); } catch(e) {}
+                }
+            }
+
+            const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared'];
+            if (innerSettingTypes.indexOf(data.type) !== -1) {
+                const c = document.getElementById('chatInnerFrame');
+                if (c && c.contentWindow && c.src && c.src.indexOf('chat_inner.html') !== -1) {
+                    try { c.contentWindow.postMessage(data, '*'); } catch(e) {}
+                }
+            }
+
+            if (data.type === 'momentsDataUpdated') {
+                const mf = document.getElementById('momentsFrame');
+                if (mf && mf.contentWindow && mf.src && mf.src.indexOf('moments.html') !== -1) {
+                    try { mf.contentWindow.postMessage({ type: 'momentsDataUpdated' }, '*'); } catch(e) {}
+                }
+            }
+
+            if (data.type === 'beautify:apply' || data.type === 'beautify:font') {
+                if (window.__nanoAppearance) {
+                    try { window.__nanoAppearance.applyMessage(data); } catch (e) {}
+                }
+                document.querySelectorAll('iframe').forEach(function(f) {
+                    if (f && f.contentWindow) {
+                        try { f.contentWindow.postMessage(data, '*'); } catch (e) {}
+                    }
+                });
+            }
+
+            if (data.type === 'closeBeautify') {
+                closeFullscreen();
+            }
+
+            if (data.type === 'listenMenuAction') {
+                try {
+                    if (data.action === 'end') {
+                        if (musicFrame && musicFrame.contentWindow) {
+                            musicFrame.contentWindow.postMessage({ type: 'endDuo' }, '*');
+                        }
+                    } else if (data.action === 'start') {
+                        openFullscreen('music.html', '', false, 'more');
+                        setTimeout(function () {
+                            try {
+                                if (musicFrame && musicFrame.contentWindow) {
+                                    musicFrame.contentWindow.postMessage({
+                                        type: 'startDuo',
+                                        charId: data.chatId || '',
+                                        charName: data.name || ''
+                                    }, '*');
+                                }
+                            } catch (e) {}
+                        }, 450);
+                    }
+                } catch (e) {}
+                return;
+            }
+
+            if (data.type === 'openChatForChar') {
+                try {
+                    const cid = data.chatId || 'default';
+                    const cname = data.name || '聊天';
+                    try {
+                        sessionStorage.setItem('nano_pending_listen_invite', JSON.stringify({
+                            chatId: cid,
+                            name: cname,
+                            song: data.song || '',
+                            artist: data.artist || '',
+                            toName: cname,
+                            ts: Date.now()
+                        }));
+                    } catch (e) {}
+                    const url = 'chat_inner.html?chat=' + encodeURIComponent(cid) + '&name=' + encodeURIComponent(cname);
+                    openFullscreen(url, cname, false, 'main');
+                    setTimeout(function () {
+                        try {
+                            const fr = document.getElementById('chatInnerFrame');
+                            if (fr && fr.contentWindow) {
+                                fr.contentWindow.postMessage({ type: 'nanoConsumeListenInvite', chatId: cid }, '*');
+                            }
+                        } catch (e) {}
+                    }, 500);
+                } catch (e) {}
+                return;
+            }
+            if (data.type === 'listenAccepted') {
+                try {
+                    openFullscreen('music.html', '', false, 'more');
+                    setTimeout(function () {
+                        try {
+                            if (musicFrame && musicFrame.contentWindow) {
+                                musicFrame.contentWindow.postMessage({
+                                    type: 'startDuo',
+                                    charId: data.chatId || '',
+                                    charName: data.charName || '',
+                                    song: data.song || ''
+                                }, '*');
+                            }
+                        } catch (e) {}
+                    }, 450);
+                } catch (e) {}
+                return;
+            }
+
+            if (data.type === 'NANO_LISTEN_NOTICE') {
+                const nf = document.getElementById('chatInnerFrame');
+                if (nf && nf.contentWindow && nf.src && nf.src.indexOf('chat_inner.html') !== -1) {
+                    try { nf.contentWindow.postMessage(data, '*'); } catch (e) {}
+                }
+                return;
+            }
+
+            if (data.type === 'NANO_LISTEN_INVITE_CARD' || data.type === 'NANO_LISTEN_INVITE_RESULT') {
+                const cf = document.getElementById('chatInnerFrame');
+                if (cf && cf.contentWindow && cf.src && cf.src.indexOf('chat_inner.html') !== -1) {
+                    try { cf.contentWindow.postMessage(data, '*'); } catch (e) {}
+                }
+                return;
+            }
+
+            if (data.type === 'NANO_COUPLE_SHARE_CARD') {
+                const cf = document.getElementById('chatInnerFrame');
+                if (cf && cf.contentWindow && cf.src && cf.src.indexOf('chat_inner.html') !== -1) {
+                    try { cf.contentWindow.postMessage(data, '*'); } catch (e) {}
+                }
+                return;
+            }
+
+            if (data.type === 'nanoRefresh') {
+                handleNanoRefresh(data, event.source);
+                return;
+            }
+
+            if (data.type === 'appNotify') {
+                if (!(data.app === 'music' && isMusicFrameActive)) {
+                    showAppNotify(data.title || '', data.body || '', data.app || '');
+                }
+                return;
+            }
+
+            if (data.type === 'musicBallState') {
+                musicBallState = {
+                    visible: !!data.visible,
+                    playing: !!data.playing,
+                    cover: data.cover || '',
+                    title: data.title || '',
+                    artist: data.artist || '',
+                    mode: data.mode || ''
+                };
+                try { syncMusicBall(); } catch (e) {}
+                return;
+            }
+
+            if (data.type === 'openFullscreen') {
+                const source = data.source || 'main';
+                if (source === 'chat_inner') {
+                    currentOverlaySource = 'chat_inner';
+                }
+                const showBack = data.showBack !== undefined ? data.showBack : true;
+                openFullscreen(data.url, data.title, showBack, source);
+            }
+
+            if (data.type === 'closeFullscreen') {
+                closeFullscreen();
+            }
+
+            if (data.type === 'backToDiscover') {
+                currentOverlaySource = 'discover';
+                closeFullscreen();
+            }
+
+            if (data.type === 'setTitle') {
+                overlayTitle.textContent = data.title || '';
+            }
+
+            if (data.type === 'groupChatTitle') {
+                lastGroupTitle = data.title || '群聊';
+                if (overlayActive && currentOverlaySource !== 'groups') {
+                    overlayTitle.textContent = lastGroupTitle;
+                }
+            }
+
+            if (data.type === 'groupsDataUpdated' || data.type === 'groupChatCreated') {
+                const chatFrame = document.querySelector('#iframeChat iframe');
+                if (chatFrame && chatFrame.contentWindow) {
+                    chatFrame.contentWindow.postMessage({ type: 'groupsDataUpdated', groupId: data.groupId || '' }, '*');
+                }
+            }
+
+            if (data.type === 'backgroundChanged') {
+                const target = document.getElementById('chatInnerFrame');
+                if (target && target.contentWindow && target.src && target.src.indexOf('chat_inner.html') !== -1) {
+                    target.contentWindow.postMessage(data, '*');
+                    console.log('[Index] 转发背景更改到 chat_inner:', data.bgType);
+                }
+            }
+
+            if (data.type === 'NANO_MEMORY_UPDATED') {
+                const target = document.getElementById('overlayFrame');
+                if (target && target.contentWindow && target.src && target.src.indexOf('memory.html') !== -1) {
+                    target.contentWindow.postMessage(data, '*');
+                }
+            }
+
+            if (data.type === 'jumpToMessage') {
+                pendingJumpMsgId = data.msgId || null;
+                currentOverlaySource = 'chat_inner';
+                closeFullscreen();
+            }
+
+            if (data.type === 'groupDissolved') {
+                lastGroupUrl = null;
+                lastGroupTitle = '';
+                currentOverlaySource = 'main';
+                closeFullscreen();
+            }
+
+            if (data.type === 'nanoCloseOverlay' || data.type === 'nano:closeMoments') {
+                try { closeFullscreen(); } catch (e) {}
+                return;
+            }
+
+            if (data.type === 'notifyOpen') {
+                try { openNotifyTarget(data.target || ''); } catch (e) {}
+                return;
+            }
+
+            if (data.type === 'keepAlive') {
+                try { localStorage.setItem('nano_keep_alive', data.enabled ? '1' : '0'); } catch (e) {}
+                if (data.enabled && navigator.wakeLock && navigator.wakeLock.request) {
+                    navigator.wakeLock.request('screen').catch(function () {});
+                }
+                try { if (window.NanoKeepAlive) window.NanoKeepAlive.apply(!!data.enabled); } catch (e) {}
+            }
+            if (data.type === 'notifySetting') {
+                try { localStorage.setItem('nano_notify_enabled', data.enabled ? '1' : '0'); } catch (e) {}
+                if (data.enabled && 'Notification' in window && Notification.permission === 'default') {
+                    try { Notification.requestPermission(); } catch (e) {}
+                }
+            }
+
+            if (data.type === 'openChat') {
+                const chatName = data.chatName || '聊天';
+                const chatAvatar = data.chatAvatar || '';
+                const chatId = data.chatId || 'default';
+                console.log('[Index] 打开聊天:', chatId, chatName);
+                try {
+                    sessionStorage.setItem('last_chat_info', JSON.stringify({ chatId, chatName, chatAvatar }));
+                } catch(e) {}
+                const url = 'chat_inner.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(chatName);
+                isChatInnerActive = true;
+                currentOverlaySource = 'main';
+                openFullscreen(url, '', false, 'main');
+                try {
+                    setTimeout(function () {
+                        const fr = document.getElementById('chatInnerFrame');
+                        if (fr && fr.contentWindow) fr.contentWindow.postMessage({ type: 'nanoOverlayOpen', chatId: chatId }, '*');
+                    }, 120);
+                } catch (e) {}
+            }
+
+            if (data.type === 'openGroupChat') {
+                lastGroupUrl = 'groups.html?group=' + encodeURIComponent(data.groupId || '');
+                lastGroupTitle = data.groupName || '群聊';
+                openFullscreen(lastGroupUrl, lastGroupTitle, false);
+                try {
+                    setTimeout(function () {
+                        if (overlayFrame && overlayFrame.contentWindow) overlayFrame.contentWindow.postMessage({ type: 'nanoOverlayOpen', chatId: data.groupId || '' }, '*');
+                    }, 160);
+                } catch (e) {}
+            }
+
+            if (data.type === 'openRoleLibrary') {
+                openFullscreen('character.html', 'Character');
+            }
+
+            if (data.type === 'alert') {
+                alert(data.message);
+            }
+
+            if (data.type === 'NANO_TRANSFER_SUBMIT' || data.type === 'NANO_GIFT_SUBMIT' || data.type === 'NANO_IMAGE_SUBMIT') {
+                const chatIframe = getChatInnerIframe();
+                if (chatIframe && chatIframe.contentWindow) {
+                    chatIframe.contentWindow.postMessage(data, '*');
+                }
+            }
+
+            if (data.type === 'NANO_VOICE_CALL_CARD') {
+                const frame = document.getElementById('chatInnerFrame');
+                if (frame && frame.contentWindow && frame.src && frame.src.indexOf('chat_inner.html') !== -1) {
+                    frame.contentWindow.postMessage(data, '*');
+                    console.log('[Index] 转发语音通话卡片到 chat_inner (chatInnerFrame)');
+                } else {
+                    const chatIframe = getChatInnerIframe();
+                    if (chatIframe && chatIframe.contentWindow) {
+                        chatIframe.contentWindow.postMessage(data, '*');
+                        console.log('[Index] 转发语音通话卡片到 chat_inner (iframeChat)');
+                    }
+                }
+            }
+
+            if (data.type === 'aiProactiveVoiceCall') {
+                const chatId = data.chatId || 'default';
+                const name = data.name || 'AI 助手';
+                const url = 'voice-call.html?chat=' + encodeURIComponent(chatId) +
+                           '&name=' + encodeURIComponent(name) +
+                           '&incoming=1';
+                console.log('[Index] AI 主动来电:', data.scenario, url);
+                voiceCallKeptAlive = false;
+                openFullscreen(url, '语音电话', false, 'main');
+            }
+
+            if (data.type === 'syncCallTime') {
+                if (window.__voiceFloatBall) {
+                    window.__voiceFloatBall.setTime(data.seconds || 0);
+                }
+            }
+
+            if (data.type === 'minimizeVoiceCall') {
+                if (window.__voiceFloatBall) {
+                    window.__voiceFloatBall.show(data.seconds || 0);
+                }
+                voiceCallKeptAlive = true;
+                voiceCallFrame.style.display = 'none';
+                const chatInnerAlive = chatInnerFrame.src && chatInnerFrame.src !== 'about:blank' && chatInnerFrame.src.indexOf('chat_inner.html') !== -1;
+                if (!chatInnerAlive) {
+                    showChatInnerFrame();
+                    chatInnerFrame.src = 'chat_inner.html?chat=' + encodeURIComponent(getChatId()) + '&name=' + encodeURIComponent(getContactName());
+                } else {
+                    showChatInnerFrame();
+                }
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+                overlay.classList.add('active');
+                overlayActive = true;
+                currentOverlaySource = 'main';
+                topBar.classList.add('hidden');
+                bottomBar.classList.add('hidden');
+                appContent.style.paddingTop = '0';
+            }
+
+            if (data.type === 'voiceCallEnded') {
+                if (window.__voiceFloatBall) {
+                    window.__voiceFloatBall.remove();
+                }
+                voiceCallFrame.style.display = 'none';
+                voiceCallFrame.src = 'about:blank';
+                voiceCallKeptAlive = false;
+                const chatInnerAlive = chatInnerFrame.src && chatInnerFrame.src !== 'about:blank' && chatInnerFrame.src.indexOf('chat_inner.html') !== -1;
+                if (chatInnerAlive) {
+                    showChatInnerFrame();
+                    overlay.classList.add('no-header');
+                    overlayTitle.textContent = '';
+                    overlayBack.classList.add('hidden');
+                    overlay.classList.add('active');
+                    overlayActive = true;
+                    currentOverlaySource = 'main';
+                    topBar.classList.add('hidden');
+                    bottomBar.classList.add('hidden');
+                    appContent.style.paddingTop = '0';
+                } else {
+                    closeFullscreen();
+                    openChatInnerPage();
+                }
+            }
+        });
+
+        function reportMusicSmoke(pass, detail) {
+            const el = document.createElement('div');
+            el.id = 'musicSmokeResult';
+            el.textContent = detail || '';
+            document.body.appendChild(el);
+            document.title = 'MUSIC_SMOKE_' + (pass ? 'PASS' : 'FAIL');
+        }
+
+        if (new URLSearchParams(window.location.search).get('smoke') === 'music') {
+            (async function musicSmoke() {
+                try {
+                    const waitMs = ms => new Promise(r => setTimeout(r, ms));
+                    openFullscreen('music.html', '', false, 'more');
+                    let okLoad = false;
+                    for (let i = 0; i < 60; i++) {
+                        try {
+                            if (musicFrame.contentDocument && musicFrame.contentDocument.title && musicFrame.contentDocument.title.indexOf('音乐') !== -1) {
+                                okLoad = true;
+                                break;
+                            }
+                        } catch (e) {}
+                        await waitMs(100);
+                    }
+                    if (!okLoad) {
+                        reportMusicSmoke(false, 'music iframe not loaded');
+                        return;
+                    }
+                    const win1 = musicFrame.contentWindow;
+                    const doc1 = musicFrame.contentDocument;
+                    try { doc1.documentElement.setAttribute('data-music-alive', '1'); } catch (e) {}
+                    const checks = [];
+                    const pass = c => checks.push(!!c);
+                    pass(overlay.classList.contains('active') && overlay.classList.contains('no-header'));
+                    pass(overlayBack.classList.contains('hidden'));
+                    pass(musicFrame.style.display === 'block');
+
+                    closeFullscreen();
+                    pass(!overlay.classList.contains('active'));
+                    pass(musicFrame.src.indexOf('music.html') !== -1);
+                    pass(musicFrame.contentWindow === win1);
+
+                    switchPage('chat');
+                    pass(musicFrame.contentWindow === win1);
+                    try {
+                        pass(musicFrame.contentDocument.documentElement.getAttribute('data-music-alive') === '1');
+                    } catch (e) { pass(false); }
+
+                    switchPage('more');
+                    openFullscreen('music.html', '', false, 'more');
+                    pass(musicFrame.style.display === 'block');
+                    pass(musicFrame.contentWindow === win1);
+
+                    const allPass = checks.every(Boolean);
+                    reportMusicSmoke(allPass, allPass ? 'MUSIC_SMOKE_PASS checks=' + checks.length : 'MUSIC_SMOKE_FAIL [' + checks.join(',') + ']');
+                    try { closeFullscreen(); } catch (e) {}
+                    switchPage('chat');
+                } catch (err) {
+                    reportMusicSmoke(false, 'err=' + String(err && err.message ? err.message : err));
+                }
+            })();
+        }
+
+        switchPage('chat');
+    })();
+
+    // ===== 开场动画逻辑（原 开场.html 的脚本，已内联）=====
+    (function () {
+        const intro = document.getElementById('nano-opening');
+        if (!intro) return;
+
+        function skipIntro() {
+            if (intro.classList.contains('fade-out')) return;
+            intro.classList.add('fade-out');
+            setTimeout(function () {
+                if (intro.parentNode) intro.remove();
+                console.log('开场动画已跳过，进入主界面');
+            }, 700);
+        }
+
+        document.body.addEventListener('click', skipIntro);
+        document.body.addEventListener('touchstart', skipIntro);
+
+        const autoSkipTimer = setTimeout(skipIntro, 4800);
+
+        document.body.addEventListener('click', function () {
+            clearTimeout(autoSkipTimer);
+        }, { once: true });
+
+        window.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') skipIntro();
+        });
+    })();
+
+    // ===== 注册 Service Worker =====
+    try {
+        if ('serviceWorker' in navigator &&
+            (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('sw.js').then(function (reg) {
+                    console.log('[SW] registered', reg.scope);
+                }).catch(function (err) {
+                    console.warn('[SW] register failed', err && err.message);
+                });
+            });
+        }
+    } catch (e) {}
+</script>
+<script src="js/api-float.js"></script>
+<script src="js/aux-memory.js"></script>
+<script src="swipe-back.js"></script>
+<script src="js/keep-alive.js"></script>
+</div>
+</body>
+</html>

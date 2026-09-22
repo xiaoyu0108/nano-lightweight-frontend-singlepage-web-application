@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>备份与恢复</title>
+    <link rel="stylesheet" href="css/backup.css">
+<script src="js/appearance.js"></script>
+</head>
+<body>
+
+    <!-- 顶栏：返回 / 备份与恢复 / 刷新 -->
+    <nav class="navbar">
+        <button class="nav-icon-btn" onclick="goBack()" aria-label="返回" data-back>
+            <svg width="12" height="21" viewBox="0 0 12 21" fill="none">
+                <path d="M10.5 1.5L2 10.5L10.5 19.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <div class="nav-title">备份与恢复</div>
+        <button class="nav-icon-btn" onclick="refreshPage(this)" aria-label="刷新">
+            <svg id="refresh-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 11a8 8 0 1 0-2.34 5.66"/>
+                <polyline points="20 4 20 11 13 11"/>
+            </svg>
+        </button>
+    </nav>
+
+    <main>
+
+        <!-- ================= 导出 ================= -->
+        <section class="list-group">
+            <div class="section-title">导出全站数据</div>
+
+            <button class="list-item" id="btnExportJson" onclick="openAlert('exportJson')">
+                <div class="item-left">
+                    <div class="item-icon icon-blue">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </div>
+                    <span class="item-title">导出为 JSON</span>
+                </div>
+                <div class="item-right">
+                    <span class="item-sub item-text-status">全站数据</span>
+                    <span class="spinner"></span>
+                    <svg class="chevron" width="8" height="13" viewBox="0 0 8 13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </button>
+
+            <button class="list-item" id="btnExportZip" onclick="openAlert('exportZip')">
+                <div class="item-left">
+                    <div class="item-icon icon-blue">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </div>
+                    <span class="item-title">导出为 ZIP</span>
+                </div>
+                <div class="item-right">
+                    <span class="item-sub item-text-status">含二进制</span>
+                    <span class="spinner"></span>
+                    <svg class="chevron" width="8" height="13" viewBox="0 0 8 13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </button>
+        </section>
+        <div class="section-footer">
+            导出内容包括：全部 IndexedDB 数据库、localStorage、sessionStorage、CacheStorage 缓存。
+            JSON 适合纯文本备份，ZIP 会额外保留二进制文件（Blob / ArrayBuffer / TypedArray）。
+        </div>
+
+        <!-- ================= 导入 ================= -->
+        <section class="list-group">
+            <div class="section-title">导入并覆盖</div>
+
+            <button class="list-item" id="btnImport" onclick="triggerFileInput()">
+                <div class="item-left">
+                    <div class="item-icon icon-green">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <span class="item-title">导入备份文件</span>
+                </div>
+                <div class="item-right">
+                    <span class="item-sub item-text-status">.json / .zip</span>
+                    <span class="spinner"></span>
+                    <svg class="chevron" width="8" height="13" viewBox="0 0 8 13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </button>
+        </section>
+        <div class="section-footer">
+            导入会覆盖当前全部数据，包括 IndexedDB、localStorage、sessionStorage 与缓存。此操作不可撤销，请谨慎执行。
+        </div>
+
+    </main>
+
+    <!-- 隐藏文件选择器 -->
+    <input type="file" id="fileInput" accept=".json,.zip" onchange="handleFileSelect(event)">
+
+    <!-- ================= iOS Alert ================= -->
+    <div class="alert-overlay" id="iosAlert">
+        <div class="alert-box">
+            <div class="alert-header">
+                <div class="alert-title" id="alertTitle">提示</div>
+                <div class="alert-message" id="alertMessage">内容</div>
+            </div>
+            <div class="alert-buttons">
+                <button class="alert-btn alert-btn-cancel" onclick="closeAlert()" data-close>取消</button>
+                <button class="alert-btn alert-btn-confirm" id="alertConfirmBtn" onclick="executeAction()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="js/backup.js"></script>
+<script src="js/api-float.js"></script>
+<script src="swipe-back.js"></script>
+</body>
+</html>

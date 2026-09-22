@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>美化</title>
+<link rel="stylesheet" href="css/beautify.css">
+</head>
+<body>
+<div id="app">
+<header class="header">
+<div class="header-left">
+<button class="back" id="back" aria-label="返回" data-back>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+</button>
+</div>
+<div class="title">美化</div>
+<div class="header-right"></div>
+</header>
+
+<main class="content">
+<nav class="tabs">
+<button class="active" data-page="global">全局</button>
+<button data-page="chat">聊天</button>
+<button data-page="font">字体</button>
+</nav>
+
+<!-- ===== 全局页面 ===== -->
+<section class="page active" id="global">
+<div class="group">
+<div class="labelrow"><span class="label">CSS代码</span><button class="import" id="globalImport" aria-label="导入">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 20h14"/><path d="M5 16v4"/><path d="M19 16v4"/></svg>
+</button><input class="hidden" id="globalFile" type="file" accept=".txt,.json,.css"></div>
+<div class="editor-wrap"><textarea id="globalCode" spellcheck="false" placeholder="全局 CSS 代码…"></textarea></div>
+</div>
+<div class="tools"><button class="tool" data-clear="global">清空</button><button class="tool" data-restore="global">还原</button><button class="tool" data-copy="global">复制初始</button><button class="tool apply" data-apply="global">应用</button></div>
+<div class="live-preview" id="globalPreviewCard">
+<div class="lp-head" data-lp="global" role="button" tabindex="0" aria-expanded="false">
+<span class="lp-title">全局预览</span><span class="lp-sub">真实页面 · 点开查看</span><span class="lp-caret">▾</span>
+</div>
+<div class="lp-body"><iframe class="lp-frame" id="globalPreviewFrame" data-target="global" data-src="index.html" loading="lazy" title="全局预览"></iframe></div>
+<span id="globalPreview" style="display:none"></span>
+</div>
+<div class="group"><div class="labelrow"><span class="label">预设</span></div><div class="presetrow"><select id="globalPreset"></select><button class="delete" data-delete="global" aria-label="删除">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m7 7 1 13h8l1-13"/><path d="M10 11v5M14 11v5"/></svg>
+</button></div></div>
+<div class="namerow"><input class="name" id="globalName" placeholder="预设名称"><div class="actions"><button class="action save" data-save="global">保存</button><button class="action edit" data-edit="global">修改</button></div></div>
+</section>
+
+<!-- ===== 聊天页面 ===== -->
+<section class="page" id="chat">
+<div class="group">
+<div class="labelrow"><span class="label">CSS代码</span><button class="import" id="chatImport" aria-label="导入">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 20h14"/><path d="M5 16v4"/><path d="M19 16v4"/></svg>
+</button><input class="hidden" id="chatFile" type="file" accept=".txt,.json,.css"></div>
+<div class="editor-wrap"><textarea id="chatCode" spellcheck="false" placeholder="聊天 CSS 代码…"></textarea></div>
+</div>
+<div class="tools"><button class="tool" data-clear="chat">清空</button><button class="tool" data-restore="chat">还原</button><button class="tool" data-copy="chat">复制初始</button><button class="tool apply" data-apply="chat">应用</button></div>
+<div class="tune-card">
+<div class="labelrow"><span class="label">头像调节（方圆 / 大小）</span></div>
+<div class="tune-row"><span class="tune-label">方圆</span><input type="range" class="tune-slider" id="avatarRadius" min="0" max="50" step="1" value="50"><span class="tune-val" id="avatarRadiusVal">50%</span></div>
+<div class="tune-row"><span class="tune-label">大小</span><input type="range" class="tune-slider" id="avatarSize" min="20" max="80" step="1" value="36"><span class="tune-val" id="avatarSizeVal">36px</span></div>
+</div>
+<div class="live-preview" id="chatPreviewCard">
+<div class="lp-head" data-lp="chat" role="button" tabindex="0" aria-expanded="false">
+<span class="lp-title">聊天预览</span><span class="lp-sub">真实页面 · 点开查看</span><span class="lp-caret">▾</span>
+</div>
+<div class="lp-body"><iframe class="lp-frame" id="chatPreviewFrame" data-target="chat" data-src="chat_inner.html" loading="lazy" title="聊天预览"></iframe></div>
+<span id="chatPreview" style="display:none"></span>
+</div>
+<div class="group"><div class="labelrow"><span class="label">预设</span></div><div class="presetrow"><select id="chatPreset"></select><button class="delete" data-delete="chat" aria-label="删除">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m7 7 1 13h8l1-13"/><path d="M10 11v5M14 11v5"/></svg>
+</button></div></div>
+<div class="namerow"><input class="name" id="chatName" placeholder="预设名称"><div class="actions"><button class="action save" data-save="chat">保存</button><button class="action edit" data-edit="chat">修改</button></div></div>
+</section>
+
+<!-- ===== 字体页面 ===== -->
+<section class="page" id="font">
+<div class="font-preview-card">
+<div style="font-size:var(--font-size-preview,28px);font-weight:400;font-family:inherit;line-height:1.4;transition:font-size 0.15s" id="fontPreview">Aa 你好，世界</div>
+<div style="font-size:11px;color:#8e8e93;margin-top:4px" id="fontMeta">系统默认</div>
+</div>
+
+<div class="font-size-group">
+<div class="font-size-header">
+<span class="font-size-label">字体大小</span>
+<span class="font-size-value" id="fontSizeDisplay">16px</span>
+</div>
+<div class="font-size-slider-wrap">
+<input type="range" class="font-size-slider" id="fontSizeSlider" min="10" max="32" value="16" step="1">
+<div class="font-size-marks">
+<span>10</span>
+<span>16</span>
+<span>24</span>
+<span>32</span>
+</div>
+</div>
+</div>
+
+<div class="group">
+<div class="labelrow"><span class="label">字体文件</span><button class="import" id="fontImport" aria-label="导入字体">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 20h14"/><path d="M5 16v4"/><path d="M19 16v4"/></svg>
+</button><input class="hidden" id="fontFile" type="file" accept=".ttf,.otf,.woff,.woff2"></div>
+<div class="font-file-row"><span id="filename">未选择</span><button class="tool-sm" id="fontClearFile">清除</button></div>
+</div>
+
+<div class="group">
+<div class="labelrow"><span class="label">字体 URL</span></div>
+<div class="url-row"><input class="name" id="fontUrl" type="url" placeholder="https://example.com/font.ttf"><button class="tool apply" id="urlApply">连接</button></div>
+</div>
+
+<div class="tools"><button class="tool" id="fontClear">清空</button><button class="tool" id="fontRestore">还原</button><button class="tool apply" id="fontApply">应用</button></div>
+
+<div class="group"><div class="labelrow"><span class="label">预设</span></div><div class="presetrow"><select id="fontPreset"></select><button class="delete" id="fontDelete" aria-label="删除">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m7 7 1 13h8l1-13"/><path d="M10 11v5M14 11v5"/></svg>
+</button></div></div>
+<div class="namerow"><input class="name" id="fontName" placeholder="预设名称"><div class="actions"><button class="action save" id="fontSave">保存</button><button class="action edit" id="fontEdit">修改</button></div></div>
+</section>
+
+</main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="js/nano-global-template.js"></script>
+<script src="js/nano-chat-template.js"></script>
+<script src="js/beautify.js"></script>
+<script src="js/api-float.js"></script>
+<script src="swipe-back.js"></script>
+</body>
+</html>

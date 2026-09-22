@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>发现</title>
+  <link rel="stylesheet" href="css/discover.css">
+  <script src="js/appearance.js"></script>
+</head>
+<body class="nano-discover">
+
+  <!-- ===== 顶栏：只有一个居中标题 ===== -->
+  <div class="top-bar">
+    <span class="top-bar-title">Discover</span>
+  </div>
+
+  <div class="container" id="mainContainer">
+
+    <!-- ===== 照片轮播墙 ===== -->
+    <section class="carousel-section">
+      <div class="carousel" id="carousel">
+        <div class="card farleft" data-index="3">
+          <img alt="">
+        </div>
+        <div class="card left" data-index="4">
+          <img alt="">
+        </div>
+        <div class="card center" data-index="0">
+          <img id="photo0" alt="">
+        </div>
+        <div class="card right" data-index="1">
+          <img alt="">
+        </div>
+        <div class="card farright" data-index="2">
+          <img alt="">
+        </div>
+      </div>
+      <div class="dots" id="dots"></div>
+    </section>
+
+    <!-- ===== 应用入口 ===== -->
+    <nav class="entries">
+      <button class="entry" data-app="moments">
+        <span class="entry-icon" style="background:#FF2D55;">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        </span>
+        <span class="entry-text">
+          <span class="entry-title">Moments</span>
+          <span class="entry-desc">little pieces of ordinary days</span>
+        </span>
+        <svg class="entry-arrow" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" stroke="#C7C7CC" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <button class="entry" data-app="ins">
+        <span class="entry-icon" style="background:#AF52DE;">
+          <svg viewBox="0 0 24 24"><path d="M9 2 7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+        </span>
+        <span class="entry-text">
+          <span class="entry-title">Instagram</span>
+          <span class="entry-desc">things we save, share &amp; remember</span>
+        </span>
+        <svg class="entry-arrow" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" stroke="#C7C7CC" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <button class="entry" data-app="couple">
+        <span class="entry-icon" style="background:#FF6B8A;">
+          <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        </span>
+        <span class="entry-text">
+          <span class="entry-title">Couple Spaces</span>
+          <span class="entry-desc">a private little place for two</span>
+        </span>
+        <svg class="entry-arrow" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" stroke="#C7C7CC" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <button class="entry" data-app="halo">
+        <span class="entry-icon" style="background:#FF3B30;">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l7 4.5-7 4.5z"/></svg>
+        </span>
+        <span class="entry-text">
+          <span class="entry-title">Halo</span>
+          <span class="entry-desc">live rooms &amp; fan love</span>
+        </span>
+        <svg class="entry-arrow" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" stroke="#C7C7CC" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <button class="entry" data-app="books">
+        <span class="entry-icon" style="background:#5856D6;">
+          <svg viewBox="0 0 24 24"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-6 15H8v-2h4v2zm3-4H8v-2h7v2zm0-4H8V7h7v2z"/></svg>
+        </span>
+        <span class="entry-text">
+          <span class="entry-title">Books</span>
+          <span class="entry-desc">stories worth reading slowly</span>
+        </span>
+        <svg class="entry-arrow" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" stroke="#C7C7CC" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <button class="entry" data-app="music">
+        <span class="entry-icon" style="background:#FA2D48;">
+          <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        </span>
+        <span class="entry-text">
+          <span class="entry-title">Music</span>
+          <span class="entry-desc">songs to listen to together</span>
+        </span>
+        <svg class="entry-arrow" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" stroke="#C7C7CC" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- 换图弹层 -->
+  <input type="file" id="fileInput" accept="image/*">
+  <div class="mask" id="mask"></div>
+  <div class="sheet" id="sheet">
+    <div class="grabber"></div>
+    <h3>更换照片</h3>
+    <button id="choose">从设备选择照片</button>
+    <button class="cancel" id="cancel" data-close>取消</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/discover.js"></script>
+<script src="js/api-float.js"></script>
+<script src="swipe-back.js"></script>
+</body>
+</html>
