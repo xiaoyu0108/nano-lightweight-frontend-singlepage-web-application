@@ -28,6 +28,8 @@
     var audioUrl = '';
     var wakeLock = null;
     var unlocked = false;
+    var restarting = false;
+    var mediaSet = false;
 
     function enabled() {
         try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
@@ -40,7 +42,7 @@
     function wavUrl() {
         if (audioUrl) return audioUrl;
         try {
-            var rate = 8000, seconds = 2, n = rate * seconds;
+            var rate = 8000, seconds = 10, n = rate * seconds;
             var buf = new ArrayBuffer(44 + n);
             var dv = new DataView(buf);
             function put(off, s) { for (var i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); }
@@ -70,10 +72,17 @@
             audioEl.src = wavUrl();
             audioEl.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
             (document.body || document.documentElement).appendChild(audioEl);
-            // 被系统暂停 / 循环被掐断时自动续播
-            ['pause', 'ended', 'stalled', 'suspend'].forEach(function (ev) {
+            // 只处理「真的停了」的情况；不要监听 suspend/stalled（缓冲时也会触发，
+            // 会导致反复 play/pause，灵动岛/状态一闪一闪）
+            ['pause', 'ended'].forEach(function (ev) {
                 audioEl.addEventListener(ev, function () {
-                    if (enabled()) setTimeout(function () { try { audioEl.play().catch(function () {}); } catch (e) {} }, 400);
+                    if (!enabled() || restarting) return;
+                    restarting = true;
+                    setTimeout(function () {
+                        restarting = false;
+                        if (!enabled() || !audioEl.paused) return;
+                        try { audioEl.play().catch(function () {}); } catch (e) {}
+                    }, 1200);
                 });
             });
         } catch (e) {}
@@ -83,12 +92,21 @@
     function setMediaSession() {
         try {
             if (!navigator.mediaSession || typeof window.MediaMetadata !== 'function') return;
+            try { navigator.mediaSession.playbackState = 'playing'; } catch (e) {}
+            if (mediaSet) return;                 // 只设一次，避免元数据反复刷新导致灵动岛闪烁
+            mediaSet = true;
             navigator.mediaSession.metadata = new window.MediaMetadata({
                 title: 'Nano 保活中',
                 artist: '定时生成 / 自动消息继续运行',
-                album: 'Nano'
+                album: 'Nano',
+                artwork: [
+                    { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+                    { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }
+                ]
             });
-            try { navigator.mediaSession.playbackState = 'playing'; } catch (e) {}
+            // 锁屏 / 灵动岛上的按钮：暂停不生效，播放会立刻续上
+            try { navigator.mediaSession.setActionHandler('pause', function () {}); } catch (e) {}
+            try { navigator.mediaSession.setActionHandler('play', function () { play(); }); } catch (e) {}
         } catch (e) {}
     }
 

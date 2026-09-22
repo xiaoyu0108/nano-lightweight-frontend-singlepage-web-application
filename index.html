@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <title>Nano</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="common.css">
     <style>
         :root {
@@ -38,8 +38,7 @@
         .app-container {
             width: 100%;
             height: 100%;
-            max-width: 430px;
-            margin: 0 auto;
+            margin: 0;
             background: transparent;
             padding: 0 16px 0 16px;
             display: flex;
@@ -128,7 +127,7 @@
 
         .bottom-actions {
             position: absolute;
-            bottom: 28px;
+            bottom: 16px;
             left: 16px;
             right: 16px;
             display: flex;
@@ -608,9 +607,9 @@
 
         #nano-opening .scene {
             position: relative;
-            width: min(100vw, 100vh);
-            height: min(100vw, 100vh);
-            max-width: 1100px; max-height: 1100px;
+            width: 100vw;
+            height: 100vh;
+            max-width: none; max-height: none;
         }
 
         #nano-opening svg { width: 100%; height: 100%; display: block; overflow: visible; }
@@ -782,7 +781,7 @@
      ============================================================ -->
 <div id="nano-opening">
   <div class="scene">
-    <svg viewBox="0 0 1000 1000" aria-hidden="true">
+    <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs>
         <filter id="planetGlow" x="-100%" y="-100%" width="300%" height="300%">
           <feGaussianBlur stdDeviation="1.8" result="b"/>
@@ -902,13 +901,13 @@
             <iframe src="chat.html"></iframe>
         </div>
         <div class="iframe-container" id="iframeApi">
-            <iframe src="api.html"></iframe>
+            <iframe data-src="api.html"></iframe>
         </div>
         <div class="iframe-container" id="iframeMore">
-            <iframe src="more.html"></iframe>
+            <iframe data-src="more.html"></iframe>
         </div>
         <div class="iframe-container" id="iframeDiscover">
-            <iframe src="discover.html"></iframe>
+            <iframe data-src="discover.html"></iframe>
         </div>
     </div>
 
@@ -1003,6 +1002,14 @@
             if (currentPage === page) return;
             const config = pageConfig[page];
             if (!config) return;
+            // 首次切到这个 tab 才真正加载它的 iframe（启动时只加载首页，快很多）
+            try {
+                const box = document.getElementById(config.container);
+                const fr = box && box.querySelector('iframe');
+                if (fr && !fr.getAttribute('src') && fr.getAttribute('data-src')) {
+                    fr.setAttribute('src', fr.getAttribute('data-src'));
+                }
+            } catch (e) {}
 
             document.querySelectorAll('.iframe-container').forEach(el => {
                 el.classList.remove('active');
@@ -1114,7 +1121,7 @@
             try {
                 const rootStyle = getComputedStyle(document.documentElement);
                 const botPx = parseFloat(rootStyle.getPropertyValue('--safe-inset-bottom')) || 0;
-                const botVal = botPx ? (botPx + 'px') : '0px';
+                const botVal = botPx > 12 ? ((botPx - 12) + 'px') : '0px';
                 getSafeTopFrames().forEach(function(f) {
                     setSafeVars(f, '0px', botVal);
                 });

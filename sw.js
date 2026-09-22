@@ -1,22 +1,60 @@
-/* sw.js — 用于 PWA 安装、通知点击聚焦。
-   刻意不做离线缓存（不做 fetch 拦截缓存），避免更新应用时读到旧文件。
+/* sw.js — 用于 PWA 安装、通知点击聚焦、静态资源加速。
+   缓存策略（解决“每次打开都要好几秒”）：
+     · HTML：先联网（保证拿到最新版本），断网时用缓存兜底
+     · CSS / JS / 图片 / 图标 / 字体：先用缓存秒开，后台静默更新（stale-while-revalidate）
+       —— 改了代码刷新两次即可看到新版；不想等可以给 CACHE 换个版本号
+     · 跨域（CDN）请求不拦截，交给浏览器自己的缓存
    注意：Service Worker 无法在应用被关闭后持续运行 AI 生成，
-   “后台回复”依赖页面常驻 + Wake Lock，真正的后台计算需要服务端配合。 */
+   “后台回复”依赖页面常驻 + 音频保活；真正的“关闭也能收到”需要服务端配合（见 push 事件）。 */
 'use strict';
+
+var CACHE = 'nano-static-v1';
+var STATIC_RE = /\.(css|js|png|jpg|jpeg|webp|svg|gif|ico|woff2?|ttf|mp3)$/i;
 
 self.addEventListener('install', function (event) {
     self.skipWaiting();
 });
 
 self.addEventListener('activate', function (event) {
-    event.waitUntil(self.clients.claim());
+    event.waitUntil(
+        caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (k) { return k === CACHE ? null : caches.delete(k); }));
+        }).then(function () { return self.clients.claim(); })
+    );
 });
 
-// 仅透传请求（不缓存），保持可安装性与网络实时性
 self.addEventListener('fetch', function (event) {
-    // 只处理同源 GET；其余交给浏览器默认行为
-    if (event.request.method !== 'GET') return;
-    // 不拦截，避免缓存陈旧资源
+    var req = event.request;
+    if (req.method !== 'GET') return;
+    var url;
+    try { url = new URL(req.url); } catch (e) { return; }
+    if (url.origin !== self.location.origin) return;
+
+    var isHTML = req.mode === 'navigate' || /\.html?$/i.test(url.pathname) || /\/$/.test(url.pathname);
+    if (isHTML) {
+        event.respondWith(
+            fetch(req).then(function (res) {
+                try { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); } catch (e) {}
+                return res;
+            }).catch(function () {
+                return caches.match(req).then(function (r) { return r || caches.match('./index.html'); });
+            })
+        );
+        return;
+    }
+
+    if (!STATIC_RE.test(url.pathname)) return;
+    event.respondWith(
+        caches.open(CACHE).then(function (cache) {
+            return cache.match(req).then(function (cached) {
+                var network = fetch(req).then(function (res) {
+                    try { if (res && res.status === 200) cache.put(req, res.clone()); } catch (e) {}
+                    return res;
+                }).catch(function () { return cached; });
+                return cached || network;
+            });
+        })
+    );
 });
 
 // 真正的「应用已关闭也能收到」推送需要服务端配合（Web Push）：

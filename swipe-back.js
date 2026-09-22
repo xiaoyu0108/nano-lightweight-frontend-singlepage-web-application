@@ -111,6 +111,29 @@
         } catch (e) {}
     }
 
+    // ===== 兜住 iOS 系统边缘手势 / 浏览器「返回」=====
+    // 不加这层的话：手指停几秒再滑，iOS 会自己执行「返回上一页」（历史后退），
+    // 而不是走本页的返回按钮逻辑。这里把历史后退拦下来，改成本页返回按钮逻辑。
+    var backGuardBusy = false;
+    function installHistoryGuard() {
+        try {
+            if (!document.querySelector('[data-back]') && !document.querySelector('[data-close]')) return;
+            history.pushState({ nanoBackGuard: 1 }, '');
+            window.addEventListener('popstate', function () {
+                if (backGuardBusy) return;
+                backGuardBusy = true;
+                setTimeout(function () { backGuardBusy = false; }, 400);
+                try { history.pushState({ nanoBackGuard: 1 }, ''); } catch (e) {}
+                try { trigger(); } catch (e) {}
+            });
+        } catch (e) {}
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', installHistoryGuard);
+    } else {
+        installHistoryGuard();
+    }
+
     document.addEventListener('touchstart', function (e) {
         tracking = false;
         if (!e.touches || e.touches.length !== 1) return;
