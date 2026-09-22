@@ -1390,3 +1390,21 @@ html, body {
 .msg-think.open .msg-think-body {
     display: block;
 }
+
+/* ===== 语音转写 / 翻译气泡：不许超出屏幕；一行超过 20 字自动换行 ===== */
+.bubble { max-width: 100%; }
+.bubble.voice-transcript-bubble { max-width: min(88vw, 20em); }
+.bubble .translation-text,
+.bubble.voice-transcript-bubble .voice-transcript {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+}
+
+/* ===== 头像与气泡稍微放大，看着不累 ===== */
+.message-avatar { width: 42px; height: 42px; font-size: 16px; }
+.message-content { max-width: 80%; }
+.bubble { font-size: 16px; padding: 9px 18px; line-height: 1.32; }
+.voice-bubble { height: 32px; min-width: 58px; }
+.voice-bubble .voice-duration { font-size: 14px; }

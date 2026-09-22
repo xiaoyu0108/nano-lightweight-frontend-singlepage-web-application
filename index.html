@@ -127,7 +127,7 @@
 
         .bottom-actions {
             position: absolute;
-            bottom: 16px;
+            bottom: 28px;
             left: 16px;
             right: 16px;
             display: flex;
@@ -348,11 +348,7 @@
             display: none;
         }
 
-        #voiceCallFrame,
-        #musicFrame {
-            top: calc(-1 * env(safe-area-inset-top, 0px));
-            height: calc(100% + env(safe-area-inset-top, 0px));
-        }
+        /* 通话 / 音乐是整屏沉浸页：位置交给它们自己的 CSS，不加安全区兜底 */
 
         .voice-float-ball {
             position: absolute;
@@ -1111,19 +1107,46 @@
                 }
             } catch (e) {}
         }
-        function applySafeTopToFrames() {
-            var standalone = false;
-            try { standalone = !!window.navigator.standalone; } catch (e) {}
+        // 安全区真正的像素值：用探针元素量 env()，比读自定义属性可靠
+        // （部分 iOS 读 --x: env(...) 会拿到原始 token，parseFloat 出来是 0）
+        function measureSafeInsets() {
             try {
-                if (!standalone && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) standalone = true;
+                const probe = document.createElement('div');
+                probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;visibility:hidden;' +
+                    'padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);';
+                document.body.appendChild(probe);
+                const cs = getComputedStyle(probe);
+                const top = parseFloat(cs.paddingTop) || 0;
+                const bottom = parseFloat(cs.paddingBottom) || 0;
+                probe.parentNode.removeChild(probe);
+                return { top: top, bottom: bottom };
+            } catch (e) { return { top: 0, bottom: 0 }; }
+        }
+        // 这些页面自己会用 --safe-top 给顶栏留白 —— 顶栏背景能一直铺到刘海里去
+        const SELF_SAFE_PAGES = ['chat.html', 'chat_inner.html', 'groups.html', 'group-setting.html',
+            'mask.html', 'character.html', 'favorite.html', 'emoji.html', 'memory.html', 'worldbook.html',
+            'music.html', 'voice-call.html'];
+        // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
+        function applySafeFallback(f) {
+            try {
+                const name = baseName(f.getAttribute('src'));
+                if (!name || SELF_SAFE_PAGES.indexOf(name) !== -1) return;
+                const doc = f.contentDocument;
+                if (!doc || !doc.head || doc.getElementById('nanoSafeFallback')) return;
+                const st = doc.createElement('style');
+                st.id = 'nanoSafeFallback';
+                st.textContent = 'body{padding-top:var(--safe-top,0px)!important}';
+                doc.head.appendChild(st);
             } catch (e) {}
-            if (!standalone) return;
+        }
+        function applySafeTopToFrames() {
             try {
-                const rootStyle = getComputedStyle(document.documentElement);
-                const botPx = parseFloat(rootStyle.getPropertyValue('--safe-inset-bottom')) || 0;
-                const botVal = botPx > 12 ? ((botPx - 12) + 'px') : '0px';
-                getSafeTopFrames().forEach(function(f) {
-                    setSafeVars(f, '0px', botVal);
+                const insets = measureSafeInsets();
+                const topVal = insets.top ? (insets.top + 'px') : '0px';
+                const botVal = insets.bottom ? (insets.bottom + 'px') : '0px';
+                getSafeTopFrames().forEach(function (f) {
+                    setSafeVars(f, topVal, botVal);
+                    applySafeFallback(f);
                 });
             } catch (e) {}
         }
@@ -1375,6 +1398,14 @@
                 appContent.style.paddingTop = '0';
             }
         }
+
+        // ===== 冷启动：从系统通知点进来（sw.js 把目标放在 ?open= 上）=====
+        try {
+            const openTarget = new URLSearchParams(location.search).get('open');
+            if (openTarget) {
+                setTimeout(function () { try { openNotifyTarget(openTarget); } catch (e) {} }, 900);
+            }
+        } catch (e) {}
 
         overlayBack.addEventListener('click', closeFullscreen);
 

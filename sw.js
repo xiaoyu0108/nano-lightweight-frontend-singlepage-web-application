@@ -32,12 +32,27 @@ self.addEventListener('fetch', function (event) {
 
     var isHTML = req.mode === 'navigate' || /\.html?$/i.test(url.pathname) || /\/$/.test(url.pathname);
     if (isHTML) {
+        // 60 秒内直接用缓存（页面之间切换秒开），超过就联网拿最新，联网失败退回缓存
         event.respondWith(
-            fetch(req).then(function (res) {
-                try { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); } catch (e) {}
-                return res;
-            }).catch(function () {
-                return caches.match(req).then(function (r) { return r || caches.match('./index.html'); });
+            caches.open(CACHE).then(function (cache) {
+                return cache.match(req).then(function (cached) {
+                    var fresh = false;
+                    try {
+                        var at = parseInt((cached && cached.headers.get('x-nano-at')) || '0', 10);
+                        fresh = !!cached && (Date.now() - at < 60000);
+                    } catch (e) {}
+                    if (fresh) return cached;
+                    return fetch(req).then(function (res) {
+                        try {
+                            var h = new Headers(res.headers);
+                            h.set('x-nano-at', String(Date.now()));
+                            cache.put(req, new Response(res.clone().body, {
+                                status: res.status, statusText: res.statusText, headers: h
+                            }));
+                        } catch (e) {}
+                        return res;
+                    }).catch(function () { return cached || caches.match('./index.html'); });
+                });
             })
         );
         return;
@@ -88,7 +103,11 @@ self.addEventListener('notificationclick', function (event) {
                     return c.focus();
                 }
             }
-            if (self.clients.openWindow) return self.clients.openWindow('./index.html');
+            if (self.clients.openWindow) {
+                // 应用已被关闭：把目标带在 URL 上，冷启动后 index.html 会自己跳转
+                var t = (event.notification.data && event.notification.data.target) || '';
+                return self.clients.openWindow('./index.html' + (t ? ('?open=' + encodeURIComponent(t)) : ''));
+            }
         })
     );
 });

@@ -127,6 +127,8 @@
     function play() {
         var a = ensureAudio();
         if (!a) return;
+        // iOS 17+：声明为 playback 音频会话，系统更不容易把页面挂起
+        try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
         try {
             var p = a.play();
             if (p && p.catch) p.catch(function () {});
