@@ -8,6 +8,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <title>Nano</title>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <!-- 聊天/通话/设置页会同步加载 localforage；在这里提前拉，避免它们卡在 CDN 往返上 -->
+    <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js">
+    <link rel="dns-prefetch" href="https://unpkg.com">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="common.css">
     <style>
@@ -60,7 +65,7 @@
 
         .top-bar {
             position: absolute;
-            top: 14px;
+            top: calc(14px + var(--safe-inset-top));
             left: 16px;
             right: 16px;
             display: flex;
@@ -127,7 +132,7 @@
 
         .bottom-actions {
             position: absolute;
-            bottom: 28px;
+            bottom: calc(12px + var(--safe-inset-bottom));
             left: 16px;
             right: 16px;
             display: flex;
@@ -240,7 +245,7 @@
             display: flex;
             justify-content: flex-start;
             align-items: center;
-            padding: 14px 0 12px 0;
+            padding: calc(14px + var(--safe-inset-top)) 0 12px 0;
             flex-shrink: 0;
             position: relative;
         }
@@ -402,7 +407,7 @@
         .app-notify {
             position: absolute;
             left: 50%;
-            top: 10px;
+            top: calc(10px + var(--safe-inset-top));
             transform: translate(-50%, -140%);
             z-index: 100000;
             width: min(92vw, 420px);
@@ -569,6 +574,20 @@
             line-height: 1.4;
         }
         .music-float-ball.expanded .ball-off-btn { display: block; }
+
+        /* 顶部灵动岛区域：透明点击带（背景仍延伸，下方按钮不受影响）。
+           点一下 = 回到聊天页 / 返回上一层，解决“点灵动岛回不去聊天”。 */
+        .notch-tap {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--safe-inset-top);
+            z-index: 100002;
+            background: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
 
         @media (max-width: 520px) {
             .app-container {
@@ -918,6 +937,8 @@
     </div>
 </div>
 
+<div class="notch-tap" id="notchTap" aria-hidden="true"></div>
+
 <div class="fullscreen-overlay" id="fullscreenOverlay">
     <div class="overlay-inner">
         <div class="overlay-header">
@@ -1125,11 +1146,14 @@
         // 这些页面自己会用 --safe-top 给顶栏留白 —— 顶栏背景能一直铺到刘海里去
         const SELF_SAFE_PAGES = ['chat.html', 'chat_inner.html', 'groups.html', 'group-setting.html',
             'mask.html', 'character.html', 'favorite.html', 'emoji.html', 'memory.html', 'worldbook.html',
-            'music.html', 'voice-call.html'];
+            'music.html', 'voice-call.html', 'storage.html', 'backup.html', 'other.html', 'more.html',
+            'discover.html', 'api.html', 'moments.html', 'ins.html', 'inner-setting.html', 'beautify.html',
+            'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
+            'phone.html'];
         // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
         function applySafeFallback(f) {
             try {
-                const name = baseName(f.getAttribute('src'));
+                const name = frameBase(f);
                 if (!name || SELF_SAFE_PAGES.indexOf(name) !== -1) return;
                 const doc = f.contentDocument;
                 if (!doc || !doc.head || doc.getElementById('nanoSafeFallback')) return;
@@ -1168,7 +1192,7 @@
                 overlayBack.classList.add('hidden');
             } else if (url.indexOf('music.html') === 0) {
                 showMusicFrame();
-                if (!musicFrame.src || musicFrame.src === 'about:blank' || musicFrame.src.indexOf('music.html') === -1) {
+                if (frameBase(musicFrame) !== 'music.html') {
                     musicFrame.src = url;
                 }
                 overlay.classList.add('no-header');
@@ -1188,7 +1212,7 @@
                 overlayBack.classList.add('hidden');
             } else if (url.indexOf('moments.html') === 0) {
                 showMomentsFrame();
-                if (!momentsFrame.src || momentsFrame.src === 'about:blank' || momentsFrame.src.indexOf('moments.html') === -1) {
+                if (frameBase(momentsFrame) !== 'moments.html') {
                     momentsFrame.src = url;
                 } else {
                     try { momentsFrame.contentWindow.postMessage({ type: 'nano:momentsShown' }, '*'); } catch (e) {}
@@ -1198,7 +1222,7 @@
                 overlayBack.classList.add('hidden');
             } else if (url.indexOf('ins.html') === 0) {
                 showInsFrame();
-                if (!insFrame.src || insFrame.src === 'about:blank' || insFrame.src.indexOf('ins.html') === -1) {
+                if (frameBase(insFrame) !== 'ins.html') {
                     insFrame.src = url;
                 } else {
                     try { insFrame.contentWindow.postMessage({ type: 'nano:insShown' }, '*'); } catch (e) {}
@@ -1255,9 +1279,9 @@
                 });
             } catch (e) {}
 
-            const chatInnerAlive = chatInnerFrame.src && chatInnerFrame.src !== 'about:blank' && chatInnerFrame.src.indexOf('chat_inner.html') !== -1;
+            const chatInnerAlive = frameBase(chatInnerFrame) === 'chat_inner.html';
 
-            if (voiceCallFrame.src && voiceCallFrame.src !== 'about:blank' && voiceCallFrame.src.indexOf('voice-call.html') !== -1) {
+            if (frameBase(voiceCallFrame) === 'voice-call.html') {
                 voiceCallFrame.style.display = 'none';
                 voiceCallFrame.src = 'about:blank';
             }
@@ -1268,7 +1292,7 @@
                 try { syncMusicBall(); } catch (e) {}
             }
 
-            if (insFrame && insFrame.style.display !== 'none' && insFrame.src && insFrame.src.indexOf('ins.html') !== -1) {
+            if (insFrame && insFrame.style.display !== 'none' && frameBase(insFrame) === 'ins.html') {
                 insFrame.style.display = 'none';
                 try { insFrame.contentWindow.postMessage({ type: 'nano:insHidden' }, '*'); } catch (e) {}
                 currentOverlaySource = null;
@@ -1408,6 +1432,18 @@
         } catch (e) {}
 
         overlayBack.addEventListener('click', closeFullscreen);
+
+        // 顶部灵动岛透明点击带：有全屏页时点一下返回上一层，否则回到聊天页
+        var notchTap = document.getElementById('notchTap');
+        if (notchTap) {
+            notchTap.addEventListener('click', function () {
+                if (overlayActive) {
+                    closeFullscreen();
+                } else if (currentPage !== 'chat') {
+                    switchPage('chat');
+                }
+            });
+        }
 
         document.querySelectorAll('.capsule-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -1580,6 +1616,16 @@
                 (el._action ? '<div class="an-actions"><span class="an-action">' + escapeNotifyHtml(el._action.label) + '</span></div>' : '') +
                 '</div>';
             el.classList.add('show');
+            // 切到后台 / 锁屏时，同步弹一条系统通知，避免只在内页提示而看不到
+            try {
+                if (window.NanoNotify && document.hidden) {
+                    window.NanoNotify.notify(title, body, {
+                        icon: opts.icon,
+                        target: (opts.action && opts.url) || '',
+                        tag: app ? ('nano-app-' + app) : ''
+                    });
+                }
+            } catch (e) {}
             clearTimeout(appNotifyTimer);
             appNotifyTimer = setTimeout(hideAppNotify, el._action ? 9000 : 5200);
         }
@@ -1587,6 +1633,17 @@
         const refreshState = {};
         const urlSourceMap = {};
         function baseName(p) { try { return String(p || '').split('?')[0].split('/').pop(); } catch (e) { return ''; } }
+        // 读取 iframe 里「实际正在显示」的页面名：页面可能在 iframe 内自己 location.href 跳转过，
+        // 此时 src 属性已过期，用属性判断会误以为它还停在旧页面。
+        function frameBase(f) {
+            if (!f) return '';
+            try {
+                var w = f.contentWindow;
+                var h = w && w.location && w.location.href;
+                if (h && h !== 'about:blank') return baseName(h);
+            } catch (e) {}
+            return baseName(f.getAttribute('src'));
+        }
         function frameForWindow(win) {
             if (!win) return null;
             for (let i = 0; i < OVERLAY_FRAME_IDS.length; i++) {
@@ -1602,7 +1659,7 @@
         function isAppForeground(url) {
             const want = baseName(url);
             if (!want) return false;
-            const matches = function (f) { return !!(f && baseName(f.getAttribute('src')) === want); };
+            const matches = function (f) { return !!(f && frameBase(f) === want); };
             if (overlayActive) {
                 for (let i = 0; i < OVERLAY_FRAME_IDS.length; i++) {
                     const f = document.getElementById(OVERLAY_FRAME_IDS[i]);
@@ -1676,7 +1733,7 @@
             if (!url) return;
             const source = urlSourceMap[baseName(url)] || 'more';
             try {
-                if (overlayFrame && baseName(overlayFrame.getAttribute('src')) === baseName(url) && overlayFrame.style.display === 'none') {
+                if (overlayFrame && frameBase(overlayFrame) === baseName(url) && overlayFrame.style.display === 'none') {
                     showOverlayFrame();
                     overlayActive = true;
                     currentOverlaySource = source;
@@ -1718,7 +1775,7 @@
 
         function postToMusic(msg) {
             try {
-                if (musicFrame && musicFrame.contentWindow && musicFrame.src && musicFrame.src.indexOf('music.html') !== -1) {
+                if (musicFrame && frameBase(musicFrame) === 'music.html') {
                     musicFrame.contentWindow.postMessage(msg, '*');
                 }
             } catch (e) {}
@@ -1964,7 +2021,7 @@
                 const currentSeconds = callSeconds;
                 hideFloatBall();
                 const frame = document.getElementById('voiceCallFrame');
-                if (voiceCallKeptAlive && frame && frame.src && frame.src.indexOf('voice-call.html') !== -1) {
+                if (voiceCallKeptAlive && frameBase(frame) === 'voice-call.html') {
                     overlayFrame.style.display = 'none';
                     chatInnerFrame.style.display = 'none';
                     musicFrame.style.display = 'none';
@@ -2073,7 +2130,14 @@
             if (data.type === 'swipeBack') {
                 try {
                     const ob = document.getElementById('overlayBack');
-                    if (ob && overlay.classList.contains('active') && ob.getBoundingClientRect().height > 0) ob.click();
+                    if (ob && overlay.classList.contains('active') && ob.getBoundingClientRect().height > 0) {
+                        ob.click();
+                    } else if (overlayActive) {
+                        // 该页没有自己的返回按钮：直接收起全屏层
+                        closeFullscreen();
+                    } else if (currentPage !== 'chat') {
+                        switchPage('chat');
+                    }
                 } catch (e) {}
                 return;
             }
@@ -2092,11 +2156,11 @@
                     }
                 });
                 const c = document.getElementById('chatInnerFrame');
-                if (c && c.contentWindow && c.src && c.src.indexOf('chat_inner.html') !== -1) {
+                if (c && frameBase(c) === 'chat_inner.html') {
                     try { c.contentWindow.postMessage(data, '*'); } catch(e) {}
                 }
                 const mf = document.getElementById('momentsFrame');
-                if (mf && mf.contentWindow && mf.src && mf.src.indexOf('moments.html') !== -1) {
+                if (mf && frameBase(mf) === 'moments.html') {
                     try { mf.contentWindow.postMessage(data, '*'); } catch(e) {}
                 }
             }
@@ -2104,14 +2168,14 @@
             const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared'];
             if (innerSettingTypes.indexOf(data.type) !== -1) {
                 const c = document.getElementById('chatInnerFrame');
-                if (c && c.contentWindow && c.src && c.src.indexOf('chat_inner.html') !== -1) {
+                if (c && frameBase(c) === 'chat_inner.html') {
                     try { c.contentWindow.postMessage(data, '*'); } catch(e) {}
                 }
             }
 
             if (data.type === 'momentsDataUpdated') {
                 const mf = document.getElementById('momentsFrame');
-                if (mf && mf.contentWindow && mf.src && mf.src.indexOf('moments.html') !== -1) {
+                if (mf && frameBase(mf) === 'moments.html') {
                     try { mf.contentWindow.postMessage({ type: 'momentsDataUpdated' }, '*'); } catch(e) {}
                 }
             }
@@ -2203,7 +2267,7 @@
 
             if (data.type === 'NANO_LISTEN_NOTICE') {
                 const nf = document.getElementById('chatInnerFrame');
-                if (nf && nf.contentWindow && nf.src && nf.src.indexOf('chat_inner.html') !== -1) {
+                if (nf && frameBase(nf) === 'chat_inner.html') {
                     try { nf.contentWindow.postMessage(data, '*'); } catch (e) {}
                 }
                 return;
@@ -2211,7 +2275,7 @@
 
             if (data.type === 'NANO_LISTEN_INVITE_CARD' || data.type === 'NANO_LISTEN_INVITE_RESULT') {
                 const cf = document.getElementById('chatInnerFrame');
-                if (cf && cf.contentWindow && cf.src && cf.src.indexOf('chat_inner.html') !== -1) {
+                if (cf && frameBase(cf) === 'chat_inner.html') {
                     try { cf.contentWindow.postMessage(data, '*'); } catch (e) {}
                 }
                 return;
@@ -2219,7 +2283,7 @@
 
             if (data.type === 'NANO_COUPLE_SHARE_CARD') {
                 const cf = document.getElementById('chatInnerFrame');
-                if (cf && cf.contentWindow && cf.src && cf.src.indexOf('chat_inner.html') !== -1) {
+                if (cf && frameBase(cf) === 'chat_inner.html') {
                     try { cf.contentWindow.postMessage(data, '*'); } catch (e) {}
                 }
                 return;
@@ -2288,7 +2352,7 @@
 
             if (data.type === 'backgroundChanged') {
                 const target = document.getElementById('chatInnerFrame');
-                if (target && target.contentWindow && target.src && target.src.indexOf('chat_inner.html') !== -1) {
+                if (target && frameBase(target) === 'chat_inner.html') {
                     target.contentWindow.postMessage(data, '*');
                     console.log('[Index] 转发背景更改到 chat_inner:', data.bgType);
                 }
@@ -2296,7 +2360,7 @@
 
             if (data.type === 'NANO_MEMORY_UPDATED') {
                 const target = document.getElementById('overlayFrame');
-                if (target && target.contentWindow && target.src && target.src.indexOf('memory.html') !== -1) {
+                if (target && frameBase(target) === 'memory.html') {
                     target.contentWindow.postMessage(data, '*');
                 }
             }
@@ -2386,7 +2450,7 @@
 
             if (data.type === 'NANO_VOICE_CALL_CARD') {
                 const frame = document.getElementById('chatInnerFrame');
-                if (frame && frame.contentWindow && frame.src && frame.src.indexOf('chat_inner.html') !== -1) {
+                if (frame && frameBase(frame) === 'chat_inner.html') {
                     frame.contentWindow.postMessage(data, '*');
                     console.log('[Index] 转发语音通话卡片到 chat_inner (chatInnerFrame)');
                 } else {
@@ -2421,7 +2485,7 @@
                 }
                 voiceCallKeptAlive = true;
                 voiceCallFrame.style.display = 'none';
-                const chatInnerAlive = chatInnerFrame.src && chatInnerFrame.src !== 'about:blank' && chatInnerFrame.src.indexOf('chat_inner.html') !== -1;
+                const chatInnerAlive = frameBase(chatInnerFrame) === 'chat_inner.html';
                 if (!chatInnerAlive) {
                     showChatInnerFrame();
                     chatInnerFrame.src = 'chat_inner.html?chat=' + encodeURIComponent(getChatId()) + '&name=' + encodeURIComponent(getContactName());
@@ -2446,7 +2510,7 @@
                 voiceCallFrame.style.display = 'none';
                 voiceCallFrame.src = 'about:blank';
                 voiceCallKeptAlive = false;
-                const chatInnerAlive = chatInnerFrame.src && chatInnerFrame.src !== 'about:blank' && chatInnerFrame.src.indexOf('chat_inner.html') !== -1;
+                const chatInnerAlive = frameBase(chatInnerFrame) === 'chat_inner.html';
                 if (chatInnerAlive) {
                     showChatInnerFrame();
                     overlay.classList.add('no-header');
@@ -2547,7 +2611,7 @@
         document.body.addEventListener('click', skipIntro);
         document.body.addEventListener('touchstart', skipIntro);
 
-        const autoSkipTimer = setTimeout(skipIntro, 4800);
+        const autoSkipTimer = setTimeout(skipIntro, 2400);
 
         document.body.addEventListener('click', function () {
             clearTimeout(autoSkipTimer);
@@ -2556,6 +2620,39 @@
         window.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') skipIntro();
         });
+    })();
+
+    // ===== 后台预热：等界面空闲后，把常用页面逐个拉进 SW 缓存 =====
+    // 目的：第一次打开这些页也不用等整页网络往返，切换几乎没有加载感。
+    (function warmPages() {
+        try {
+            if (!navigator.serviceWorker) return;
+            if (navigator.connection && navigator.connection.saveData) return;
+            var pages = ['chat_inner.html', 'storage.html', 'backup.html', 'other.html', 'beautify.html',
+                'inner-setting.html', 'groups.html', 'group-setting.html', 'music.html', 'ins.html',
+                'moments.html', 'halo.html', 'books.html', 'character.html', 'mask.html', 'favorite.html',
+                'emoji.html', 'worldbook.html', 'memory.html', 'phone.html', 'offline.html',
+                'offline-setting.html', 'couple-spaces.html', 'voice-call.html', 'api.html',
+                'discover.html', 'more.html'];
+            var i = 0;
+            function next() {
+                if (i >= pages.length) return;
+                var u = pages[i++];
+                try {
+                    fetch(u, { credentials: 'same-origin' }).catch(function () {}).then(function () {
+                        setTimeout(next, 250);
+                    });
+                } catch (e) { setTimeout(next, 250); }
+            }
+            // 等 Service Worker 接管后再拉，否则抓到的东西不会进 SW 缓存
+            var tries = 0;
+            function start() {
+                if (navigator.serviceWorker.controller) { next(); return; }
+                if (++tries > 15) return;
+                setTimeout(start, 2000);
+            }
+            setTimeout(start, 5000);
+        } catch (e) {}
     })();
 
     // ===== 注册 Service Worker =====
@@ -2574,6 +2671,7 @@
 </script>
 <script src="js/api-float.js"></script>
 <script src="js/aux-memory.js"></script>
+<script src="js/nano-notify.js"></script>
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js"></script>
 </div>

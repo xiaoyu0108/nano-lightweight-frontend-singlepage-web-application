@@ -36,7 +36,7 @@ body::-webkit-scrollbar {
 body {
     background: var(--bg);
     color: var(--text);
-    padding-top: 64px;
+    padding-top: calc(64px + var(--safe-top, env(safe-area-inset-top, 0px)));
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
 }
@@ -45,14 +45,14 @@ body {
 .navbar {
     position: fixed;
     top: 0; left: 0; right: 0;
-    height: 64px;
+    height: calc(64px + var(--safe-top, env(safe-area-inset-top, 0px)));
     background: #ffffff;
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     display: grid;
     grid-template-columns: 44px 1fr 44px;
     align-items: center;
-    padding: 0 8px;
+    padding: var(--safe-top, env(safe-area-inset-top, 0px)) 8px 0;
     z-index: 100;
     border-bottom: 0.5px solid var(--separator);
 }
@@ -313,7 +313,7 @@ body {
     background: #ffffff;
     border-radius: 20px 20px 0 0;
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
-    padding: 8px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 12px calc(16px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
     transform: translateY(110%);
     visibility: hidden;
     transition: transform 0.32s cubic-bezier(0.25, 0.8, 0.25, 1), visibility 0.32s;

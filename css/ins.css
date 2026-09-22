@@ -8,7 +8,7 @@ button,input,textarea{font:inherit}button{border:0;background:none;padding:0;cur
   --pink-bubble:#fce4ec;
 }
 .app{width:100%;height:100vh;height:100dvh;max-width:480px;margin:auto;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
-.status{height:28px;flex:none}
+.status{height:max(28px, var(--safe-top, env(safe-area-inset-top, 0px)));flex:none}
 
 /* ===== 主顶�?===== */
 .topbar{height:56px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex:none;background:var(--bg);z-index:6}
@@ -73,7 +73,7 @@ body:not(.fullscreen-active) .content{padding-bottom:68px}
 .time{font-size:10px;color:#b0b0b4;text-transform:uppercase;margin-top:5px}
 
 /* ===== 底栏 ===== */
-.bottom{position:absolute;bottom:0;left:0;right:0;height:68px;background:rgba(255,255,255,.98);backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-around;padding-bottom:env(safe-area-inset-bottom);z-index:10}
+.bottom{position:absolute;bottom:0;left:0;right:0;height:68px;background:rgba(255,255,255,.98);backdrop-filter:blur(14px);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-around;padding-bottom:var(--safe-bottom, env(safe-area-inset-bottom));z-index:10}
 .nav-item{width:20%;height:60px;display:flex;align-items:center;justify-content:center}
 .nav-item.active .nav-icon{stroke-width:2.4}
 .nav-avatar{width:25px;height:25px;border-radius:50%;object-fit:cover;border:1.5px solid var(--ink);background:#e0e0e0;background-size:cover;background-position:center}
@@ -164,7 +164,7 @@ body:not(.fullscreen-active) .content{padding-bottom:68px}
 .reply{display:flex;gap:8px;padding:7px 0}
 .reply .comment-text{font-size:12px}
 
-.comment-input{flex:0 0 auto;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.comment-input{flex:0 0 auto;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:calc(8px + var(--safe-bottom, env(safe-area-inset-bottom)))}
 .comment-input .letter-avatar{width:32px;height:32px;font-size:14px}
 .comment-input input{flex:1;border:1px solid #e0e0e0;background:#f7f7f7;border-radius:20px;height:40px;padding:0 16px;outline:none;font-size:13px}
 .send{font-size:14px;font-weight:700;color:var(--accent);padding:0 6px;flex:none}
@@ -229,7 +229,7 @@ body:not(.fullscreen-active) .content{padding-bottom:68px}
 .action-sheet{
   position:absolute;left:0;right:0;bottom:0;
   background:#fff;border-radius:24px 24px 0 0;
-  padding:6px 14px calc(20px + env(safe-area-inset-bottom));
+  padding:6px 14px calc(20px + var(--safe-bottom, env(safe-area-inset-bottom)));
   max-height:82%;overflow-y:auto;scrollbar-width:none;
   animation:up .25s cubic-bezier(.2,.9,.3,1);
   box-shadow:0 -10px 40px rgba(0,0,0,.15);
@@ -342,7 +342,7 @@ body:not(.fullscreen-active) .content{padding-bottom:68px}
 .msg.in{background:var(--bubble-in);color:var(--ink);border-top-left-radius:8px}
 .msg.out{background:var(--pink-bubble);color:#111;border-top-right-radius:8px}
 
-.chat-input-bar{flex:0 0 auto;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:8px 10px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.chat-input-bar{flex:0 0 auto;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:8px 10px;padding-bottom:calc(8px + var(--safe-bottom, env(safe-area-inset-bottom)))}
 .chat-input-bar input{flex:1;border:0;background:transparent;height:40px;padding:0 6px;outline:none;font-size:15px;min-width:0}
 .chat-input-bar .mini-btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex:none;border-radius:50%}
 .chat-input-bar .mini-btn:active{background:#f0f0f0}
@@ -387,7 +387,7 @@ body:not(.fullscreen-active) .content{padding-bottom:68px}
 /* ===== 表情包面板（底部弹起，参�?chat-inner 的可用版本） ===== */
 .ins-emoji-overlay{position:absolute;inset:0;z-index:26;background:rgba(0,0,0,.12);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none;align-items:flex-end;justify-content:center}
 .ins-emoji-overlay.active{display:flex}
-.ins-emoji-panel{width:100%;max-width:480px;margin:0 auto;background:rgba(255,255,255,.97);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px rgba(0,0,0,.14);padding:14px 14px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;max-height:66vh;overflow:hidden;animation:insEmojiUp .22s ease}
+.ins-emoji-panel{width:100%;max-width:480px;margin:0 auto;background:rgba(255,255,255,.97);border-radius:20px 20px 0 0;box-shadow:0 -6px 30px rgba(0,0,0,.14);padding:14px 14px calc(16px + var(--safe-bottom, env(safe-area-inset-bottom)));display:flex;flex-direction:column;max-height:66vh;overflow:hidden;animation:insEmojiUp .22s ease}
 @keyframes insEmojiUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .ins-emoji-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex:none}
 .ins-emoji-title{font-size:16px;font-weight:600;color:#1c1c1e}
@@ -423,7 +423,7 @@ body:not(.fullscreen-active) .content{padding-bottom:68px}
 .pm-head-close{position:absolute;right:12px;top:12px;width:30px;height:30px;border-radius:50%;background:#f2f2f3;display:flex;align-items:center;justify-content:center}
 .pm-head-close:active{background:#e6e6e8}
 .pm-head-close svg{width:13px;height:13px;stroke:var(--muted);stroke-width:2.4;fill:none;stroke-linecap:round}
-.pm-scroll{overflow-y:auto;padding:14px 16px calc(20px + env(safe-area-inset-bottom));scrollbar-width:none}
+.pm-scroll{overflow-y:auto;padding:14px 16px calc(20px + var(--safe-bottom, env(safe-area-inset-bottom)));scrollbar-width:none}
 .pm-scroll::-webkit-scrollbar{display:none}
 .pm-section{margin-bottom:18px}
 .pm-section:last-child{margin-bottom:0}

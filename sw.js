@@ -8,8 +8,10 @@
    “后台回复”依赖页面常驻 + 音频保活；真正的“关闭也能收到”需要服务端配合（见 push 事件）。 */
 'use strict';
 
-var CACHE = 'nano-static-v1';
+var CACHE = 'nano-static-v3';
 var STATIC_RE = /\.(css|js|png|jpg|jpeg|webp|svg|gif|ico|woff2?|ttf|mp3)$/i;
+var HTML_FRESH_MS = 10 * 60 * 1000;   // 10 分钟内直接用缓存，切页秒开
+var NET_TIMEOUT_MS = 1500;            // 有缓存时，网络最多等 1.5 秒，超时先上缓存
 
 self.addEventListener('install', function (event) {
     self.skipWaiting();
@@ -32,17 +34,17 @@ self.addEventListener('fetch', function (event) {
 
     var isHTML = req.mode === 'navigate' || /\.html?$/i.test(url.pathname) || /\/$/.test(url.pathname);
     if (isHTML) {
-        // 60 秒内直接用缓存（页面之间切换秒开），超过就联网拿最新，联网失败退回缓存
+        // 10 分钟内直接命中缓存（页面之间切换秒开）；否则联网拿最新。
+        // 有缓存时最多等 2.5 秒网络，超时就先用缓存显示，后台继续更新，
+        // 避免网络慢/节点卡时整个页面卡住几十秒。
         event.respondWith(
             caches.open(CACHE).then(function (cache) {
                 return cache.match(req).then(function (cached) {
-                    var fresh = false;
-                    try {
-                        var at = parseInt((cached && cached.headers.get('x-nano-at')) || '0', 10);
-                        fresh = !!cached && (Date.now() - at < 60000);
-                    } catch (e) {}
-                    if (fresh) return cached;
-                    return fetch(req).then(function (res) {
+                    var at = 0;
+                    try { at = parseInt((cached && cached.headers.get('x-nano-at')) || '0', 10) || 0; } catch (e) {}
+                    if (cached && (Date.now() - at < HTML_FRESH_MS)) return cached;
+
+                    var network = fetch(req).then(function (res) {
                         try {
                             var h = new Headers(res.headers);
                             h.set('x-nano-at', String(Date.now()));
@@ -51,7 +53,15 @@ self.addEventListener('fetch', function (event) {
                             }));
                         } catch (e) {}
                         return res;
-                    }).catch(function () { return cached || caches.match('./index.html'); });
+                    });
+
+                    if (!cached) {
+                        return network.catch(function () { return caches.match('./index.html'); });
+                    }
+                    return Promise.race([
+                        network,
+                        new Promise(function (resolve) { setTimeout(function () { resolve(cached); }, NET_TIMEOUT_MS); })
+                    ]).catch(function () { return cached; });
                 });
             })
         );

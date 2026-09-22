@@ -17,7 +17,7 @@
 html,body{background:var(--bg);overflow-x:hidden}
 body{margin:0;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Helvetica Neue",sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 button,input,textarea{font:inherit}button{cursor:pointer;border:0}
-.app{max-width:430px;min-height:100vh;margin:auto;padding:env(safe-area-inset-top, 0px) 18px 40px;position:relative;overflow-x:hidden}
+.app{max-width:430px;min-height:100vh;margin:auto;padding:var(--safe-top, env(safe-area-inset-top, 0px)) 18px 40px;position:relative;overflow-x:hidden}
 
 /* ---------- 主页 header ---------- */
 header{
@@ -187,7 +187,7 @@ header .logo{
 .fullpage .inner{
   max-width:430px;
   margin:auto;
-  padding:env(safe-area-inset-top, 0px) 18px 40px;
+  padding:var(--safe-top, env(safe-area-inset-top, 0px)) 18px 40px;
   position:relative;
 }
 .fullpage header{

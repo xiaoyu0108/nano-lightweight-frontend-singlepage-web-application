@@ -1226,6 +1226,11 @@ document.getElementById('saveBtn').onclick = function() {
 };
 
 document.getElementById('backBtn').onclick = function() {
+  // 在 iframe 里：交给主框架收起全屏层，绝不 history.back()（会回到上次打开的页面）
+  if (window.parent && window.parent !== window) {
+    try { window.parent.postMessage({ type: 'closeFullscreen' }, '*'); } catch (e) {}
+    return;
+  }
   if (history.length > 1) history.back();
   else location.href = 'offline.html';
 };

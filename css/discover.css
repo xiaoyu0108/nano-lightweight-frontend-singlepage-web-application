@@ -17,7 +17,9 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 /* ---------- 顶栏 ---------- */
 .top-bar{
   position:sticky;top:0;z-index:10;
-  height:52px;display:flex;align-items:center;justify-content:center;
+  height:calc(52px + var(--safe-top, env(safe-area-inset-top, 0px)));
+  padding-top:var(--safe-top, env(safe-area-inset-top, 0px));
+  display:flex;align-items:center;justify-content:center;
   background:#fff;
   border-bottom:.5px solid rgba(0,0,0,.06);
 }

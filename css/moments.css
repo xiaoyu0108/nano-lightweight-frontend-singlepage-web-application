@@ -39,11 +39,11 @@ body, html {
 .page-view::-webkit-scrollbar { width: 0; }
 
 .top-nav {
-    height: 44px;
+    height: calc(44px + var(--safe-top, env(safe-area-inset-top, 0px)));
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 12px;
+    padding: var(--safe-top, env(safe-area-inset-top, 0px)) 12px 0;
     background: rgba(247,247,247,0.95);
     backdrop-filter: blur(12px);
     position: sticky;
@@ -948,7 +948,7 @@ input[type="file"] { display: none; }
 }
 .mm-viewer-bar {
     display: flex; justify-content: center; gap: 26px;
-    padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+    padding: 14px 16px calc(18px + var(--safe-bottom, env(safe-area-inset-bottom)));
     background: rgba(0, 0, 0, 0.55);
 }
 .mm-vbtn {

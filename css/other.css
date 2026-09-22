@@ -19,7 +19,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 12px 52px 8px;
+    padding: calc(12px + var(--safe-top, env(safe-area-inset-top, 0px))) 52px 8px;
     background: rgba(242, 242, 247, 0.86);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -58,7 +58,7 @@ body {
     margin: 0 auto;
     padding: 14px 16px 44px;
     overflow-y: auto;
-    height: calc(100vh - 56px);
+    height: calc(100vh - 56px - var(--safe-top, env(safe-area-inset-top, 0px)));
 }
 .card-group { margin-bottom: 22px; }
 

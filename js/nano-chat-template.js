@@ -411,7 +411,7 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    群顶栏高度用 --chat-topbar-pad 也可控制；群公告条可 order/margin 调整或隐藏。 */
 .nano-groups .topbar {
   position: relative; z-index: 30; width: 100%; flex-shrink: 0;
-  padding: var(--chat-topbar-pad, calc(8px + env(safe-area-inset-top, 0px))) 8px 6px;
+  padding: var(--chat-topbar-pad, calc(8px + var(--safe-top, env(safe-area-inset-top, 0px)))) 8px 6px;
   display: flex; align-items: center; justify-content: space-between; gap: 6px;
 }
 .nano-groups .back-btn { width: 40px; height: 40px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }

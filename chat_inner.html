@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="css/chat-inner.css">
     <link rel="stylesheet" href="css/heart.css">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://unpkg.com">
     <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
     <script src="js/appearance.js"></script>
     <script src="js/nano-notify.js"></script>
@@ -421,6 +423,22 @@
 </div>
 <style id="nanoVoiceCustomCSS"></style>
 
+<script>
+(function(){
+  // 点顶部“灵动岛”标题 = 返回聊天列表（主框架收到后关闭内页）
+  var t = document.getElementById('chatTitle');
+  if (t) {
+    t.style.cursor = 'pointer';
+    t.addEventListener('click', function(){
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'nanoCloseOverlay' }, '*');
+        }
+      } catch (e) {}
+    });
+  }
+})();
+</script>
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>
 </body>

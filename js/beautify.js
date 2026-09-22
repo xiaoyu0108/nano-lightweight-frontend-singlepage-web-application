@@ -10,7 +10,7 @@ const GLOBAL_TEMPLATE_OLD = `/* ===== 全局美化模板 =====
 */
 
 :root {
-            --safe-inset-top: env(safe-area-inset-top, 0px);
+            --safe-inset-top: var(--safe-top, env(safe-area-inset-top, 0px));
         }
         * {
             margin: 0;
@@ -1655,7 +1655,7 @@ const CHAT_TEMPLATE_OLD = `/* ===== 聊天美化模板 ===== */
   z-index: 30;
   width: 100%;
   flex-shrink: 0;
-  padding: 6px 14px calc(10px + env(safe-area-inset-bottom,0px));
+  padding: 6px 14px calc(10px + var(--safe-bottom, env(safe-area-inset-bottom,0px)));
   display: flex;
   align-items: center;
   gap: 8px;

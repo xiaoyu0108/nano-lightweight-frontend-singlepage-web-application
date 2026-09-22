@@ -117,6 +117,11 @@
     var backGuardBusy = false;
     function installHistoryGuard() {
         try {
+            // 只在最外层文档安装这层拦截。
+            // iframe 里的页面再 pushState，会把「历史返回」搅乱：
+            // 之后页面自己的 history.back() 会先撞到被拦截的假状态，
+            // 结果返回到「上一次打开的页面 / about:blank」而不是绑定的目标页。
+            if (window.parent !== window) return;
             if (!document.querySelector('[data-back]') && !document.querySelector('[data-close]')) return;
             history.pushState({ nanoBackGuard: 1 }, '');
             window.addEventListener('popstate', function () {

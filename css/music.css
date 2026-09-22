@@ -32,7 +32,7 @@ html, body {
 /* ===== 顶栏 ===== */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px 10px; flex-shrink: 0; background: var(--bg);
+  padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 20px 10px; flex-shrink: 0; background: var(--bg);
   position: relative; z-index: 10;
 }
 .topbar-btn {
@@ -765,7 +765,7 @@ html, body {
 
 .solo-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px 8px; flex-shrink: 0;
+  padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 20px 8px; flex-shrink: 0;
   position: relative;
 }
 .solo-header-btn {
@@ -840,7 +840,7 @@ html, body {
 }
 .online-list-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px 10px; flex-shrink: 0;
+  padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 20px 10px; flex-shrink: 0;
 }
 .online-list-header-btn {
   width: 36px; height: 36px; border: none; background: transparent;
@@ -859,7 +859,7 @@ html, body {
 .online-list-top {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  padding: 26px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 26px 18px calc(14px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
   display: flex; align-items: center;
   background: linear-gradient(to bottom, rgba(255,255,255,0), #fff 42%);
   pointer-events: none;
@@ -1307,7 +1307,7 @@ html, body {
 }
 .playlist-detail-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px 10px; flex-shrink: 0;
+  padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 20px 10px; flex-shrink: 0;
 }
 .playlist-detail-header-btn {
   width: 36px; height: 36px; border: none; background: transparent;

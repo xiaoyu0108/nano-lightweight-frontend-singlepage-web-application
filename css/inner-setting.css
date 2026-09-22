@@ -34,7 +34,7 @@ body::-webkit-scrollbar {
 }
 
 .container {
-    padding: 16px 14px 40px 14px;
+    padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 14px calc(40px + var(--safe-bottom, env(safe-area-inset-bottom, 0px))) 14px;
     height: 100%;
     overflow-y: auto;
     scrollbar-width: none;
