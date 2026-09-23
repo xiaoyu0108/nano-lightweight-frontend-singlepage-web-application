@@ -1389,37 +1389,35 @@
 
             function renderBg(img) {
                 try {
+                    function setImp(el, prop, val) { try { el.style.setProperty(prop, val, 'important'); } catch (e) {} }
                     if (bgType === 'image' && img) {
-                        container.style.backgroundImage = 'url(' + img + ')';
-                        container.style.backgroundSize = 'cover';
-                        container.style.backgroundPosition = 'center';
-                        container.style.backgroundRepeat = 'no-repeat';
-                        container.style.backgroundColor = 'transparent';
+                        var u = 'url(' + img + ')';
+                        setImp(container, 'background-image', u);
+                        setImp(container, 'background-size', 'cover');
+                        setImp(container, 'background-position', 'center');
+                        setImp(container, 'background-repeat', 'no-repeat');
+                        setImp(container, 'background-color', 'transparent');
+                        setImp(document.documentElement, 'background-image', u);
+                        setImp(document.documentElement, 'background-size', 'cover');
+                        setImp(document.documentElement, 'background-position', 'center');
+                        setImp(document.documentElement, 'background-repeat', 'no-repeat');
+                        setImp(document.body, 'background-image', u);
+                        setImp(document.body, 'background-size', 'cover');
+                        setImp(document.body, 'background-position', 'center');
+                        setImp(document.body, 'background-repeat', 'no-repeat');
+                        setImp(document.body, 'background-color', 'transparent');
                         document.documentElement.style.setProperty('--page-bg', 'transparent');
-                        if (scrollEl) scrollEl.style.background = 'transparent';
+                        if (scrollEl) setImp(scrollEl, 'background', 'transparent');
                     } else {
+                        var col = bgColor || '#ffffff';
                         container.style.backgroundImage = 'none';
-                        container.style.backgroundColor = bgColor || '#ffffff';
-                        document.documentElement.style.setProperty('--page-bg', '#ffffff');
-                        if (scrollEl) scrollEl.style.background = 'transparent';
-                    }
-                    // 让 html/body 也同步背景，避免手机下拉回弹时露出白底
-                    const val = bgType === 'image' && img ? ('url(' + img + ')') : 'none';
-                    if (bgType === 'image' && img) {
-                        document.body.style.backgroundImage = val;
-                        document.body.style.backgroundSize = 'cover';
-                        document.body.style.backgroundPosition = 'center';
-                        document.body.style.backgroundRepeat = 'no-repeat';
-                        document.body.style.backgroundColor = 'transparent';
-                        document.documentElement.style.backgroundImage = val;
-                        document.documentElement.style.backgroundSize = 'cover';
-                        document.documentElement.style.backgroundPosition = 'center';
-                    } else {
-                        const col = bgColor || '#ffffff';
-                        document.body.style.backgroundImage = 'none';
-                        document.body.style.backgroundColor = col;
+                        container.style.backgroundColor = col;
                         document.documentElement.style.backgroundImage = 'none';
                         document.documentElement.style.backgroundColor = col;
+                        document.body.style.backgroundImage = 'none';
+                        document.body.style.backgroundColor = col;
+                        document.documentElement.style.setProperty('--page-bg', '#ffffff');
+                        if (scrollEl) scrollEl.style.background = 'transparent';
                     }
                 } catch(e) {}
             }
