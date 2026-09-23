@@ -44,7 +44,7 @@ button, input, textarea { font: inherit; outline: none; }
 .nano-voice-modal {
   position: relative;
   width: min(400px, calc(100vw - 24px));
-  max-height: min(700px, calc(100dvh - 120px));
+  max-height: min(700px, calc(100vh - 120px));
   overflow: hidden;
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(36px) saturate(190%);
@@ -324,7 +324,7 @@ button, input, textarea { font: inherit; outline: none; }
 
 @media (max-height: 640px) {
   .nano-voice-layer { padding: 12px; }
-  .nano-voice-modal { max-height: calc(100dvh - 24px); }
+  .nano-voice-modal { max-height: calc(100vh - 24px); }
   .iv-content { min-height: 160px; padding-bottom: 62px; }
   .iv-thought { font-size: 15px; }
 }

@@ -13,7 +13,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
     background: #FFFFFF;
     color: #1C1C1E;
-    height: 100dvh;
+    height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -22,7 +22,7 @@ body {
 .phone {
     width: 100%;
     max-width: 430px;
-    height: 100dvh;
+    height: 100vh;
     max-height: 932px;
     background: #FFFFFF;
     display: flex;

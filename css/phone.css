@@ -47,7 +47,7 @@ input,textarea{font-family:inherit}
 .phone{
   position:relative;
   width:100vw;
-  height:100dvh;
+  height:100vh;
   min-height:100%;
   overflow:hidden;
   background:var(--bg);

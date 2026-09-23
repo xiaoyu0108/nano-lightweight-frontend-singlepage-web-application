@@ -30,7 +30,7 @@
 
         html, body {
             width: 100%;
-            height: 100%;
+            height: 100vh;
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -624,7 +624,7 @@
         #nano-opening .scene {
             position: relative;
             width: 100vw;
-            height: 100dvh;
+            height: 100vh;
             max-width: none; max-height: none;
         }
 
@@ -2669,7 +2669,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-23-5';
+        var BUILD = 'nano-2026-09-23-6';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

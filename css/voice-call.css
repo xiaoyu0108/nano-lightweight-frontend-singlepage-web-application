@@ -9,7 +9,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     background: #f2f2f7;
     color: #1c1c1e;
-    height: 100dvh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
