@@ -2656,9 +2656,34 @@
         } catch (e) {}
     })();
 
+    // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
+    (function nanoSelfHeal() {
+        var BUILD = 'nano-2026-09-23-3';
+        var changed = false;
+        try {
+            changed = localStorage.getItem('nano_build') !== BUILD;
+            if (changed) localStorage.setItem('nano_build', BUILD);
+        } catch (e) {}
+        window.__nanoHealing = changed;
+        if (!changed) return;
+        if (!('serviceWorker' in navigator)) return;
+        try {
+            navigator.serviceWorker.getRegistrations().then(function (rs) {
+                return Promise.all(rs.map(function (r) { return r.unregister(); }));
+            }).then(function () {
+                if (!window.caches) return null;
+                return caches.keys().then(function (ks) {
+                    return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+                });
+            }).then(function () {
+                location.reload();
+            }).catch(function () {});
+        } catch (e) {}
+    })();
+
     // ===== 注册 Service Worker =====
     try {
-        if ('serviceWorker' in navigator &&
+        if ('serviceWorker' in navigator && !window.__nanoHealing &&
             (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
             navigator.serviceWorker.addEventListener('controllerchange', function () {
                 try {
@@ -2669,7 +2694,7 @@
                 } catch (e) {}
             });
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js').then(function (reg) {
+                navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
                     console.log('[SW] registered', reg.scope);
                     try { if (reg && reg.update) reg.update(); } catch (e) {}
                 }).catch(function (err) {
