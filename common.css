@@ -1,4 +1,7 @@
 * { box-sizing: border-box; }
+:root { --nano-bottom-ext: 0px; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
-.bg { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 0; background: #ffffff; background-size: cover; background-position: center; }
-.app { position: fixed; inset: 0; z-index: 1; background: transparent; }
+/* 固定层向下多铺 --nano-bottom-ext：iOS 主屏 App 的布局视口不含底部小白条区域，
+   这截会露成空白/白条。用 JS 量出的缺口把它铺满，底栏才能真正贴到屏幕最底部。 */
+.bg { position: fixed; top: 0; right: 0; bottom: calc(-1 * var(--nano-bottom-ext, 0px)); left: 0; z-index: 0; background: #ffffff; background-size: cover; background-position: center; }
+.app { position: fixed; top: 0; left: 0; right: 0; bottom: calc(-1 * var(--nano-bottom-ext, 0px)); z-index: 1; background: transparent; }
