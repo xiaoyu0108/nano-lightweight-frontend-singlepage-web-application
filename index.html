@@ -133,7 +133,7 @@
 
         .bottom-actions {
             position: absolute;
-            bottom: max(8px, calc(var(--safe-inset-bottom, 0px) - 26px));
+            bottom: 6px;
             left: 16px;
             right: 16px;
             display: flex;
@@ -1168,7 +1168,7 @@
             try {
                 const insets = measureSafeInsets();
                 const topVal = insets.top ? (insets.top + 'px') : '0px';
-                const botVal = insets.bottom ? (insets.bottom + 'px') : '0px';
+                const botVal = '0px';
                 getSafeTopFrames().forEach(function (f) {
                     setSafeVars(f, topVal, botVal);
                     applySafeFallback(f);

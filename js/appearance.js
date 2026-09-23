@@ -115,7 +115,7 @@
             fixed = fixed.replace(/(\.bottom-actions\s*\{[^}]*?)justify-content:\s*space-between;/m, '$1justify-content: center;');
         }
         if (fixed.indexOf('.bottom-actions') !== -1) {
-            fixed = fixed.replace(/(\.bottom-actions\s*\{[^}]*?)bottom\s*:\s*28px\s*;/m, '$1bottom: max(8px, calc(var(--safe-inset-bottom, 0px) - 26px));');
+            fixed = fixed.replace(/(\.bottom-actions\s*\{[^}]*?)bottom\s*:[^;]*;/m, '$1bottom: 6px;');
         }
         if (fixed.indexOf('.overlay-header') !== -1) {
             fixed = fixed.replace(/(\.overlay-header\s*\{[^}]*?)padding\s*:\s*14px\s+0\s+12px\s+0\s*;/m, '$1padding: calc(14px + var(--safe-inset-top, 0px)) 0 12px 0;');

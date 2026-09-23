@@ -204,7 +204,7 @@ html, body {
    清零即可（配方 C）。想整条底栏换背景：给 .bottom-actions 加 background。 */
 .nano-index .bottom-actions {
   position: absolute;
-  bottom: max(8px, calc(var(--safe-inset-bottom, 0px) - 26px));
+  bottom: 6px;
   left: 16px;
   right: 16px;
   display: flex;
