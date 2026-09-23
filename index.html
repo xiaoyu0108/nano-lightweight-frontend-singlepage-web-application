@@ -798,23 +798,38 @@
         var iosStandalone = (typeof nav.standalone !== 'undefined') &&
             (nav.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
         var root = document.documentElement;
+        // 量 100vh 的真实高度：iOS 上 100vh 常常比布局视口高，差值就是被系统吃掉的那一截
+        function measureVh() {
+            try {
+                if (!document.body) return 0;
+                var d = document.createElement('div');
+                d.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:100vh;visibility:hidden;pointer-events:none;';
+                document.body.appendChild(d);
+                var h = d.getBoundingClientRect().height;
+                d.parentNode.removeChild(d);
+                return h || 0;
+            } catch (e) { return 0; }
+        }
         function apply() {
             var ext = 0;
             try {
                 if (iosStandalone) {
                     var sh = (window.screen && window.screen.height) ? window.screen.height : 0;
                     var ih = window.innerHeight || 0;
-                    var gap = Math.round(sh - ih);
+                    var gap = Math.round(Math.max(sh, measureVh()) - ih);
                     if (window.visualViewport) {
                         var vv = Math.round((window.visualViewport.height || 0) + (window.visualViewport.offsetTop || 0) - ih);
                         if (vv > gap) gap = vv;
                     }
-                    if (gap > 0 && gap <= 80) ext = gap;
+                    if (gap > 0 && gap <= 120) ext = gap;
                 }
             } catch (e) {}
             root.style.setProperty('--nano-bottom-ext', ext + 'px');
         }
         apply();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', apply);
+        }
         window.addEventListener('resize', apply);
         window.addEventListener('orientationchange', apply);
         window.addEventListener('pageshow', apply);
