@@ -948,7 +948,7 @@ input[type="file"] { display: none; }
 }
 .mm-viewer-bar {
     display: flex; justify-content: center; gap: 26px;
-    padding: 14px 16px calc(18px + var(--safe-bottom, 0px));
+    padding: 14px 16px calc(18px + 0px);
     background: rgba(0, 0, 0, 0.55);
 }
 .mm-vbtn {

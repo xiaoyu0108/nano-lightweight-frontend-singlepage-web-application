@@ -19,7 +19,7 @@ button svg{pointer-events:none;vertical-align:middle;flex-shrink:0}
 .title{font-size:17px;font-weight:600;text-align:center;color:#1c1c1e;letter-spacing:-.2px}
 
 /* ===== Content ===== */
-.content{min-height:0;flex:1;overflow:auto;padding:10px 14px calc(20px + var(--safe-bottom, 0px));-webkit-overflow-scrolling:touch}
+.content{min-height:0;flex:1;overflow:auto;padding:10px 14px calc(20px + 0px);-webkit-overflow-scrolling:touch}
 
 /* ===== Tabs（白底下划线样式，避免顶栏下方出现灰条）===== */
 .tabs{height:40px;padding:0;background:#ffffff;border-bottom:0.5px solid rgba(60,60,67,.10);border-radius:0;display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:0 0 12px}
@@ -119,7 +119,7 @@ select:focus,.name:focus{border-color:rgba(0,122,255,.4);box-shadow:0 0 0 2px rg
 .url-row .tool{height:36px;padding:0 14px}
 
 /* ===== Toast ===== */
-.toast{position:fixed;z-index:99;left:50%;bottom:calc(20px + var(--safe-bottom, 0px));transform:translate(-50%,12px);opacity:0;pointer-events:none;background:rgba(30,30,32,.88);color:#fff;border-radius:10px;padding:7px 14px;font-size:12px;transition:.2s;white-space:nowrap}
+.toast{position:fixed;z-index:99;left:50%;bottom:calc(20px + 0px);transform:translate(-50%,12px);opacity:0;pointer-events:none;background:rgba(30,30,32,.88);color:#fff;border-radius:10px;padding:7px 14px;font-size:12px;transition:.2s;white-space:nowrap}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
 /* ===== Responsive ===== */

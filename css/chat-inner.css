@@ -513,7 +513,7 @@ html, body {
 }
 .bottom-bar {
     position: relative; z-index: 30; width: 100%; flex-shrink: 0;
-    padding: var(--chat-bottombar-pad, 6px 14px max(8px, calc(var(--safe-bottom, 0px) - 26px)));
+    padding: var(--chat-bottombar-pad, 6px 14px max(8px, calc(0px - 26px)));
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .more-btn {

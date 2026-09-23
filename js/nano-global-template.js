@@ -1251,7 +1251,7 @@ html, body {
 .nano-index .bottom-actions { left: 0; right: 0; bottom: 0; }
 .nano-index .capsule-group {
   flex: 1; border-radius: 0; justify-content: space-around;
-  padding: 10px 8px calc(10px + var(--safe-bottom, 0px));
+  padding: 10px 8px calc(10px + 0px);
   background: rgba(255, 255, 255, 0.92);
 }
 */

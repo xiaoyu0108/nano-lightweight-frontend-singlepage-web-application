@@ -1655,7 +1655,7 @@ const CHAT_TEMPLATE_OLD = `/* ===== 聊天美化模板 ===== */
   z-index: 30;
   width: 100%;
   flex-shrink: 0;
-  padding: 6px 14px calc(10px + var(--safe-bottom, 0px));
+  padding: 6px 14px calc(10px + 0px);
   display: flex;
   align-items: center;
   gap: 8px;

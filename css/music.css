@@ -859,7 +859,7 @@ html, body {
 .online-list-top {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  padding: 26px 18px calc(14px + var(--safe-bottom, 0px));
+  padding: 26px 18px calc(14px + 0px);
   display: flex; align-items: center;
   background: linear-gradient(to bottom, rgba(255,255,255,0), #fff 42%);
   pointer-events: none;
