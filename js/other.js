@@ -288,31 +288,33 @@
 // ===== 全局底栏位置调节（作用于所有页面的底栏） =====
 (function () {
     'use strict';
-    var KEY = 'nanoBottomShift';
-    var range = document.getElementById('bottomShift');
-    var val = document.getElementById('bottomShiftVal');
-    var reset = document.getElementById('bottomShiftReset');
-
-    function read() {
-        try { return parseInt(localStorage.getItem(KEY) || '0', 10) || 0; } catch (e) { return 0; }
+    var STEP = 4, MIN = -160, MAX = 200;
+    var KEYS = { top: 'nanoTopShift', bottom: 'nanoBottomShift' };
+    function read(k) {
+        try { return parseInt(localStorage.getItem(k) || '0', 10) || 0; } catch (e) { return 0; }
     }
-    function render(n) {
-        if (range) range.value = String(n);
-        if (val) val.textContent = (n > 0 ? '+' : '') + n;
+    function render(target, n) {
+        var el = document.getElementById(target === 'top' ? 'topShiftVal' : 'bottomShiftVal');
+        if (el) el.textContent = (n > 0 ? '+' : '') + n;
     }
-    function apply(n) {
+    function apply(target, n) {
         n = parseInt(n, 10) || 0;
-        try { localStorage.setItem(KEY, String(n)); } catch (e) {}
-        render(n);
-        if (window.__nanoAppearance && window.__nanoAppearance.applyMessage) {
-            try { window.__nanoAppearance.applyMessage({ type: 'nanoBottomShift', value: n }); } catch (e) {}
-        }
-        if (window.parent !== window) {
-            try { window.parent.postMessage({ type: 'nanoBottomShift', value: n }, '*'); } catch (e) {}
-        }
+        n = Math.max(MIN, Math.min(MAX, n));
+        var key = KEYS[target];
+        try { localStorage.setItem(key, String(n)); } catch (e) {}
+        render(target, n);
+        var msg = { type: target === 'top' ? 'nanoTopShift' : 'nanoBottomShift', value: n };
+        if (window.__nanoAppearance) { try { window.__nanoAppearance.applyMessage(msg); } catch (e) {} }
+        if (window.parent !== window) { try { window.parent.postMessage(msg, '*'); } catch (e) {} }
     }
-
-    render(read());
-    if (range) range.addEventListener('input', function () { apply(this.value); });
-    if (reset) reset.addEventListener('click', function () { apply(0); });
+    document.querySelectorAll('.nudge-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var target = this.getAttribute('data-target');
+            var dir = parseInt(this.getAttribute('data-dir'), 10) || 0;
+            if (!target) return;
+            apply(target, dir === 0 ? 0 : read(KEYS[target]) + dir * STEP);
+        });
+    });
+    render('top', read(KEYS.top));
+    render('bottom', read(KEYS.bottom));
 })();

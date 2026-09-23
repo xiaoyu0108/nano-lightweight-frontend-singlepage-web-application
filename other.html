@@ -102,15 +102,23 @@
         <section class="card-group">
             <div class="group-title">界面</div>
             <div class="list-group">
-                <div class="list-item slider-row">
-                    <span class="item-title">底栏位置</span>
-                    <div class="slider-control">
-                        <input type="range" class="ball-range" id="bottomShift" min="-60" max="120" step="1" value="0">
+                <div class="list-item">
+                    <span class="item-title">顶栏位置</span>
+                    <div class="nudge-controls">
+                        <button class="nudge-btn" data-target="top" data-dir="-1">上调</button>
+                        <span class="nudge-value" id="topShiftVal">0</span>
+                        <button class="nudge-btn" data-target="top" data-dir="1">下调</button>
+                        <button class="nudge-btn reset" data-target="top" data-dir="0">恢复</button>
                     </div>
-                    <span class="slider-value" id="bottomShiftVal">0</span>
                 </div>
-                <div class="list-item tap-row" id="bottomShiftReset">
-                    <span class="item-title">恢复默认位置</span>
+                <div class="list-item">
+                    <span class="item-title">底栏位置</span>
+                    <div class="nudge-controls">
+                        <button class="nudge-btn" data-target="bottom" data-dir="-1">上调</button>
+                        <span class="nudge-value" id="bottomShiftVal">0</span>
+                        <button class="nudge-btn" data-target="bottom" data-dir="1">下调</button>
+                        <button class="nudge-btn reset" data-target="bottom" data-dir="0">恢复</button>
+                    </div>
                 </div>
             </div>
         </section>

@@ -2192,7 +2192,7 @@
                 });
             }
 
-            if (data.type === 'nanoBottomShift') {
+            if (data.type === 'nanoBottomShift' || data.type === 'nanoTopShift') {
                 if (window.__nanoAppearance) {
                     try { window.__nanoAppearance.applyMessage(data); } catch (e) {}
                 }

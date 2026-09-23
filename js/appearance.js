@@ -296,6 +296,9 @@
         try {
             applyBottomShift(readCss('nanoBottomShift'));
         } catch (e) {}
+        try {
+            applyTopShift(readCss('nanoTopShift'));
+        } catch (e) {}
         var cfg = readFontCfgSync();
         if (cfg) {
             applyFontCfg(cfg);
@@ -305,15 +308,21 @@
     }
 
     // ---- 全局底栏位置偏移（“其他”页的底栏位置滑杆，作用于所有页面的底栏） ----
+    var TOP_SHIFT_SEL = '.top-bar,.navbar,.nav-bar,.memory-topbar,.topbar,.page-topbar,.overlay-header,.status';
     var BOTTOM_SHIFT_SEL = '.bottom-actions,.bottom-bar,footer.bottom,.bottom,' +
         '.dm-composer,.mm-viewer-bar,.comment-input,.chat-input-bar,.ins-emoji-panel';
-    function applyBottomShift(px) {
+    function applyShift(kind, px) {
+        var key = kind === 'top' ? 'nanoTopShift' : 'nanoBottomShift';
         var v = parseInt(px, 10);
-        if (isNaN(v)) { try { v = parseInt(localStorage.getItem('nanoBottomShift') || '0', 10) || 0; } catch (e) { v = 0; } }
-        applyStyle('nano-bottom-shift',
-            ':root{--nano-bottom-shift:' + v + 'px;}' +
-            BOTTOM_SHIFT_SEL + '{transform:translateY(var(--nano-bottom-shift,0px)) !important;}');
+        if (isNaN(v)) { try { v = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) { v = 0; } }
+        var varName = kind === 'top' ? '--nano-top-shift' : '--nano-bottom-shift';
+        var sel = kind === 'top' ? TOP_SHIFT_SEL : BOTTOM_SHIFT_SEL;
+        applyStyle('nano-' + kind + '-shift',
+            ':root{' + varName + ':' + v + 'px;}' +
+            sel + '{transform:translateY(var(' + varName + ',0px)) !important;}');
     }
+    function applyTopShift(px) { applyShift('top', px); }
+    function applyBottomShift(px) { applyShift('bottom', px); }
 
     // ---- 供父框架 / 其它模块调用的入口 ----
     window.__nanoAppearance = {
@@ -325,12 +334,15 @@
                 else if (data.target === 'chat-avatar') applyChatAvatarCss(data.css || '');
             } else if (data.type === 'beautify:font') {
                 applyFontCfg(data.cfg || null);
+            } else if (data.type === 'nanoTopShift') {
+                applyTopShift(data.value);
             } else if (data.type === 'nanoBottomShift') {
                 applyBottomShift(data.value);
             } else if (data.type === 'beautify:refresh') {
                 applySaved();
             }
         },
+        applyTopShift: applyTopShift,
         applyBottomShift: applyBottomShift,
         applySaved: applySaved
     };
