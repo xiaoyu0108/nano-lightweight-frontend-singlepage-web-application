@@ -293,12 +293,26 @@
         try {
             applyGlobalCss(unlockScrollCss(migrateGlobalCss(readCss('beautify_global_v2'))));
         } catch (e) {}
+        try {
+            applyBottomShift(readCss('nanoBottomShift'));
+        } catch (e) {}
         var cfg = readFontCfgSync();
         if (cfg) {
             applyFontCfg(cfg);
         } else {
             loadFontCfgFromIDB().then(function(c) { if (c) applyFontCfg(c); });
         }
+    }
+
+    // ---- 全局底栏位置偏移（“其他”页的底栏位置滑杆，作用于所有页面的底栏） ----
+    var BOTTOM_SHIFT_SEL = '.bottom-actions,.bottom-bar,footer.bottom,.bottom,' +
+        '.dm-composer,.mm-viewer-bar,.comment-input,.chat-input-bar,.ins-emoji-panel';
+    function applyBottomShift(px) {
+        var v = parseInt(px, 10);
+        if (isNaN(v)) { try { v = parseInt(localStorage.getItem('nanoBottomShift') || '0', 10) || 0; } catch (e) { v = 0; } }
+        applyStyle('nano-bottom-shift',
+            ':root{--nano-bottom-shift:' + v + 'px;}' +
+            BOTTOM_SHIFT_SEL + '{transform:translateY(var(--nano-bottom-shift,0px)) !important;}');
     }
 
     // ---- 供父框架 / 其它模块调用的入口 ----
@@ -311,10 +325,13 @@
                 else if (data.target === 'chat-avatar') applyChatAvatarCss(data.css || '');
             } else if (data.type === 'beautify:font') {
                 applyFontCfg(data.cfg || null);
+            } else if (data.type === 'nanoBottomShift') {
+                applyBottomShift(data.value);
             } else if (data.type === 'beautify:refresh') {
                 applySaved();
             }
         },
+        applyBottomShift: applyBottomShift,
         applySaved: applySaved
     };
 

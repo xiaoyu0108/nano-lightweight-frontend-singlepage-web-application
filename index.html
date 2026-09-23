@@ -2192,6 +2192,17 @@
                 });
             }
 
+            if (data.type === 'nanoBottomShift') {
+                if (window.__nanoAppearance) {
+                    try { window.__nanoAppearance.applyMessage(data); } catch (e) {}
+                }
+                document.querySelectorAll('iframe').forEach(function(f) {
+                    if (f && f.contentWindow) {
+                        try { f.contentWindow.postMessage(data, '*'); } catch (e) {}
+                    }
+                });
+            }
+
             if (data.type === 'closeBeautify') {
                 closeFullscreen();
             }
