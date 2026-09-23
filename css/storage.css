@@ -37,7 +37,7 @@ body {
     background: var(--bg);
     color: var(--text);
     padding-top: calc(64px + var(--safe-top, env(safe-area-inset-top, 0px)));
-    min-height: 100vh;
+    min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
 }
 
