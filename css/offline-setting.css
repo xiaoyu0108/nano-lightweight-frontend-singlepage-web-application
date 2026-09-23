@@ -46,7 +46,7 @@ align-items:center;background:rgba(248,243,244,.92);backdrop-filter:blur(20px);b
 .sheet-backdrop{display:none;position:fixed;inset:0;background:rgba(60,45,48,.25);backdrop-filter:blur(5px);z-index:60}
 .sheet-backdrop.open{display:block}
 .sheet{position:absolute;left:0;right:0;bottom:0;max-height:92vh;background:#faf5f5;border-radius:23px 23px 0 0;
-box-shadow:0 -12px 45px rgba(60,45,48,.12);padding-bottom:calc(10px + var(--safe-bottom, env(safe-area-inset-bottom)));display:flex;flex-direction:column}
+box-shadow:0 -12px 45px rgba(60,45,48,.12);padding-bottom:calc(10px + var(--safe-bottom, 0px));display:flex;flex-direction:column}
 .sheet-head{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 17px;border-bottom:1px solid var(--line);flex:none;background:#faf5f5}
 .sheet-title{font-size:16px;font-weight:650;color:#5a4e50}.sheet-close{font-size:13px;color:var(--sub);padding:8px}
 .sheet-body{overflow:auto;padding:14px 14px 20px;flex:1;scrollbar-width:none}

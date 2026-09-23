@@ -74,7 +74,7 @@
         // 结构：顶栏贴安全区（不留空隙），底栏避让底部小白条；可用下面两个变量 DIY
         '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;}' +
         '.multi-select-bar{top:var(--safe-top,0px) !important;}' +
-        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,max(8px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) - 26px))) !important;}';
+        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,max(8px, calc(var(--safe-bottom, 0px) - 26px))) !important;}';
 
     function applyChatCss(css) {
         // 聊天 CSS 仅作用于单聊/群聊内页（额外的聊天专用覆盖）

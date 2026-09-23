@@ -18,7 +18,7 @@ body.dark{
 .page{position:absolute;inset:0;display:none;background:var(--bg);overflow:hidden}
 .page.active{display:block}
 .scroll{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.page-inner{padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 14px) 16px calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 110px)}
+.page-inner{padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 14px) 16px calc(var(--safe-bottom, 0px) + 110px)}
 .page.no-nav .page-inner{padding-bottom:28px}
 .topbar{
   height:calc(54px + var(--safe-top, env(safe-area-inset-top, 0px)));display:flex;align-items:center;justify-content:space-between;
@@ -35,7 +35,7 @@ body.dark{
 .iconbtn:active{background:var(--surface2)}
 svg{display:block}
 .nav{
-  position:absolute;z-index:50;left:12px;right:12px;bottom:calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 10px);
+  position:absolute;z-index:50;left:12px;right:12px;bottom:calc(var(--safe-bottom, 0px) + 10px);
   height:62px;border:1px solid color-mix(in srgb,var(--line) 82%,transparent);
   background:color-mix(in srgb,var(--surface) 88%,transparent);
   backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
@@ -231,7 +231,7 @@ body.dark .barrage .reacts span{background:rgba(255,255,255,.1);color:var(--text
 
 .live-composer{
   position:absolute;left:0;right:0;bottom:0;z-index:40;
-  padding:9px 12px calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 11px);
+  padding:9px 12px calc(var(--safe-bottom, 0px) + 11px);
   background:color-mix(in srgb,var(--bg) 82%,transparent);
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   border-top:1px solid color-mix(in srgb,var(--line) 75%,transparent);
@@ -253,7 +253,7 @@ body.dark .barrage .reacts span{background:rgba(255,255,255,.1);color:var(--text
   box-shadow:0 20px 50px rgba(18,24,35,.22);
   padding:10px;display:none;
   touch-action:none;cursor:grab;
-  left:auto;right:14px;bottom:calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 92px)
+  left:auto;right:14px;bottom:calc(var(--safe-bottom, 0px) + 92px)
 }
 #miniLive.show{display:block}
 #miniLive.dragging{cursor:grabbing;box-shadow:0 26px 60px rgba(18,24,35,.28)}
@@ -366,7 +366,7 @@ body.dark .barrage .reacts span{background:rgba(255,255,255,.1);color:var(--text
 #chatMessages .reacts span{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:11px;color:var(--text)}
 #chatMessages .reply-btn{margin-top:6px;padding:6px 11px;border-radius:999px;background:var(--surface2);border:0;font-size:11px;font-weight:700;color:var(--blue)}
 
-.dm-composer{position:absolute;z-index:25;left:0;right:0;bottom:0;padding:9px 12px calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 11px);display:flex;align-items:center;gap:7px;background:color-mix(in srgb,var(--bg) 88%,transparent);border-top:1px solid color-mix(in srgb,var(--line) 75%,transparent)}
+.dm-composer{position:absolute;z-index:25;left:0;right:0;bottom:0;padding:9px 12px calc(var(--safe-bottom, 0px) + 11px);display:flex;align-items:center;gap:7px;background:color-mix(in srgb,var(--bg) 88%,transparent);border-top:1px solid color-mix(in srgb,var(--line) 75%,transparent)}
 .composer-plus,.composer-send{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;flex:none}
 .composer-plus{border:0;background:var(--surface);color:var(--text);box-shadow:0 4px 14px rgba(20,25,35,.05)}
 .composer-send{background:var(--text);color:var(--bg);box-shadow:0 6px 18px rgba(20,25,35,.12)}
@@ -425,7 +425,7 @@ body.dark .mine-thumb{background:linear-gradient(145deg,#2a2c31,#1c1e22)}
 .switch i{display:block;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15);transition:.2s}
 .switch.on{background:var(--blue)}.switch.on i{transform:translateX(17px)}
 
-.modal{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.3);display:none;align-items:flex-end;padding:0 16px calc(var(--safe-bottom, env(safe-area-inset-bottom)) + 18px)}
+.modal{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.3);display:none;align-items:flex-end;padding:0 16px calc(var(--safe-bottom, 0px) + 18px)}
 .modal.show{display:flex}
 .sheet{width:100%;background:var(--surface);border-radius:24px;padding:18px 18px 14px;box-shadow:0 22px 60px rgba(18,24,35,.22);max-width:420px;margin:auto}
 .sheet h2{font-size:16px;margin:0 0 12px;letter-spacing:-.03em;text-align:center;font-weight:800}

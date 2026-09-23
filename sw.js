@@ -76,7 +76,11 @@ self.addEventListener('fetch', function (event) {
                     try { if (res && res.status === 200) cache.put(req, res.clone()); } catch (e) {}
                     return res;
                 }).catch(function () { return cached; });
-                return cached || network;
+                if (!cached) return network;
+                return Promise.race([
+                    network,
+                    new Promise(function (resolve) { setTimeout(function () { resolve(cached); }, NET_TIMEOUT_MS); })
+                ]).catch(function () { return cached; });
             });
         })
     );

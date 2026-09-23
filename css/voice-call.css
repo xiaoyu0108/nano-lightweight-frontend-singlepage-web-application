@@ -347,7 +347,7 @@ body {
 
 /* ===== 底部输入�?===== */
 .bottom-area {
-    padding: 8px 16px calc(12px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
+    padding: 8px 16px calc(12px + var(--safe-bottom, 0px));
     flex-shrink: 0;
     background: transparent;
 }

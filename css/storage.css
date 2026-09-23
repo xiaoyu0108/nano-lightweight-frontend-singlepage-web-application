@@ -313,7 +313,7 @@ body {
     background: #ffffff;
     border-radius: 20px 20px 0 0;
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
-    padding: 8px 12px calc(16px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
+    padding: 8px 12px calc(16px + var(--safe-bottom, 0px));
     transform: translateY(110%);
     visibility: hidden;
     transition: transform 0.32s cubic-bezier(0.25, 0.8, 0.25, 1), visibility 0.32s;

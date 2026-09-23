@@ -19,7 +19,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: calc(12px + var(--safe-top, env(safe-area-inset-top, 0px))) 52px 8px;
+    padding: 12px 52px 8px;
+    border-top: var(--safe-top, env(safe-area-inset-top, 0px)) solid transparent;
     background: rgba(242, 242, 247, 0.86);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);

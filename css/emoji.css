@@ -626,4 +626,4 @@ body {
     }
 }
 
-.nav-bar { padding-top: calc(14px + var(--safe-top, 0px)); }
+.nav-bar { border-top: var(--safe-top, env(safe-area-inset-top, 0px)) solid transparent; }

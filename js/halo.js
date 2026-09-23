@@ -1648,7 +1648,7 @@ function collapseLive(){
   const mini=$('miniLive');
   mini.classList.add('show');
   mini.style.right='14px';
-  mini.style.bottom='calc(env(safe-area-inset-bottom) + 92px)';
+  mini.style.bottom='calc(0px + 92px)';
   mini.style.left='auto';mini.style.top='auto';
   requestAnimationFrame(clampMini);
   updateLiveHomeBackDot();
