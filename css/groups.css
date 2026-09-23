@@ -373,7 +373,7 @@ html, body {
 /* ========== 底部输入�?========== */
 .bottom-bar {
     position: relative; z-index: 30; width: 100%; flex-shrink: 0;
-    padding: 8px 12px calc(8px + 0px);
+    padding: 8px 12px 4px;
     display: flex; align-items: center; gap: 8px;
     background: transparent;
 }

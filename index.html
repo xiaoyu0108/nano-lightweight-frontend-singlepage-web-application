@@ -133,7 +133,7 @@
 
         .bottom-actions {
             position: absolute;
-            bottom: 6px;
+            bottom: 0;
             left: 16px;
             right: 16px;
             display: flex;
@@ -2681,26 +2681,12 @@
         } catch (e) {}
     })();
 
-    // ===== 注册 Service Worker =====
+    // ===== Service Worker：暂时停用，保证每次都加载最新代码（解决 iOS PWA 缓存旧版本） =====
     try {
-        if ('serviceWorker' in navigator && !window.__nanoHealing &&
-            (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-            navigator.serviceWorker.addEventListener('controllerchange', function () {
-                try {
-                    if (!sessionStorage.getItem('nanoSwReloaded')) {
-                        sessionStorage.setItem('nanoSwReloaded', '1');
-                        location.reload();
-                    }
-                } catch (e) {}
-            });
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
-                    console.log('[SW] registered', reg.scope);
-                    try { if (reg && reg.update) reg.update(); } catch (e) {}
-                }).catch(function (err) {
-                    console.warn('[SW] register failed', err && err.message);
-                });
-            });
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (rs) {
+                return Promise.all(rs.map(function (r) { return r.unregister(); }));
+            }).catch(function () {});
         }
     } catch (e) {}
 </script>

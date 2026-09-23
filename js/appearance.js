@@ -74,7 +74,7 @@
         // 结构：顶栏贴安全区（不留空隙），底栏避让底部小白条；可用下面两个变量 DIY
         '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;}' +
         '.multi-select-bar{top:var(--safe-top,0px) !important;}' +
-        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,max(8px, calc(0px - 26px))) !important;}';
+        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,4px) !important;}';
 
     function applyChatCss(css) {
         // 聊天 CSS 仅作用于单聊/群聊内页（额外的聊天专用覆盖）
@@ -115,7 +115,7 @@
             fixed = fixed.replace(/(\.bottom-actions\s*\{[^}]*?)justify-content:\s*space-between;/m, '$1justify-content: center;');
         }
         if (fixed.indexOf('.bottom-actions') !== -1) {
-            fixed = fixed.replace(/(\.bottom-actions\s*\{[^}]*?)bottom\s*:[^;]*;/m, '$1bottom: 6px;');
+            fixed = fixed.replace(/(\.bottom-actions\s*\{[^}]*?)bottom\s*:[^;]*;/m, '$1bottom: 0;');
         }
         if (fixed.indexOf('.overlay-header') !== -1) {
             fixed = fixed.replace(/(\.overlay-header\s*\{[^}]*?)padding\s*:\s*14px\s+0\s+12px\s+0\s*;/m, '$1padding: calc(14px + var(--safe-inset-top, 0px)) 0 12px 0;');
