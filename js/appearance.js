@@ -72,9 +72,9 @@
         '.message-row.centered .message-content,.message-row.sys-notice .message-content' +
         '{max-width:88%;align-items:center;}' +
         // 结构：顶栏贴安全区（不留空隙），底栏避让底部小白条；可用下面两个变量 DIY
-        '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;}' +
+        '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;background:transparent !important;}' +
         '.multi-select-bar{top:var(--safe-top,0px) !important;}' +
-        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,4px) !important;}';
+        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,4px) !important;background:transparent !important;}';
 
     function applyChatCss(css) {
         // 聊天 CSS 仅作用于单聊/群聊内页（额外的聊天专用覆盖）
