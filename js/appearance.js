@@ -299,6 +299,9 @@
         try {
             applyTopShift(readCss('nanoTopShift'));
         } catch (e) {}
+        try {
+            applyFlushFix();
+        } catch (e) {}
         var cfg = readFontCfgSync();
         if (cfg) {
             applyFontCfg(cfg);
@@ -323,6 +326,17 @@
     }
     function applyTopShift(px) { applyShift('top', px); }
     function applyBottomShift(px) { applyShift('bottom', px); }
+
+    // ---- 强制所有底栏贴底（不吃缓存：始终注入，覆盖旧的页面 CSS / 旧预设） ----
+    var BOTTOM_FLUSH_FIX =
+        'html .bottom-actions,html .nano-index .bottom-actions{bottom:0 !important;padding-bottom:0 !important;}' +
+        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:4px !important;background:transparent !important;}' +
+        'html footer.bottom{padding-bottom:0 !important;}' +
+        'html .bottom{padding-bottom:0 !important;}' +
+        'html .dm-composer{padding-bottom:4px !important;}' +
+        'html .mm-viewer-bar{padding-bottom:4px !important;}' +
+        'html .comment-input,html .chat-input-bar{padding-bottom:4px !important;}';
+    function applyFlushFix() { applyStyle('nano-flush-fix', BOTTOM_FLUSH_FIX); }
 
     // ---- 供父框架 / 其它模块调用的入口 ----
     window.__nanoAppearance = {
