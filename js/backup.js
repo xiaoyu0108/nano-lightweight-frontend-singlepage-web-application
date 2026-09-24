@@ -912,7 +912,216 @@ function handleFileSelect(event) {
     event.target.value = '';
 }
 
+// ================= 单个角色 导出 / 导入 =================
+const CHAR_BACKUP_TYPE = 'nano-single-char-backup';
+
+function charLocalStorageKeys(charId) {
+    const out = [];
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (!k) continue;
+            if (
+                k === 'chat_messages_' + charId ||
+                k === 'chat_reply_pending_' + charId ||
+                k === 'chat_req_' + charId ||
+                k === 'chat_cleared_' + charId ||
+                k === 'nano_moment_img_round_' + charId ||
+                k === 'voice_call_seconds_' + charId
+            ) { out.push(k); continue; }
+            if (k.indexOf('chat_setting_') === 0 && k.slice(-(charId.length + 1)) === '_' + charId) out.push(k);
+        }
+    } catch (e) {}
+    return out;
+}
+
+function idbReadAll(dbName, storeName) {
+    return openDatabase(dbName).then((db) => new Promise((resolve) => {
+        try {
+            if (!db.objectStoreNames.contains(storeName)) { db.close(); resolve([]); return; }
+            const tx = db.transaction(storeName, 'readonly');
+            getAllRecords(tx.objectStore(storeName)).then((rows) => { db.close(); resolve(rows || []); });
+        } catch (e) { try { db.close(); } catch (e2) {} resolve([]); }
+    })).catch(() => []);
+}
+
+function idbPutRecord(dbName, storeName, key, value) {
+    return openDatabase(dbName).then((db) => new Promise((resolve) => {
+        try {
+            if (!db.objectStoreNames.contains(storeName)) { db.close(); resolve(false); return; }
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            if (store.keyPath) store.put(value); else store.put(value, key);
+            txDone(tx).then(() => { db.close(); resolve(true); });
+        } catch (e) { try { db.close(); } catch (e2) {} resolve(false); }
+    })).catch(() => false);
+}
+
+async function listCharactersForBackup() {
+    const rows = await idbReadAll('nano_characters_db', 'characters');
+    return rows.map((r) => r.value).filter((v) => v && v.id);
+}
+
+async function collectCharBackup(charId) {
+    const character = (await listCharactersForBackup()).find((c) => c.id === charId) || null;
+
+    const localStorageData = {};
+    charLocalStorageKeys(charId).forEach((k) => { try { localStorageData[k] = localStorage.getItem(k); } catch (e) {} });
+
+    const indexedDBData = {};
+
+    const chars = await idbReadAll('nano_characters_db', 'characters');
+    const charRow = chars.find((r) => (r.value && r.value.id === charId) || r.key === charId);
+    if (charRow) indexedDBData['nano_characters_db'] = { characters: [charRow] };
+
+    const vmem = {};
+    const configRows = (await idbReadAll('nano_vector_memory_db', 'config')).filter((r) =>
+        ['memlist_' + charId, 'auxchat_' + charId, 'auxmeta_' + charId, 'auxstate_' + charId].indexOf(r.key) !== -1);
+    if (configRows.length) vmem.config = configRows;
+    const stateRows = (await idbReadAll('nano_vector_memory_db', 'chat_state')).filter((r) =>
+        r.key === charId || (r.value && r.value.chatId === charId));
+    if (stateRows.length) vmem.chat_state = stateRows;
+    const cmRows = (await idbReadAll('nano_vector_memory_db', 'chat_messages')).filter((r) =>
+        r.key === charId || (r.value && r.value.chatId === charId));
+    if (cmRows.length) vmem.chat_messages = cmRows;
+    const memRows = (await idbReadAll('nano_vector_memory_db', 'memories')).filter((r) =>
+        r.value && r.value.chatId === charId);
+    if (memRows.length) vmem.memories = memRows;
+    if (Object.keys(vmem).length) indexedDBData['nano_vector_memory_db'] = vmem;
+
+    const phoneRows = (await idbReadAll('check_phone_db', 'app_data')).filter((r) =>
+        typeof r.key === 'string' && (r.key === 'wallpaper_' + charId || r.key.indexOf('icon_' + charId + '_') === 0));
+    if (phoneRows.length) indexedDBData['check_phone_db'] = { app_data: phoneRows };
+
+    const vcRows = await idbReadAll('voice_call_' + charId, 'messages');
+    if (vcRows.length) indexedDBData['voice_call_' + charId] = { messages: vcRows };
+
+    let mask = null, maskAvatar = null;
+    const bindUser = character && character.bindUser;
+    if (bindUser) {
+        const maskRows = await idbReadAll('nano_mask_db', 'mask_data');
+        const maskRec = maskRows.find((r) => r.value && Array.isArray(r.value.masks));
+        if (maskRec) mask = maskRec.value.masks.find((m) => m.id === bindUser) || null;
+        const avRows = await idbReadAll('MaskAvatarDB', 'avatars');
+        const avRow = avRows.find((r) => r.key === bindUser || (r.value && r.value.id === bindUser));
+        if (avRow) maskAvatar = avRow.value;
+    }
+
+    let worldbookFiles = [];
+    const wbRows = await idbReadAll('nano_worldbook_db', 'worldbook_data');
+    const wbRec = wbRows.find((r) => r.value && Array.isArray(r.value.files));
+    if (wbRec) {
+        worldbookFiles = wbRec.value.files.filter((f) =>
+            f && Array.isArray(f.boundCharacters) && f.boundCharacters.indexOf(charId) !== -1);
+    }
+
+    return {
+        meta: { type: CHAR_BACKUP_TYPE, version: 1, charId: charId, name: (character && character.name) || '', exportedAt: new Date().toISOString() },
+        character: character,
+        localStorage: localStorageData,
+        indexedDB: indexedDBData,
+        mask: mask,
+        maskAvatar: maskAvatar,
+        worldbookFiles: worldbookFiles
+    };
+}
+
+async function exportSelectedChar() {
+    const sel = $('charSelect');
+    const charId = sel && sel.value;
+    if (!charId) { alert('请先选择一个角色'); return; }
+    const data = await collectCharBackup(charId);
+    const name = (data.meta && data.meta.name) || charId;
+    downloadBlob(new Blob([JSON.stringify(data)], { type: 'application/json' }), timestampName('Nano-Char-' + name, 'json'));
+}
+
+async function mergeWorldbookFiles(files) {
+    if (!files || !files.length) return;
+    const rows = await idbReadAll('nano_worldbook_db', 'worldbook_data');
+    const rec = rows.find((r) => r.value && Array.isArray(r.value.files));
+    const data = rec ? rec.value : { groups: [], files: [] };
+    data.groups = Array.isArray(data.groups) ? data.groups : [];
+    data.files = Array.isArray(data.files) ? data.files : [];
+    files.forEach((f) => {
+        if (!f) return;
+        const idx = data.files.findIndex((x) => x && x.id === f.id);
+        if (idx >= 0) data.files[idx] = f; else data.files.push(f);
+    });
+    await idbPutRecord('nano_worldbook_db', 'worldbook_data', 'data', data);
+    try { localStorage.setItem('nano_worldbook_data_v5', JSON.stringify(data)); } catch (e) {}
+}
+
+async function mergeMask(mask, avatar) {
+    if (mask) {
+        const rows = await idbReadAll('nano_mask_db', 'mask_data');
+        const rec = rows.find((r) => r.value && Array.isArray(r.value.masks));
+        const data = rec ? rec.value : { masks: [], currentMaskId: mask.id };
+        data.masks = Array.isArray(data.masks) ? data.masks : [];
+        const idx = data.masks.findIndex((m) => m && m.id === mask.id);
+        if (idx >= 0) data.masks[idx] = mask; else data.masks.push(mask);
+        if (!data.currentMaskId) data.currentMaskId = mask.id;
+        await idbPutRecord('nano_mask_db', 'mask_data', 'data', data);
+        try { localStorage.setItem('nano_mask_data', JSON.stringify(data)); } catch (e) {}
+    }
+    if (avatar && avatar.id) {
+        await idbPutRecord('MaskAvatarDB', 'avatars', avatar.id, avatar);
+    }
+}
+
+async function refreshCharSelect() {
+    const sel = $('charSelect');
+    if (!sel) return;
+    const prev = sel.value;
+    const chars = await listCharactersForBackup();
+    sel.innerHTML = '';
+    chars.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name || c.id;
+        sel.appendChild(opt);
+    });
+    if (prev) { try { sel.value = prev; } catch (e) {} }
+}
+
+async function importCharBackup(data) {
+    if (!data || !data.meta || data.meta.type !== CHAR_BACKUP_TYPE) throw new Error('不是「单个角色」备份文件');
+    const ls = data.localStorage || {};
+    Object.keys(ls).forEach((k) => { try { localStorage.setItem(k, ls[k]); } catch (e) {} });
+    const idb = data.indexedDB || {};
+    for (const dbName in idb) {
+        for (const storeName in idb[dbName]) {
+            const rows = idb[dbName][storeName] || [];
+            for (const row of rows) {
+                try { await idbPutRecord(dbName, storeName, row.key, row.value); } catch (e) {}
+            }
+        }
+    }
+    await mergeWorldbookFiles(data.worldbookFiles);
+    await mergeMask(data.mask, data.maskAvatar);
+    await refreshCharSelect();
+    return data.meta;
+}
+
+function triggerCharImport() {
+    const inp = $('charFileInput');
+    if (inp) inp.click();
+}
+
+async function handleCharImportFile(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const meta = await importCharBackup(data);
+        alert('已导入角色「' + ((meta && meta.name) || (meta && meta.charId) || '') + '」的数据');
+    } catch (e) {
+        alert('导入失败：' + (e && e.message ? e.message : e));
+    }
+}
+
 // ================= 初始化 =================
 document.addEventListener('DOMContentLoaded', () => {
-    // 无需预扫描，保持轻量
+    refreshCharSelect();
 });

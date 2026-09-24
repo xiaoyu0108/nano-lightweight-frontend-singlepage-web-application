@@ -228,4 +228,12 @@ body {
 .alert-btn-cancel { border-right: 0.5px solid var(--separator); }
 .alert-btn-confirm { font-weight: 600; }
 .alert-btn-confirm.danger { color: var(--red); }
-#fileInput { display: none; }
+#fileInput, #charFileInput { display: none; }
+.char-select {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary, #8e8e93);
+    font-size: 15px;
+    max-width: 46vw;
+    text-align: right;
+}

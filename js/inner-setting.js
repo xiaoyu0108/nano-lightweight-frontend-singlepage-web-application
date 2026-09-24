@@ -837,6 +837,22 @@
         }
     });
 
+    // 当前楼层：线上（回聊天详情）/ 线下（切到线下模式聊天）
+    var floorSeg = document.getElementById('floorSeg');
+    if (floorSeg) {
+        floorSeg.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest ? e.target.closest('.floor-btn') : null;
+            if (!btn) return;
+            var floor = btn.dataset.floor;
+            if (floor === 'offline') {
+                var q = '?chat=' + encodeURIComponent(chatId || '') + '&name=' + encodeURIComponent(chatName || '');
+                location.href = 'offline.html' + q;
+            } else {
+                try { window.parent.postMessage({ type: 'closeFullscreen' }, '*'); } catch (err) {}
+            }
+        });
+    }
+
     // 自己的返回按钮：收起本页，回到聊天详情页（由主框架恢复 chat_inner）
     var navBackBtn = document.getElementById('navBack');
     if (navBackBtn) {

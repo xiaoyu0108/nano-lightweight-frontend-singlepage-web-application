@@ -80,6 +80,30 @@ body::-webkit-scrollbar {
     flex-shrink: 0;
 }
 
+/* 当前楼层 分段控件 */
+.floor-seg {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 9px;
+    background: rgba(120, 120, 128, 0.12);
+}
+.floor-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    font-size: 13px;
+    line-height: 1;
+    padding: 6px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+}
+.floor-btn.active {
+    background: #FFFFFF;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
 .container {
     padding: calc(64px + var(--safe-top, env(safe-area-inset-top, 0px))) 14px calc(40px + 0px) 14px;
     height: 100%;

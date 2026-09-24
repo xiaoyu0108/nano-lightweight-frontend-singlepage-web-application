@@ -1010,6 +1010,66 @@
         currentTarget = null;
     }
 
+    // ===== 头像栏持久化 + 统一裁成方图（修「存不住 / 不适配」）=====
+    const AVATAR_BAR_KEY = 'nano_avatar_bar';
+    function readAvatarBar() {
+        try { const a = JSON.parse(localStorage.getItem(AVATAR_BAR_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+    }
+    function writeAvatarBar(arr) {
+        try { localStorage.setItem(AVATAR_BAR_KEY, JSON.stringify(arr)); } catch (e) {}
+    }
+    function renderAvatarSlot(item, value) {
+        if (!item || !value) return;
+        item.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = value;
+        img.onload = function () { item.classList.add('has-image'); };
+        img.onerror = function () { item.classList.remove('has-image'); };
+        item.appendChild(img);
+        item.classList.add('has-image');
+    }
+    function setAvatarSlot(index, value) {
+        if (isNaN(index)) return;
+        const arr = readAvatarBar();
+        arr[index] = value;
+        writeAvatarBar(arr);
+        renderAvatarSlot(document.querySelector('.avatar-item[data-index="' + index + '"]'), value);
+    }
+    // 文件 → 居中裁成正方形的小图（同时解决体积过大存不进 localStorage）
+    function cropToSquareDataURL(file, size) {
+        return new Promise(function (resolve) {
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                const raw = ev.target.result;
+                const image = new Image();
+                image.onload = function () {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size; canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        const side = Math.min(image.width, image.height);
+                        const sx = (image.width - side) / 2;
+                        const sy = (image.height - side) / 2;
+                        ctx.drawImage(image, sx, sy, side, side, 0, 0, size, size);
+                        resolve(canvas.toDataURL('image/jpeg', 0.88));
+                    } catch (e) { resolve(raw); }
+                };
+                image.onerror = function () { resolve(raw); };
+                image.src = raw;
+            };
+            reader.onerror = function () { resolve(null); };
+            reader.readAsDataURL(file);
+        });
+    }
+    // 载入时恢复
+    (function hydrateAvatarBar() {
+        const arr = readAvatarBar();
+        document.querySelectorAll('.avatar-item:not(.avatar-add)').forEach(function (item) {
+            const idx = parseInt(item.dataset.index, 10);
+            if (!isNaN(idx) && arr[idx]) renderAvatarSlot(item, arr[idx]);
+        });
+    })();
+
     avatarItems.forEach(item => {
         item.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1029,19 +1089,11 @@
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.onchange = function(e) {
+            input.onchange = async function(e) {
                 const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(ev) {
-                        target.innerHTML = '';
-                        const img = document.createElement('img');
-                        img.src = ev.target.result;
-                        target.appendChild(img);
-                        target.classList.add('has-image');
-                    };
-                    reader.readAsDataURL(file);
-                }
+                if (!file || !target) return;
+                const dataUrl = await cropToSquareDataURL(file, 200);
+                if (dataUrl) setAvatarSlot(parseInt(target.dataset.index, 10), dataUrl);
             };
             input.click();
         }
@@ -1066,6 +1118,7 @@
                 alert('图片加载失败，请检查链接');
             };
             target.appendChild(img);
+            setAvatarSlot(parseInt(target.dataset.index, 10), url);
             closeModal();
         } else if (!url) {
             alert('请输入有效的图片链接');

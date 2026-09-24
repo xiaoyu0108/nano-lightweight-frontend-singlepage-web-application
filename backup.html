@@ -74,6 +74,63 @@
             JSON 适合纯文本备份，ZIP 会额外保留二进制文件（Blob / ArrayBuffer / TypedArray）。
         </div>
 
+        <!-- ================= 单个角色 ================= -->
+        <section class="list-group">
+            <div class="section-title">单个角色</div>
+
+            <div class="list-item" style="cursor:default;">
+                <div class="item-left">
+                    <div class="item-icon icon-blue">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                    </div>
+                    <span class="item-title">选择角色</span>
+                </div>
+                <div class="item-right">
+                    <select id="charSelect" class="char-select"></select>
+                </div>
+            </div>
+
+            <button class="list-item" id="btnCharExport" onclick="exportSelectedChar()">
+                <div class="item-left">
+                    <div class="item-icon icon-blue">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </div>
+                    <span class="item-title">导出该角色</span>
+                </div>
+                <div class="item-right">
+                    <span class="item-sub item-text-status">聊天记录 / 世界书 / 记忆 / user</span>
+                    <span class="spinner"></span>
+                    <svg class="chevron" width="8" height="13" viewBox="0 0 8 13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </button>
+
+            <button class="list-item" id="btnCharImport" onclick="triggerCharImport()">
+                <div class="item-left">
+                    <div class="item-icon icon-green">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <span class="item-title">导入该角色</span>
+                </div>
+                <div class="item-right">
+                    <span class="item-sub item-text-status">.json</span>
+                    <span class="spinner"></span>
+                    <svg class="chevron" width="8" height="13" viewBox="0 0 8 13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </button>
+        </section>
+        <div class="section-footer">
+            单个角色备份包含：角色设定、聊天记录、聊天设置、记忆库（含上下文状态）、绑定的世界书、绑定的用户（人设 / 头像）、手机壁纸与图标、语音通话记录。
+            导入为「合并写入」，不会清空其它角色或全站数据。
+        </div>
+
         <!-- ================= 导入 ================= -->
         <section class="list-group">
             <div class="section-title">导入并覆盖</div>
@@ -104,6 +161,7 @@
 
     <!-- 隐藏文件选择器 -->
     <input type="file" id="fileInput" accept=".json,.zip" onchange="handleFileSelect(event)">
+    <input type="file" id="charFileInput" accept=".json" onchange="handleCharImportFile(event)">
 
     <!-- ================= iOS Alert ================= -->
     <div class="alert-overlay" id="iosAlert">
