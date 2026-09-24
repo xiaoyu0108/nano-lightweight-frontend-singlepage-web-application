@@ -837,6 +837,14 @@
         }
     });
 
+    // 自己的返回按钮：收起本页，回到聊天详情页（由主框架恢复 chat_inner）
+    var navBackBtn = document.getElementById('navBack');
+    if (navBackBtn) {
+        navBackBtn.addEventListener('click', function () {
+            try { window.parent.postMessage({ type: 'closeFullscreen' }, '*'); } catch (e) {}
+        });
+    }
+
     if (window.parent !== window) {
         window.parent.postMessage({ type: 'pageLoaded', page: 'inner_setting' }, '*');
         window.parent.postMessage({ type: 'setTitle', title: '聊天设置' }, '*');

@@ -130,7 +130,7 @@
 
         .bottom-actions {
             position: absolute;
-            bottom: 0;
+            bottom: 20px;
             left: 16px;
             right: 16px;
             display: flex;
@@ -1199,7 +1199,11 @@
                 overlayBack.classList.add('hidden');
             } else if (url.includes('chat_inner.html')) {
                 showChatInnerFrame();
-                chatInnerFrame.src = url;
+                // 同一个聊天且 iframe 还活着就不重载，直接复用（切换更快）
+                if (chatInnerFrame.getAttribute('data-loaded-url') !== url) {
+                    chatInnerFrame.setAttribute('data-loaded-url', url);
+                    chatInnerFrame.src = url;
+                }
                 overlay.classList.add('no-header');
                 overlayTitle.textContent = '';
                 overlayBack.classList.add('hidden');
@@ -1232,7 +1236,7 @@
             } else {
                 showOverlayFrame();
                 overlayFrame.src = url;
-                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html'];
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
                 if (noOuterHeader) {
@@ -1325,6 +1329,7 @@
                     url += '&jump=' + encodeURIComponent(pendingJumpMsgId);
                     pendingJumpMsgId = null;
                     showChatInnerFrame();
+                    chatInnerFrame.setAttribute('data-loaded-url', url);
                     chatInnerFrame.src = url;
                     overlay.classList.add('active');
                     overlay.classList.add('no-header');
@@ -2504,7 +2509,9 @@
                 const chatInnerAlive = frameBase(chatInnerFrame) === 'chat_inner.html';
                 if (!chatInnerAlive) {
                     showChatInnerFrame();
-                    chatInnerFrame.src = 'chat_inner.html?chat=' + encodeURIComponent(getChatId()) + '&name=' + encodeURIComponent(getContactName());
+                    const _cu = 'chat_inner.html?chat=' + encodeURIComponent(getChatId()) + '&name=' + encodeURIComponent(getContactName());
+                    chatInnerFrame.setAttribute('data-loaded-url', _cu);
+                    chatInnerFrame.src = _cu;
                 } else {
                     showChatInnerFrame();
                 }
@@ -2662,20 +2669,34 @@
                     });
                 } catch (e) { setTimeout(next, 250); }
             }
-            // 等 Service Worker 接管后再拉，否则抓到的东西不会进 SW 缓存
-            var tries = 0;
-            function start() {
-                if (navigator.serviceWorker.controller) { next(); return; }
-                if (++tries > 15) return;
-                setTimeout(start, 2000);
+            // SW 已停用：直接顺序 fetch，浏览器 HTTP 缓存同样能命中
+            setTimeout(next, 5000);
+        } catch (e) {}
+    })();
+
+    // ===== 预热其它底部 tab：提前把 iframe 建好，切换时不用再等整页加载 =====
+    (function warmTabs() {
+        try {
+            var frames = Array.prototype.slice.call(
+                document.querySelectorAll('.iframe-container iframe[data-src]')
+            );
+            var i = 0;
+            function next() {
+                if (i >= frames.length) return;
+                var fr = frames[i++];
+                try {
+                    if (!fr.getAttribute('src')) fr.setAttribute('src', fr.getAttribute('data-src'));
+                } catch (e) {}
+                setTimeout(next, 1200);
             }
-            setTimeout(start, 5000);
+            // 等开场动画结束、首页稳定后再逐个预热
+            setTimeout(next, 3200);
         } catch (e) {}
     })();
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-24-3';
+        var BUILD = 'nano-2026-09-24-4';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

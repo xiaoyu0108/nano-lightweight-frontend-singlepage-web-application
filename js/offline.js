@@ -10,6 +10,10 @@ const DB_VERSION = 2;
 const MESSAGES_STORE = 'messages';
 const SETTINGS_STORE = 'settings';
 
+// 切换「心声 / 思考链」时不要自动跳到底部，保持当前滚动位置
+let suppressAutoScroll = false;
+let pendingScrollRestore = null;
+
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -563,8 +567,15 @@ function render() {
 
   updateSelectBar();
 
-  // 每次渲染默认定位到“最新一条”卡片（除非用户正展开更早消息）
-  if (!showAllMessages || !document.body.dataset.freezeScroll) {
+  // 每次渲染默认定位到“最新一条”卡片（除非用户正展开更早消息，或本次只是切换心声/思考链）
+  if (suppressAutoScroll) {
+    suppressAutoScroll = false;
+    if (pendingScrollRestore !== null) {
+      const y = pendingScrollRestore;
+      pendingScrollRestore = null;
+      requestAnimationFrame(() => { chat.scrollTop = y; });
+    }
+  } else if (!showAllMessages || !document.body.dataset.freezeScroll) {
     requestAnimationFrame(() => chat.scrollTop = chat.scrollHeight);
   }
 }
@@ -778,8 +789,8 @@ document.getElementById('modalConfirm').onclick = () => {
   closeDeleteModal();
 };
 
-function toggleHeart(i) { messages[i].showHeart = !messages[i].showHeart; saveMessages(messages); render(); }
-function toggleThinking(i) { messages[i].showThinking = !messages[i].showThinking; saveMessages(messages); render(); }
+function toggleHeart(i) { pendingScrollRestore = chat.scrollTop; suppressAutoScroll = true; messages[i].showHeart = !messages[i].showHeart; saveMessages(messages); render(); }
+function toggleThinking(i) { pendingScrollRestore = chat.scrollTop; suppressAutoScroll = true; messages[i].showThinking = !messages[i].showThinking; saveMessages(messages); render(); }
 function enterSelect(i) { selectMode = true; messages[i].selected = true; saveMessages(messages); render(); }
 function updateSelectBar() {
   const count = messages.filter(m => m.selected).length;

@@ -33,8 +33,55 @@ body::-webkit-scrollbar {
     display: none;
 }
 
+/* ===== 自己的顶栏（返回 + 标题）===== */
+.page-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: calc(48px + var(--safe-top, env(safe-area-inset-top, 0px)));
+    padding: var(--safe-top, env(safe-area-inset-top, 0px)) 10px 0 10px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    background: #FFFFFF;
+    border-bottom: 0.5px solid var(--separator);
+    z-index: 100;
+}
+.nav-back {
+    width: 38px;
+    height: 38px;
+    border: none;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ios-blue);
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.nav-back svg {
+    width: 22px;
+    height: 22px;
+}
+.nav-back:active {
+    opacity: 0.5;
+}
+.nav-title {
+    flex: 1;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+.nav-spacer {
+    width: 38px;
+    flex-shrink: 0;
+}
+
 .container {
-    padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 14px calc(40px + 0px) 14px;
+    padding: calc(64px + var(--safe-top, env(safe-area-inset-top, 0px))) 14px calc(40px + 0px) 14px;
     height: 100%;
     overflow-y: auto;
     scrollbar-width: none;

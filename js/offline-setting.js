@@ -1226,13 +1226,16 @@ document.getElementById('saveBtn').onclick = function() {
 };
 
 document.getElementById('backBtn').onclick = function() {
-  // 在 iframe 里：交给主框架收起全屏层，绝不 history.back()（会回到上次打开的页面）
-  if (window.parent && window.parent !== window) {
-    try { window.parent.postMessage({ type: 'closeFullscreen' }, '*'); } catch (e) {}
-    return;
-  }
-  if (history.length > 1) history.back();
-  else location.href = 'offline.html';
+  // 返回到「线下模式聊天」（同一个 iframe 内的 offline.html），而不是退出到线上聊天详情
+  var q = '';
+  try {
+    var p = new URLSearchParams(location.search);
+    var cid = p.get('chat');
+    var nm = p.get('name');
+    if (cid) q += 'chat=' + encodeURIComponent(cid);
+    if (nm) q += (q ? '&' : '') + 'name=' + encodeURIComponent(nm);
+  } catch (e) {}
+  location.href = 'offline.html' + (q ? '?' + q : '');
 };
 
 // ============================================================
