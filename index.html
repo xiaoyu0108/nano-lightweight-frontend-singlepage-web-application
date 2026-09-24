@@ -787,56 +787,6 @@
     <!-- 开场动画样式结束 -->
 
     <script src="js/appearance.js"></script>
-    <script>
-        // iOS 主屏 App（standalone）里，布局视口底部可能不含“小白条”那块安全区，
-    // 于是 .app/.bg 这种 position:fixed;inset:0 的层会短一截，底下露白。
-    // 这里量出实际缺口，写进 --nano-bottom-ext，让固定层向下多铺这么多，底栏即可贴到屏幕最底。
-    (function () {
-        'use strict';
-        if (window.top !== window.self) return; // 只在外壳(index)里做，iframe 内不做
-        var nav = window.navigator || {};
-        var iosStandalone = (typeof nav.standalone !== 'undefined') &&
-            (nav.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
-        var root = document.documentElement;
-        // 量 100vh 的真实高度：iOS 上 100vh 常常比布局视口高，差值就是被系统吃掉的那一截
-        function measureVh() {
-            try {
-                if (!document.body) return 0;
-                var d = document.createElement('div');
-                d.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:100vh;visibility:hidden;pointer-events:none;';
-                document.body.appendChild(d);
-                var h = d.getBoundingClientRect().height;
-                d.parentNode.removeChild(d);
-                return h || 0;
-            } catch (e) { return 0; }
-        }
-        function apply() {
-            var ext = 0;
-            try {
-                if (iosStandalone) {
-                    var sh = (window.screen && window.screen.height) ? window.screen.height : 0;
-                    var ih = window.innerHeight || 0;
-                    var gap = Math.round(Math.max(sh, measureVh()) - ih);
-                    if (window.visualViewport) {
-                        var vv = Math.round((window.visualViewport.height || 0) + (window.visualViewport.offsetTop || 0) - ih);
-                        if (vv > gap) gap = vv;
-                    }
-                    if (gap > 0 && gap <= 120) ext = gap;
-                }
-            } catch (e) {}
-            root.style.setProperty('--nano-bottom-ext', ext + 'px');
-        }
-        apply();
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', apply);
-        }
-        window.addEventListener('resize', apply);
-        window.addEventListener('orientationchange', apply);
-        window.addEventListener('pageshow', apply);
-        setTimeout(apply, 300);
-        setTimeout(apply, 1200);
-    })();
-    </script>
 </head>
 <body class="nano-index">
 <div class="bg"></div>
@@ -2728,7 +2678,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-23-7';
+        var BUILD = 'nano-2026-09-24-1';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;
