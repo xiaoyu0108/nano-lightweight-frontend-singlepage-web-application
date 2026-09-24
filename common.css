@@ -1,6 +1,6 @@
 * { box-sizing: border-box; }
-/* 统一用 100vh：iOS 主屏 App 里只有 100vh 才会撑到真实屏幕底部；
-   position:fixed 的 inset:0 / 100% / 100dvh 只到 WebKit 认为的可视区，底部会露白条。 */
-html, body { margin: 0; height: 100vh; overflow: hidden; background: #000; }
-.bg { position: fixed; top: 0; left: 0; right: 0; height: 100vh; z-index: 0; background: #ffffff; background-size: cover; background-position: center; }
-.app { position: fixed; top: 0; left: 0; right: 0; height: 100vh; z-index: 1; background: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+/* .app 始终留在可视区内（底栏才能点到），不参与任何底部扩展。
+   .bg 只做背景，用 100vh 往底部小白条区多铺一点，既不遮底栏也不影响点击。 */
+.bg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; min-height: 100vh; z-index: 0; background: #ffffff; background-size: cover; background-position: center; }
+.app { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; background: transparent; }
