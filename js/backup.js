@@ -1000,8 +1000,16 @@ async function collectCharBackup(charId) {
     const bindUser = character && character.bindUser;
     if (bindUser) {
         const maskRows = await idbReadAll('nano_mask_db', 'mask_data');
-        const maskRec = maskRows.find((r) => r.value && Array.isArray(r.value.masks));
-        if (maskRec) mask = maskRec.value.masks.find((m) => m.id === bindUser) || null;
+        // mask_data 存的是 {key:'data', value:{masks,...}}，需要多取一层 value
+        const maskRec = maskRows.find((r) => r.value && r.value.value && Array.isArray(r.value.value.masks));
+        if (maskRec) mask = maskRec.value.value.masks.find((m) => m.id === bindUser) || null;
+        if (!mask) {
+            try {
+                const raw = localStorage.getItem('nano_mask_data');
+                const d = raw ? JSON.parse(raw) : null;
+                if (d && Array.isArray(d.masks)) mask = d.masks.find((m) => m.id === bindUser) || null;
+            } catch (e) {}
+        }
         const avRows = await idbReadAll('MaskAvatarDB', 'avatars');
         const avRow = avRows.find((r) => r.key === bindUser || (r.value && r.value.id === bindUser));
         if (avRow) maskAvatar = avRow.value;
@@ -1009,9 +1017,10 @@ async function collectCharBackup(charId) {
 
     let worldbookFiles = [];
     const wbRows = await idbReadAll('nano_worldbook_db', 'worldbook_data');
-    const wbRec = wbRows.find((r) => r.value && Array.isArray(r.value.files));
+    // worldbook_data 同样包了一层 {key:'data', value:{files,...}}
+    const wbRec = wbRows.find((r) => r.value && r.value.value && Array.isArray(r.value.value.files));
     if (wbRec) {
-        worldbookFiles = wbRec.value.files.filter((f) =>
+        worldbookFiles = wbRec.value.value.files.filter((f) =>
             f && Array.isArray(f.boundCharacters) && f.boundCharacters.indexOf(charId) !== -1);
     }
 
@@ -1038,8 +1047,8 @@ async function exportSelectedChar() {
 async function mergeWorldbookFiles(files) {
     if (!files || !files.length) return;
     const rows = await idbReadAll('nano_worldbook_db', 'worldbook_data');
-    const rec = rows.find((r) => r.value && Array.isArray(r.value.files));
-    const data = rec ? rec.value : { groups: [], files: [] };
+    const rec = rows.find((r) => r.value && r.value.value && Array.isArray(r.value.value.files));
+    const data = rec ? rec.value.value : { groups: [], files: [] };
     data.groups = Array.isArray(data.groups) ? data.groups : [];
     data.files = Array.isArray(data.files) ? data.files : [];
     files.forEach((f) => {
@@ -1047,20 +1056,31 @@ async function mergeWorldbookFiles(files) {
         const idx = data.files.findIndex((x) => x && x.id === f.id);
         if (idx >= 0) data.files[idx] = f; else data.files.push(f);
     });
-    await idbPutRecord('nano_worldbook_db', 'worldbook_data', 'data', data);
+    await idbPutRecord('nano_worldbook_db', 'worldbook_data', 'data', { key: 'data', value: data });
     try { localStorage.setItem('nano_worldbook_data_v5', JSON.stringify(data)); } catch (e) {}
 }
 
 async function mergeMask(mask, avatar) {
     if (mask) {
         const rows = await idbReadAll('nano_mask_db', 'mask_data');
-        const rec = rows.find((r) => r.value && Array.isArray(r.value.masks));
-        const data = rec ? rec.value : { masks: [], currentMaskId: mask.id };
+        const rec = rows.find((r) => r.value && r.value.value && Array.isArray(r.value.value.masks));
+        let data = rec ? rec.value.value : null;
+        if (!data) {
+            // 没有 IDB 记录时以 localStorage 为底，避免覆盖掉其他人设
+            try {
+                const raw = localStorage.getItem('nano_mask_data');
+                const d = raw ? JSON.parse(raw) : null;
+                if (d && Array.isArray(d.masks)) data = d;
+            } catch (e) {}
+        }
+        if (!data || !Array.isArray(data.masks)) data = { masks: [], currentMaskId: mask.id };
         data.masks = Array.isArray(data.masks) ? data.masks : [];
         const idx = data.masks.findIndex((m) => m && m.id === mask.id);
+        const isNewMask = idx < 0;
         if (idx >= 0) data.masks[idx] = mask; else data.masks.push(mask);
-        if (!data.currentMaskId) data.currentMaskId = mask.id;
-        await idbPutRecord('nano_mask_db', 'mask_data', 'data', data);
+        // 新导入的人设直接设为当前，导入的角色才能立刻显示/切换
+        if (!data.currentMaskId || isNewMask) data.currentMaskId = mask.id;
+        await idbPutRecord('nano_mask_db', 'mask_data', 'data', { key: 'data', value: data });
         try { localStorage.setItem('nano_mask_data', JSON.stringify(data)); } catch (e) {}
     }
     if (avatar && avatar.id) {
@@ -1115,6 +1135,9 @@ async function handleCharImportFile(event) {
         const text = await file.text();
         const data = JSON.parse(text);
         const meta = await importCharBackup(data);
+        // 通知已打开的页面刷新（人设/角色/联系人）
+        try { if (window.parent !== window) window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e) {}
+        try { if (window.parent !== window) window.parent.postMessage({ type: 'currentMaskChanged' }, '*'); } catch (e) {}
         alert('已导入角色「' + ((meta && meta.name) || (meta && meta.charId) || '') + '」的数据');
     } catch (e) {
         alert('导入失败：' + (e && e.message ? e.message : e));

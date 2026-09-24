@@ -858,7 +858,11 @@ function openChatWindow(){
   w.style.right='auto'; w.style.bottom='auto';
   if(!currentChar) showCharPicker();
 }
-function closeChatWindow(){ document.getElementById('chatWindow').classList.remove('show'); }
+function closeChatWindow(){
+  document.getElementById('chatWindow').classList.remove('show');
+  // 聊完收起小窗：把本次对话收尾总结进长期记忆
+  try{ flushAux(); }catch(e){}
+}
 /* 点击悬浮球：已在显示则收起，否则展开 */
 function toggleChatWindow(){
   const w=document.getElementById('chatWindow');
@@ -961,8 +965,7 @@ async function pickChar(c){
   // 记录到辅助记忆，音乐/图书里的对话会被总结进 memlist_<charId>
   try{ if(window.AuxMemory) window.AuxMemory.track(c.id || c.name, { charName: currentCharName }); }catch(e){}
   // 初始：char 先说一句，但不调用 API，等用户点回复
-  addMsg('char', currentCharName, c.avatar, `我看到你标记的这段文字了：「${markedText||'（未选择）'}」。想听听你的想法。`, '');
-  if(markedText) addMsg('me','我','','',markedText,'引用段落');
+  addMsg('char', currentCharName, c.avatar, null, `我看到你标记的这段文字了：「${markedText||'（未选择）'}」。想听听你的想法。`, '');
 }
 let lastTimeShown='';
 function addTimeDivider(){
@@ -993,7 +996,8 @@ function addMsg(side, nick, avatar, cls, text, quote){
     <div class="avatar-sm ${side==='me'?'':(cls||'')}">${avatarHtml}</div>
     <div class="bubble-wrap">
       <div class="nick">${escapeHtml(nick)}</div>
-      <div class="bubble">${quote?`<div class="quote">${escapeHtml(quote)}</div>`:''}${escapeHtml(text)}</div>
+      ${quote?`<div class="quote-bubble">${escapeHtml(quote)}</div>`:''}
+      <div class="bubble">${escapeHtml(text)}</div>
     </div>`;
   el.querySelector('.bubble').addEventListener('dblclick',e=>{
     e.stopPropagation();
@@ -1153,11 +1157,23 @@ function buildHistoryMessages(){
     const isMe=m.classList.contains('me');
     const bubble=m.querySelector('.bubble');
     if(!bubble) return;
-    const quoteEl=bubble.querySelector('.quote');
-    let text=bubble.innerText.replace(quoteEl?quoteEl.innerText:'').trim();
+    const quoteEl=m.querySelector('.quote-bubble') || bubble.querySelector('.quote');
+    let text=bubble.innerText.trim();
     if(quoteEl) text=`（引用：${quoteEl.innerText}）\n${text}`;
-    msgs.push({role:isMe?'user':'assistant', content:text});
+    const rid=m.dataset?m.dataset.aiRound:null;
+    // 同一轮 char 拆出的多个气泡合并成一条 assistant 消息，避免被拆成多轮
+    if(!isMe && rid && msgs.length){
+      const last=msgs[msgs.length-1];
+      if(last && last.role==='assistant' && last._rid===rid){
+        last.content+='\n'+text;
+        return;
+      }
+    }
+    const entry={role:isMe?'user':'assistant', content:text};
+    if(!isMe && rid) entry._rid=rid;
+    msgs.push(entry);
   });
+  msgs.forEach(x=>{ delete x._rid; });
   return msgs;
 }
 
@@ -1224,15 +1240,37 @@ function flushAux(){
 }
 
 /* ==================== 发送 / 回复 ==================== */
+/* 把一段回复拆成多个气泡：先按换行，再按句末标点，过长再按逗号拆，每条 <=26 字 */
+function splitBubbles(text){
+  const t=String(text||'').replace(/\r/g,'').trim();
+  if(!t) return ['……'];
+  const segs=[];
+  t.split(/\n+/).map(x=>x.trim()).filter(Boolean).forEach(function(p){
+    p.split(/(?<=[。！？!?…~])\s*/).map(x=>x.trim()).filter(Boolean).forEach(function(x){
+      if(x.length<=26){ segs.push(x); return; }
+      let buf='';
+      x.split(/[，,、；;]/).map(y=>y.trim()).filter(Boolean).forEach(function(c){
+        const next=buf?(buf+'，'+c):c;
+        if(next.length>26){ if(buf) segs.push(buf); buf=c; }
+        else buf=next;
+      });
+      if(buf) segs.push(buf);
+    });
+  });
+  return segs.length?segs:[t];
+}
+
 /* 有字 -> 发送用户消息；无字 -> 让 char 回复（调用 API） */
 async function sendOrReply(){
   if(!currentChar){ toast('请先选择角色'); return; }
   const i=document.getElementById('chatInput');
   const v=i.value.trim();
   if(v){
+    // 引用优先用双击引用；没有则用刚标记的原文段落（保证 char 知道在讨论哪段）
+    const q = quotedText || markedText || '';
     addTimeDivider();
-    addMsg('me','我',null,null,v,quotedText);
-    pushAux('user', v, quotedText);
+    addMsg('me','我',null,null,v,q);
+    pushAux('user', v, q);
     i.value='';
     cancelQuote();
     document.getElementById('chatAction').textContent='回复';
@@ -1256,8 +1294,14 @@ async function replyFromChar(){
     removeTyping();
     if(reply){
       addTimeDivider();
-      addMsg('char', currentCharName, currentChar.avatar, null, reply, '');
-      pushAux('char', reply);
+      const segs=splitBubbles(reply);
+      const rid='r'+Date.now();
+      for(let si=0; si<segs.length; si++){
+        const el=addMsg('char', currentCharName, currentChar.avatar, null, segs[si], '');
+        if(el && el.dataset) el.dataset.aiRound=rid;
+        pushAux('char', segs[si]);
+        if(si<segs.length-1) await new Promise(r=>setTimeout(r,380));
+      }
       try{ if(window.NanoNotify) window.NanoNotify.notify(currentCharName||'一起看', String(reply).slice(0,60), { target:'books', channel:'books' }); }catch(e){}
     }else{
       addMsg('char', currentCharName, currentChar.avatar, null, '（没有生成内容）', '');
@@ -1270,13 +1314,21 @@ async function replyFromChar(){
   }
 }
 
-/* 重roll：删掉最后一条 char 消息，重新调用 API */
+/* 重roll：删掉上一轮 char 的所有气泡，重新调用 API */
 async function retryRound(){
   if(!currentChar){ toast('请先选择角色'); return; }
   const box=document.getElementById('chatWindowBody');
   const msgs=[...box.querySelectorAll('.msg')];
+  let rid=null;
   for(let i=msgs.length-1;i>=0;i--){
-    if(!msgs[i].classList.contains('me')){ msgs[i].remove(); break; }
+    if(!msgs[i].classList.contains('me')){ rid=msgs[i].dataset.aiRound||null; break; }
+  }
+  if(rid){
+    msgs.forEach(m=>{ if(m.dataset.aiRound===rid) m.remove(); });
+  }else{
+    for(let i=msgs.length-1;i>=0;i--){
+      if(!msgs[i].classList.contains('me')){ msgs[i].remove(); break; }
+    }
   }
   await replyFromChar();
 }
@@ -1580,8 +1632,8 @@ function backToDiscover(){
   }catch(e){ console.warn(e); }
 })();
 
-window.addEventListener('beforeunload',()=>{ stopReadingTimer(); });
-window.addEventListener('pagehide',()=>{ stopReadingTimer(); });
+window.addEventListener('beforeunload',()=>{ try{ flushAux(); }catch(e){} stopReadingTimer(); });
+window.addEventListener('pagehide',()=>{ try{ flushAux(); }catch(e){} stopReadingTimer(); });
 
 let resizeTimer=null;
 window.addEventListener('resize',()=>{

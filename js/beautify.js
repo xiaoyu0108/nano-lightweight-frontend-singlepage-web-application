@@ -2312,6 +2312,44 @@ document.getElementById("globalFile").onchange = () => handleImport("global");
 document.getElementById("chatFile").onchange = () => handleImport("chat");
 
 /* ============================================================
+   导出当前选中的预设（分享图标；导出 {type,name,css} JSON，可被导入还原）
+   ============================================================ */
+function downloadTextFile(filename, text) {
+  try {
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (e) {
+    toast("导出失败");
+  }
+}
+
+async function exportBeautifyPreset(type) {
+  const sel = document.getElementById(type + "Preset");
+  const id = sel ? Number(sel.value) || 0 : 0;
+  let name = getName(type) || (type === "global" ? "全局美化" : "聊天美化");
+  let css = getCode(type);
+  if (id) {
+    try {
+      const items = await storeAll("presets");
+      const p = items.find(x => x.id === id && x.category === type);
+      if (p) { name = p.name || name; css = p.code || p.css || css; }
+    } catch (e) {}
+  }
+  downloadTextFile(String(name).replace(/[\\/:*?"<>|]/g, "_") + ".json", JSON.stringify({ type, name, css }, null, 2));
+  toast("已导出预设：" + name);
+}
+
+document.getElementById("globalExport").onclick = () => exportBeautifyPreset("global");
+document.getElementById("chatExport").onclick = () => exportBeautifyPreset("chat");
+
+/* ============================================================
    字体功能
    ============================================================ */
 let fontState = { name: "", source: "", type: "", data: null, size: 16 };

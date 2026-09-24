@@ -203,8 +203,12 @@
 <div class="file-import">
 <label class="import-label">
 <svg class="svg-mini" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M5 14.5v4A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-4"/></svg>
-导入 TXT / DOCX<input id="cssFile" type="file" accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+导入 TXT / DOCX<input id="cssFile" type="file" accept=".txt,.docx,.json,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
 </label>
+<button class="import-label" id="cssExport" type="button" aria-label="导出当前预设" style="font-family:inherit;gap:4px">
+<svg class="svg-mini" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+导出
+</button>
 <span id="cssFileName" style="font-size:10px;color:var(--sub)"></span>
 </div>
 <textarea class="textarea" id="cssText" spellcheck="false" placeholder="在这里输入 CSS……"></textarea>

@@ -826,6 +826,26 @@ document.getElementById('cssPreset').onchange = function() {
 };
 
 document.getElementById('clearCssBtn').onclick = function() { document.getElementById('cssText').value = ''; showToast('已清空CSS'); };
+document.getElementById('cssExport').onclick = function() {
+  const sel = document.getElementById('cssPreset');
+  const val = sel ? sel.value : 'custom';
+  let name = document.getElementById('cssPresetName').value.trim() || '线下美化';
+  let css = document.getElementById('cssText').value;
+  if (val && val.startsWith('user-')) {
+    const idx = parseInt(val.replace('user-', ''));
+    const p = cssPresets[idx];
+    if (p) { name = p.name || name; css = p.content || css; }
+  }
+  const data = JSON.stringify({ type: 'offline', name: name, css: css }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name.replace(/[\\/:*?"<>|]/g, '_') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('已导出预设：' + name);
+};
 document.getElementById('applyCss').onclick = function() {
   settings.customCSS = document.getElementById('cssText').value;
   saveSettings();
@@ -861,8 +881,16 @@ document.getElementById('restoreCss').onclick = function() {
 //  10. 文档导入
 // ============================================================
 async function readDocument(file) {
-  if (file.name.toLowerCase().endsWith('.txt')) return await file.text();
-  if (file.name.toLowerCase().endsWith('.docx')) {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith('.txt') || lower.endsWith('.css')) return await file.text();
+  if (lower.endsWith('.json')) {
+    const text = await file.text();
+    try {
+      const parsed = JSON.parse(text);
+      return (typeof parsed === 'string') ? parsed : (parsed.css || parsed.code || text);
+    } catch { return text; }
+  }
+  if (lower.endsWith('.docx')) {
     if (!window.mammoth) {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');

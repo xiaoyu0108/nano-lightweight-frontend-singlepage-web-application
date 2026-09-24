@@ -93,6 +93,7 @@
   var onlineQueue = [];
   var onlineQueueIndex = 0;
   var onlineQueueType = '';   // 'daily' | 'recent'
+  var onlineQueueActive = false;  // 当前播放是否属于在线列表队列
 
   var $ = function(id) { return document.getElementById(id); };
   var tabs = document.querySelectorAll('.tab-item');
@@ -320,15 +321,10 @@
     });
   });
 
-  // 迷你播放器显示逻辑：Mine / Online 显示，Listen 不显示
+  // 迷你播放器显示逻辑：Mine / Online 常驻显示（没选歌也显示占位），Listen 页不显示
   function updateMiniPlayerVisibility() {
-    var hasSong = currentSongIndex >= 0 && currentSongIndex < songs.length;
-    // Mine 页
-    if (hasSong && currentTab === 'mine') miniPlayer.classList.add('show');
-    else miniPlayer.classList.remove('show');
-    // Online 页
-    if (hasSong && currentTab === 'online') onlineMiniPlayer.classList.add('show');
-    else onlineMiniPlayer.classList.remove('show');
+    miniPlayer.classList.toggle('show', currentTab === 'mine');
+    onlineMiniPlayer.classList.toggle('show', currentTab === 'online');
   }
 
   // ============================================================
@@ -1391,8 +1387,10 @@
       });
   }
 
-  function playSong(idx) {
+  function playSong(idx, keepOnlineQueue) {
     if (idx < 0 || idx >= songs.length) return;
+    // 从「我的」/普通播放进入时，退出在线列表队列，避免播完误跳到每日推荐
+    if (!keepOnlineQueue) onlineQueueActive = false;
     currentSongIndex = idx;
     var song = songs[idx];
     if (!song) return;
@@ -1509,7 +1507,7 @@
 
   function onSongEnd() {
     // 如果当前是在线列表播放，走在线队列
-    if (onlineQueue && onlineQueue.length > 0 && onlineQueueIndex >= 0) {
+    if (onlineQueueActive && onlineQueue && onlineQueue.length > 0 && onlineQueueIndex >= 0) {
       onOnlineQueueEnd();
       return;
     }
@@ -1519,7 +1517,6 @@
       // 顺序播放：播到最后一首就从头继续，绝不「播一首就停」
       if (currentSongIndex < songs.length - 1) playSong(currentSongIndex + 1);
       else if (songs.length > 0) playSong(0);
-      else if (onlineQueue && onlineQueue.length > 0) { onlineQueueIndex = 0; playFromOnlineQueue(0); }
       else { isPlaying = false; updatePlayBtn(); }
     }
   }
@@ -2712,6 +2709,7 @@
   var ballOffsetX = 0, ballOffsetY = 0;
   var ballClickTimer = null;
   var ballLastTouch = 0;
+  var ballExpandedClick = false;
 
   function saveBallPos() {
     try { localStorage.setItem('nano_music_ball_pos', JSON.stringify(ballPos)); } catch(e) {}
@@ -2906,7 +2904,9 @@
   }
 
   function ballDown(clientX, clientY) {
-    if (ballExpanded) return;
+    ballExpandedClick = false;
+    // 展开状态下不拖拽，但记录一次点击，点击结束时收起
+    if (ballExpanded) { ballExpandedClick = true; return; }
     ballDragging = true;
     ballMoved = false;
     ballStartX = clientX;
@@ -2929,6 +2929,12 @@
     updateBallPosition();
   }
   function ballUp() {
+    // 展开状态被单击：收起
+    if (ballExpandedClick) {
+      ballExpandedClick = false;
+      collapseBall();
+      return;
+    }
     if (!ballDragging) return;
     ballDragging = false;
     if (ballMoved) { saveBallPos(); return; }
@@ -3176,6 +3182,15 @@
 
         onlineQueue = normalized.slice();
         onlineQueueIndex = 0;
+        // 若当前正在播该列表里的歌，重新打开列表时定位到它，避免续播跳回第一首
+        try {
+          var cur = (currentSongIndex >= 0 && currentSongIndex < songs.length) ? songs[currentSongIndex] : null;
+          if (onlineQueueActive && cur && cur.source === 'netease') {
+            for (var qi = 0; qi < normalized.length; qi++) {
+              if (normalized[qi].id === cur.neteaseId) { onlineQueueIndex = qi; break; }
+            }
+          }
+        } catch (e) {}
 
         onlineListBody.innerHTML = '';
         normalized.forEach(function(item, i) {
@@ -3240,7 +3255,8 @@
       renderSongs();
       existing = songs.length - 1;
     }
-    playSong(existing);
+    onlineQueueActive = true;
+    playSong(existing, true);
   }
 
   function onOnlineQueueEnd() {
@@ -3259,14 +3275,8 @@
     if (onlineQueueIndex < onlineQueue.length - 1) {
       onlineQueueIndex++;
       playFromOnlineQueue(onlineQueueIndex);
-    } else if (songs && songs.length > 0) {
-      // 在线歌单播完 → 回到自己的歌单继续（先 mine 后 online）
-      onlineQueue = [];
-      onlineQueueIndex = 0;
-      onlineQueueType = '';
-      playSong(0);
     } else {
-      // 自己的歌单也是空的 → 在线列表循环
+      // 在线列表播完 → 循环本列表，继续自动下一首
       onlineQueueIndex = 0;
       playFromOnlineQueue(0);
     }
@@ -3274,9 +3284,7 @@
 
   function closeOnlineListPage() {
     onlineListPage.classList.remove('show');
-    onlineQueue = [];
-    onlineQueueIndex = 0;
-    onlineQueueType = '';
+    // 保留 onlineQueue：关闭列表后仍按该队列自动续播
   }
 
   onlineListBack.addEventListener('click', closeOnlineListPage);

@@ -1580,7 +1580,7 @@
                 musicBallEl.style.top = '58%';
             }
 
-            var startX = 0, startY = 0, offX = 0, offY = 0, moved = false, clickTimer = null, lastTouchTs = 0;
+            var startX = 0, startY = 0, offX = 0, offY = 0, moved = false, lastTapTs = 0, suppressClick = false, lastTouchTs = 0;
 
             function down(cx, cy) {
                 isMusicBallDragging = true; moved = false;
@@ -1605,25 +1605,38 @@
                 isMusicBallDragging = false;
                 musicBallEl.classList.remove('dragging');
                 if (moved) {
+                    // 拖动结束：不触发点击，避免拖完顺带展开/回音乐
+                    suppressClick = true;
+                    setTimeout(function () { suppressClick = false; }, 350);
                     try {
                         var r = musicBallEl.getBoundingClientRect();
                         localStorage.setItem('nano_music_ball_pos', JSON.stringify({ x: r.left, y: r.top }));
                     } catch (e) {}
-                    return;
-                }
-                if (clickTimer) {
-                    clearTimeout(clickTimer); clickTimer = null;
-                    openMusicFromBall();
-                } else {
-                    clickTimer = setTimeout(function () {
-                        clickTimer = null;
-                        toggleMusicBallExpand();
-                    }, 250);
                 }
             }
 
+            // 用 click 统一判定单击/双击（click 每次点按只触发一次，避免 mouse/touch 重复触发）
+            musicBallEl.addEventListener('click', function (e) {
+                if (e.target.closest && (e.target.closest('.ball-expand-btn') || e.target.closest('.ball-off-btn'))) return;
+                if (suppressClick) { suppressClick = false; return; }
+                var now = Date.now();
+                if (now - lastTapTs < 280) {
+                    // 双击：回到音乐 App
+                    lastTapTs = 0;
+                    openMusicFromBall();
+                } else {
+                    // 单击：展开 / 收起悬浮球
+                    lastTapTs = now;
+                    setTimeout(function () {
+                        if (lastTapTs === now) {
+                            lastTapTs = 0;
+                            toggleMusicBallExpand();
+                        }
+                    }, 290);
+                }
+            });
             musicBallEl.addEventListener('mousedown', function (e) {
-                // 触摸后浏览器会补发鼠标事件，忽略它，避免单击被当成双击
+                // 触摸后浏览器会补发鼠标事件，忽略它，避免影响拖拽状态
                 if (Date.now() - lastTouchTs < 700) return;
                 e.preventDefault(); down(e.clientX, e.clientY);
             });
@@ -2765,7 +2778,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-1';
+        var BUILD = 'nano-2026-09-25-3';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

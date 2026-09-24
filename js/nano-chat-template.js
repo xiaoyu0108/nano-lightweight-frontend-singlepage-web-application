@@ -88,7 +88,7 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 .quote-block .quote-name { font-weight: 600; opacity: 0.75; margin-right: 3px; font-size: 12px; flex-shrink: 0; color: #6e6e73; }
 .quote-block .quote-text { opacity: 0.9; color: #6e6e73; word-break: break-word; white-space: pre-wrap; }
 
-/* 翻译文字（默认与原文同一气泡，用一条细线分隔；想拆成两个气泡见配方 E） */
+/* 翻译文字：默认已拆成独立气泡，位于原文气泡上方（见 .translation-bubble） */
 .bubble .translation-text {
   display: block; margin-top: 4px; padding-top: 4px;
   border-top: 0.5px solid rgba(128, 128, 128, 0.2);
@@ -96,6 +96,15 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 }
 .bubble.me .translation-text { border-top-color: rgba(255, 255, 255, 0.2); }
 .translation-text { display: block; margin-top: 4px; color: #6c6c70; font-size: 14px; }
+/* 译文独立气泡（在原文上方） */
+.translation-bubble {
+  display: block; align-self: flex-start;
+  margin: 0 0 4px 0; padding: 6px 10px;
+  border-radius: 12px; background: rgba(0, 0, 0, 0.05);
+  color: #6c6c70; font-size: 13px; line-height: 1.4;
+  max-width: 100%; overflow-wrap: anywhere; word-break: break-word;
+}
+.translation-bubble.me { align-self: flex-end; background: rgba(0, 122, 255, 0.12); color: #0060df; }
 
 /* 撤回 / 居中系统框
    HTML：<div class="message-row recalled|sys-notice"><div class="recall-notice [expand]">…</div></div> */

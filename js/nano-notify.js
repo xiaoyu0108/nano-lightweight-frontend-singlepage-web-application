@@ -136,12 +136,27 @@
             if (!('Notification' in window) || Notification.permission !== 'granted') return;
             // 优先走 Service Worker：应用退到后台/锁屏时也能稳定弹出，点击由 sw.js 带回 target
             if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                var settled = false;
+                // SW 未注册时 ready 永不 resolve，加超时兜底改用 new Notification
+                var fb = setTimeout(function () {
+                    if (settled) return;
+                    settled = true;
+                    legacy();
+                }, 600);
                 navigator.serviceWorker.ready.then(function (reg) {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(fb);
                     if (reg && reg.showNotification) {
                         try { reg.showNotification(title || 'Nano', payload); return; } catch (e) {}
                     }
                     legacy();
-                }).catch(function () { legacy(); });
+                }).catch(function () {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(fb);
+                    legacy();
+                });
             } else {
                 legacy();
             }

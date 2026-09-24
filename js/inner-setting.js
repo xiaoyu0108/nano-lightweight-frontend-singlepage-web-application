@@ -886,27 +886,202 @@
         });
     }
     function loadFloorCounts() {
-        var onEl = document.getElementById('floorOnlineCount');
-        var offEl = document.getElementById('floorOfflineCount');
-        if (!onEl || !offEl) return;
-        countOnlineMessages().then(function (n) { onEl.textContent = n; });
-        countOfflineMessages().then(function (n) { offEl.textContent = n; });
+        var el = document.getElementById('floorCountText');
+        if (!el) return;
+        var online = 0, offline = 0;
+        function render() { el.textContent = '线上 ' + online + ' · 线下 ' + offline; }
+        countOnlineMessages().then(function (n) { online = n; render(); });
+        countOfflineMessages().then(function (n) { offline = n; render(); });
     }
 
-    // 当前楼层：线上（回聊天详情）/ 线下（切到线下模式聊天）
-    var floorSeg = document.getElementById('floorSeg');
-    if (floorSeg) {
-        floorSeg.addEventListener('click', function (e) {
-            var btn = e.target && e.target.closest ? e.target.closest('.floor-btn') : null;
-            if (!btn) return;
-            var floor = btn.dataset.floor;
-            if (floor === 'offline') {
-                var q = '?chat=' + encodeURIComponent(chatId || '') + '&name=' + encodeURIComponent(chatName || '');
-                location.href = 'offline.html' + q;
+    // ===== Token 占用（按字符估算）：线上/线下/记忆库/世界书/社交软件 =====
+    var TOKEN_KEYS = { content: 1, text: 1, desc: 1, description: 1, summary: 1, setting: 1, persona: 1, prompt: 1, remark: 1, bio: 1, title: 1, message: 1, memory: 1, detail: 1, keys: 1, foreign: 1, speech: 1, narration: 1 };
+    function estimateTokens(s) {
+        s = String(s || '');
+        if (!s) return 0;
+        var cjk = (s.match(/[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/g) || []).length;
+        var other = s.length - cjk;
+        return Math.ceil(cjk + other / 4);
+    }
+    function tokenTextFrom(obj, depth) {
+        depth = depth || 0;
+        if (obj == null || depth > 8) return '';
+        if (typeof obj === 'string') return (obj.length < 4000 && obj.indexOf('data:') !== 0) ? obj + '\n' : '';
+        var out = '';
+        if (Array.isArray(obj)) {
+            for (var i = 0; i < obj.length && i < 4000; i++) out += tokenTextFrom(obj[i], depth + 1);
+            return out;
+        }
+        if (typeof obj === 'object') {
+            for (var k in obj) {
+                var v = obj[k];
+                if (typeof v === 'string') {
+                    if (TOKEN_KEYS[k] && v && v.length < 4000 && v.indexOf('data:') !== 0) out += v + '\n';
+                } else if (v && typeof v === 'object') {
+                    out += tokenTextFrom(v, depth + 1);
+                }
+            }
+        }
+        return out;
+    }
+    function dbExists(name) {
+        return new Promise(function (resolve) {
+            if (!indexedDB.databases) { resolve(true); return; }
+            try {
+                indexedDB.databases().then(function (list) {
+                    resolve(!!list && list.some(function (d) { return d && d.name === name; }));
+                }).catch(function () { resolve(true); });
+            } catch (e) { resolve(true); }
+        });
+    }
+    function idbReadStore(dbName, storeName, filterFn) {
+        return dbExists(dbName).then(function (exists) {
+            if (!exists) return [];
+            return new Promise(function (resolve) {
+                if (!('indexedDB' in window)) { resolve([]); return; }
+                try {
+                    // 不指定版本：只读，绝不抢先建库/建表
+                    var req = indexedDB.open(dbName);
+                    req.onupgradeneeded = function () {};
+                    req.onsuccess = function (e) {
+                        var db = e.target.result, out = [];
+                        try {
+                            if (!db.objectStoreNames.contains(storeName)) { db.close(); resolve([]); return; }
+                            var r = db.transaction(storeName, 'readonly').objectStore(storeName).openCursor();
+                            r.onsuccess = function (ev) {
+                                var cur = ev.target.result;
+                                if (cur) {
+                                    try { if (!filterFn || filterFn(cur.value, cur.key)) out.push({ key: cur.key, value: cur.value }); } catch (err) {}
+                                    cur.continue();
+                                } else { resolve(out); try { db.close(); } catch (err) {} }
+                            };
+                            r.onerror = function () { resolve(out); try { db.close(); } catch (err) {} };
+                        } catch (err) { resolve([]); try { db.close(); } catch (e2) {} }
+                    };
+                    req.onerror = function () { resolve([]); };
+                } catch (e) { resolve([]); }
+            });
+        });
+    }
+    function lfGet(key) {
+        return new Promise(function (resolve) {
+            if (typeof localforage !== 'undefined') {
+                localforage.getItem(key).then(function (v) { resolve(v); }).catch(function () { resolve(null); });
             } else {
-                try { window.parent.postMessage({ type: 'closeFullscreen' }, '*'); } catch (err) {}
+                try { resolve(JSON.parse(localStorage.getItem(key) || 'null')); } catch (e) { resolve(null); }
             }
         });
+    }
+    function matchCharText(obj) {
+        var s = '';
+        try { s = JSON.stringify(obj); } catch (e) { return false; }
+        if (!s) return false;
+        if (chatId && s.indexOf(chatId) !== -1) return true;
+        if (chatName && s.indexOf(chatName) !== -1) return true;
+        return false;
+    }
+    async function gatherTokenStats() {
+        var stats = { online: 0, offline: 0, memory: 0, worldbook: 0, social: 0 };
+        try { stats.online = estimateTokens(tokenTextFrom(await lfGet('chat_messages_' + chatId))); } catch (e) {}
+        try {
+            var off = await idbReadStore('MeetSettingsDB', 'messages', function (v) { return v && (v.chatId || '') === chatId; });
+            stats.offline = estimateTokens(tokenTextFrom(off));
+        } catch (e) {}
+        try {
+            var mem = await idbReadStore('nano_vector_memory_db', 'config', function (v, k) { return k === 'memlist_' + chatId || k === 'auxchat_' + chatId; });
+            var mem2 = await idbReadStore('nano_vector_memory_db', 'chat_messages', function (v, k) { return k === chatId || (v && v.chatId === chatId); });
+            stats.memory = estimateTokens(tokenTextFrom(mem) + tokenTextFrom(mem2));
+        } catch (e) {}
+        try {
+            var wbRows = await idbReadStore('nano_worldbook_db', 'worldbook_data', null);
+            var files = [];
+            wbRows.forEach(function (row) {
+                var val = row.value;
+                if (val && val.value && Array.isArray(val.value.files)) val = val.value;
+                if (val && Array.isArray(val.files)) {
+                    val.files.forEach(function (f) {
+                        if (!f) return;
+                        var bound = Array.isArray(f.boundCharacters) ? f.boundCharacters : [];
+                        if (bound.length === 0 || bound.indexOf(chatId) !== -1) files.push(f);
+                    });
+                }
+            });
+            stats.worldbook = estimateTokens(tokenTextFrom(files));
+        } catch (e) {}
+        try {
+            var socialText = '';
+            // 朋友圈
+            try {
+                var mo = JSON.parse(localStorage.getItem('nano_moments_data') || '[]');
+                if (Array.isArray(mo)) socialText += tokenTextFrom(mo.filter(matchCharText));
+            } catch (e) {}
+            // Halo（按角色名匹配聊天记录）
+            try {
+                var halo = await idbReadStore('nano_halo_db', 'halo_state', null);
+                halo.forEach(function (row) {
+                    var rec = row.value;
+                    var S = rec && rec.value ? rec.value : rec;
+                    var log = S && S.chatLog && chatName && S.chatLog[chatName];
+                    if (log) socialText += tokenTextFrom(log);
+                });
+            } catch (e) {}
+            // Instagram（匹配到角色的会话）
+            try {
+                var insRows = await idbReadStore('nano_ins_db', 'state', function (v, k) { return typeof k === 'string' && k.indexOf('nano_ins_chat_') === 0; });
+                insRows.forEach(function (row) {
+                    var rec = row.value;
+                    var st = rec && rec.value ? rec.value : rec;
+                    var hist = st && st.chatHistories;
+                    if (!hist || typeof hist !== 'object') return;
+                    Object.keys(hist).forEach(function (uid) {
+                        if (matchCharText(hist[uid])) socialText += tokenTextFrom(hist[uid]);
+                    });
+                });
+            } catch (e) {}
+            stats.social = estimateTokens(socialText);
+        } catch (e) {}
+        return stats;
+    }
+    function renderTokenChart(stats) {
+        var labels = { online: '线上记录', offline: '线下记录', memory: '记忆库', worldbook: '世界书', social: '社交软件' };
+        var colors = { online: '#007aff', offline: '#34c759', memory: '#ff9500', worldbook: '#af52de', social: '#ff2d55' };
+        var entries = Object.keys(labels).map(function (k) {
+            return { k: k, label: labels[k], v: stats[k] || 0, color: colors[k] };
+        }).filter(function (e) { return e.v > 0; }).sort(function (a, b) { return b.v - a.v; });
+        var total = entries.reduce(function (a, e) { return a + e.v; }, 0);
+        var totalEl = document.getElementById('tokenTotal');
+        var ring = document.getElementById('tokenRing');
+        var legend = document.getElementById('tokenLegend');
+        if (totalEl) totalEl.textContent = total ? ('≈' + total.toLocaleString() + ' tokens') : '暂无数据';
+        if (ring) {
+            var C = 2 * Math.PI * 40;
+            var off = 0;
+            var html = '<circle cx="50" cy="50" r="40" fill="none" stroke="#eef0f3" stroke-width="12"></circle>';
+            if (total) {
+                entries.forEach(function (e) {
+                    var len = e.v / total * C;
+                    html += '<circle cx="50" cy="50" r="40" fill="none" stroke="' + e.color + '" stroke-width="12" stroke-linecap="butt"'
+                        + ' stroke-dasharray="' + len.toFixed(3) + ' ' + (C - len).toFixed(3) + '"'
+                        + ' stroke-dashoffset="' + (-off).toFixed(3) + '" transform="rotate(-90 50 50)"></circle>';
+                    off += len;
+                });
+                html += '<text x="50" y="47" text-anchor="middle" font-size="13" font-weight="600" fill="#1c1c1e">' + Math.round(total / 1000) + 'k</text>';
+                html += '<text x="50" y="60" text-anchor="middle" font-size="7" fill="#8e8e93">tokens</text>';
+            }
+            ring.innerHTML = html;
+        }
+        if (legend) {
+            legend.innerHTML = total ? entries.map(function (e) {
+                return '<div style="display:flex;align-items:center;gap:6px;margin:3px 0;">'
+                    + '<span style="width:8px;height:8px;border-radius:50%;flex:none;background:' + e.color + ';"></span>'
+                    + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e.label + '</span>'
+                    + '<span style="color:#8e8e93;flex:none;">' + e.v.toLocaleString() + ' · ' + Math.round(e.v / total * 100) + '%</span>'
+                    + '</div>';
+            }).join('') : '<div style="color:#8e8e93;">暂无数据</div>';
+        }
+    }
+    function loadTokenChart() {
+        gatherTokenStats().then(renderTokenChart).catch(function () { });
     }
 
     // 自己的返回按钮：收起本页，回到聊天详情页（由主框架恢复 chat_inner）
@@ -924,5 +1099,6 @@
 
     loadInfo();
     loadFloorCounts();
+    loadTokenChart();
     console.log('[Setting] 聊天设置页面已加载，chatId:', chatId);
 })();

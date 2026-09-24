@@ -32,7 +32,7 @@ html, body {
 /* ===== 顶栏 ===== */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 20px 10px; flex-shrink: 0; background: var(--bg);
+  padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 20px 10px; flex-shrink: 0; background: transparent;
   position: relative; z-index: 10;
 }
 .topbar-btn {
@@ -49,7 +49,7 @@ html, body {
 /* ===== Tab ===== */
 .tab-capsule-wrap {
   display: flex; justify-content: center;
-  padding: 0 20px 16px; flex-shrink: 0; background: var(--bg);
+  padding: 0 20px 16px; flex-shrink: 0; background: transparent;
 }
 .tab-capsule {
   display: flex; align-items: center;

@@ -234,11 +234,24 @@
                     <div class="item-text">当前楼层</div>
                 </div>
                 <div class="item-right">
-                    <div class="floor-seg" id="floorSeg">
-                        <button type="button" class="floor-btn active" data-floor="online">线上 <b id="floorOnlineCount">0</b></button>
-                        <button type="button" class="floor-btn" data-floor="offline">线下 <b id="floorOfflineCount">0</b></button>
-                    </div>
+                    <span class="floor-count" id="floorCountText">线上 0 · 线下 0</span>
                 </div>
+            </div>
+            <div class="list-item" style="cursor:default;display:block;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div class="item-left">
+                        <div class="item-icon" style="color: var(--ios-blue);">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                        </div>
+                        <div class="item-text">Token 占用</div>
+                    </div>
+                    <div class="item-right"><span id="tokenTotal" style="font-size:13px;color:#8e8e93;">统计中…</span></div>
+                </div>
+                <div style="display:flex;gap:14px;align-items:center;margin-top:10px;">
+                    <svg id="tokenRing" viewBox="0 0 100 100" width="108" height="108" style="flex:none;"></svg>
+                    <div id="tokenLegend" style="flex:1;min-width:0;font-size:12px;line-height:1.5;color:#3c3c43;"></div>
+                </div>
+                <div style="font-size:11px;color:#aeaeb2;margin-top:6px;">按字符估算，仅供参考</div>
             </div>
             <div class="list-item" id="searchItem">
                 <div class="item-left">

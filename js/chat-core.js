@@ -682,6 +682,13 @@
         prompt += '  [heart:坐在窗边，白衬衫微敞，指尖轻叩桌面||我盯着屏幕上的字打了又删，最后还是把它们发了出去。说不上是难过还是庆幸，只觉得这些话终于有了出口，可发出去的那一刻又莫名发慌，忍不住想对方会怎么看我，会不会嫌我太黏人，心里像有一小块地方轻轻塌了下去。]\n';
         prompt += '- 注意：无论你是哪个国家的人，心声手记（此刻印象与心声独白）**一律用中文**输出。\n';
         prompt += '- 文风：清爽自然、细水长流、有呼吸感。拒绝无病呻吟，拒绝堆砌形容词。像真实的私人日记，偶尔跳跃或迟疑，不要总结性发言。\n';
+        // 心声「内置提示词」：用户在心声美化区填写的强制要求，生成心声时必须读取
+        try {
+            const heartBuiltin = (localStorage.getItem('nano_heart_builtin_prompt') || '').trim();
+            if (heartBuiltin) {
+                prompt += '\n【心声 · 内置要求（必须遵守，优先级高于上面的通用示例）】\n' + heartBuiltin + '\n';
+            }
+        } catch (e) {}
 
         if (isForeign) {
             const langMap = {
@@ -1818,17 +1825,18 @@
             const textSpan = document.createElement('span');
             textSpan.textContent = text;
             bubble.appendChild(textSpan);
-            if (translation) {
-                const transDiv = document.createElement('span');
-                transDiv.className = 'translation-text';
-                transDiv.textContent = translation;
-                bubble.appendChild(transDiv);
-            }
             if (transcript) {
                 const transDiv = document.createElement('span');
                 transDiv.className = 'voice-transcript';
                 transDiv.textContent = transcript;
                 bubble.appendChild(transDiv);
+            }
+            // 译文单独成块，放在气泡外侧上方，方便在美化里单独控制样式
+            if (translation) {
+                const transEl = document.createElement('div');
+                transEl.className = 'translation-bubble translation-text ' + (type === 'left' ? 'other' : 'me');
+                transEl.textContent = translation;
+                content.appendChild(transEl);
             }
             content.appendChild(bubble);
             if (quote && quote.text) {
@@ -3354,11 +3362,45 @@
         }
         const faceRef = getChatSetting('faceRef', '') || '';
         let body = { model: imgModel, prompt: prompt, n: 1, size: '1024x1024' };
-        if (faceRef && faceRef.trim() !== '') {
+        const hasFace = !!(faceRef && faceRef.trim() !== '');
+        if (hasFace) {
+            // 兼容部分支持图生图的网关字段
+            body.image = faceRef;
             body.reference_image = [faceRef];
             body.input_reference_image = [faceRef];
         }
             let baseUrl = toV1Base(resolveApiHost(imgUrl));
+
+        // 锁脸优先走图生图 /images/edits（multipart），失败再退回普通生图
+        if (hasFace && faceRef.indexOf('data:') === 0) {
+            try {
+                const comma = faceRef.indexOf(',');
+                const bstr = atob(faceRef.slice(comma + 1));
+                const u8 = new Uint8Array(bstr.length);
+                for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i);
+                const mime = (faceRef.slice(5, comma).split(';')[0]) || 'image/png';
+                const fd = new FormData();
+                fd.append('model', imgModel);
+                fd.append('prompt', prompt);
+                fd.append('n', '1');
+                fd.append('size', '1024x1024');
+                fd.append('image', new Blob([u8], { type: mime }), 'face.png');
+                const editResp = await fetch(baseUrl + '/images/edits', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + imgKey },
+                    body: fd
+                });
+                if (editResp.ok) {
+                    const ed = await editResp.json();
+                    const eitem = ed && ed.data && ed.data[0];
+                    if (eitem && eitem.url) return eitem.url;
+                    if (eitem && eitem.b64_json) return 'data:image/png;base64,' + eitem.b64_json;
+                }
+            } catch (e) {
+                console.warn('[Image] 锁脸图生图失败，改用普通生图:', e && e.message);
+            }
+        }
+
         let response;
         try {
             response = await fetch(baseUrl + '/images/generations', {

@@ -373,11 +373,12 @@
             bubbleText.className = 'bubble-text';
             bubbleText.innerHTML = renderTextWithMention(m.text || '');
             bubble.appendChild(bubbleText);
+            // 译文独立成块，放在气泡外侧上方
             if (m.translation) {
-                var transEl = document.createElement('span');
-                transEl.className = 'translation-text';
+                var transEl = document.createElement('div');
+                transEl.className = 'translation-bubble translation-text ' + (m.type === 'left' ? 'other' : 'me');
                 transEl.textContent = m.translation;
-                bubble.appendChild(transEl);
+                content.appendChild(transEl);
             }
             content.appendChild(bubble);
         }

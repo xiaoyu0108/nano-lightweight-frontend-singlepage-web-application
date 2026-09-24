@@ -338,6 +338,86 @@ function setupThoughtExpand(el) {
     }
   }
 
+  // ===== 已应用的 CSS 持久化（默认外观交给 css/heart.css，不再被默认模板覆盖）=====
+  function saveAppliedCss(css) {
+    try { localStorage.setItem('nano_voice_applied_css', css || ''); } catch (e) {}
+  }
+  function loadAppliedCss() {
+    try { return localStorage.getItem('nano_voice_applied_css') || ''; } catch (e) { return ''; }
+  }
+
+  // ===== 快捷 DIY =====
+  function quickCfgGet() {
+    try { return JSON.parse(localStorage.getItem('nano_voice_quick') || '{}') || {}; } catch (e) { return {}; }
+  }
+  function quickCfgSet(o) {
+    try { localStorage.setItem('nano_voice_quick', JSON.stringify(o || {})); } catch (e) {}
+  }
+  function applyQuick() {
+    const c = quickCfgGet();
+    let css = '';
+    if (c.hideAvatar) css += '.nano-voice-modal .iv-avatar{display:none !important;}\n';
+    if (c.hideName) css += '.nano-voice-modal .iv-name{display:none !important;}\n';
+    if (c.hideSubject) css += '.nano-voice-modal .iv-subject{display:none !important;}\n';
+    if (c.hideMeta) css += '.nano-voice-modal .iv-meta{display:none !important;}\n';
+    if (c.avatarRight) css += '.iv-sender{flex-direction:row-reverse;}\n.iv-sender-info{margin-left:0;margin-right:14px;text-align:right;}\n.iv-unread{margin-left:0;margin-right:12px;}\n';
+    let tag = document.getElementById('nanoVoiceQuickCSS');
+    if (!tag) {
+      tag = document.createElement('style');
+      tag.id = 'nanoVoiceQuickCSS';
+      document.body.appendChild(tag);
+    }
+    tag.textContent = css;
+    // 自定义「美化 / 取消」按钮文案
+    const bf = $('ivBeautify'), ex = $('ivExit');
+    if (bf) {
+      if (c.beautifyLabel) { if (!bf.dataset.icon) bf.dataset.icon = bf.innerHTML; bf.textContent = c.beautifyLabel; }
+      else if (bf.dataset.icon) { bf.innerHTML = bf.dataset.icon; delete bf.dataset.icon; }
+    }
+    if (ex) {
+      if (c.exitLabel) { if (!ex.dataset.icon) ex.dataset.icon = ex.innerHTML; ex.textContent = c.exitLabel; }
+      else if (ex.dataset.icon) { ex.innerHTML = ex.dataset.icon; delete ex.dataset.icon; }
+    }
+    // 内置提示词
+    const bp = $('ivBuiltinPrompt');
+    if (bp) bp.value = (function () { try { return localStorage.getItem('nano_heart_builtin_prompt') || ''; } catch (e) { return ''; } })();
+    // 面板控件回填
+    const sa = $('ivShowAvatar'), sn = $('ivShowName'), ar = $('ivAvatarRight');
+    if (sa) sa.checked = !c.hideAvatar;
+    if (sn) sn.checked = !c.hideName;
+    if (ar) ar.checked = !!c.avatarRight;
+    const ss = $('ivShowSubject'), sm = $('ivShowMeta');
+    if (ss) ss.checked = !c.hideSubject;
+    if (sm) sm.checked = !c.hideMeta;
+    const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
+    if (bl) bl.value = c.beautifyLabel || '';
+    if (el) el.value = c.exitLabel || '';
+  }
+  function bindQuick() {
+    const save = async function () {
+      const c = quickCfgGet();
+      const sa = $('ivShowAvatar'), sn = $('ivShowName'), ar = $('ivAvatarRight');
+      c.hideAvatar = sa ? !sa.checked : false;
+      c.hideName = sn ? !sn.checked : false;
+      c.avatarRight = ar ? !!ar.checked : false;
+      const ss = $('ivShowSubject'), sm = $('ivShowMeta');
+      c.hideSubject = ss ? !ss.checked : false;
+      c.hideMeta = sm ? !sm.checked : false;
+      const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
+      c.beautifyLabel = bl ? bl.value.trim() : '';
+      c.exitLabel = el ? el.value.trim() : '';
+      quickCfgSet(c);
+      try {
+        const bp = $('ivBuiltinPrompt');
+        localStorage.setItem('nano_heart_builtin_prompt', bp ? bp.value.trim() : '');
+      } catch (e) {}
+      applyQuick();
+      if (window.console) console.log('[Heart] 快捷 DIY 已保存');
+    };
+    const qs = $('ivQuickSave');
+    if (qs) qs.addEventListener('click', save);
+  }
+
   // ===== 关闭弹窗 =====
   function closeVoice() {
     const layer = $('nanoVoiceLayer');
@@ -409,8 +489,13 @@ function setupThoughtExpand(el) {
     const defaultTpl = all.find(t => t.id === 'default');
     if (defaultTpl) {
       $('ivCss').value = defaultTpl.css;
-      applyCustomCSS(defaultTpl.css);
     }
+    // 默认外观交给 css/heart.css；仅当用户自定义过才注入覆盖 CSS，
+    // 这样直接改 css/heart.css 也能生效（不再被默认模板强制覆盖）
+    const appliedCss = loadAppliedCss();
+    if (appliedCss) applyCustomCSS(appliedCss);
+    applyQuick();
+    bindQuick();
 
     // ===== 事件绑定 =====
     $('ivExit').addEventListener('click', closeVoice);
@@ -525,6 +610,7 @@ function setupThoughtExpand(el) {
     $('ivApply').addEventListener('click', async function() {
       const css = $('ivCss').value;
       applyCustomCSS(css);
+      saveAppliedCss(css);
       const id = $('ivTemplateSelect').value;
       if (id) {
         await saveCurrentToTemplate();
@@ -536,6 +622,7 @@ function setupThoughtExpand(el) {
     $('ivReset').addEventListener('click', async function() {
       const styleTag = document.getElementById('nanoVoiceCustomCSS');
       if (styleTag) styleTag.textContent = '';
+      saveAppliedCss('');
       document.querySelector('.iv-thought').style.cssText = '';
       document.querySelector('.nano-voice-modal').style.cssText = '';
       // 同步把 CSS 覆盖输入栏恢复为默认模板（初始 UI）的 css 代码
@@ -554,6 +641,28 @@ function setupThoughtExpand(el) {
 
     // 导入功能
     $('ivImportBtn').addEventListener('click', function() { $('ivFileInput').click(); });
+    // 导出当前选中的预设（分享图标）
+    $('ivExportBtn').addEventListener('click', async function() {
+      const id = $('ivTemplateSelect').value;
+      let name = ($('ivTemplateName').value.trim()) || '心声美化';
+      let css = $('ivCss').value;
+      if (id) {
+        try {
+          const all = await getAllTemplates();
+          const tpl = all.find(t => t.id === id);
+          if (tpl) { name = tpl.name || name; css = tpl.css || css; }
+        } catch (e) {}
+      }
+      try {
+        const blob = new Blob([JSON.stringify({ type: 'heart', name: name, css: css }, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = String(name).replace(/[\\/:*?"<>|]/g, '_') + '.json';
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      } catch (e) { alert('导出失败'); }
+    });
     $('ivFileInput').addEventListener('change', function(event) {
       const file = event.target.files[0];
       if (!file) return;

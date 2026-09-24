@@ -366,6 +366,13 @@
         <div class="iv-setting">
           <div class="iv-setting-header">
             <span class="iv-setting-title">CSS 覆盖</span>
+            <button class="iv-import-btn" id="ivExportBtn" aria-label="导出当前预设">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 15V4" />
+                <path d="m8 8 4-4 4 4" />
+                <path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+              </svg>
+            </button>
             <button class="iv-import-btn" id="ivImportBtn" aria-label="导入样式文件">
               <svg viewBox="0 0 24 24">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -376,6 +383,40 @@
             <input type="file" id="ivFileInput" accept=".json,.txt" style="display: none;">
           </div>
           <textarea class="iv-css" id="ivCss" spellcheck="false"></textarea>
+        </div>
+
+        <div class="iv-setting">
+          <div class="iv-setting-header">
+            <span class="iv-setting-title">快捷 DIY</span>
+          </div>
+          <div style="padding:4px 16px 14px;display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#1c1c1e;">
+              <span>显示头像</span>
+              <input type="checkbox" id="ivShowAvatar" checked style="width:18px;height:18px;">
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#1c1c1e;">
+              <span>显示昵称</span>
+              <input type="checkbox" id="ivShowName" checked style="width:18px;height:18px;">
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#1c1c1e;">
+              <span>头像靠右</span>
+              <input type="checkbox" id="ivAvatarRight" style="width:18px;height:18px;">
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#1c1c1e;">
+              <span>显示「此刻·印象」</span>
+              <input type="checkbox" id="ivShowSubject" checked style="width:18px;height:18px;">
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#1c1c1e;">
+              <span>显示收件信息</span>
+              <input type="checkbox" id="ivShowMeta" checked style="width:18px;height:18px;">
+            </label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="ivBeautifyLabel" placeholder="美化按钮文案" maxlength="6" style="flex:1;padding:8px 10px;border-radius:10px;border:1px solid rgba(60,60,67,.12);background:rgba(255,255,255,.6);font-size:13px;">
+              <input type="text" id="ivExitLabel" placeholder="取消按钮文案" maxlength="6" style="flex:1;padding:8px 10px;border-radius:10px;border:1px solid rgba(60,60,67,.12);background:rgba(255,255,255,.6);font-size:13px;">
+            </div>
+            <textarea id="ivBuiltinPrompt" placeholder="心声内置提示词（AI 生成心声时必读，例如：必须提及今天的约定）" style="width:100%;min-height:64px;resize:vertical;border-radius:10px;border:1px solid rgba(60,60,67,.12);background:rgba(255,255,255,.6);padding:10px;font-size:13px;line-height:1.5;"></textarea>
+            <button class="iv-template-btn primary" id="ivQuickSave" style="align-self:flex-end;">保存快捷设置</button>
+          </div>
         </div>
 
         <div class="iv-template-manager">
