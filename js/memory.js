@@ -330,6 +330,15 @@
         return u;
     }
 
+    // 通知父页面/当前会话：记忆库发生变化，立即重载长期记忆
+    function notifyMemoryUpdated() {
+        try {
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'NANO_MEMORY_UPDATED', chatId: getChatId() }, '*');
+            }
+        } catch (e) {}
+    }
+
     // ============================================================
     // 加载/保存设置
     // ============================================================
@@ -722,6 +731,7 @@
             }
             console.log('[Memory] 总结完成 chatId=', chatId, '生成', items.length, '条记忆');
             await renderMemoryList();
+            notifyMemoryUpdated();
             isProcessing = false;
 
         } catch (err) {
@@ -978,6 +988,7 @@
             console.log('[Memory] 渲染记忆列表, chatId=', chatId, '找到', items ? items.length : 0, '条');
             const container = memoryListContainer;
             container.innerHTML = '';
+            container.classList.remove('memory-timeline');
 
             // 记忆检索：按关键词过滤内容/类型/角色
             const q = (memorySearchInput ? memorySearchInput.value : '').trim().toLowerCase();
@@ -1014,8 +1025,8 @@
                 '地理位置': '#34c759', '情感状态': '#ff2d55', '项目进展': '#007aff'
             };
 
-            // 记忆库超过 50 条时，默认只展示最新 50 条，更早的折叠起来
-            const HIDE_AFTER = 50;
+            // 记忆库超过 20 条时，默认只展示最新 20 条，更早的折叠起来
+            const HIDE_AFTER = 20;
             let displayList = sorted;
             let hiddenCount = 0;
             if (!memoryListExpanded && sorted.length > HIDE_AFTER) {
@@ -1023,9 +1034,10 @@
                 hiddenCount = sorted.length - HIDE_AFTER;
             }
 
+            container.classList.add('memory-timeline');
             displayList.forEach(item => {
                 const card = document.createElement('div');
-                card.className = 'memory-card';
+                card.className = 'memory-card timeline-card';
                 card.onclick = () => openEditModal(item.id);
 
                 const header = document.createElement('div');
@@ -1072,7 +1084,7 @@
                 const btn = document.createElement('button');
                 btn.className = 'memory-expand-btn';
                 btn.style.cssText = 'display:block;width:100%;margin:10px 0 4px;padding:10px 0;border:none;border-radius:12px;background:rgba(120,120,128,0.12);color:#007aff;font-size:13px;font-family:inherit;cursor:pointer;';
-                btn.textContent = hiddenCount > 0 ? ('展开更早的 ' + hiddenCount + ' 条记忆') : '收起更早的记忆';
+                btn.textContent = hiddenCount > 0 ? ('展开（' + hiddenCount + ' 条）') : '收起';
                 btn.addEventListener('click', function () {
                     memoryListExpanded = !memoryListExpanded;
                     renderMemoryList();
@@ -1137,6 +1149,7 @@
             await storeMemory(item);
             closeEditModal();
             await renderMemoryList();
+            notifyMemoryUpdated();
             alert('记忆已更新');
         } catch (err) {
             alert('更新失败: ' + err.message);
@@ -1150,6 +1163,7 @@
         await deleteMemoryFromDB(currentEditId);
         closeEditModal();
         await renderMemoryList();
+        notifyMemoryUpdated();
         alert('已删除');
     }
     window.deleteMemory = deleteMemory;

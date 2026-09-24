@@ -18,7 +18,7 @@ body.dark{
 .page{position:absolute;inset:0;display:none;background:var(--bg);overflow:hidden}
 .page.active{display:block}
 .scroll{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.page-inner{padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 14px) 16px calc(0px + 110px)}
+.page-inner{padding:14px 16px calc(0px + 110px)}
 .page.no-nav .page-inner{padding-bottom:28px}
 .topbar{
   height:calc(54px + var(--safe-top, env(safe-area-inset-top, 0px)));display:flex;align-items:center;justify-content:space-between;

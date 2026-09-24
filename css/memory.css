@@ -269,6 +269,35 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 .memory-card:active { transform: scale(0.98); background: #f0f0f4; }
 
+/* 记忆库：时间轴样式（左侧竖线 + 节点） */
+#memoryListContainer.memory-timeline {
+    position: relative;
+    padding-left: 24px;
+}
+#memoryListContainer.memory-timeline::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 14px;
+    bottom: 14px;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, rgba(0,122,255,0.5), rgba(0,122,255,0.1));
+}
+.memory-card.timeline-card { position: relative; }
+.memory-card.timeline-card::before {
+    content: "";
+    position: absolute;
+    left: -24px;
+    top: 20px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #007aff;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 0 2px rgba(0,122,255,0.18);
+}
+
 .memory-header {
     display: flex;
     justify-content: space-between;

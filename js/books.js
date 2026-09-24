@@ -59,7 +59,8 @@ function bGet(s,k){return new Promise((res,rej)=>{const t=bookDB.transaction(s,'
 /* 通用打开某个 nano 库 */
 function openNanoDB(dbName, storeName, keyPath){
   return new Promise((res,rej)=>{
-    const req=indexedDB.open(dbName,1);
+    // 不指定版本：以当前实际版本打开，避免 nano_api_db(版本2) 等被降到版本1 触发 VersionError 而读不到配置
+    const req=indexedDB.open(dbName);
     req.onupgradeneeded=(e)=>{
       const d=e.target.result;
       if(!d.objectStoreNames.contains(storeName)){
@@ -132,21 +133,29 @@ async function loadRuntimeData(){
   // ---- 4. API 配置 ----
   const cfg = await nanoGet('nano_api_db','api_data','nano_api_config');
   if(cfg){
+    // api.js 存的是 {key, value}，value 里才是配置；兼容直接存配置的旧结构
+    const v = (cfg.value && typeof cfg.value === 'object') ? cfg.value : cfg;
     runtime.api = {
-      mainUrl: cfg.mainUrl || '',
-      mainKey: cfg.mainKey || '',
-      mainModel: cfg.mainModel || '',
-      mainTemp: cfg.mainTemp != null ? cfg.mainTemp : 0.8
+      mainUrl: v.mainUrl || '',
+      mainKey: v.mainKey || '',
+      mainModel: v.mainModel || '',
+      mainTemp: v.mainTemp != null ? v.mainTemp : 0.8
     };
   }
-  // 兼容：有的结构是 cfg.value
-  if(!runtime.api && cfg && cfg.value){
-    runtime.api = {
-      mainUrl: cfg.value.mainUrl || '',
-      mainKey: cfg.value.mainKey || '',
-      mainModel: cfg.value.mainModel || '',
-      mainTemp: cfg.value.mainTemp != null ? cfg.value.mainTemp : 0.8
-    };
+  // 兜底：IDB 读不到时用 localStorage（api.js 失败降级时写在这里）
+  if(!runtime.api){
+    try{
+      const raw=localStorage.getItem('nano_api_config');
+      if(raw){
+        const v=JSON.parse(raw);
+        runtime.api={
+          mainUrl: v.mainUrl || '',
+          mainKey: v.mainKey || '',
+          mainModel: v.mainModel || '',
+          mainTemp: v.mainTemp != null ? v.mainTemp : 0.8
+        };
+      }
+    }catch(e){}
   }
 }
 
@@ -828,7 +837,7 @@ function endDrag(e){
   document.removeEventListener('touchmove',onDrag);
   document.removeEventListener('mouseup',endDrag);
   document.removeEventListener('touchend',endDrag);
-  if(!ballDrag.moved) openChatWindow();
+  if(!ballDrag.moved) toggleChatWindow();
 }
 
 /* ==================== 聊天窗 ==================== */
@@ -850,6 +859,58 @@ function openChatWindow(){
   if(!currentChar) showCharPicker();
 }
 function closeChatWindow(){ document.getElementById('chatWindow').classList.remove('show'); }
+/* 点击悬浮球：已在显示则收起，否则展开 */
+function toggleChatWindow(){
+  const w=document.getElementById('chatWindow');
+  if(w.classList.contains('show')) closeChatWindow();
+  else openChatWindow();
+}
+
+/* ==================== 聊天窗拖拽 ==================== */
+let winDrag={dragging:false,startX:0,startY:0,origX:0,origY:0,moved:false};
+function startWinDrag(e){
+  const win=document.getElementById('chatWindow');
+  if(!win.classList.contains('show')) return;
+  if(e.target.closest('.cw-close')) return;
+  const appRect=document.getElementById('app').getBoundingClientRect();
+  const rect=win.getBoundingClientRect();
+  const p=e.touches?e.touches[0]:e;
+  winDrag.dragging=true; winDrag.moved=false;
+  winDrag.startX=p.clientX; winDrag.startY=p.clientY;
+  winDrag.origX=rect.left-appRect.left; winDrag.origY=rect.top-appRect.top;
+  document.addEventListener('mousemove',onWinDrag);
+  document.addEventListener('touchmove',onWinDrag,{passive:false});
+  document.addEventListener('mouseup',endWinDrag);
+  document.addEventListener('touchend',endWinDrag);
+}
+function onWinDrag(e){
+  if(!winDrag.dragging) return;
+  e.preventDefault();
+  const win=document.getElementById('chatWindow');
+  const appRect=document.getElementById('app').getBoundingClientRect();
+  const p=e.touches?e.touches[0]:e;
+  const dx=p.clientX-winDrag.startX, dy=p.clientY-winDrag.startY;
+  if(Math.abs(dx)>4||Math.abs(dy)>4) winDrag.moved=true;
+  let nx=Math.max(0,Math.min(appRect.width-win.offsetWidth, winDrag.origX+dx));
+  let ny=Math.max(0,Math.min(appRect.height-win.offsetHeight, winDrag.origY+dy));
+  win.style.left=nx+'px'; win.style.top=ny+'px';
+  win.style.right='auto'; win.style.bottom='auto';
+}
+function endWinDrag(){
+  if(!winDrag.dragging) return;
+  winDrag.dragging=false;
+  document.removeEventListener('mousemove',onWinDrag);
+  document.removeEventListener('touchmove',onWinDrag);
+  document.removeEventListener('mouseup',endWinDrag);
+  document.removeEventListener('touchend',endWinDrag);
+}
+(function bindChatWindowDrag(){
+  const win=document.getElementById('chatWindow');
+  const head=win && win.querySelector('.chat-window-head');
+  if(!head) return;
+  head.addEventListener('mousedown',startWinDrag);
+  head.addEventListener('touchstart',startWinDrag,{passive:true});
+})();
 
 function renderChars(){
   // 挂到 window 便于内联使用

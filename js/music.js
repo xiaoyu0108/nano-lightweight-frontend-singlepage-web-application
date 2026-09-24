@@ -2711,6 +2711,7 @@
   var ballStartX = 0, ballStartY = 0;
   var ballOffsetX = 0, ballOffsetY = 0;
   var ballClickTimer = null;
+  var ballLastTouch = 0;
 
   function saveBallPos() {
     try { localStorage.setItem('nano_music_ball_pos', JSON.stringify(ballPos)); } catch(e) {}
@@ -2950,6 +2951,8 @@
 
   musicFloatBall.addEventListener('mousedown', function(e) {
     if (e.target.closest('.ball-expand-btn') || e.target.closest('.ball-off-btn')) return;
+    // 触摸后浏览器会补发鼠标事件，忽略它，避免单击被当成双击
+    if (Date.now() - ballLastTouch < 700) return;
     e.preventDefault();
     ballDown(e.clientX, e.clientY);
   });
@@ -2957,6 +2960,7 @@
   document.addEventListener('mouseup', ballUp);
   musicFloatBall.addEventListener('touchstart', function(e) {
     if (e.target.closest('.ball-expand-btn') || e.target.closest('.ball-off-btn')) return;
+    ballLastTouch = Date.now();
     var t = e.touches[0];
     ballDown(t.clientX, t.clientY);
   }, { passive: true });

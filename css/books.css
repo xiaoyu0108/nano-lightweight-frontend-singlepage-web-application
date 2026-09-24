@@ -312,7 +312,9 @@ img{display:block;max-width:100%}
   padding:12px 14px;border-bottom:1px solid #f0f0f2;
   display:flex;align-items:center;gap:10px;flex:none;
   background:#fafafb;
+  cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
 }
+.chat-window-head.dragging{cursor:grabbing}
 .chat-window-head .cw-avatar{
   width:32px;height:32px;border-radius:50%;
   background:linear-gradient(145deg,#b8b8c8,#9a9aae);

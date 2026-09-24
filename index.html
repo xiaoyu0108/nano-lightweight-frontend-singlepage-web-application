@@ -1470,9 +1470,22 @@
 
         // ===== 冷启动：从系统通知点进来（sw.js 把目标放在 ?open= 上）=====
         try {
-            const openTarget = new URLSearchParams(location.search).get('open');
+            const params = new URLSearchParams(location.search);
+            const openTarget = params.get('open');
             if (openTarget) {
-                setTimeout(function () { try { openNotifyTarget(openTarget); } catch (e) {} }, 900);
+                // 处理完立刻从地址栏移除：避免系统把带 ?open 的地址当作下次冷启动的入口，直接跳进会话页
+                try {
+                    params.delete('open');
+                    const qs = params.toString();
+                    history.replaceState(null, '', location.pathname + (qs ? ('?' + qs) : '') + location.hash);
+                } catch (e) {}
+                const handledKey = 'nano_open_handled_' + openTarget;
+                let alreadyHandled = false;
+                try { alreadyHandled = sessionStorage.getItem(handledKey) === '1'; } catch (e) {}
+                if (!alreadyHandled) {
+                    try { sessionStorage.setItem(handledKey, '1'); } catch (e) {}
+                    setTimeout(function () { try { openNotifyTarget(openTarget); } catch (e) {} }, 900);
+                }
             }
         } catch (e) {}
 
@@ -1567,7 +1580,7 @@
                 musicBallEl.style.top = '58%';
             }
 
-            var startX = 0, startY = 0, offX = 0, offY = 0, moved = false, clickTimer = null;
+            var startX = 0, startY = 0, offX = 0, offY = 0, moved = false, clickTimer = null, lastTouchTs = 0;
 
             function down(cx, cy) {
                 isMusicBallDragging = true; moved = false;
@@ -1609,10 +1622,15 @@
                 }
             }
 
-            musicBallEl.addEventListener('mousedown', function (e) { e.preventDefault(); down(e.clientX, e.clientY); });
+            musicBallEl.addEventListener('mousedown', function (e) {
+                // 触摸后浏览器会补发鼠标事件，忽略它，避免单击被当成双击
+                if (Date.now() - lastTouchTs < 700) return;
+                e.preventDefault(); down(e.clientX, e.clientY);
+            });
             document.addEventListener('mousemove', function (e) { if (isMusicBallDragging) move(e.clientX, e.clientY); });
             document.addEventListener('mouseup', up);
             musicBallEl.addEventListener('touchstart', function (e) {
+                lastTouchTs = Date.now();
                 var t = e.touches[0]; down(t.clientX, t.clientY);
             }, { passive: true });
             document.addEventListener('touchmove', function (e) {
@@ -2425,6 +2443,11 @@
                 if (target && frameBase(target) === 'memory.html') {
                     target.contentWindow.postMessage(data, '*');
                 }
+                // 记忆页增删改后，让正在打开的会话立即重载长期记忆
+                const cf = document.getElementById('chatInnerFrame');
+                if (cf && frameBase(cf) === 'chat_inner.html') {
+                    try { cf.contentWindow.postMessage(data, '*'); } catch (e) {}
+                }
             }
 
             if (data.type === 'jumpToMessage') {
@@ -2671,13 +2694,13 @@
             setTimeout(function () {
                 if (intro.parentNode) intro.remove();
                 console.log('开场动画已跳过，进入主界面');
-            }, 700);
+            }, 450);
         }
 
         document.body.addEventListener('click', skipIntro);
         document.body.addEventListener('touchstart', skipIntro);
 
-        const autoSkipTimer = setTimeout(skipIntro, 2400);
+        const autoSkipTimer = setTimeout(skipIntro, 1200);
 
         document.body.addEventListener('click', function () {
             clearTimeout(autoSkipTimer);
@@ -2693,7 +2716,7 @@
     (function warmPages() {
         try {
             if (!navigator.serviceWorker) return;
-            if (navigator.connection && navigator.connection.saveData) return;
+            if (navigator.connection && (navigator.connection.saveData || /(^|-)2g$|slow-2g|(^|-)3g$/.test(navigator.connection.effectiveType || ''))) return;
             var pages = ['chat_inner.html', 'storage.html', 'backup.html', 'other.html', 'beautify.html',
                 'inner-setting.html', 'groups.html', 'group-setting.html', 'music.html', 'ins.html',
                 'moments.html', 'halo.html', 'books.html', 'character.html', 'mask.html', 'favorite.html',
@@ -2711,7 +2734,10 @@
                 } catch (e) { setTimeout(next, 250); }
             }
             // SW 已停用：直接顺序 fetch，浏览器 HTTP 缓存同样能命中
-            setTimeout(next, 5000);
+            // 改为空闲时才预热，避免和首页/首屏资源抢带宽
+            var startWarm = function () { setTimeout(next, 300); };
+            if (window.requestIdleCallback) requestIdleCallback(startWarm, { timeout: 6000 });
+            else setTimeout(startWarm, 6000);
         } catch (e) {}
     })();
 
@@ -2728,16 +2754,18 @@
                 try {
                     if (!fr.getAttribute('src')) fr.setAttribute('src', fr.getAttribute('data-src'));
                 } catch (e) {}
-                setTimeout(next, 1200);
+                setTimeout(next, 1600);
             }
-            // 等开场动画结束、首页稳定后再逐个预热
-            setTimeout(next, 3200);
+            // 首页稳定后、设备空闲时再逐个预热，别和首屏抢带宽
+            var startTabWarm = function () { setTimeout(next, 200); };
+            if (window.requestIdleCallback) requestIdleCallback(startTabWarm, { timeout: 7000 });
+            else setTimeout(startTabWarm, 5000);
         } catch (e) {}
     })();
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-24-6';
+        var BUILD = 'nano-2026-09-25-1';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

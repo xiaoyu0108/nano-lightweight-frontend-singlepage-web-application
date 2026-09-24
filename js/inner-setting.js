@@ -837,6 +837,62 @@
         }
     });
 
+    // 当前楼层：统计线上 / 线下各自已聊的条数
+    function countOnlineMessages() {
+        return new Promise(function (resolve) {
+            var key = 'chat_messages_' + chatId;
+            function fromLocal() {
+                try { resolve((JSON.parse(localStorage.getItem(key) || '[]') || []).length); }
+                catch (e) { resolve(0); }
+            }
+            if (typeof localforage !== 'undefined') {
+                localforage.getItem(key).then(function (data) {
+                    if (Array.isArray(data)) resolve(data.length);
+                    else fromLocal();
+                }).catch(fromLocal);
+            } else {
+                fromLocal();
+            }
+        });
+    }
+    function countOfflineMessages() {
+        return new Promise(function (resolve) {
+            if (!('indexedDB' in window)) { resolve(0); return; }
+            try {
+                // 不指定版本：只读统计，绝不抢先建库/建表，避免破坏 offline.js 的表结构
+                var req = indexedDB.open('MeetSettingsDB');
+                req.onupgradeneeded = function () {};
+                req.onsuccess = function (e) {
+                    try {
+                        var db = e.target.result;
+                        if (!db.objectStoreNames.contains('messages')) { resolve(0); try { db.close(); } catch (err) {} return; }
+                        var r = db.transaction('messages', 'readonly').objectStore('messages').openCursor();
+                        var n = 0;
+                        r.onsuccess = function (ev) {
+                            var cur = ev.target.result;
+                            if (cur) {
+                                if ((cur.value && (cur.value.chatId || '')) === chatId) n++;
+                                cur.continue();
+                            } else {
+                                resolve(n);
+                                try { db.close(); } catch (err) {}
+                            }
+                        };
+                        r.onerror = function () { resolve(n); try { db.close(); } catch (err) {} };
+                    } catch (err) { resolve(0); }
+                };
+                req.onerror = function () { resolve(0); };
+            } catch (e) { resolve(0); }
+        });
+    }
+    function loadFloorCounts() {
+        var onEl = document.getElementById('floorOnlineCount');
+        var offEl = document.getElementById('floorOfflineCount');
+        if (!onEl || !offEl) return;
+        countOnlineMessages().then(function (n) { onEl.textContent = n; });
+        countOfflineMessages().then(function (n) { offEl.textContent = n; });
+    }
+
     // 当前楼层：线上（回聊天详情）/ 线下（切到线下模式聊天）
     var floorSeg = document.getElementById('floorSeg');
     if (floorSeg) {
@@ -867,5 +923,6 @@
     }
 
     loadInfo();
+    loadFloorCounts();
     console.log('[Setting] 聊天设置页面已加载，chatId:', chatId);
 })();

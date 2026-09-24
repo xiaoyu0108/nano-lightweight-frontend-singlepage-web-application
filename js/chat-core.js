@@ -1009,6 +1009,8 @@
     let __autoSummaryBusy = false;
     // 共享长期记忆（线上/线下都写这里，发消息时注入给模型）
     let __memHints = '';
+    // 上下文读取条数（记忆页「上下文保留条数」）：每次回复读取多少条前文
+    let __memContextLimit = 30;
     function refreshMemoryHints() {
         if (typeof indexedDB === 'undefined' || !chatId) return Promise.resolve();
         return __memGet('config', 'memlist_' + chatId).then(function(rec) {
@@ -1017,6 +1019,11 @@
             const priv = list.filter(function(it){ return !(it && it.groupId); });
             const recent = priv.slice(-40);
             __memHints = recent.length ? recent.map(function(it) { return '· ' + (it.content || it.text || ''); }).join('\n') : '';
+        }).then(function () {
+            return __memCfg('contextLimit');
+        }).then(function (v) {
+            const n = parseInt(v, 10);
+            if (n > 0) __memContextLimit = n;
         }).catch(function() { __memHints = ''; });
     }
 
@@ -3475,8 +3482,8 @@
             for (let i = messages.length - 1; i >= 0; i--) {
                 const m = messages[i];
                 if (!foundAI && m.type === 'left' && !m.recalled) {
+                    // 找到最近一条 AI 回复：把它也纳入历史，模型才知道自己上一句说了什么
                     foundAI = true;
-                    continue;
                 }
                 if (foundAI) {
                     previousMessages.unshift(m);
@@ -3487,7 +3494,7 @@
             for (let i = previousMessages.length - 1; i >= 0; i--) {
                 const m = previousMessages[i];
                 const desc = describeMsgForAI(m);
-                if (!m.recalled && desc && prevCount < 12) {
+                if (!m.recalled && desc && prevCount < __memContextLimit) {
                     history.push({ role: m.type === 'right' ? 'user' : 'assistant', content: desc });
                     prevCount++;
                 }
@@ -5213,6 +5220,14 @@ if (callCard) {
         if (data.type === 'nanoConsumeListenInvite') {
             if (data.chatId && String(data.chatId) !== String(chatId)) return;
             try { consumePendingListenInvite(); } catch (e) {}
+            return;
+        }
+
+        // 记忆库在记忆页被增删改：立即刷新注入模型的长期记忆
+        if (data.type === 'NANO_MEMORY_UPDATED') {
+            if (!data.chatId || String(data.chatId) === String(chatId)) {
+                try { refreshMemoryHints(); } catch (e) {}
+            }
             return;
         }
 
