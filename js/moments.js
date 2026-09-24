@@ -971,30 +971,43 @@
     var pendingDeleteComment = null;
 
     function setupLongPress(ciDiv, itemId, ci) {
+        var startX = 0, startY = 0, moved = false;
         function onStart(e) {
             isLongPress = false;
+            moved = false;
+            var t = (e.touches && e.touches[0]) || e;
+            startX = t.clientX || 0;
+            startY = t.clientY || 0;
             longPressTimer = setTimeout(function() {
                 isLongPress = true;
                 pendingDeleteComment = { id: itemId, ci: ci };
                 document.getElementById('deleteCommentModal').classList.add('show');
             }, 600);
         }
+        function onMove(e) {
+            // 只要手指/鼠标移动超过阈值，就当成滑动/滚动，取消长按并且不触发回复
+            clearTimeout(longPressTimer);
+            var t = (e.touches && e.touches[0]) || e;
+            var dx = (t.clientX || 0) - startX;
+            var dy = (t.clientY || 0) - startY;
+            if (Math.abs(dx) > 8 || Math.abs(dy) > 8) moved = true;
+        }
         function onEnd(e) {
             clearTimeout(longPressTimer);
-            if (!isLongPress) {
-                var item = momentsData.find(function(m) { return m.id === itemId; });
-                if (item && item.comments && item.comments[ci]) {
-                    promptReply(itemId, item.comments[ci].user);
-                }
+            if (moved || isLongPress) return; // 滑动/滚动不触发回复弹窗
+            var item = momentsData.find(function(m) { return m.id === itemId; });
+            if (item && item.comments && item.comments[ci]) {
+                promptReply(itemId, item.comments[ci].user);
             }
         }
-        function onCancel() { clearTimeout(longPressTimer); }
+        function onCancel() { clearTimeout(longPressTimer); moved = true; }
         ciDiv.addEventListener('mousedown', onStart);
         ciDiv.addEventListener('mouseup', onEnd);
         ciDiv.addEventListener('mouseleave', onCancel);
         ciDiv.addEventListener('touchstart', onStart, { passive: true });
         ciDiv.addEventListener('touchend', onEnd, { passive: true });
-        ciDiv.addEventListener('touchmove', onCancel, { passive: true });
+        ciDiv.addEventListener('touchmove', onMove, { passive: true });
+        ciDiv.addEventListener('touchcancel', onCancel, { passive: true });
     }
 
     // ===== 渲染 =====

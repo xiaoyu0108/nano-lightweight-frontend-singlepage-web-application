@@ -120,7 +120,7 @@
 
     function getDefaultWallet() {
         return {
-            balance: 0,
+            balance: 5000,
             cardNumber: '',
             bankName: '',
             transactions: []

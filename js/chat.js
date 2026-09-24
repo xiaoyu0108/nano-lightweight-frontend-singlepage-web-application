@@ -117,7 +117,8 @@
 
     function groupMsgPreview(lastMsg, groupId) {
         let text;
-        if (lastMsg.isImage) text = '图片';
+        if (lastMsg.isImage && lastMsg.imageData && (lastMsg.imageData.isEmoji || lastMsg.imageData.emojiName || lastMsg.imageData.desc === '表情包')) text = '[表情包]' + (lastMsg.imageData.emojiName || lastMsg.imageData.desc || '');
+        else if (lastMsg.isImage) text = '图片';
         else if (lastMsg.isVoice) text = '语音';
         else if (lastMsg.isCard) text = '卡片消息';
         else text = lastMsg.text || '';
@@ -618,7 +619,9 @@
         msg.className = 'chat-msg';
         const lastMsg = getLastMessage(chatId);
         if (lastMsg) {
-            if (lastMsg.isImage) {
+            if (lastMsg.isImage && lastMsg.imageData && (lastMsg.imageData.isEmoji || lastMsg.imageData.emojiName || lastMsg.imageData.desc === '表情包')) {
+                msg.textContent = '[表情包]' + (lastMsg.imageData.emojiName || lastMsg.imageData.desc || '');
+            } else if (lastMsg.isImage) {
                 msg.textContent = '图片';
             } else if (lastMsg.isCard) {
                 if (lastMsg.cardData && lastMsg.cardData.cardType === 'transfer') {

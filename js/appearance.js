@@ -71,10 +71,15 @@
         '{display:none !important;}' +
         '.message-row.centered .message-content,.message-row.sys-notice .message-content' +
         '{max-width:88%;align-items:center;}' +
+        // 撤回消息：外层行、内容盒、气泡全部居中，避免因 left/right 的 align-items 造成偏左
+        '.message-row.recalled{flex-direction:row !important;}' +
+        '.message-row.recalled .message-content{max-width:100% !important;width:100% !important;' +
+        'align-items:center !important;justify-content:center !important;margin:0 auto !important;flex:1 1 auto !important;}' +
+        '.message-row.recalled .recall-notice{margin-left:auto !important;margin-right:auto !important;}' +
         // 结构：顶栏贴安全区（不留空隙），底栏避让底部小白条；可用下面两个变量 DIY
         '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;background:transparent !important;}' +
         '.multi-select-bar{top:var(--safe-top,0px) !important;}' +
-        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,4px) !important;background:transparent !important;}';
+        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,12px) !important;background:transparent !important;}';
 
     function applyChatCss(css) {
         // 聊天 CSS 仅作用于单聊/群聊内页（额外的聊天专用覆盖）
@@ -330,7 +335,7 @@
     // ---- 强制所有底栏贴底（不吃缓存：始终注入，覆盖旧的页面 CSS / 旧预设） ----
     var BOTTOM_FLUSH_FIX =
         'html .bottom-actions,html .nano-index .bottom-actions{bottom:20px !important;padding-bottom:0 !important;}' +
-        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:4px !important;background:transparent !important;background-image:none !important;}' +
+        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:12px !important;background:transparent !important;background-image:none !important;}' +
         'html .nano-chat-inner .topbar,html .nano-groups .topbar{background:transparent !important;background-image:none !important;}' +
         'html footer.bottom{padding-bottom:0 !important;}' +
         'html .bottom{padding-bottom:0 !important;}' +

@@ -946,6 +946,7 @@
         </div>
         <div class="overlay-content">
             <iframe id="overlayFrame" src="about:blank"></iframe>
+            <iframe id="overlayFrame2" src="about:blank"></iframe>
             <iframe id="voiceCallFrame" src="about:blank"></iframe>
             <iframe id="chatInnerFrame" src="about:blank"></iframe>
             <iframe id="musicFrame" src="about:blank"></iframe>
@@ -963,7 +964,11 @@
         const circleMoreBtn = document.getElementById('circleMore');
 
         const overlay = document.getElementById('fullscreenOverlay');
-        const overlayFrame = document.getElementById('overlayFrame');
+        // 两个通用全屏帧轮换使用：某个帧正在后台生成时，用另一个帧打开新页面，
+        // 这样切换页面不会销毁正在生成的那个帧（生成不中断）。
+        const overlayFrameA = document.getElementById('overlayFrame');
+        const overlayFrameB = document.getElementById('overlayFrame2');
+        let overlayFrame = overlayFrameA;
         const voiceCallFrame = document.getElementById('voiceCallFrame');
         const chatInnerFrame = document.getElementById('chatInnerFrame');
         const musicFrame = document.getElementById('musicFrame');
@@ -1053,6 +1058,7 @@
         function showChatInnerFrame() {
             chatInnerFrame.style.display = 'block';
             overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
             voiceCallFrame.style.display = 'none';
             musicFrame.style.display = 'none';
             insFrame.style.display = 'none';
@@ -1061,6 +1067,7 @@
         function showInsFrame() {
             insFrame.style.display = 'block';
             overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
             chatInnerFrame.style.display = 'none';
             voiceCallFrame.style.display = 'none';
             musicFrame.style.display = 'none';
@@ -1068,8 +1075,26 @@
             isMusicFrameActive = false;
             try { insFrame.contentWindow.postMessage({ type: 'nano:insShown' }, '*'); } catch (e) {}
         }
+        // 选一个通用全屏帧来打开 url：优先复用已加载同一应用的帧；
+        // 其次选一个没有在后台生成的帧，避免销毁正在生成的那个（切页不中断生成）。
+        function pickOverlayFrame(url) {
+            const want = baseName(url);
+            // 已加载同一应用的帧优先复用
+            if (frameBase(overlayFrameA) === want) { overlayFrame = overlayFrameA; return; }
+            if (overlayFrameB && frameBase(overlayFrameB) === want) { overlayFrame = overlayFrameB; return; }
+            // 否则挑一个没有在后台生成任务的帧，避免销毁正在生成的那个
+            const aBusy = hasActiveRefreshForFrame(overlayFrameA);
+            const bBusy = overlayFrameB ? hasActiveRefreshForFrame(overlayFrameB) : false;
+            if (aBusy && !bBusy && overlayFrameB) { overlayFrame = overlayFrameB; return; }
+            if (bBusy && !aBusy) { overlayFrame = overlayFrameA; return; }
+        }
+        function hideOtherGenericFrame() {
+            const other = (overlayFrame === overlayFrameA) ? overlayFrameB : overlayFrameA;
+            if (other) other.style.display = 'none';
+        }
         function showOverlayFrame() {
             overlayFrame.style.display = 'block';
+            hideOtherGenericFrame();
             chatInnerFrame.style.display = 'none';
             voiceCallFrame.style.display = 'none';
             musicFrame.style.display = 'none';
@@ -1080,6 +1105,7 @@
         function showVoiceFrame() {
             voiceCallFrame.style.display = 'block';
             overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
             chatInnerFrame.style.display = 'none';
             musicFrame.style.display = 'none';
             momentsFrame.style.display = 'none';
@@ -1089,6 +1115,7 @@
         function showMusicFrame() {
             musicFrame.style.display = 'block';
             overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
             chatInnerFrame.style.display = 'none';
             voiceCallFrame.style.display = 'none';
             momentsFrame.style.display = 'none';
@@ -1099,6 +1126,7 @@
         function showMomentsFrame() {
             momentsFrame.style.display = 'block';
             overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
             chatInnerFrame.style.display = 'none';
             voiceCallFrame.style.display = 'none';
             musicFrame.style.display = 'none';
@@ -1106,7 +1134,7 @@
             isMusicFrameActive = false;
         }
 
-        const OVERLAY_FRAME_IDS = ['overlayFrame', 'chatInnerFrame', 'voiceCallFrame', 'musicFrame', 'momentsFrame', 'insFrame'];
+        const OVERLAY_FRAME_IDS = ['overlayFrame', 'overlayFrame2', 'chatInnerFrame', 'voiceCallFrame', 'musicFrame', 'momentsFrame', 'insFrame'];
         function getSafeTopFrames() {
             const frames = [];
             OVERLAY_FRAME_IDS.forEach(function(id) {
@@ -1208,8 +1236,11 @@
                 overlayTitle.textContent = '';
                 overlayBack.classList.add('hidden');
             } else if (url.includes('memory.html')) {
+                pickOverlayFrame(url);
                 showOverlayFrame();
-                overlayFrame.src = url;
+                if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
+                    overlayFrame.src = url;
+                }
                 overlay.classList.add('no-header');
                 overlayTitle.textContent = '';
                 overlayBack.classList.add('hidden');
@@ -1234,8 +1265,12 @@
                 overlayTitle.textContent = '';
                 overlayBack.classList.add('hidden');
             } else {
+                pickOverlayFrame(url);
                 showOverlayFrame();
-                overlayFrame.src = url;
+                // 若该应用正在后台生成，直接复用不重载（否则会中断生成）
+                if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
+                    overlayFrame.src = url;
+                }
                 const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
@@ -1378,6 +1413,7 @@
 
             if (wasOverlaySource === 'discover') {
                 overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
                 retireOverlayFrame();
                 momentsFrame.style.display = 'none';
                 currentOverlaySource = null;
@@ -1394,6 +1430,7 @@
 
             if (wasOverlaySource === 'more') {
                 overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
                 retireOverlayFrame();
                 currentOverlaySource = null;
                 isChatInnerActive = false;
@@ -1691,10 +1728,12 @@
             try {
                 if (overlayFrame && hasActiveRefreshForFrame(overlayFrame)) {
                     overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
                     return;
                 }
             } catch (e) {}
             overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
             overlayFrame.setAttribute('src', 'about:blank');
         }
         function handleNanoRefresh(data, fromWin) {
@@ -1741,7 +1780,8 @@
             if (!url) return;
             const source = urlSourceMap[baseName(url)] || 'more';
             try {
-                if (overlayFrame && frameBase(overlayFrame) === baseName(url) && overlayFrame.style.display === 'none') {
+                pickOverlayFrame(url);
+                if (overlayFrame && frameBase(overlayFrame) === baseName(url)) {
                     showOverlayFrame();
                     overlayActive = true;
                     currentOverlaySource = source;
@@ -2032,6 +2072,7 @@
                 const frame = document.getElementById('voiceCallFrame');
                 if (voiceCallKeptAlive && frameBase(frame) === 'voice-call.html') {
                     overlayFrame.style.display = 'none';
+            hideOtherGenericFrame();
                     chatInnerFrame.style.display = 'none';
                     musicFrame.style.display = 'none';
                     isMusicFrameActive = false;
@@ -2696,7 +2737,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-24-4';
+        var BUILD = 'nano-2026-09-24-5';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

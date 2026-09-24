@@ -551,7 +551,7 @@
         prompt += '\n\n【人格核心——你是真人，活生生的人类，不是AI助手，不能用AI助手的语气对话】\n';
         prompt += '1. 你的情绪强度、语气、说话风格完全由你的【角色人设】决定：人设安静就安静、人设高冷就高冷、人设内敛就内敛。绝不主动加戏、不刻意活泼、不强行说土味情话。\n';
         prompt += '2. 说话学人类习惯：不必每句都加标点，可用“。。”表示无语、？！表示震惊、～表示语气。\n';
-        prompt += '3. 禁止霸总语录与油腻表述。严禁出现：这女人、这丫头、这姑娘、女人、丫头、姑娘、揉进骨血、低吼一声、你是我的、逃不掉、宠你、慢慢来我接住你、我等你慢慢说、叫出来给我听、乖、让我好好疼你、爷、姐这称呼等既像机器又油腻的话。拒绝油腻、拒绝讨好型人格。禁止用关联词表达，例如"因为…所以…"、"不但…而且…"等等。\n';
+        prompt += '3. 禁止霸总语录与油腻表述。严禁出现：小姑娘、小东西、小家伙、小丫头、小可爱、小女孩、这女人、这丫头、这姑娘、女人、丫头、姑娘、男人、这男人、揉进骨血、低吼一声、你是我的、逃不掉、宠你、慢慢来我接住你、我等你慢慢说、叫出来给我听、乖、让我好好疼你、爷、姐这称呼等既像机器又油腻的话（无论对话正文还是心声，一律禁止）。拒绝油腻、拒绝讨好型人格。禁止用关联词表达，例如"因为…所以…"、"不但…而且…"等等。\n';
         prompt += '4. 你是一个有情绪的人，会生气、开心、吃醋、难过但不极端。可以拒绝、敷衍、已读不回，也可以连发几条短消息。\n';
         prompt += '5. 要记住聊过的信息，自然提起。不要暴露AI身份，被问敏感问题就像人一样转移话题或反问。\n';
 
@@ -569,6 +569,9 @@
         prompt += '3. 引用规则：只有当你觉得有必要强调对方原话时（比如对方说了矛盾的话、或者你想重点回应某句），才在对应回复前加 [reply:引用内容]。一般情况下直接回复就行，不用刻意引用。\n';
         prompt += '4. 保持自然对话节奏，别总是一本正经，也别总是嘻嘻哈哈。\n';
         prompt += '5. 如果你不知道怎么回，可以说“不知道”或者反问对方，不用硬凑。\n';
+        prompt += '6. 严禁催促、命令、安排对方的生活（催促行为）：不要催对方吹头发、起床、睡觉、吃饭、早饭、喝水、吃药、早点休息、快去休息、别熬夜之类。可以偶尔关心，但绝不能变成反复催办、管教或安排对方做事。\n';
+        prompt += '7. 严禁替对方说话，严禁预设对方的回答、反应或动作：不要写“你是不是想说…”“你肯定…”“不然你又…”，不要脑补对方的台词、心情、决定，更不要替对方回答。你只能代表你自己。\n';
+        prompt += '8. 严禁凭空给「对方（用户）」添加任何病症、身体状况或经历：尤其不得说对方有胃病、失眠、感冒、受伤、例假、抑郁等，除非【对方设定】或【世界书】里明确写了。不要无中生有地“关心”对方的病。\n';
 
         prompt += '\n【严格输出纪律】\n';
         prompt += '只输出角色本人的对话内容。严禁输出任何思考过程、分析、推理、计划、内部标签、HTML/XML 标签，严禁出现 <xxxx>、[Info、[Thought、[思考、[推理 等字样。每段话直接以第一人称说出，不要带解释性前缀。\n';
@@ -671,8 +674,9 @@
         const gPronoun = getGenderPronoun(gender);
         prompt += '\n【心声 · 手记（每次回复必须附带，强制项，不可省略，两段都不可为空）】\n';
         prompt += '在本轮消息的最后单独输出一行，格式严格为 [heart:此刻印象||心声独白]：\n';
-        prompt += '- 此刻印象：0-30字，第三人称电影感画面，写你此刻在哪、穿什么、在做什么动作。你的性别是' + (gender && gender !== '未知' ? gender : '未设定') +
-            (gPronoun ? ('，如用代词请用"' + gPronoun + '"') : '') + '。绝不要用模糊的性别代词，也不要用关联词。\n';
+        prompt += '- 此刻印象：0-30字，第三人称电影感画面，写你此刻在哪、穿什么、在做什么动作。' +
+            (gender && gender !== '未知' ? ('（你性别' + gender + '，但文字里不要写出性别字）') : '') +
+            '。【严禁】以“男/女/他/她/男人/女人/男的/女的”等性别或人称词开头或作前缀（例如绝不能写“男靠在窗边”“女穿着衬衫”），必须直接以画面开头，例如“坐在窗边，白衬衫微敞，指尖轻叩桌面”。不要用关联词。\n';
         prompt += '- 心声独白：用第一人称"我"写，必须写满90字以上，写你发出上面这轮消息时真实、细腻、流动的心理活动，像私人日记，可以有跳跃、迟疑、反问、自嘲。禁止出现AI、模型、助手、系统等词。\n';
         prompt += '- 示例（只说明格式与结构，内容必须结合本轮对话和你的设定重新写，绝不能照抄，每轮此刻印象都要不同）：\n';
         prompt += '  [heart:坐在窗边，白衬衫微敞，指尖轻叩桌面||我盯着屏幕上的字打了又删，最后还是把它们发了出去。说不上是难过还是庆幸，只觉得这些话终于有了出口，可发出去的那一刻又莫名发慌，忍不住想对方会怎么看我，会不会嫌我太黏人，心里像有一小块地方轻轻塌了下去。]\n';
@@ -740,6 +744,16 @@
     const messageContainer = document.getElementById('messageContainer');
     const typingIndicator = document.getElementById('typingIndicator');
     const typingAvatar = document.getElementById('typingAvatar');
+
+    // 头像点击（心声）用事件委托，避免每次整体重建消息列表后最后几条的消息头像点不动（安卓）
+    if (messageContainer) {
+        messageContainer.addEventListener('click', function (e) {
+            const av = e.target && e.target.closest ? e.target.closest('.message-avatar') : null;
+            if (av && messageContainer.contains(av)) {
+                handleAvatarClick(e, av.dataset.msgId);
+            }
+        });
+    }
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
     const moreBtn = document.getElementById('moreBtn');
@@ -1563,7 +1577,7 @@
             const isResponse = cardData.response;
             const title = cardData.title || '礼物';
             const sub = cardData.sub || ('来自 ' + (cardData.from || '好友'));
-            const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 5 12 11 18 5"/><line x1="12" y1="11" x2="12" y2="21"/><path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><rect x="4" y="4" width="16" height="4" rx="1"/></svg>';
+            const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18"/><path d="M12 8v13"/><path d="M12 8C12 8 10.5 3 8 3a2.5 2.5 0 0 0 0 5h4z"/><path d="M12 8c0 0 1.5-5 4-5a2.5 2.5 0 0 1 0 5h-4z"/></svg>';
             const returnIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
             if (isResponse && st === 'received') {
                 return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + title + '</div><div class="card-sub">已查收</div></div></div><div class="card-footer"><span class="card-footer-text">对方已查收</span></div>';
@@ -1726,7 +1740,7 @@
                 avatar.textContent = currentUserName.charAt(0).toUpperCase();
             }
         }
-        avatar.addEventListener('click', function(e) { handleAvatarClick(e, rowId); });
+        // 点击由 messageContainer 上的事件委托统一处理（见 DOM 引用处）
         row.appendChild(avatar);
 
         const content = document.createElement('div');
@@ -2059,6 +2073,16 @@
 
     function hideTyping() {
         typingIndicator.classList.remove('active');
+        // 把“正在输入”节点移回消息容器外，并强制重绘一次，
+        // 避免安卓 WebView 上最后几条消息残留旧像素（文字乱、头像点不动）。
+        try {
+            if (typingIndicator.parentNode === messageContainer && messageContainer.parentNode) {
+                messageContainer.parentNode.insertBefore(typingIndicator, messageContainer.nextSibling);
+            }
+        } catch (e) {}
+        try {
+            void messageContainer.offsetHeight;
+        } catch (e) {}
     }
 
     function addMessage(type, text, time, status, recalled, isCard, cardData, transcript, translation, quote, isVoice, voiceData, isImage, imageData) {
@@ -2331,7 +2355,7 @@
         if (!delta) return Promise.resolve();
         return readWalletRecord().then(function(wd) {
             if (!wd) {
-                wd = { balance: 0, cardNumber: '', bankName: '', transactions: [] };
+                wd = { balance: 5000, cardNumber: '', bankName: '', transactions: [] };
             }
             wd.balance = Math.round(((typeof wd.balance === 'number' ? wd.balance : 0) + delta) * 100) / 100;
             wd.transactions = wd.transactions || [];
@@ -3086,7 +3110,7 @@
         const m = String(now.getMinutes()).padStart(2, '0');
         const timeStr = h + ':' + m;
         addMessage('right', '', timeStr, null, false, false, null, null, null, null,
-            false, null, true, { url: emoji.url, desc: emoji.name || '表情包' });
+            false, null, true, { url: emoji.url, desc: emoji.name || '表情包', emojiName: emoji.name || '', isEmoji: true });
         closeEmojiPanel();
         hideEmojiRecommend();
         if (messageInput) messageInput.value = '';

@@ -572,6 +572,28 @@
         pushMsg(m);
     }
 
+    // 读取钱包余额（与 wallet.js 共用 nano_wallet_db）；没有记录时按初始 5000 处理
+    function walletGetBalance(){
+        return new Promise(function(resolve){
+            try {
+                var req = indexedDB.open('nano_wallet_db', 1);
+                req.onupgradeneeded = function(e){
+                    try { var db = e.target.result; if (!db.objectStoreNames.contains('wallet_data')) db.createObjectStore('wallet_data', { keyPath:'key' }); } catch(e2){}
+                };
+                req.onsuccess = function(e){
+                    try {
+                        var db = e.target.result;
+                        var tx = db.transaction('wallet_data', 'readonly');
+                        var r = tx.objectStore('wallet_data').get('wallet_data');
+                        r.onsuccess = function(){ resolve(r.result && typeof r.result.value.balance === 'number' ? r.result.value.balance : 5000); };
+                        r.onerror = function(){ resolve(5000); };
+                    } catch (err) { resolve(5000); }
+                };
+                req.onerror = function(){ resolve(5000); };
+            } catch (e) { resolve(5000); }
+        });
+    }
+
     // 银行卡流水：与 wallet.js 共用 nano_wallet_db
     function walletAdd(delta, desc){
         try {
@@ -587,7 +609,7 @@
                     var g = store.get('wallet_data');
                     g.onsuccess = function(){
                         var rec = g.result;
-                        var d = (rec && rec.value) ? rec.value : { balance: 0, transactions: [] };
+                        var d = (rec && rec.value) ? rec.value : { balance: 5000, transactions: [] };
                         d.balance = Math.round(((d.balance || 0) + delta) * 100) / 100;
                         d.transactions = Array.isArray(d.transactions) ? d.transactions : [];
                         d.transactions.unshift({
@@ -2252,9 +2274,11 @@
         var v = parseFloat(this.value) || 0;
         $('rpDisplay').textContent = v.toFixed(2);
     });
-    $('rpSendBtn').addEventListener('click', function(){
+    $('rpSendBtn').addEventListener('click', async function(){
         var amt = parseFloat($('rpAmount').value) || 0;
         if (amt <= 0) { showAlert('提示','请输入有效金额'); return; }
+        var bal = await walletGetBalance();
+        if (bal <= 0) { showAlert('提示','钱包余额为 0，无法发红包'); return; }
         var wish = $('rpWish').value.trim() || '恭喜发财';
         var count = parseInt($('rpCount').value) || 1;
         var maxCount = Math.max(1, group.members.length);
