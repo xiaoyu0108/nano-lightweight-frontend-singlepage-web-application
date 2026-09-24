@@ -36,14 +36,11 @@
             overflow: hidden;
             overscroll-behavior: none;
             background: transparent;
-            position: fixed;
-            top: 0;
-            left: 0;
         }
 
         .app-container {
             width: 100%;
-            height: 100%;
+            height: 100vh;
             margin: 0;
             background: transparent;
             padding: 0 16px 0 16px;
@@ -217,7 +214,7 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 100%;
+            height: 100vh;
             background: #ffffff;
             z-index: 100;
             display: none;
@@ -237,7 +234,7 @@
             width: 100%;
             max-width: 430px;
             margin: 0 auto;
-            height: 100%;
+            height: 100vh;
             display: flex;
             flex-direction: column;
         }
@@ -2678,7 +2675,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-24-2';
+        var BUILD = 'nano-2026-09-24-3';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

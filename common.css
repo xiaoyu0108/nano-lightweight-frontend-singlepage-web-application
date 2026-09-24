@@ -1,6 +1,6 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
-/* .app 始终留在可视区内（底栏才能点到），不参与任何底部扩展。
-   .bg 只做背景，用 100vh 往底部小白条区多铺一点，既不遮底栏也不影响点击。 */
-.bg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; min-height: 100vh; z-index: 0; background: #ffffff; background-size: cover; background-position: center; }
-.app { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; background: transparent; }
+/* 高度链统一用 100vh（不用 100dvh / 不堆 safe-area）：PWA 没有地址栏，
+   100vh 才是 WebKit 认定的整屏高度；由 iOS 自己去处理安全区。 */
+html, body { margin: 0; height: 100vh; overflow: hidden; background: #000; }
+.bg { position: fixed; top: 0; left: 0; right: 0; height: 100vh; z-index: 0; background: #ffffff; background-size: cover; background-position: center; }
+.app { position: fixed; top: 0; left: 0; right: 0; height: 100vh; z-index: 1; background: transparent; }
