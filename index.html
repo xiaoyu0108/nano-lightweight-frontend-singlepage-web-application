@@ -1029,7 +1029,7 @@
                 const box = document.getElementById(config.container);
                 const fr = box && box.querySelector('iframe');
                 if (fr && !fr.getAttribute('src') && fr.getAttribute('data-src')) {
-                    fr.setAttribute('src', fr.getAttribute('data-src'));
+                    fr.setAttribute('src', withBuild(fr.getAttribute('data-src')));
                 }
             } catch (e) {}
 
@@ -1209,7 +1209,17 @@
         window.addEventListener('resize', applySafeTopToFrames);
         setTimeout(applySafeTopToFrames, 300);
 
+        // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
+        function withBuild(u) {
+            try {
+                if (!u || /^(https?:|blob:|data:|about:)/i.test(u)) return u;
+                var b = (typeof BUILD !== 'undefined' && BUILD) ? BUILD : '';
+                if (!b) return u;
+                return u + (u.indexOf('?') === -1 ? '?' : '&') + 'nb=' + encodeURIComponent(b);
+            } catch (e) { return u; }
+        }
         function openFullscreen(url, title, showBack, source) {
+            url = withBuild(url);
             voiceCallKeptAlive = false;
             try { urlSourceMap[baseName(url)] = source || ''; } catch (e) {}
             if (url.indexOf('voice-call.html') === 0) {
@@ -1363,6 +1373,7 @@
                     const chatName = chatInfo && chatInfo.chatName ? chatInfo.chatName : '聊天';
                     let url = 'chat_inner.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(chatName);
                     url += '&jump=' + encodeURIComponent(pendingJumpMsgId);
+                    url = withBuild(url);
                     pendingJumpMsgId = null;
                     showChatInnerFrame();
                     chatInnerFrame.setAttribute('data-loaded-url', url);
@@ -2617,7 +2628,7 @@
                 const chatInnerAlive = frameBase(chatInnerFrame) === 'chat_inner.html';
                 if (!chatInnerAlive) {
                     showChatInnerFrame();
-                    const _cu = 'chat_inner.html?chat=' + encodeURIComponent(getChatId()) + '&name=' + encodeURIComponent(getContactName());
+                    const _cu = withBuild('chat_inner.html?chat=' + encodeURIComponent(getChatId()) + '&name=' + encodeURIComponent(getContactName()));
                     chatInnerFrame.setAttribute('data-loaded-url', _cu);
                     chatInnerFrame.src = _cu;
                 } else {
@@ -2834,7 +2845,7 @@
                 if (i >= frames.length) return;
                 var fr = frames[i++];
                 try {
-                    if (!fr.getAttribute('src')) fr.setAttribute('src', fr.getAttribute('data-src'));
+                    if (!fr.getAttribute('src')) fr.setAttribute('src', withBuild(fr.getAttribute('data-src')));
                 } catch (e) {}
                 setTimeout(next, 1600);
             }
@@ -2847,7 +2858,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-9';
+        var BUILD = 'nano-2026-09-25-10';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

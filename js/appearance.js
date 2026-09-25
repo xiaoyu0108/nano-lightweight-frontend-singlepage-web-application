@@ -46,6 +46,13 @@
         host.appendChild(st);
     }
 
+    // 统一隐藏滚动条（保留滚动能力），避免右侧出现"侧边栏"
+    try {
+        applyStyle('nano-hide-scrollbar',
+            'html,body,*{scrollbar-width:none !important;-ms-overflow-style:none !important;}' +
+            'html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{width:0 !important;height:0 !important;display:none !important;}');
+    } catch (e) {}
+
     // 全局 CSS 只作用于：index / chat（列表+内页+群聊） / discover / more
     // 其他功能页保持不动，避免被全局样式误改
     var GLOBAL_TARGET_PAGES = [
