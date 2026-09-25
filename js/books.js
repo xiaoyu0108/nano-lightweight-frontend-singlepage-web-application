@@ -937,17 +937,22 @@ function endWinDrag(){
   win.addEventListener('touchmove',onPreMove,{passive:true});
 })();
 
-/* iOS 键盘弹出时隐藏悬浮球，避免遮挡输入栏 */
+/* iOS 键盘弹出时隐藏悬浮球，并把聊天窗抬到键盘上方 */
 (function watchKeyboard(){
   if(!window.visualViewport) return;
   const vv=window.visualViewport;
-  function update(){
-    const kb=Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+  let parentKb=0, localKb=0;
+  function apply(){
+    const kb=Math.max(parentKb, localKb);
+    document.documentElement.style.setProperty('--nano-kb', kb+'px');
+    document.documentElement.classList.toggle('keyboard-open', kb>0.5);
     document.body.classList.toggle('keyboard-open', kb>120);
   }
-  vv.addEventListener('resize',update);
-  vv.addEventListener('scroll',update);
-  setTimeout(update,300);
+  function upd(){ localKb=Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)); apply(); }
+  vv.addEventListener('resize',upd);
+  vv.addEventListener('scroll',upd);
+  window.addEventListener('message',function(e){ var d=e.data; if(d&&d.type==='nanoKeyboard'){ parentKb=Math.max(0,Math.round(Number(d.kb)||0)); apply(); } });
+  setTimeout(upd,300);
 })();
 
 function renderChars(){

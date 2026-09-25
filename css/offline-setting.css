@@ -64,6 +64,9 @@ background:#fff;outline:none;padding:11px 12px;font-size:12px;line-height:1.65;c
 .textarea:focus{background:#fff;border-color:#dcc8cb;box-shadow:0 0 0 2px rgba(210,190,196,.15)}
 .file-import{display:flex;align-items:center;gap:7px;margin-bottom:8px}
 .svg-mini{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.icon-export{width:34px;height:34px;flex:none;border:1px solid var(--line2);border-radius:10px;background:#fff;color:var(--accent,#007aff);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.icon-export:active{transform:scale(.92)}
+.icon-export svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .switch{width:40px;height:24px;border-radius:14px;background:#d1cfd6;padding:3px;position:relative;flex:none;cursor:pointer;transition:background .2s;border:1px solid #c5c3ca}
 .switch i{display:block;width:18px;height:18px;background:#fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:transform .2s cubic-bezier(.34,1.56,.64,1);border:1px solid #e8e7ec}
 .switch.on{background:#bca8ab;border-color:#a89497}

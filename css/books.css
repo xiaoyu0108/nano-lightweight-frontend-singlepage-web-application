@@ -291,6 +291,8 @@ img{display:block;max-width:100%}
 }
 .float-ball.show{display:flex}
 body.keyboard-open .float-ball{display:none !important}
+/* iOS 键盘：把聊天小窗抬到键盘上方 */
+html.keyboard-open .chat-window{ transform: translateY(calc(-1 * var(--nano-kb, 0px))); }
 .float-ball:active{transform:scale(1.06)}
 .float-ball.dragging{cursor:grabbing;transform:scale(1.10)}
 .float-ball img{width:100%;height:100%;object-fit:cover;border-radius:50%}

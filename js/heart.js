@@ -360,6 +360,7 @@ function setupThoughtExpand(el) {
     if (c.hideName) css += '.nano-voice-modal .iv-name{display:none !important;}\n';
     if (c.hideSubject) css += '.nano-voice-modal .iv-subject{display:none !important;}\n';
     if (c.hideMeta) css += '.nano-voice-modal .iv-meta{display:none !important;}\n';
+    if (c.hideUnread) css += '.nano-voice-modal .iv-unread{display:none !important;}\n';
     if (c.avatarRight) css += '.iv-sender{flex-direction:row-reverse;}\n.iv-sender-info{margin-left:0;margin-right:14px;text-align:right;}\n.iv-unread{margin-left:0;margin-right:12px;}\n';
     let tag = document.getElementById('nanoVoiceQuickCSS');
     if (!tag) {
@@ -389,6 +390,8 @@ function setupThoughtExpand(el) {
     const ss = $('ivShowSubject'), sm = $('ivShowMeta');
     if (ss) ss.checked = !c.hideSubject;
     if (sm) sm.checked = !c.hideMeta;
+    const hu = $('ivHideUnread');
+    if (hu) hu.checked = !!c.hideUnread;
     const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
     if (bl) bl.value = c.beautifyLabel || '';
     if (el) el.value = c.exitLabel || '';
@@ -403,6 +406,8 @@ function setupThoughtExpand(el) {
       const ss = $('ivShowSubject'), sm = $('ivShowMeta');
       c.hideSubject = ss ? !ss.checked : false;
       c.hideMeta = sm ? !sm.checked : false;
+      const hu = $('ivHideUnread');
+      c.hideUnread = hu ? !!hu.checked : false;
       const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
       c.beautifyLabel = bl ? bl.value.trim() : '';
       c.exitLabel = el ? el.value.trim() : '';

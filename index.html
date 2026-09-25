@@ -2722,9 +2722,26 @@
         (function watchKeyboard() {
             if (!window.visualViewport) return;
             const vv = window.visualViewport;
+            function propagate(kb) {
+                // 把键盘高度同步给所有同源 iframe，让内部输入栏整体上移
+                let frames = [];
+                try { frames = Array.prototype.slice.call(document.querySelectorAll('iframe')); } catch (e) {}
+                frames.forEach(function (fr) {
+                    try {
+                        const doc = fr.contentDocument;
+                        if (!doc) return;
+                        doc.documentElement.style.setProperty('--nano-kb', kb + 'px');
+                        doc.documentElement.classList.toggle('keyboard-open', kb > 0.5);
+                        try { fr.contentWindow.postMessage({ type: 'nanoKeyboard', kb: kb }, '*'); } catch (e) {}
+                    } catch (e) {}
+                });
+            }
             function update() {
-                const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+                if (kb === update._last) return;
+                update._last = kb;
                 document.body.classList.toggle('keyboard-open', kb > 120);
+                propagate(kb);
             }
             vv.addEventListener('resize', update);
             vv.addEventListener('scroll', update);
@@ -2814,7 +2831,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-4';
+        var BUILD = 'nano-2026-09-25-5';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

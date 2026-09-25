@@ -384,8 +384,8 @@
               </svg>
             </button>
             </span>
-            <input type="file" id="ivFileInput" accept=".json,.txt" style="display: none;">
           </div>
+          <input type="file" id="ivFileInput" accept=".json,.txt" style="display: none;">
           <textarea class="iv-css" id="ivCss" spellcheck="false"></textarea>
         </div>
 
@@ -399,6 +399,7 @@
             <label class="iv-quick-row"><span class="iv-quick-label">头像靠右</span><span class="iv-switch"><input type="checkbox" id="ivAvatarRight"><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">显示「此刻 · 印象」</span><span class="iv-switch"><input type="checkbox" id="ivShowSubject" checked><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">显示收件信息</span><span class="iv-switch"><input type="checkbox" id="ivShowMeta" checked><i></i></span></label>
+            <label class="iv-quick-row"><span class="iv-quick-label">隐藏未读红点</span><span class="iv-switch"><input type="checkbox" id="ivHideUnread"><i></i></span></label>
             <div class="iv-quick-field">
               <span class="iv-quick-field-title">按钮文案</span>
               <div class="iv-quick-field-row">
@@ -477,5 +478,31 @@
 </script>
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>
+<script>
+// iOS 键盘：收缩聊天容器，让输入栏位于键盘上方（父页面也会 postMessage 同步）
+(function () {
+  var parentKb = 0, localKb = 0;
+  function apply() {
+    var kb = Math.max(parentKb, localKb);
+    document.documentElement.style.setProperty('--nano-kb', kb + 'px');
+    document.documentElement.classList.toggle('keyboard-open', kb > 0.5);
+  }
+  try {
+    if (window.visualViewport) {
+      var vv = window.visualViewport;
+      var upd = function () {
+        localKb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+        apply();
+      };
+      vv.addEventListener('resize', upd);
+      vv.addEventListener('scroll', upd);
+    }
+  } catch (e) {}
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (d && d.type === 'nanoKeyboard') { parentKb = Math.max(0, Math.round(Number(d.kb) || 0)); apply(); }
+  });
+})();
+</script>
 </body>
 </html>
