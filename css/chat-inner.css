@@ -1450,3 +1450,4 @@ html.keyboard-open .chat-container {
 .nano-action-btns button{flex:1;height:30px;border-radius:9px;border:0;font-size:13px;cursor:pointer;}
 .nano-action-btns .nano-run{background:#ff4d94;color:#fff;}
 .nano-action-btns .nano-skip{background:rgba(120,120,128,.14);color:#1c1c1e;}
+.nano-action-btns .nano-copy{background:rgba(0,122,255,.12);color:#007aff;}

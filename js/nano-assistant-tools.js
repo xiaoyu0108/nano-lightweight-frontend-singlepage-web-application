@@ -40,6 +40,10 @@
     lines.push('【世界书条目字段】' + (KB.worldbookEntryFields || []).join(', '));
     lines.push('');
     lines.push('写 CSS 时直接给完整可用的 CSS。不确定选择器或结构时，先 read_file 读取对应文件再动手，不要瞎猜。');
+    try {
+      var extra = (localStorage.getItem('nano_builtin_prompt') || '').trim();
+      if (extra) lines.push('\n【用户自定义内置要求（必须遵守）】\n' + extra);
+    } catch (e) {}
     return lines.join('\n');
   }
 

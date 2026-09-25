@@ -1177,7 +1177,7 @@
             'music.html', 'voice-call.html', 'storage.html', 'backup.html', 'other.html', 'more.html',
             'discover.html', 'api.html', 'moments.html', 'ins.html', 'inner-setting.html', 'beautify.html',
             'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
-            'phone.html', 'assistant.html'];
+            'phone.html', 'assistant.html', 'nano-setting.html'];
         // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
         function applySafeFallback(f) {
             try {
@@ -2858,7 +2858,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-10';
+        var BUILD = 'nano-2026-09-25-11';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

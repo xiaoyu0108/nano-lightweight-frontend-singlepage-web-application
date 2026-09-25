@@ -1384,7 +1384,7 @@
                     avatar: avatarSrc || ''
                 }));
             } catch(e) {}
-            window.parent.postMessage({ type: 'openFullscreen', url: 'inner-setting.html?chat=' + encodeURIComponent(chatId), title: '设置', source: 'chat_inner' }, '*');
+            window.parent.postMessage({ type: 'openFullscreen', url: (isNanoChat ? 'nano-setting.html' : 'inner-setting.html') + '?chat=' + encodeURIComponent(chatId), title: '设置', source: 'chat_inner' }, '*');
         }
     });
 
@@ -4078,10 +4078,20 @@
         if (!host) return;
         var box = document.createElement('div');
         box.className = 'nano-action';
+        var copyBtn = (a.tool === 'apply_beautify' && a.args && a.args.css) ? '<button class="nano-copy">复制</button>' : '';
         box.innerHTML = '<div class="nano-action-title">' + (window.NanoAssistant.actionTitle(a) || a.tool) + '</div>'
             + (a.tool === 'apply_beautify' ? '<div class="nano-action-desc">' + String((a.args && a.args.css) || '').slice(0, 400).replace(/</g, '&lt;') + '</div>' : '')
-            + '<div class="nano-action-btns"><button class="nano-skip">取消</button><button class="nano-run">执行</button></div>';
+            + '<div class="nano-action-btns">' + copyBtn + '<button class="nano-skip">取消</button><button class="nano-run">立即执行</button></div>';
         host.appendChild(box);
+        var cp = box.querySelector('.nano-copy');
+        if (cp) cp.addEventListener('click', function () {
+            var code = (a.args && a.args.css) || '';
+            try {
+                if (navigator.clipboard) navigator.clipboard.writeText(code).then(function(){ cp.textContent = '已复制'; }, function(){ cp.textContent = '复制失败'; });
+                else { cp.textContent = code; cp.select && cp.select(); }
+            } catch (e) { cp.textContent = '复制失败'; }
+            setTimeout(function () { cp.textContent = '复制'; }, 1500);
+        });
         box.querySelector('.nano-skip').addEventListener('click', function () { box.remove(); });
         box.querySelector('.nano-run').addEventListener('click', async function () {
             try {
@@ -4117,6 +4127,8 @@
             row = addMessage('left', parsed.clean, nowHHMM(), null, false, false, null, null, null, null);
         }
         var reads = parsed.actions.filter(function (a) { return a.tool === 'read_file' && a.args && a.args.path; });
+        // 先渲染本条回复里的写入动作（即使同时有 read_file，也不要丢）
+        parsed.actions.filter(function (a) { return a.tool !== 'read_file'; }).forEach(function (a) { renderNanoAction(a, row); });
         if (reads.length) {
             var out = '';
             for (var i = 0; i < reads.length; i++) {
@@ -4132,7 +4144,6 @@
             renderNanoContinue(row, extra);
             return;
         }
-        parsed.actions.filter(function (a) { return a.tool !== 'read_file'; }).forEach(function (a) { renderNanoAction(a, row); });
         if (!parsed.clean && parsed.actions.length === 0) {
             addMessage('left', '（没有内容）', nowHHMM(), null, false, false, null, null, null, null);
         }
