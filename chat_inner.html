@@ -502,6 +502,21 @@
     var d = e.data;
     if (d && d.type === 'nanoKeyboard') { parentKb = Math.max(0, Math.round(Number(d.kb) || 0)); apply(); }
   });
+  // iOS 第二次聚焦输入框可能不再触发 resize：每次聚焦都主动查询父页面并重算
+  function isField(t) { return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
+  function requery() {
+    try { if (window.parent !== window) window.parent.postMessage({ type: 'nanoKeyboardQuery' }, '*'); } catch (err) {}
+    try { if (window.visualViewport) localKb = Math.max(0, Math.round(window.innerHeight - window.visualViewport.height)); } catch (err) {}
+    apply();
+  }
+  document.addEventListener('focusin', function (e) {
+    if (!isField(e.target)) return;
+    [60, 160, 320, 520].forEach(function (t) { setTimeout(requery, t); });
+  });
+  document.addEventListener('focusout', function () {
+    setTimeout(requery, 80);
+    setTimeout(requery, 320);
+  });
 })();
 </script>
 </body>

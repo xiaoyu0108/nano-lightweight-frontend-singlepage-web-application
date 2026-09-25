@@ -1723,6 +1723,15 @@
         return wrap;
     }
 
+    // 译文显示模式：true=独立气泡（在原文气泡外），false=与原文同一气泡
+    function translationSeparate() {
+        try { return localStorage.getItem('nano_trans_separate') !== '0'; } catch (e) { return true; }
+    }
+    // 设置页改模式时（跨文档）重渲染
+    window.addEventListener('storage', function (e) {
+        if (e && e.key === 'nano_trans_separate') { try { renderMessages(); } catch (err) {} }
+    });
+
     function createMessageRow(type, text, time, status, id, recalled, isCard, cardData, transcript, translation, quote, isVoice, voiceData, isImage, imageData, grouped) {
         const rowId = id || 'msg_' + (++messageIdCounter);
         const row = document.createElement('div');
@@ -1831,12 +1840,19 @@
                 transDiv.textContent = transcript;
                 bubble.appendChild(transDiv);
             }
-            // 译文单独成块，放在气泡外侧上方，方便在美化里单独控制样式
+            // 译文：可选「独立气泡」或「与原文同一气泡」，可在聊天设置里切换 / 美化里调样式
             if (translation) {
-                const transEl = document.createElement('div');
-                transEl.className = 'translation-bubble translation-text ' + (type === 'left' ? 'other' : 'me');
-                transEl.textContent = translation;
-                content.appendChild(transEl);
+                if (translationSeparate()) {
+                    const transEl = document.createElement('div');
+                    transEl.className = 'translation-bubble translation-text ' + (type === 'left' ? 'other' : 'me');
+                    transEl.textContent = translation;
+                    content.appendChild(transEl);
+                } else {
+                    const transSpan = document.createElement('span');
+                    transSpan.className = 'translation-text ' + (type === 'left' ? 'other' : 'me');
+                    transSpan.textContent = translation;
+                    bubble.appendChild(transSpan);
+                }
             }
             content.appendChild(bubble);
             if (quote && quote.text) {
@@ -5270,6 +5286,12 @@ if (callCard) {
             if (!data.chatId || String(data.chatId) === String(chatId)) {
                 try { refreshMemoryHints(); } catch (e) {}
             }
+            return;
+        }
+
+        // 译文显示模式切换：立即重渲染消息列表
+        if (data.type === 'nanoTransMode') {
+            try { renderMessages(); } catch (e) {}
             return;
         }
 

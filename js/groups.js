@@ -4,6 +4,9 @@
 (function(){
     'use strict';
     function getQueryParam(n){ return new URLSearchParams(location.search).get(n); }
+    // 译文显示模式：true=独立气泡（气泡外），false=与原文同一气泡
+    function translationSeparate(){ try { return localStorage.getItem('nano_trans_separate') !== '0'; } catch (e) { return true; } }
+    window.addEventListener('storage', function(e){ if(e && e.key === 'nano_trans_separate'){ try{ renderMessages(); }catch(err){} } });
     var chatId = getQueryParam('group') || getQueryParam('chat') || 'group_default';
     var jumpMsgId = getQueryParam('jump') || '';
     var GROUP_KEY = 'group_data_' + chatId;
@@ -373,12 +376,19 @@
             bubbleText.className = 'bubble-text';
             bubbleText.innerHTML = renderTextWithMention(m.text || '');
             bubble.appendChild(bubbleText);
-            // 译文独立成块，放在气泡外侧上方
+            // 译文：可选「独立气泡」或「与原文同一气泡」
             if (m.translation) {
-                var transEl = document.createElement('div');
-                transEl.className = 'translation-bubble translation-text ' + (m.type === 'left' ? 'other' : 'me');
-                transEl.textContent = m.translation;
-                content.appendChild(transEl);
+                if (translationSeparate()) {
+                    var transEl = document.createElement('div');
+                    transEl.className = 'translation-bubble translation-text ' + (m.type === 'left' ? 'other' : 'me');
+                    transEl.textContent = m.translation;
+                    content.appendChild(transEl);
+                } else {
+                    var transSpan = document.createElement('span');
+                    transSpan.className = 'translation-text ' + (m.type === 'left' ? 'other' : 'me');
+                    transSpan.textContent = m.translation;
+                    bubble.appendChild(transSpan);
+                }
             }
             content.appendChild(bubble);
         }

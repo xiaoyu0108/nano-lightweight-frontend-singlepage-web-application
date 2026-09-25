@@ -787,6 +787,28 @@
         }
     });
 
+    // 译文模式：独立气泡 / 与原文同一气泡
+    var transToggle = document.getElementById('transSeparateToggle');
+    var transStatus = document.getElementById('transStatus');
+    function applyTransMode() {
+        var sep = true;
+        try { sep = localStorage.getItem('nano_trans_separate') !== '0'; } catch (e) {}
+        if (transToggle) transToggle.checked = sep;
+        if (transStatus) transStatus.textContent = sep ? '分开' : '同一气泡';
+    }
+    applyTransMode();
+    if (transToggle) {
+        transToggle.addEventListener('change', function (e) {
+            var sep = e.target.checked;
+            try { localStorage.setItem('nano_trans_separate', sep ? '1' : '0'); } catch (err) {}
+            if (transStatus) transStatus.textContent = sep ? '分开' : '同一气泡';
+            // 通知父页面转发给当前会话，立即重渲染
+            if (window.parent !== window) {
+                try { window.parent.postMessage({ type: 'nanoTransMode', chatId: chatId, separate: sep }, '*'); } catch (err) {}
+            }
+        });
+    }
+
     document.getElementById('searchItem').addEventListener('click', openSearchModal);
     searchInput.addEventListener('input', performSearch);
     searchInput.addEventListener('keydown', function(e) {

@@ -948,7 +948,7 @@ function endWinDrag(){
     document.documentElement.classList.toggle('keyboard-open', kb>0.5);
     document.body.classList.toggle('keyboard-open', kb>120);
   }
-  function upd(){ localKb=Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)); apply(); }
+  function upd(){ localKb=Math.max(0, Math.round(window.innerHeight - vv.height)); apply(); }
   vv.addEventListener('resize',upd);
   vv.addEventListener('scroll',upd);
   window.addEventListener('message',function(e){ var d=e.data; if(d&&d.type==='nanoKeyboard'){ parentKb=Math.max(0,Math.round(Number(d.kb)||0)); apply(); } });
