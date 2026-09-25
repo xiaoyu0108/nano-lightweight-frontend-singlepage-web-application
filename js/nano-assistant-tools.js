@@ -17,6 +17,8 @@
     lines.push('3. 你可以读取源码来回答"我应该怎么改/改哪个文件"，并给出清晰步骤。');
     lines.push('4. 你不能新增页面或改后端逻辑；这类需求要告诉用户需要开发者改源码并重新部署。');
     lines.push('5. 回复尽量简短：先给结论，再给必要步骤。除非用户要求，不要长篇大论。');
+    lines.push('6. 做美化/世界书这类修改时【不要读源码】：知识库里已有足够的选择器，直接用即可，并输出 <action> 块。只有用户明确问"这个功能在哪个文件、源码怎么改"时，才 use read_file。');
+    lines.push('7. 需要修改时必须真的输出 <action> 块，绝不要只说"点击下方按钮"却不给 action。');
     lines.push('');
     lines.push('【执行动作的方式】');
     lines.push('需要真正修改时，在回复里输出代码块（用户会看到确认按钮，确认后才生效）：');
@@ -39,7 +41,7 @@
     lines.push('');
     lines.push('【世界书条目字段】' + (KB.worldbookEntryFields || []).join(', '));
     lines.push('');
-    lines.push('写 CSS 时直接给完整可用的 CSS。不确定选择器或结构时，先 read_file 读取对应文件再动手，不要瞎猜。');
+    lines.push('写 CSS 时直接给完整可用的 CSS（用上面的选择器即可，不要为了美化去读源码）。');
     try {
       var extra = (localStorage.getItem('nano_builtin_prompt') || '').trim();
       if (extra) lines.push('\n【用户自定义内置要求（必须遵守）】\n' + extra);
@@ -49,10 +51,12 @@
 
   function parseActions(text) {
     var actions = [];
-    var clean = String(text || '').replace(/<action>([\s\S]*?)<\/action>/g, function (_, json) {
-      try { var o = JSON.parse(json.trim()); if (o && o.tool) actions.push(o); } catch (e) {}
-      return '';
-    });
+    function push(json) {
+      try { var o = JSON.parse(String(json).trim()); if (o && o.tool) actions.push(o); } catch (e) {}
+    }
+    var clean = String(text || '').replace(/<action>([\s\S]*?)<\/action>/g, function (_, json) { push(json); return ''; });
+    // 兼容模型用 ```json {...} ``` 包裹动作的情况
+    clean = clean.replace(/```(?:json)?\s*(\{[\s\S]*?"tool"[\s\S]*?\})\s*```/g, function (_, json) { push(json); return ''; });
     return { clean: clean.trim(), actions: actions };
   }
 

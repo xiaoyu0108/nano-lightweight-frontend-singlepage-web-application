@@ -1576,6 +1576,12 @@
 
     // ===== 构建卡片 HTML =====
     function buildCardHTML(cardData) {
+        if (cardData.cardType === 'file') {
+            const name = String(cardData.name || '文件').replace(/[<>&]/g, '');
+            const size = String(cardData.size || '').replace(/[<>&]/g, '');
+            const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>';
+            return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + name + '</div><div class="card-sub">' + (size || '文件') + '</div></div></div>';
+        }
         if (cardData.cardType === 'transfer') {
             const st = cardData.status || 'pending';
             const isResponse = cardData.response;
@@ -3262,16 +3268,19 @@
         console.log('[Chat] 用户发送消息', text);
     }
 
-    // 纳米助手：发送文件内容（作为一条用户消息，直接触发回复）
+    // 纳米助手：发送文件（文件卡片，不自动调用 API，等用户让纳米解析）
     function sendFileContent(name, text) {
         text = String(text || '');
         if (!text.trim()) return;
         if (text.length > 15000) text = text.slice(0, 15000) + '\n…（已截断）';
-        var now = new Date();
-        var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-        addMessage('right', '【文件：' + (name || '文件') + '】\n' + text, timeStr, null, false, false, null, null, null, null);
+        var bytes = 0;
+        try { bytes = new Blob([text]).size; } catch (e) { bytes = text.length; }
+        var size = bytes < 1024 ? (bytes + ' B') : (bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / 1048576).toFixed(1) + ' MB');
+        addMessage('right', '', nowHHMM(), null, false, true, { cardType: 'file', name: name || '文件', size: size, content: text });
         scrollToBottom();
-        triggerReply();
+        // 不自动触发回复；进入"可回复"状态，用户点回复或发消息时纳米才解析
+        isWaitingForReply = true;
+        updateSendButtonMode();
     }
 
     // ===== AI 主动来电（点击回复后由 AI 根据对话内容通过 [call:] 触发）=====
@@ -3302,6 +3311,9 @@
             const who = m.type === 'right' ? '用户' : '角色';
             const status = cd.status || 'pending';
             const isResp = cd.response;
+            if (cd.cardType === 'file') {
+                return who + '发送了文件「' + (cd.name || '文件') + '」（' + (cd.size || '') + '），文件内容如下：\n' + String(cd.content || '');
+            }
             if (cd.cardType === 'transfer') {
                 const amount = cd.amount || '';
                 const note = cd.title ? '（备注：' + cd.title + '）' : '';
@@ -4125,6 +4137,9 @@
         var row = null;
         if (parsed.clean) {
             row = addMessage('left', parsed.clean, nowHHMM(), null, false, false, null, null, null, null);
+        }
+        if (!row && parsed.actions.length) {
+            row = addMessage('left', '好的，这是方案：', nowHHMM(), null, false, false, null, null, null, null);
         }
         var reads = parsed.actions.filter(function (a) { return a.tool === 'read_file' && a.args && a.args.path; });
         // 先渲染本条回复里的写入动作（即使同时有 read_file，也不要丢）

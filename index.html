@@ -1282,7 +1282,7 @@
                 if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
                     overlayFrame.src = url;
                 }
-                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html'];
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
                 if (noOuterHeader) {
@@ -2858,7 +2858,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-11';
+        var BUILD = 'nano-2026-09-25-12';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;
