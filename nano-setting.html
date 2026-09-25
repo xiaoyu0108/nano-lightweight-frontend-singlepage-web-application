@@ -35,6 +35,22 @@
         <input class="ns-input" id="nsAvatarUrl" placeholder="或输入头像图片 URL">
         <button class="ns-mini-btn" id="nsAvatarUrlSave">使用</button>
       </div>
+      <div class="ns-row">
+        <button class="ns-mini-btn ns-ghost" id="nsAvatarReset">恢复默认头像</button>
+      </div>
+
+      <!-- 聊天背景 -->
+      <div class="ns-card">
+        <div class="ns-card-title">聊天背景</div>
+        <div class="ns-bg-preview" id="nsBgPreview">无预览</div>
+        <div class="ns-row">
+          <button class="ns-mini-btn" id="nsBgPick">从图库选择</button>
+          <input type="color" id="nsBgColor" value="#ffffff" class="ns-color" title="背景颜色">
+          <button class="ns-mini-btn ns-ghost" id="nsBgReset">恢复默认</button>
+        </div>
+        <input type="file" id="nsBgFile" accept="image/*" style="display:none">
+        <div class="ns-hint">选图片会作为聊天背景；只改颜色则用纯色。恢复默认即白底。</div>
+      </div>
 
       <!-- 数据概览 -->
       <div class="ns-card">

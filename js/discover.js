@@ -206,7 +206,8 @@
     couple:  { url: 'couple-spaces.html', title: 'Couple Spaces' },
     halo:    { url: 'halo.html', title: 'Halo' },
     books:   { url: 'books.html', title: 'Books' },
-    music:   { url: 'music.html', title: 'Music' }
+    music:   { url: 'music.html', title: 'Music' },
+    appstore: { url: 'appstore.html', title: 'App Store', showBack: true }
   };
 
   Array.prototype.forEach.call(document.querySelectorAll('.entry[data-app]'), function (el) {
@@ -219,7 +220,7 @@
             type: 'openFullscreen',
             url: app.url,
             title: app.title,
-            showBack: false,
+            showBack: app.showBack === true,
             source: 'discover'
           }, '*');
           return;

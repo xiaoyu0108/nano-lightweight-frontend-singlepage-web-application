@@ -61,6 +61,18 @@
     }).catch(function () { return false; });
   }
   function refreshChatList() { try { window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e) {} }
+  // 把角色资料同步给父页面，再转发给正在打开的 chat_inner / 聊天列表
+  function broadcastChar(patch) {
+    try {
+      window.parent.postMessage({
+        type: 'nanoCharUpdated',
+        chatId: chatId,
+        name: patch && patch.name,
+        avatar: patch && patch.avatar
+      }, '*');
+    } catch (e) {}
+    refreshChatList();
+  }
 
   /* ---------- 消息 ---------- */
   function getMessages() {
@@ -173,19 +185,101 @@
     if (!dataUrl) return;
     $('nsAvatar').src = dataUrl;
     await saveChar({ avatar: dataUrl });
-    refreshChatList(); toast('头像已更新');
+    broadcastChar({ avatar: dataUrl }); toast('头像已更新');
   });
   $('nsAvatarUrlSave').addEventListener('click', async function () {
     var url = $('nsAvatarUrl').value.trim(); if (!url) return;
     $('nsAvatar').src = url;
     await saveChar({ avatar: url });
-    refreshChatList(); toast('头像已更新');
+    broadcastChar({ avatar: url }); toast('头像已更新');
+  });
+  var nsAvatarResetBtn = $('nsAvatarReset');
+  if (nsAvatarResetBtn) nsAvatarResetBtn.addEventListener('click', async function () {
+    $('nsAvatar').src = DEFAULT_AVATAR;
+    $('nsAvatarUrl').value = '';
+    await saveChar({ avatar: '' });
+    broadcastChar({ avatar: '' }); toast('已恢复默认头像');
   });
   var nameTimer = null;
   $('nsName').addEventListener('input', function () {
     clearTimeout(nameTimer);
     var v = this.value.trim() || '纳米';
     nameTimer = setTimeout(async function () { await saveChar({ name: v }); refreshChatList(); }, 500);
+  });
+
+  /* ---------- 聊天背景 ---------- */
+  function bgKey(suffix) { return 'chat_setting_' + suffix + '_' + chatId; }
+  function readBgVal(k) { try { var v = localStorage.getItem(bgKey(k)); if (v === null) return null; try { return JSON.parse(v); } catch (e) { return v; } } catch (e) { return null; } }
+  function writeBgVal(k, v) { try { localStorage.setItem(bgKey(k), JSON.stringify(v)); } catch (e) {} }
+  function removeBgVal(k) { try { localStorage.removeItem(bgKey(k)); } catch (e) {} }
+
+  function paintBgPreview(type, color, image) {
+    var box = $('nsBgPreview');
+    if (!box) return;
+    if (type === 'image' && image) {
+      box.style.backgroundImage = 'url(' + image + ')';
+      box.style.backgroundSize = 'cover';
+      box.style.backgroundPosition = 'center';
+      box.textContent = '';
+    } else {
+      box.style.backgroundImage = 'none';
+      box.style.backgroundColor = color || '#ffffff';
+      box.textContent = (color && color !== '#ffffff') ? '纯色背景' : '无预览';
+    }
+  }
+  function broadcastBg(type, color, image) {
+    try {
+      window.parent.postMessage({
+        type: 'backgroundChanged', chatId: chatId,
+        bgType: type, bgColor: color || '#ffffff', bgImage: image || ''
+      }, '*');
+    } catch (e) {}
+  }
+  function loadBgUI() {
+    var type = readBgVal('bgType') || 'color';
+    var color = readBgVal('bgColor') || '#ffffff';
+    var done = function (image) { paintBgPreview(type, color, image); };
+    if (type === 'image' && typeof localforage !== 'undefined') {
+      localforage.getItem(bgKey('bgImage')).then(function (img) {
+        done(img || '');
+        if (!img) { writeBgVal('bgType', 'color'); paintBgPreview('color', color, ''); }
+      }).catch(function () { done(''); });
+    } else {
+      done('');
+    }
+    if ($('nsBgColor')) $('nsBgColor').value = /^#[0-9a-f]{6}$/i.test(color) ? color : '#ffffff';
+  }
+  var nsBgPick = $('nsBgPick');
+  if (nsBgPick) nsBgPick.addEventListener('click', function () { $('nsBgFile').value = ''; $('nsBgFile').click(); });
+  var nsBgFile = $('nsBgFile');
+  if (nsBgFile) nsBgFile.addEventListener('change', async function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    var dataUrl = await compress(f);
+    if (!dataUrl) return;
+    writeBgVal('bgType', 'image');
+    try { if (typeof localforage !== 'undefined') await localforage.setItem(bgKey('bgImage'), dataUrl); } catch (e2) {}
+    paintBgPreview('image', '', dataUrl);
+    broadcastBg('image', '', dataUrl);
+    toast('背景已更新');
+  });
+  var nsBgColor = $('nsBgColor');
+  if (nsBgColor) nsBgColor.addEventListener('input', async function () {
+    var c = this.value || '#ffffff';
+    writeBgVal('bgType', 'color');
+    writeBgVal('bgColor', c);
+    try { if (typeof localforage !== 'undefined') await localforage.removeItem(bgKey('bgImage')); } catch (e) {}
+    paintBgPreview('color', c, '');
+    broadcastBg('color', c, '');
+  });
+  var nsBgReset = $('nsBgReset');
+  if (nsBgReset) nsBgReset.addEventListener('click', async function () {
+    writeBgVal('bgType', 'color');
+    writeBgVal('bgColor', '#ffffff');
+    try { if (typeof localforage !== 'undefined') await localforage.removeItem(bgKey('bgImage')); } catch (e) {}
+    if ($('nsBgColor')) $('nsBgColor').value = '#ffffff';
+    paintBgPreview('color', '#ffffff', '');
+    broadcastBg('color', '#ffffff', '');
+    toast('已恢复默认背景');
   });
 
   $('nsDeleteAll').addEventListener('click', async function () {
@@ -220,4 +314,5 @@
   });
 
   loadAll();
+  loadBgUI();
 })();

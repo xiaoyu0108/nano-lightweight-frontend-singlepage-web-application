@@ -86,7 +86,7 @@
         // 结构：顶栏贴安全区（不留空隙），底栏避让底部小白条；可用下面两个变量 DIY
         '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;background:transparent !important;}' +
         '.multi-select-bar{top:var(--safe-top,0px) !important;}' +
-        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,12px) !important;background:transparent !important;}';
+        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,max(12px,env(safe-area-inset-bottom,0px))) !important;background:transparent !important;border:0 !important;box-shadow:none !important;}';
 
     function applyChatCss(css) {
         // 聊天 CSS 仅作用于单聊/群聊内页（额外的聊天专用覆盖）
@@ -342,7 +342,7 @@
     // ---- 强制所有底栏贴底（不吃缓存：始终注入，覆盖旧的页面 CSS / 旧预设） ----
     var BOTTOM_FLUSH_FIX =
         'html .bottom-actions,html .nano-index .bottom-actions{bottom:20px !important;padding-bottom:0 !important;}' +
-        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:12px !important;background:transparent !important;background-image:none !important;}' +
+        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:max(12px,env(safe-area-inset-bottom,0px)) !important;background:transparent !important;background-image:none !important;border:0 !important;border-top:0 !important;box-shadow:none !important;}' +
         'html .nano-chat-inner .topbar,html .nano-groups .topbar{background:transparent !important;background-image:none !important;}' +
         'html footer.bottom{padding-bottom:0 !important;}' +
         'html .bottom{padding-bottom:0 !important;}' +

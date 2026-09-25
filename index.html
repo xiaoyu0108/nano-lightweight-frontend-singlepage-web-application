@@ -2281,6 +2281,14 @@
                 }
             }
 
+            if (data.type === 'nanoCharUpdated') {
+                // 纳米资料（头像/昵称）改动：同步给正在打开的单聊页
+                const c = document.getElementById('chatInnerFrame');
+                if (c && frameBase(c) === 'chat_inner.html') {
+                    try { c.contentWindow.postMessage(data, '*'); } catch (e) {}
+                }
+            }
+
             const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared', 'nanoTransMode'];
             if (innerSettingTypes.indexOf(data.type) !== -1) {
                 const c = document.getElementById('chatInnerFrame');
@@ -2858,7 +2866,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-14';
+        var BUILD = 'nano-2026-09-25-15';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

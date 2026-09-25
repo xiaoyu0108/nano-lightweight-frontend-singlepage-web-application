@@ -3631,7 +3631,8 @@
                 body: JSON.stringify({
                     model: model,
                     messages: history,
-                    max_tokens: 1200,
+                    // 纳米要输出完整 CSS + action，给足 token，避免回复被截断
+                    max_tokens: isNanoChat ? 4000 : 1500,
                     temperature: (typeof config.mainTemp === 'number' ? config.mainTemp : parseFloat(config.mainTemp)) || 0.7
                 })
             };
@@ -5510,6 +5511,28 @@ if (callCard) {
             chatTitle.textContent = displayName;
             avatarPlaceholder.textContent = displayName.charAt(0).toUpperCase();
             if (window.__chat) window.__chat.displayName = displayName;
+            renderMessages();
+        } else if (data.type === 'nanoCharUpdated') {
+            // 纳米设置里改了头像/昵称：实时同步顶栏与消息头像（无需重载页面）
+            if (typeof data.avatar === 'string') {
+                avatarSrc = data.avatar || '';
+                if (avatarSrc.trim() !== '') {
+                    avatarImage.src = avatarSrc;
+                    avatarImage.style.display = 'block';
+                    avatarPlaceholder.style.display = 'none';
+                } else {
+                    avatarPlaceholder.textContent = (displayName || 'N').charAt(0).toUpperCase();
+                    avatarPlaceholder.style.display = 'flex';
+                    avatarImage.style.display = 'none';
+                }
+            }
+            if (data.name) {
+                displayName = data.name;
+                chatName = data.name;
+                if (characterData) characterData.name = data.name;
+                chatTitle.textContent = displayName;
+                if (window.__chat) window.__chat.displayName = displayName;
+            }
             renderMessages();
         } else if (data.type === 'backgroundChanged') {
             applyChatBackground();
