@@ -1153,6 +1153,8 @@
                     const de = f.contentDocument.documentElement;
                     de.style.setProperty('--safe-top', top);
                     de.style.setProperty('--safe-bottom', bot);
+                    // 底栏专用：iPhone 底部安全区（Home 指示条 / 悬浮栏）像素值
+                    de.style.setProperty('--nano-safe-bottom', bot);
                 }
             } catch (e) {}
         }
@@ -1195,7 +1197,7 @@
             try {
                 const insets = measureSafeInsets();
                 const topVal = insets.top ? (insets.top + 'px') : '0px';
-                const botVal = '0px';
+                const botVal = insets.bottom ? (insets.bottom + 'px') : '0px';
                 getSafeTopFrames().forEach(function (f) {
                     setSafeVars(f, topVal, botVal);
                     applySafeFallback(f);
@@ -1207,6 +1209,8 @@
         });
         window.addEventListener('load', applySafeTopToFrames);
         window.addEventListener('resize', applySafeTopToFrames);
+        window.addEventListener('orientationchange', applySafeTopToFrames);
+        try { if (window.visualViewport) window.visualViewport.addEventListener('resize', applySafeTopToFrames); } catch (e) {}
         setTimeout(applySafeTopToFrames, 300);
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
@@ -2866,7 +2870,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-15';
+        var BUILD = 'nano-2026-09-25-16';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

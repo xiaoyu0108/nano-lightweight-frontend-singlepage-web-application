@@ -3106,7 +3106,7 @@
         groups.forEach(function(g) {
             const tab = document.createElement('button');
             tab.className = 'ep-group-tab' + (g.id === currentEmojiGroupId ? ' active' : '');
-            tab.textContent = g.name || '未命名';
+            tab.textContent = String(g.name || '').trim() || '未命名';
             tab.addEventListener('click', function() {
                 currentEmojiGroupId = g.id;
                 renderEmojiPanel();

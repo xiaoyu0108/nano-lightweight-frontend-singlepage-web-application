@@ -109,17 +109,39 @@
     $('stTokens').textContent = estimateTokens(joined);
     $('stMemory').textContent = memCount;
   }
-  function renderRecords(msgs) {
-    var box = $('nsRecords');
-    if (!msgs.length) { box.innerHTML = '<div class="ns-empty">还没有聊天记录</div>'; return; }
-    var last = msgs.slice(-30);
-    box.innerHTML = last.map(function (m) {
-      var me = m && m.type === 'right';
+  /* ---------- 查找聊天记录 ---------- */
+  var allMsgs = [];
+  function hitSnippet(text, q) {
+    var t = String(text || '');
+    var i = t.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return esc(t.slice(0, 140));
+    var start = Math.max(0, i - 30);
+    var end = Math.min(t.length, i + q.length + 60);
+    var pre = start > 0 ? '…' : '';
+    var post = end < t.length ? '…' : '';
+    return pre + esc(t.slice(start, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length, end)) + post;
+  }
+  function renderSearch(q) {
+    var box = $('nsSearchResults');
+    if (!box) return;
+    q = String(q || '').trim();
+    if (!q) { box.innerHTML = '<div class="ns-empty">输入关键词开始查找</div>'; return; }
+    var ql = q.toLowerCase();
+    var hits = [];
+    for (var i = allMsgs.length - 1; i >= 0 && hits.length < 60; i--) {
+      var m = allMsgs[i];
+      if (!m) continue;
+      var text = String(m.text || '');
+      if (!text || text.toLowerCase().indexOf(ql) === -1) continue;
+      hits.push({ m: m, text: text });
+    }
+    if (!hits.length) { box.innerHTML = '<div class="ns-empty">没有找到包含「' + esc(q) + '」的消息</div>'; return; }
+    box.innerHTML = '<div class="ns-search-count">找到 ' + hits.length + ' 条</div>' + hits.map(function (h) {
+      var me = h.m.type === 'right';
       var role = me ? '我' : '纳米';
-      var text = String((m && (m.text || '')) || '').slice(0, 300) || '（非文本消息）';
-      return '<div class="ns-rec ' + (me ? 'me' : '') + '"><span class="ns-rec-role">' + role + '</span>' + esc(text) + '</div>';
+      return '<div class="ns-hit"><span class="ns-rec-role">' + role + (h.m.time ? (' · ' + esc(h.m.time)) : '') + '</span>' + hitSnippet(h.text, q) + '</div>';
     }).join('');
-    box.scrollTop = box.scrollHeight;
+    box.scrollTop = 0;
   }
 
   async function loadAll() {
@@ -132,9 +154,10 @@
       $('nsAvatar').src = DEFAULT_AVATAR;
     }
     var msgs = await getMessages();
+    allMsgs = msgs;
     var memCount = await getMemoryCount();
     renderStats(msgs, memCount);
-    renderRecords(msgs);
+    renderSearch($('nsSearchInput') ? $('nsSearchInput').value : '');
   }
 
   /* ---------- 返回 ---------- */
@@ -306,6 +329,16 @@
     toast('已删除全部记录');
     loadAll();
   });
+
+  var nsSearchInput = $('nsSearchInput');
+  if (nsSearchInput) {
+    var searchTimer = null;
+    nsSearchInput.addEventListener('input', function () {
+      var v = this.value;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () { renderSearch(v); }, 180);
+    });
+  }
 
   $('nsPrompt').value = (function () { try { return localStorage.getItem('nano_builtin_prompt') || ''; } catch (e) { return ''; } })();
   $('nsPromptSave').addEventListener('click', function () {

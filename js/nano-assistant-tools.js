@@ -252,7 +252,7 @@
       return { name: String((e && e.name) || '').trim(), url: String((e && (e.url || e.src || e.image)) || '').trim() };
     }).filter(function (e) { return e.url; });
     if (!list.length) throw new Error('没有可添加的表情（缺少图片地址）');
-    var name = String(groupName || '').trim() || '纳米表情';
+    var name = String(groupName || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 24) || '纳米表情';
     var group = data.emojiGroups.find(function (g) { return g && g.name === name; });
     if (!group) {
       group = { id: 'g' + Date.now() + '_' + Math.random().toString(36).slice(2, 5), name: name, emojis: [] };

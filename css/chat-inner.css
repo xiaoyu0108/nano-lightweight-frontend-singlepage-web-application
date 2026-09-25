@@ -521,7 +521,7 @@ html.keyboard-open .chat-container {
 .bottom-bar {
     position: relative; z-index: 30; width: 100%; flex-shrink: 0;
     /* 默认带上 iPhone 底部安全区，避免输入栏被 Home 指示条/底部栏压住 */
-    padding: var(--chat-bottombar-pad, 6px 14px calc(4px + env(safe-area-inset-bottom, 0px)));
+    padding: var(--chat-bottombar-pad, 6px 14px calc(4px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px))));
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .more-btn {
@@ -668,11 +668,11 @@ html.keyboard-open .chat-container {
     width: 100%; max-width: 420px; margin: 0 auto;
     background: rgba(255,255,255,0.95); border-radius: 20px 20px 0 0;
     box-shadow: 0 -6px 30px rgba(0,0,0,0.14); overflow: hidden;
-    padding: 14px 14px 24px; animation: vsUp 0.22s ease;
+    padding: 14px 14px calc(24px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px))); animation: vsUp 0.22s ease;
     max-height: 60vh;
     display: flex; flex-direction: column;
 }
-.ep-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ep-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .ep-title { font-size: 16px; font-weight: 600; color: #1c1c1e; }
 .ep-close {
     width: 30px; height: 30px; border: none; border-radius: 50%; background: rgba(120,120,128,0.12);
@@ -680,7 +680,8 @@ html.keyboard-open .chat-container {
 }
 .ep-close svg { width: 15px; height: 15px; }
 .ep-groups {
-    display: flex; overflow-x: auto; gap: 6px; padding-bottom: 10px;
+    /* 关键：不允许被下方网格挤压，否则分组名会被裁切/压扁 */
+    flex: 0 0 auto; display: flex; align-items: center; overflow-x: auto; gap: 6px; padding: 2px 0 10px;
 }
 .ep-groups::-webkit-scrollbar { display: none; }
 .ep-group-tab {
