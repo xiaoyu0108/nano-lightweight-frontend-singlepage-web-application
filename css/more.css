@@ -156,6 +156,12 @@ body {
 .icon-world { background-color: #007AFF; }
 .icon-beautify { background-color: #AF52DE; }
 .icon-assistant { background-color: #FF4D94; }
+.nano-switch { position: relative; width: 44px; height: 26px; flex: none; margin-left: auto; }
+.nano-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 2; }
+.nano-switch i { position: absolute; inset: 0; border-radius: 26px; background: rgba(120,120,128,0.22); transition: background .2s; }
+.nano-switch i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform .2s; }
+.nano-switch input:checked + i { background: #34c759; }
+.nano-switch input:checked + i::after { transform: translateX(18px); }
 .icon-storage { background-color: #FF6B8A; }
 .icon-data { background-color: #5856D6; }
 .icon-other { background-color: #5AC8FA; }

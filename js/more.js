@@ -349,7 +349,78 @@
         if (e.target === avatarModal) closeAvatarModal();
     });
 
-    // ===== 点击列表项跳转独立 HTML =====
+    // ===== 纳米助手开关：开启后在聊天列表出现「纳米」角色 =====
+    var NANO_ID = 'nano_ai';
+    var NANO_AVATAR = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">' +
+        '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9ecb"/><stop offset="1" stop-color="#ff4d94"/></linearGradient></defs>' +
+        '<rect width="80" height="80" rx="20" fill="url(#g)"/>' +
+        '<rect x="18" y="24" width="44" height="34" rx="12" fill="#fff" opacity="0.95"/>' +
+        '<circle cx="32" cy="41" r="4.5" fill="#ff4d94"/><circle cx="48" cy="41" r="4.5" fill="#ff4d94"/>' +
+        '<rect x="38" y="12" width="4" height="10" rx="2" fill="#fff"/><circle cx="40" cy="11" r="4" fill="#fff"/></svg>');
+    function openCharsDB() {
+        return new Promise(function (resolve, reject) {
+            try {
+                var req = indexedDB.open('nano_characters_db', 1);
+                req.onupgradeneeded = function (e) {
+                    var d = e.target.result;
+                    if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' });
+                };
+                req.onsuccess = function () { resolve(req.result); };
+                req.onerror = function () { reject(req.error); };
+            } catch (e) { reject(e); }
+        });
+    }
+    function ensureNanoCharacter(on) {
+        return openCharsDB().then(function (db) {
+            return new Promise(function (resolve) {
+                try {
+                    var tx = db.transaction('characters', 'readwrite');
+                    var store = tx.objectStore('characters');
+                    var g = store.get(NANO_ID);
+                    g.onsuccess = function () {
+                        var existing = g.result;
+                        if (on) {
+                            if (!existing) {
+                                store.put({
+                                    id: NANO_ID, name: '纳米', avatar: NANO_AVATAR,
+                                    gender: '女', nationality: '中国', setting: '',
+                                    bindUser: '', isNpc: true, worldbookBindings: [],
+                                    nanoAssistant: true
+                                });
+                            } else {
+                                existing.name = '纳米';
+                                existing.isNpc = true;
+                                existing.nanoAssistant = true;
+                                store.put(existing);
+                            }
+                        } else if (existing) {
+                            store.delete(NANO_ID);
+                        }
+                    };
+                    tx.oncomplete = function () { db.close(); resolve(true); };
+                    tx.onerror = function () { db.close(); resolve(false); };
+                } catch (e) { try { db.close(); } catch (err) {} resolve(false); }
+            });
+        }).catch(function () { return false; });
+    }
+    (function bindNanoToggle() {
+        var t = document.getElementById('nanoToggle');
+        if (!t) return;
+        var on = false;
+        try { on = localStorage.getItem('nano_assistant_enabled') === '1'; } catch (e) {}
+        t.checked = on;
+        if (on) ensureNanoCharacter(true);
+        t.addEventListener('change', async function () {
+            var v = this.checked;
+            try { localStorage.setItem('nano_assistant_enabled', v ? '1' : '0'); } catch (e) {}
+            await ensureNanoCharacter(v);
+            try { if (window.parent !== window) window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e) {}
+            showToast(v ? '纳米助手已开启，去聊天列表找她' : '纳米助手已关闭');
+        });
+    })();
+
+
     document.querySelectorAll('.list-item').forEach(function(item) {
         item.addEventListener('click', function() {
             var page = this.dataset.page;

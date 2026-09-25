@@ -6,6 +6,7 @@
 
     const moreBtn = document.getElementById('moreBtn');
     const moreOverlay = document.getElementById('moreOverlay');
+    const IS_NANO = (function () { try { return new URLSearchParams(location.search).get('chat') === 'nano_ai'; } catch (e) { return false; } })();
 
     // ===== 默认菜单配置（viewBox 0 0 24 24，stroke-width 2.5） =====
     const DEFAULT_MENU_ITEMS = [
@@ -165,6 +166,14 @@
             if (b && b.id === 'reroll') return 1;
             return 0;
         });
+        // 纳米助手：加号菜单里加入「发送文件」
+        if (IS_NANO && !items.some(function (it) { return it && it.id === 'file'; })) {
+            items.push({
+                id: 'file', label: '文件',
+                icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/>',
+                color: '#FF4D94'
+            });
+        }
         items.forEach(function(item) {
             const btn = document.createElement('button');
             btn.className = 'more-item';
@@ -187,6 +196,48 @@
         });
     }
 
+    // ===== 纳米助手：发送文件 =====
+    function loadMammothForNano() {
+        return new Promise(function (res) {
+            if (window.mammoth) return res(true);
+            var s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js';
+            s.onload = function () { res(!!window.mammoth); };
+            s.onerror = function () { res(false); };
+            document.head.appendChild(s);
+        });
+    }
+    function readNanoFile(file) {
+        var lower = file.name.toLowerCase();
+        if (lower.endsWith('.docx')) {
+            return loadMammothForNano().then(function (ok) {
+                if (!ok) throw new Error('docx 解析库加载失败');
+                return file.arrayBuffer().then(function (buf) { return window.mammoth.extractRawText({ arrayBuffer: buf }); })
+                    .then(function (r) { return (r && r.value) || ''; });
+            });
+        }
+        return file.text();
+    }
+    function pickFileForNano() {
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt,.json,.docx,.md,.csv';
+        input.style.display = 'none';
+        input.addEventListener('change', async function () {
+            var f = input.files[0];
+            if (!f) { input.remove(); return; }
+            try {
+                var text = await readNanoFile(f);
+                if (window.__chat && window.__chat.sendFileContent) window.__chat.sendFileContent(f.name, text);
+            } catch (e) {
+                try { window.__chat.showAlert('读取失败', String((e && e.message) || e)); } catch (err) {}
+            }
+            input.remove();
+        });
+        document.body.appendChild(input);
+        input.click();
+    }
+
     // ===== 处理动作 =====
     function handleAction(action) {
         moreOverlay.classList.remove('active');
@@ -194,6 +245,9 @@
         switch (action) {
             case 'reroll':
                 handleReroll();
+                break;
+            case 'file':
+                pickFileForNano();
                 break;
             case 'transfer':
                 document.getElementById('transferAmount').value = '';

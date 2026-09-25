@@ -14,6 +14,8 @@
     const chatName = getQueryParam('name') || '聊天';
     const chatAvatar = getQueryParam('avatar') || '';
     const jumpMsgId = getQueryParam('jump') || '';
+    // 纳米助手会话：走独立系统提示词 + 可执行动作
+    const isNanoChat = !!(window.NanoAssistant && window.NanoAssistant.isNano(chatId));
 
     // ===== 从 IndexedDB 读取角色（和 character.js 共用数据源） =====
     let allCharacters = [];
@@ -486,6 +488,10 @@
 
     // ===== 构建 System Prompt（新提示词） =====
     function buildSystemPrompt() {
+        // 纳米助手：使用专属系统提示词（前端知识库 + 动作协议）
+        if (isNanoChat && window.NanoAssistant) {
+            return window.NanoAssistant.systemPrompt();
+        }
         const user = currentUser ? currentUser.name : '用户';
         const charName = characterData ? characterData.name : (chatName || '角色');
         const gender = characterData ? characterData.gender : '未知';
@@ -2129,8 +2135,8 @@
         if (type === 'left' && !recalled) {
             const msg = messages.find(m => m.id === row.dataset.id);
             if (msg) msg.turn = currentTurn;
-            // 角色偶尔随机撤回自己刚发出的消息
-            if (!isImage && !isCard && !isVoice && !translation && !transcript && text && Math.random() < 0.05) {
+            // 角色偶尔随机撤回自己刚发出的消息（纳米助手不撤回）
+            if (!isNanoChat && !isImage && !isCard && !isVoice && !translation && !transcript && text && Math.random() < 0.05) {
                 (function(mid) {
                     setTimeout(function() {
                         const m = messages.find(mm => mm.id === mid);
@@ -2150,7 +2156,7 @@
             if (window.NanoBadge) {
                 if (type === 'right') {
                     window.NanoBadge.activity(chatId);
-                } else if (type === 'left' && !recalled) {
+                } else if (type === 'left' && !recalled && !isNanoChat) {
                     const __preview = text || (isImage ? '[图片]' : (isVoice ? '[语音]' : (isCard ? '[卡片消息]' : '发来一条消息')));
                     const __title = (characterData && characterData.name) || displayName || '新消息';
                     window.NanoBadge.incoming(chatId, __title, __preview, { target: 'chat:' + chatId });
@@ -3256,6 +3262,18 @@
         console.log('[Chat] 用户发送消息', text);
     }
 
+    // 纳米助手：发送文件内容（作为一条用户消息，直接触发回复）
+    function sendFileContent(name, text) {
+        text = String(text || '');
+        if (!text.trim()) return;
+        if (text.length > 15000) text = text.slice(0, 15000) + '\n…（已截断）';
+        var now = new Date();
+        var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        addMessage('right', '【文件：' + (name || '文件') + '】\n' + text, timeStr, null, false, false, null, null, null, null);
+        scrollToBottom();
+        triggerReply();
+    }
+
     // ===== AI 主动来电（点击回复后由 AI 根据对话内容通过 [call:] 触发）=====
     function triggerIncomingCall(scenario) {
         const url = 'voice-call.html?chat=' + encodeURIComponent(chatId) +
@@ -3504,7 +3522,7 @@
         });
     }
 
-    async function callApi(userMessage) {
+    async function callApi(userMessage, extraContext) {
         const config = await getApiConfig();
         if (!config) {
             if (!suppressApiAlerts) showAlert('配置错误', 'API 未配置，请先在「API」页面配置主 API。\n注意：手机端与电脑是不同来源，需要在手机打开的页面里单独填写一次；若填写的是 localhost/127.0.0.1 的本地 API，会自动改用当前局域网地址。');
@@ -3563,6 +3581,11 @@
                     history.push({ role: 'user', content: text });
                 }
             });
+
+            // 纳米助手：把读取到的源码/额外上下文追加为一条 user 消息
+            if (extraContext) {
+                history.push({ role: 'user', content: String(extraContext) });
+            }
 
             if (history.length > 0 && history[history.length - 1].role !== 'user') {
                 const tail = (userMessage && String(userMessage).trim()) ? userMessage : '（请继续）';
@@ -4043,8 +4066,85 @@
         } catch (e) {}
     }
 
+    // ===== 纳米助手：把模型回复里的 <action> 解析成确认卡并执行 =====
+    function nanoAttachTo(row) {
+        if (row && row.querySelector && row.querySelector('.message-content')) return row.querySelector('.message-content');
+        var rows = messageContainer.querySelectorAll('.message-row.left');
+        var last = rows[rows.length - 1];
+        return last ? last.querySelector('.message-content') : null;
+    }
+    function renderNanoAction(a, row) {
+        var host = nanoAttachTo(row);
+        if (!host) return;
+        var box = document.createElement('div');
+        box.className = 'nano-action';
+        box.innerHTML = '<div class="nano-action-title">' + (window.NanoAssistant.actionTitle(a) || a.tool) + '</div>'
+            + (a.tool === 'apply_beautify' ? '<div class="nano-action-desc">' + String((a.args && a.args.css) || '').slice(0, 400).replace(/</g, '&lt;') + '</div>' : '')
+            + '<div class="nano-action-btns"><button class="nano-skip">取消</button><button class="nano-run">执行</button></div>';
+        host.appendChild(box);
+        box.querySelector('.nano-skip').addEventListener('click', function () { box.remove(); });
+        box.querySelector('.nano-run').addEventListener('click', async function () {
+            try {
+                await window.NanoAssistant.execAction(a);
+                box.innerHTML = '<div class="nano-action-title">✓ ' + (window.NanoAssistant.actionTitle(a) || '') + ' 已执行</div>';
+            } catch (e) {
+                box.innerHTML = '<div class="nano-action-title" style="color:#ff3b30">✗ 失败：' + String(e.message || e).replace(/</g, '&lt;') + '</div>';
+            }
+        });
+    }
+    function renderNanoContinue(row, extraContext) {
+        var host = nanoAttachTo(row);
+        if (!host) return;
+        var box = document.createElement('div');
+        box.className = 'nano-action';
+        box.innerHTML = '<div class="nano-action-title">纳米还想再读一次源码/继续处理</div>'
+            + '<div class="nano-action-desc">本次回复已经调用 2 次 API。继续会再调用一次，是否继续？</div>'
+            + '<div class="nano-action-btns"><button class="nano-skip">停止</button><button class="nano-run">继续</button></div>';
+        host.appendChild(box);
+        box.querySelector('.nano-skip').addEventListener('click', function () { box.innerHTML = '<div class="nano-action-title">已停止</div>'; });
+        box.querySelector('.nano-run').addEventListener('click', async function () {
+            box.innerHTML = '<div class="nano-action-title">继续处理中…</div>';
+            var next = await callApi('', extraContext);
+            processNanoReply(next || '（继续后没有生成内容）', 1);
+        });
+    }
+    async function processNanoReply(reply, depth) {
+        var NA = window.NanoAssistant;
+        if (!NA) return;
+        var parsed = NA.parseActions(reply);
+        var row = null;
+        if (parsed.clean) {
+            row = addMessage('left', parsed.clean, nowHHMM(), null, false, false, null, null, null, null);
+        }
+        var reads = parsed.actions.filter(function (a) { return a.tool === 'read_file' && a.args && a.args.path; });
+        if (reads.length) {
+            var out = '';
+            for (var i = 0; i < reads.length; i++) {
+                var txt = await NA.fetchSource(reads[i].args.path);
+                out += '\n===== ' + reads[i].args.path + ' =====\n' + (txt || '（读取失败）') + '\n';
+            }
+            var extra = '[以下是你请求读取的源码，请基于它继续]\n' + out;
+            if (depth < 1) {
+                if (!row) row = addMessage('left', '（正在读取源码…）', nowHHMM(), null, false, false, null, null, null, null);
+                var next = await callApi('', extra);
+                return processNanoReply(next || '（读取后没有生成内容）', depth + 1);
+            }
+            renderNanoContinue(row, extra);
+            return;
+        }
+        parsed.actions.filter(function (a) { return a.tool !== 'read_file'; }).forEach(function (a) { renderNanoAction(a, row); });
+        if (!parsed.clean && parsed.actions.length === 0) {
+            addMessage('left', '（没有内容）', nowHHMM(), null, false, false, null, null, null, null);
+        }
+    }
+
     async function processReply(reply, quoteTarget) {
         if (!reply) return;
+        if (isNanoChat && window.NanoAssistant) {
+            // 纳米助手：不走进度/心声/卡片等角色逻辑
+            currentTurn++;
+            return processNanoReply(reply, 0);
+        }
 
         reply = cleanReplyText(reply);
         if (!reply) return;
@@ -5373,6 +5473,7 @@ if (data.type === 'NANO_VOICE_CALL_CARD') {
         renderMessages: renderMessages,
         saveMessages: saveMessages,
         sendMessage: sendMessage,
+        sendFileContent: sendFileContent,
         triggerReply: triggerReply,
         claimCard: claimCard,
         receiveCard: receiveCard,

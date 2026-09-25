@@ -1441,3 +1441,12 @@ html.keyboard-open .chat-container {
     white-space: normal;
 }
 .translation-bubble.me { align-self: flex-end; background: rgba(0, 122, 255, 0.12); color: #0060df; }
+
+/* 纳米助手动作确认卡 */
+.nano-action{margin-top:8px;background:rgba(255,77,148,.08);border:1px solid rgba(255,77,148,.3);border-radius:12px;padding:10px 12px;max-width:100%;}
+.nano-action-title{font-size:13px;font-weight:600;color:#c2185b;}
+.nano-action-desc{margin-top:6px;font-size:11.5px;color:#8e8e93;max-height:120px;overflow:auto;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;}
+.nano-action-btns{display:flex;gap:8px;margin-top:8px;}
+.nano-action-btns button{flex:1;height:30px;border-radius:9px;border:0;font-size:13px;cursor:pointer;}
+.nano-action-btns .nano-run{background:#ff4d94;color:#fff;}
+.nano-action-btns .nano-skip{background:rgba(120,120,128,.14);color:#1c1c1e;}
