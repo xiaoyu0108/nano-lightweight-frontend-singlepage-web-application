@@ -152,7 +152,7 @@
         loadBackground();
 
         var prompt = getSetting('imagePrompt', '');
-        promptStatus.textContent = prompt || '未设置';
+        promptStatus.textContent = prompt ? shortPromptText(prompt) : '未设置';
 
         var face = getSetting('faceRef', '');
         if (face) {
@@ -619,6 +619,10 @@
     }
 
     // ===== 生图提示词 =====
+    function shortPromptText(s) {
+        s = String(s || '').replace(/\s+/g, ' ').trim();
+        return s.length > 8 ? (s.slice(0, 8) + '…') : s;
+    }
     function openPromptModal() {
         var current = getSetting('imagePrompt', '');
         promptInput.value = current || '';
@@ -629,7 +633,7 @@
     function savePrompt() {
         var val = promptInput.value.trim();
         setSetting('imagePrompt', val);
-        promptStatus.textContent = val || '未设置';
+        promptStatus.textContent = val ? shortPromptText(val) : '未设置';
         promptModal.classList.remove('active');
     }
 
@@ -1100,5 +1104,18 @@
     loadInfo();
     loadFloorCounts();
     loadTokenChart();
+    // Token 占用：默认收起，点击展开小卡片
+    (function bindTokenToggle() {
+        var item = document.getElementById('tokenItem');
+        var details = document.getElementById('tokenDetails');
+        var chevron = document.getElementById('tokenChevron');
+        if (!item || !details) return;
+        item.addEventListener('click', function () {
+            var open = details.style.display !== 'none';
+            details.style.display = open ? 'none' : 'block';
+            if (chevron) chevron.style.transform = open ? '' : 'rotate(90deg)';
+            if (!open) loadTokenChart();
+        });
+    })();
     console.log('[Setting] 聊天设置页面已加载，chatId:', chatId);
 })();

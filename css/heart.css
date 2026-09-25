@@ -237,6 +237,37 @@ button, input, textarea { font: inherit; outline: none; }
   padding: 10px 16px 6px;
 }
 .iv-setting-title { color: var(--iv-secondary); font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; }
+.iv-css-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+
+/* ===== 快捷 DIY ===== */
+.iv-quick { padding: 6px 16px 16px; display: flex; flex-direction: column; }
+.iv-quick-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 0; border-bottom: 1px solid var(--iv-separator, rgba(60,60,67,0.12));
+}
+.iv-quick-row:last-of-type { border-bottom: 0; }
+.iv-quick-label { font-size: 13px; color: var(--iv-primary, #1c1c1e); }
+.iv-switch { position: relative; width: 44px; height: 26px; flex: none; }
+.iv-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 2; }
+.iv-switch i { position: absolute; inset: 0; border-radius: 26px; background: rgba(120,120,128,0.22); transition: background 0.2s; }
+.iv-switch i::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+.iv-switch input:checked + i { background: #34c759; }
+.iv-switch input:checked + i::after { transform: translateX(18px); }
+.iv-quick-field { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.iv-quick-field-title { font-size: 12px; color: var(--iv-secondary, #8e8e93); font-weight: 600; }
+.iv-quick-field-row { display: flex; gap: 8px; }
+.iv-quick input[type="text"], .iv-quick textarea {
+  width: 100%; border: 1px solid rgba(60,60,67,0.12); background: rgba(255,255,255,0.7);
+  border-radius: 10px; padding: 9px 10px; font-size: 13px; font-family: inherit;
+  color: #1c1c1e; outline: none;
+}
+.iv-quick input[type="text"]:focus, .iv-quick textarea:focus { border-color: rgba(0,122,255,0.5); background: #fff; }
+.iv-quick textarea { min-height: 68px; resize: vertical; line-height: 1.5; }
+.iv-quick-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
 .iv-import-btn {
   background: none; border: 0; padding: 4px; cursor: pointer;
   color: var(--iv-secondary); display: flex; align-items: center; justify-content: center;

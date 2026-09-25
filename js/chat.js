@@ -1254,6 +1254,10 @@
         if (data && (data.type === 'currentMaskChanged' || data.type === 'homeDataUpdated' || data.type === 'contactsDataUpdated' || data.type === 'groupsDataUpdated')) {
             renderAll();
         }
+        // 从会话内页返回：立即刷新，清掉已读的红点
+        if (data && (data.type === 'nanoOverlayClosed' || data.type === 'nanoOverlayOpen')) {
+            renderAll();
+        }
     });
 
     // ===== 群资料/群消息变化 → 刷新群聊卡片 =====

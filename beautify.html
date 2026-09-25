@@ -28,11 +28,11 @@
 <!-- ===== 全局页面 ===== -->
 <section class="page active" id="global">
 <div class="group">
-<div class="labelrow"><span class="label">CSS代码</span><button class="import" id="globalExport" aria-label="导出预设">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+<div class="labelrow"><span class="label">CSS代码</span><span class="import-actions"><button class="import" id="globalExport" aria-label="导出预设">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>
 </button><button class="import" id="globalImport" aria-label="导入">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 20h14"/><path d="M5 16v4"/><path d="M19 16v4"/></svg>
-</button><input class="hidden" id="globalFile" type="file" accept=".txt,.json,.css"></div>
+</button></span><input class="hidden" id="globalFile" type="file" accept=".txt,.json,.css"></div>
 <div class="editor-wrap"><textarea id="globalCode" spellcheck="false" placeholder="全局 CSS 代码…"></textarea></div>
 </div>
 <div class="tools"><button class="tool" data-clear="global">清空</button><button class="tool" data-restore="global">还原</button><button class="tool" data-copy="global">复制初始</button><button class="tool apply" data-apply="global">应用</button></div>
@@ -52,11 +52,11 @@
 <!-- ===== 聊天页面 ===== -->
 <section class="page" id="chat">
 <div class="group">
-<div class="labelrow"><span class="label">CSS代码</span><button class="import" id="chatExport" aria-label="导出预设">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+<div class="labelrow"><span class="label">CSS代码</span><span class="import-actions"><button class="import" id="chatExport" aria-label="导出预设">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>
 </button><button class="import" id="chatImport" aria-label="导入">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 20h14"/><path d="M5 16v4"/><path d="M19 16v4"/></svg>
-</button><input class="hidden" id="chatFile" type="file" accept=".txt,.json,.css"></div>
+</button></span><input class="hidden" id="chatFile" type="file" accept=".txt,.json,.css"></div>
 <div class="editor-wrap"><textarea id="chatCode" spellcheck="false" placeholder="聊天 CSS 代码…"></textarea></div>
 </div>
 <div class="tools"><button class="tool" data-clear="chat">清空</button><button class="tool" data-restore="chat">还原</button><button class="tool" data-copy="chat">复制初始</button><button class="tool apply" data-apply="chat">应用</button></div>

@@ -910,10 +910,44 @@ function endWinDrag(){
 }
 (function bindChatWindowDrag(){
   const win=document.getElementById('chatWindow');
-  const head=win && win.querySelector('.chat-window-head');
-  if(!head) return;
-  head.addEventListener('mousedown',startWinDrag);
-  head.addEventListener('touchstart',startWinDrag,{passive:true});
+  if(!win) return;
+  const head=win.querySelector('.chat-window-head');
+  let lpTimer=null, lpX=0, lpY=0, lpActive=false;
+  function isInteractive(t){
+    return !!(t && t.closest && (t.closest('.cw-close')||t.closest('button')||t.closest('input')||t.closest('textarea')||t.closest('.bubble')||t.closest('.bubble-menu')||t.closest('.quote-preview')));
+  }
+  function onDown(e){
+    if(!win.classList.contains('show')) return;
+    if(isInteractive(e.target)) return;
+    const p=e.touches?e.touches[0]:e;
+    if(head && head.contains(e.target)){ startWinDrag(e); return; }
+    // 非标题栏区域：长按 350ms 才进入拖拽，避免和滚动/点按冲突
+    lpX=p.clientX; lpY=p.clientY; lpActive=false;
+    clearTimeout(lpTimer);
+    lpTimer=setTimeout(function(){ lpActive=true; startWinDrag(e); }, 350);
+  }
+  function onPreMove(e){
+    if(lpActive) return;
+    const p=e.touches?e.touches[0]:e;
+    if(Math.abs(p.clientX-lpX)>8||Math.abs(p.clientY-lpY)>8){ clearTimeout(lpTimer); }
+  }
+  win.addEventListener('mousedown',onDown);
+  win.addEventListener('touchstart',onDown,{passive:true});
+  win.addEventListener('mousemove',onPreMove);
+  win.addEventListener('touchmove',onPreMove,{passive:true});
+})();
+
+/* iOS 键盘弹出时隐藏悬浮球，避免遮挡输入栏 */
+(function watchKeyboard(){
+  if(!window.visualViewport) return;
+  const vv=window.visualViewport;
+  function update(){
+    const kb=Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.body.classList.toggle('keyboard-open', kb>120);
+  }
+  vv.addEventListener('resize',update);
+  vv.addEventListener('scroll',update);
+  setTimeout(update,300);
 })();
 
 function renderChars(){

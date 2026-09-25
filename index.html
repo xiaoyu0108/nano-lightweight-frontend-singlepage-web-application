@@ -473,6 +473,7 @@
             border: 1.5px solid rgba(255, 255, 255, 0.85);
         }
         .music-float-ball.show { display: flex; }
+        body.keyboard-open .music-float-ball { display: none !important; }
         .music-float-ball:active { cursor: grabbing; }
 
         .music-float-ball.expanded {
@@ -1387,6 +1388,15 @@
                 bottomBar.classList.add('hidden');
                 appContent.style.paddingTop = '0';
                 appContent.style.paddingBottom = '0';
+                // 重新回到 chat_inner：恢复未读上下文，避免在会话里还被当成"未读"
+                try {
+                    let info = null;
+                    try { info = JSON.parse(sessionStorage.getItem('last_chat_info') || 'null'); } catch (e) {}
+                    const cid = (info && info.chatId) || '';
+                    if (chatInnerFrame && chatInnerFrame.contentWindow) {
+                        chatInnerFrame.contentWindow.postMessage({ type: 'nanoOverlayOpen', chatId: cid }, '*');
+                    }
+                } catch (e) {}
                 return;
             }
 
@@ -1678,6 +1688,7 @@
                 el.id = 'appNotify';
                 el.className = 'app-notify';
                 el.addEventListener('click', function () {
+                    if (el._target) { try { openNotifyTarget(el._target); } catch (e) {} hideAppNotify(); return; }
                     if (el._action && el._action.url) { openAppFromNotify(el._action); hideAppNotify(); return; }
                     if (el._app === 'music') openMusicFromBall();
                     hideAppNotify();
@@ -1686,10 +1697,12 @@
             }
             el._app = app || '';
             el._action = (opts.action && opts.url) ? { label: opts.action, url: opts.url, title: opts.title || '' } : null;
+            el._target = opts.target || '';
             el.innerHTML = '<div class="an-icon">' + escapeNotifyHtml(opts.icon || ((app === 'music') ? '🎧' : '🔔')) + '</div>' +
                 '<div class="an-main"><div class="an-title">' + escapeNotifyHtml(title) + '</div>' +
                 '<div class="an-body">' + escapeNotifyHtml(body) + '</div>' +
                 (el._action ? '<div class="an-actions"><span class="an-action">' + escapeNotifyHtml(el._action.label) + '</span></div>' : '') +
+                (!el._action && el._target ? '<div class="an-actions"><span class="an-action">点击查看</span></div>' : '') +
                 '</div>';
             el.classList.add('show');
             // 切到后台 / 锁屏时，同步弹一条系统通知，避免只在内页提示而看不到
@@ -1697,13 +1710,13 @@
                 if (window.NanoNotify && document.hidden) {
                     window.NanoNotify.notify(title, body, {
                         icon: opts.icon,
-                        target: (opts.action && opts.url) || '',
+                        target: opts.target || ((opts.action && opts.url) || ''),
                         tag: app ? ('nano-app-' + app) : ''
                     });
                 }
             } catch (e) {}
             clearTimeout(appNotifyTimer);
-            appNotifyTimer = setTimeout(hideAppNotify, el._action ? 9000 : 5200);
+            appNotifyTimer = setTimeout(hideAppNotify, (el._action || el._target) ? 9000 : 5200);
         }
 
         const refreshState = {};
@@ -1850,6 +1863,16 @@
                     }));
                 } catch (e) {}
                 openFullscreen('chat_inner.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(name || '聊天'), '', false, 'main');
+            }
+            if (target.indexOf('group:') === 0) {
+                const gid = target.slice(6);
+                openFullscreen('groups.html?group=' + encodeURIComponent(gid), '群聊', false, 'main');
+                return;
+            }
+            if (target.indexOf('offline:') === 0) {
+                const oid = target.slice(8);
+                openFullscreen('offline.html?chat=' + encodeURIComponent(oid), '线下聊天', false, 'main');
+                return;
             }
         }
 
@@ -2389,7 +2412,7 @@
 
             if (data.type === 'appNotify') {
                 if (!(data.app === 'music' && isMusicFrameActive)) {
-                    showAppNotify(data.title || '', data.body || '', data.app || '');
+                    showAppNotify(data.title || '', data.body || '', data.app || '', { target: data.target || '', icon: data.icon || '' });
                 }
                 return;
             }
@@ -2694,6 +2717,19 @@
         }
 
         switchPage('chat');
+
+        // ===== iOS 键盘弹出时隐藏悬浮球，避免遮挡输入栏 =====
+        (function watchKeyboard() {
+            if (!window.visualViewport) return;
+            const vv = window.visualViewport;
+            function update() {
+                const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                document.body.classList.toggle('keyboard-open', kb > 120);
+            }
+            vv.addEventListener('resize', update);
+            vv.addEventListener('scroll', update);
+            setTimeout(update, 300);
+        })();
     })();
 
     // ===== 开场动画逻辑（原 开场.html 的脚本，已内联）=====
@@ -2778,7 +2814,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-3';
+        var BUILD = 'nano-2026-09-25-4';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

@@ -116,6 +116,19 @@
         opts = opts || {};
         if (!enabled() && !opts.force) return;
         playSound(soundFor(opts));
+        // 前台可见时补一个「应用内横幅」：iOS 上 new Notification 不可用，只有它能看见
+        try {
+            if (window.parent !== window && document.visibilityState === 'visible') {
+                window.parent.postMessage({
+                    type: 'appNotify',
+                    app: opts.app || (opts.channel === 'music' ? 'music' : ''),
+                    title: title || 'Nano',
+                    body: String(body || ''),
+                    icon: opts.icon || '',
+                    target: opts.target || ''
+                }, '*');
+            }
+        } catch (e) {}
         var payload = {
             body: String(body || '').slice(0, 120),
             tag: opts.tag || ('nano-' + Date.now()),
