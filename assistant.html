@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>娜娜 · 美化助手</title>
+  <link rel="stylesheet" href="css/assistant.css">
+  <script src="js/appearance.js"></script>
+</head>
+<body class="nano-assistant">
+  <div class="as-app" id="asApp">
+    <header class="as-topbar">
+      <button class="as-back" id="asBack" data-back aria-label="返回">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="as-title">
+        <span class="as-name">娜娜</span>
+        <span class="as-sub" id="asSub">美化 · 世界书 · 装修小助手</span>
+      </div>
+      <button class="as-clear" id="asClear" aria-label="清空">清空</button>
+    </header>
+
+    <div class="as-scroll" id="asScroll">
+      <div class="as-msg-wrap" id="asMsgs"></div>
+    </div>
+
+    <div class="as-suggests" id="asSuggests">
+      <button data-q="帮我把心声改成粉色系主题，柔和一点">粉色心声</button>
+      <button data-q="把聊天顶栏和底栏改成半透明毛玻璃">聊天毛玻璃</button>
+      <button data-q="我想加一本世界书，帮我看看怎么做">加世界书</button>
+      <button data-q="全局底栏图标太挤了，帮我调一下">调底部栏</button>
+    </div>
+
+    <footer class="as-inputbar">
+      <button class="as-attach" id="asAttach" aria-label="发送文件">
+        <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <textarea id="asInput" rows="1" placeholder="告诉娜娜你想怎么改…"></textarea>
+      <button class="as-send" id="asSend" aria-label="发送">
+        <svg viewBox="0 0 24 24"><path d="M3 20l18-8L3 4v6l12 2-12 2z" fill="currentColor"/></svg>
+      </button>
+      <input type="file" id="asFile" accept=".txt,.json,.docx,.md,.csv" style="display:none">
+    </footer>
+  </div>
+
+  <script src="js/nano-assistant-knowledge.js"></script>
+  <script src="js/assistant.js"></script>
+  <script src="swipe-back.js"></script>
+</body>
+</html>

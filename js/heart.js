@@ -646,6 +646,14 @@ function setupThoughtExpand(el) {
 
     // 导入功能
     $('ivImportBtn').addEventListener('click', function() { $('ivFileInput').click(); });
+    // 娜娜助手下发心声 CSS：立即应用并持久化
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (d && d.type === 'nanoVoiceCss') {
+        applyCustomCSS(d.css || '');
+        saveAppliedCss(d.css || '');
+      }
+    });
     // 导出当前选中的预设（分享图标）
     $('ivExportBtn').addEventListener('click', async function() {
       const id = $('ivTemplateSelect').value;
