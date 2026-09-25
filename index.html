@@ -2839,7 +2839,7 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-6';
+        var BUILD = 'nano-2026-09-25-7';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;
