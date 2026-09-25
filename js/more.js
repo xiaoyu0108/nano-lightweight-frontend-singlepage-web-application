@@ -411,6 +411,11 @@
         try { on = localStorage.getItem('nano_assistant_enabled') === '1'; } catch (e) {}
         t.checked = on;
         if (on) ensureNanoCharacter(true);
+        var item = document.getElementById('nanoItem');
+        if (item) item.addEventListener('click', function (e) {
+            if (e.target.closest && e.target.closest('.nano-switch')) return;
+            t.click();
+        });
         t.addEventListener('change', async function () {
             var v = this.checked;
             try { localStorage.setItem('nano_assistant_enabled', v ? '1' : '0'); } catch (e) {}
