@@ -21,8 +21,8 @@ window.NANO_ASSISTANT_KB = {
       id: 'chat', name: '聊天美化',
       storage: 'localStorage: beautify_chat_v2（同时写 beautify_chat）',
       target: 'chat',
-      desc: '作用于单聊 chat_inner 与群聊 groups 内页：顶栏 .topbar、底栏 .bottom-bar、气泡 .bubble、引用 .quote-block、译文 .translation-bubble、头像 .message-avatar。',
-      selectors: ['.nano-chat-inner .topbar', '.nano-chat-inner .bottom-bar', '.bubble', '.bubble.other', '.bubble.me', '.quote-block', '.translation-bubble', '.message-content']
+      desc: '作用于单聊 chat_inner 与群聊 groups 内页：顶栏 .topbar、底栏 .bottom-bar、气泡 .bubble、引用 .quote-block、译文 .translation-bubble、头像 .message-avatar；也可以改聊天背景 .chat-container / .message-scroll / body（background / background-image）。',
+      selectors: ['.nano-chat-inner .topbar', '.nano-chat-inner .bottom-bar', '.bubble', '.bubble.other', '.bubble.me', '.quote-block', '.translation-bubble', '.message-content', '.nano-chat-inner .chat-container', '.nano-chat-inner .message-scroll']
     },
     {
       id: 'chat-avatar', name: '聊天头像',
@@ -82,6 +82,7 @@ window.NANO_ASSISTANT_KB = {
     translationMode: 'localStorage.nano_trans_separate（1=独立气泡 0=同一气泡）',
     offlineSettings: 'IndexedDB MeetSettingsDB/settings，主记录 id=main_settings，字段 customCSS',
     worldbook: 'IndexedDB nano_worldbook_db/worldbook_data，值结构 {key:"data", value:{groups:[], files:[]}}；files[].entries[] 为条目',
+    emoji: 'IndexedDB nano_api_db/emoji_data，key=nano_emoji_data，值 {emojiGroups:[{id,name,emojis:[{id,name,url}]}], balance, favorites}；同时 localStorage.nano_emoji_data',
     characters: 'IndexedDB nano_characters_db/characters',
     mask: 'localStorage.nano_mask_data + IndexedDB nano_mask_db',
     apiConfig: 'IndexedDB nano_api_db/api_data/nano_api_config'
@@ -92,8 +93,10 @@ window.NANO_ASSISTANT_KB = {
 
   // 助手可以下发的动作（写进 <action>...</action> 代码块）
   commands: [
-    { tool: 'apply_beautify', args: { scope: 'global|chat|chat-avatar|heart|offline', name: '预设名', css: '完整 CSS' }, note: '覆盖对应美化，用户可随时恢复默认' },
-    { tool: 'add_worldbook', args: { name: '世界书名', entries: [{ title: '条目名', keywords: '触发词', content: '内容' }] }, note: '新增一本世界书' },
+    { tool: 'apply_beautify', args: { scope: 'global|chat|chat-avatar|heart|offline', name: '预设名', css: '完整 CSS' }, note: '覆盖对应美化，并自动存成可切换预设；用户可随时恢复默认' },
+    { tool: 'add_worldbook', args: { name: '世界书名', entries: [{ title: '条目名', keywords: '触发词', content: '内容' }] }, note: '新增一本世界书（仅当用户明确要设定/世界书时用）' },
+    { tool: 'add_emoji', args: { group: '分组名', emojis: [{ name: '表情名', url: '图片地址' }] }, note: '把「名字:图片链接」清单加入表情包（用户说加表情包时用这个，不要用 add_worldbook）' },
+    { tool: 'set_chat_background', args: { color: '#ffffff', image: '图片URL（可选）' }, note: '直接更换当前聊天背景（颜色或图片）；用户说“换背景”优先用这个' },
     { tool: 'read_file', args: { path: 'js/chat-core.js' }, note: '只读，用于准确回答/给出修改步骤' },
     { tool: 'open_page', args: { url: 'beautify.html' }, note: '帮用户打开对应页面' }
   ]

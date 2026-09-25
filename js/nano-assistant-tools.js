@@ -19,6 +19,8 @@
     lines.push('5. 回复尽量简短：先给结论，再给必要步骤。除非用户要求，不要长篇大论。');
     lines.push('6. 做美化/世界书这类修改时【不要读源码】：知识库里已有足够的选择器，直接用即可，并输出 <action> 块。只有用户明确问"这个功能在哪个文件、源码怎么改"时，才 use read_file。');
     lines.push('7. 需要修改时必须真的输出 <action> 块：只有输出了 <action>，界面才会出现「复制 / 立即执行」按钮。绝不要只说"点击下方按钮 / 已为你改好"却不给 action。如果暂时不确定选择器，就先问清楚，不要假装已经改好。');
+    lines.push('8. 用户发来"表情包 / 图片清单"（一般是「名字：图片链接」的形式）并要求加入表情包时，必须用 add_emoji，绝对不要用 add_worldbook。只有用户明确说要"世界书/设定"时才用 add_worldbook。');
+    lines.push('9. 每次 apply_beautify 都会自动存成一个「可切换的预设」（在对应美化页里能选），所以 name 要起一个简短好认的名字，方便用户之后切换。');
     lines.push('');
     lines.push('【执行动作的方式】');
     lines.push('需要真正修改时，在回复里输出代码块（用户会看到确认按钮，确认后才生效）：');
@@ -43,6 +45,7 @@
     lines.push('');
     lines.push('写 CSS 时直接给完整可用的 CSS（用上面的选择器即可，不要为了美化去读源码）。css 字段里可以带换行，直接写多行 CSS 即可。');
     lines.push('每次要修改样式，都必须：①用一两句话说明你要改什么；②输出一个 <action> 块，css 字段放完整可复制的代码。');
+    lines.push('用户说“换背景”时：优先用 set_chat_background（有图片用 args.image，只有颜色用 args.color）；需要更复杂的背景样式时才用 scope=chat 的 CSS（改 .chat-container / .message-scroll / body）。');
     try {
       var extra = (localStorage.getItem('nano_builtin_prompt') || '').trim();
       if (extra) lines.push('\n【用户自定义内置要求（必须遵守）】\n' + extra);
@@ -201,6 +204,74 @@
       req.onerror = function () { reject(new Error('打开库失败')); };
     });
   }
+  /* ---------- 表情包：写入 nano_api_db / emoji_data / nano_emoji_data ---------- */
+  function openEmojiDB() {
+    return new Promise(function (res, rej) {
+      try {
+        var req = indexedDB.open('nano_api_db', 2);
+        req.onupgradeneeded = function (e) {
+          var d = e.target.result;
+          if (!d.objectStoreNames.contains('api_data')) d.createObjectStore('api_data', { keyPath: 'key' });
+          if (!d.objectStoreNames.contains('emoji_data')) d.createObjectStore('emoji_data', { keyPath: 'key' });
+          if (!d.objectStoreNames.contains('favorite_data')) d.createObjectStore('favorite_data', { keyPath: 'key' });
+        };
+        req.onsuccess = function () { res(req.result); };
+        req.onerror = function () { rej(req.error); };
+      } catch (e) { rej(e); }
+    });
+  }
+  function getEmojiDataRaw() {
+    return openEmojiDB().then(function (db) {
+      return new Promise(function (res) {
+        try {
+          if (!db.objectStoreNames.contains('emoji_data')) { db.close(); res(null); return; }
+          var rq = db.transaction('emoji_data', 'readonly').objectStore('emoji_data').get('nano_emoji_data');
+          rq.onsuccess = function () { db.close(); res(rq.result ? rq.result.value : null); };
+          rq.onerror = function () { db.close(); res(null); };
+        } catch (e) { res(null); }
+      });
+    }).catch(function () { return null; });
+  }
+  function saveEmojiDataRaw(data) {
+    try { localStorage.setItem('nano_emoji_data', JSON.stringify(data)); } catch (e) {}
+    return openEmojiDB().then(function (db) {
+      return new Promise(function (res) {
+        try {
+          var tx = db.transaction('emoji_data', 'readwrite');
+          tx.objectStore('emoji_data').put({ key: 'nano_emoji_data', value: data });
+          tx.oncomplete = function () { db.close(); res(true); };
+          tx.onerror = function () { db.close(); res(false); };
+        } catch (e) { res(false); }
+      });
+    }).catch(function () { return false; });
+  }
+  async function addEmoji(groupName, emojis) {
+    var data = await getEmojiDataRaw();
+    if (!data || !Array.isArray(data.emojiGroups)) data = { emojiGroups: [], balance: 0, favorites: [] };
+    var list = (emojis || []).map(function (e) {
+      return { name: String((e && e.name) || '').trim(), url: String((e && (e.url || e.src || e.image)) || '').trim() };
+    }).filter(function (e) { return e.url; });
+    if (!list.length) throw new Error('没有可添加的表情（缺少图片地址）');
+    var name = String(groupName || '').trim() || '纳米表情';
+    var group = data.emojiGroups.find(function (g) { return g && g.name === name; });
+    if (!group) {
+      group = { id: 'g' + Date.now() + '_' + Math.random().toString(36).slice(2, 5), name: name, emojis: [] };
+      data.emojiGroups.push(group);
+    }
+    if (!Array.isArray(group.emojis)) group.emojis = [];
+    var seen = {};
+    group.emojis.forEach(function (e) { if (e && e.url) seen[e.url] = 1; });
+    list.forEach(function (e) {
+      if (seen[e.url]) return;
+      seen[e.url] = 1;
+      group.emojis.push({ id: genId('e'), name: e.name || '', url: e.url });
+    });
+    await saveEmojiDataRaw(data);
+    try { window.dispatchEvent(new CustomEvent('nanoEmojiUpdated')); } catch (e) {}
+    try { window.parent.postMessage({ type: 'nanoEmojiUpdated' }, '*'); } catch (e) {}
+    return group;
+  }
+
   function genId(p) { return p + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); }
   function normalizeEntry(e) {
     e = e || {};
@@ -254,6 +325,7 @@
   }
   async function applyBeautify(scope, name, css) {
     css = String(css || '');
+    name = String(name || '').trim() || '纳米预设';
     if (scope === 'global') {
       localStorage.setItem('beautify_global_v2', css); localStorage.setItem('beautify_global', css);
       savePreset('global', name, css); broadcast('global', css);
@@ -265,9 +337,11 @@
       savePreset('chat-avatar', name, css); broadcast('chat-avatar', css);
     } else if (scope === 'heart') {
       localStorage.setItem('nano_voice_applied_css', css);
+      savePreset('heart', name, css);
       try { window.parent.postMessage({ type: 'nanoVoiceCss', css: css }, '*'); } catch (e) {}
     } else if (scope === 'offline') {
       await setOfflineCss(css);
+      savePreset('offline', name, css);
     } else {
       throw new Error('未知 scope：' + scope);
     }
@@ -277,18 +351,47 @@
     try { window.parent.postMessage({ type: 'openFullscreen', url: url, title: '', source: 'more', showBack: false }, '*'); }
     catch (e) { window.location.href = url; }
   }
+  // 直接更换当前聊天背景（等同聊天设置里的「换背景」）
+  async function setChatBackground(color, imageUrl) {
+    var chatId = NANO_ID;
+    try { chatId = new URLSearchParams(location.search).get('chat') || NANO_ID; } catch (e) {}
+    var key = function (s) { return 'chat_setting_' + s + '_' + chatId; };
+    color = String(color || '').trim();
+    imageUrl = String(imageUrl || '').trim();
+    if (imageUrl) {
+      try { localStorage.setItem(key('bgType'), JSON.stringify('image')); } catch (e) {}
+      try { if (typeof localforage !== 'undefined') await localforage.setItem(key('bgImage'), imageUrl); } catch (e) {}
+    } else {
+      try { localStorage.setItem(key('bgType'), JSON.stringify('color')); } catch (e) {}
+      try { localStorage.setItem(key('bgColor'), JSON.stringify(color || '#ffffff')); } catch (e) {}
+      try { if (typeof localforage !== 'undefined') await localforage.removeItem(key('bgImage')); } catch (e) {}
+    }
+    try {
+      window.parent.postMessage({
+        type: 'backgroundChanged', chatId: chatId,
+        bgType: imageUrl ? 'image' : 'color',
+        bgColor: color || '#ffffff',
+        bgImage: imageUrl || ''
+      }, '*');
+    } catch (e) {}
+    return true;
+  }
   async function execAction(a) {
     if (!a || !a.tool) throw new Error('空动作');
     var args = a.args || {};
     if (a.tool === 'apply_beautify') return applyBeautify(args.scope, args.name, args.css);
     if (a.tool === 'add_worldbook') return addWorldbook(args.name, args.entries);
+    if (a.tool === 'add_emoji') return addEmoji(args.group || args.name, args.emojis || args.items);
+    if (a.tool === 'set_chat_background') return setChatBackground(args.color, args.image);
     if (a.tool === 'open_page') return openPage(args.url);
     if (a.tool === 'read_file') return null;
     throw new Error('未知动作 ' + a.tool);
   }
   function actionTitle(a) {
-    if (a.tool === 'apply_beautify') return '覆盖「' + (a.args.scope || '') + '」美化';
+    if (a.tool === 'apply_beautify') return '覆盖「' + (a.args.scope || '') + '」美化：' + (a.args.name || '未命名');
     if (a.tool === 'add_worldbook') return '新增世界书：' + (a.args.name || '');
+    if (a.tool === 'add_emoji') return '新增表情包分组：' + (a.args.group || a.args.name || '纳米表情') + '（' + (((a.args.emojis || a.args.items || []).length)) + ' 个）';
+    if (a.tool === 'set_chat_background') return '更换聊天背景：' + (a.args.image ? '图片' : (a.args.color || '默认'));
     if (a.tool === 'open_page') return '打开页面：' + (a.args.url || '');
     return a.tool;
   }

@@ -510,6 +510,13 @@
     try { if (window.parent !== window) window.parent.postMessage({ type: 'nanoKeyboardQuery' }, '*'); } catch (err) {}
     try { if (window.visualViewport) localKb = Math.max(0, Math.round(window.innerHeight - window.visualViewport.height)); } catch (err) {}
     apply();
+    // iOS：键盘弹起后把输入框滚进可视区，避免被半透明键盘/底部栏压住看不到字
+    try {
+      var ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable) && ae.scrollIntoView) {
+        ae.scrollIntoView({ block: 'nearest' });
+      }
+    } catch (err) {}
   }
   document.addEventListener('focusin', function (e) {
     if (!isField(e.target)) return;

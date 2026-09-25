@@ -39,6 +39,54 @@
         });
     }
 
+    // ===== 纳米助手自愈：开关开着但角色行丢了就补回来（切换页面后不会“不见了”） =====
+    var NANO_ID = 'nano_ai';
+    var NANO_AVATAR = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">' +
+        '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9ecb"/><stop offset="1" stop-color="#ff4d94"/></linearGradient></defs>' +
+        '<rect width="80" height="80" rx="20" fill="url(#g)"/>' +
+        '<rect x="18" y="24" width="44" height="34" rx="12" fill="#fff" opacity="0.95"/>' +
+        '<circle cx="32" cy="41" r="4.5" fill="#ff4d94"/><circle cx="48" cy="41" r="4.5" fill="#ff4d94"/>' +
+        '<rect x="38" y="12" width="4" height="10" rx="2" fill="#fff"/><circle cx="40" cy="11" r="4" fill="#fff"/></svg>');
+    var nanoHealedOnce = false;
+    function ensureNanoCharacterExists() {
+        if (nanoHealedOnce) return Promise.resolve();
+        nanoHealedOnce = true;
+        var on = false;
+        try { on = localStorage.getItem('nano_assistant_enabled') === '1'; } catch (e) {}
+        if (!on) return Promise.resolve();
+        return new Promise(function(resolve) {
+            try {
+                var req = indexedDB.open('nano_characters_db', 1);
+                req.onupgradeneeded = function(e) {
+                    try {
+                        var d = e.target.result;
+                        if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' });
+                    } catch (err) {}
+                };
+                req.onsuccess = function() {
+                    try {
+                        var db = req.result;
+                        var tx = db.transaction('characters', 'readwrite');
+                        var store = tx.objectStore('characters');
+                        var g = store.get(NANO_ID);
+                        g.onsuccess = function() {
+                            var ex = g.result;
+                            if (!ex) {
+                                store.put({ id: NANO_ID, name: '纳米', avatar: NANO_AVATAR, gender: '女', nationality: '中国', setting: '', bindUser: '', isNpc: true, worldbookBindings: [], nanoAssistant: true });
+                            } else if (!ex.nanoAssistant) {
+                                ex.nanoAssistant = true; ex.isNpc = true; store.put(ex);
+                            }
+                        };
+                        tx.oncomplete = function() { db.close(); resolve(); };
+                        tx.onerror = function() { db.close(); resolve(); };
+                    } catch (err) { resolve(); }
+                };
+                req.onerror = function() { resolve(); };
+            } catch (e) { resolve(); }
+        });
+    }
+
     // ===== 获取某个聊天的最新消息 =====
     function getLastMessage(chatId) {
         try {
@@ -493,6 +541,7 @@
     // ===== 渲染聊天列表（改为异步） =====
     async function renderChatList() {
         const currentUser = getCurrentUser();
+        await ensureNanoCharacterExists();
         const allChars = await getCharacters();
         const groups = loadGroups();
 

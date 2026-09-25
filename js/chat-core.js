@@ -3017,6 +3017,15 @@
     let emojiData = null;
     let currentEmojiGroupId = null;
 
+    // 纳米助手新增表情包后，清掉缓存，下次打开表情面板即可看到
+    try {
+        window.addEventListener('nanoEmojiUpdated', function () { emojiData = null; });
+        window.addEventListener('message', function (e) {
+            var d = e.data;
+            if (d && (d.type === 'nanoEmojiUpdated' || d.type === 'emojiDataUpdated')) emojiData = null;
+        });
+    } catch (e) {}
+
     function getEmojiData() {
         return new Promise(function(resolve) {
             try {
@@ -4111,14 +4120,32 @@
         function code() { return (a.tool === 'apply_beautify' && a.args && a.args.css) || ''; }
         function persist() { try { if (msg) { if (!Array.isArray(msg.nanoActions)) msg.nanoActions = []; saveMessages(); } } catch (e) {} }
         function paint() {
-            if (a.status === 'done') { box.innerHTML = '<div class="nano-action-title">✓ ' + nanoEsc(title()) + ' 已执行</div>'; return; }
-            if (a.status === 'failed') { box.innerHTML = '<div class="nano-action-title" style="color:#ff3b30">✗ 失败：' + nanoEsc(a.error || '') + '</div>'; return; }
             var css = code();
-            box.innerHTML = '<div class="nano-action-title">' + nanoEsc(title()) + '</div>'
-                + (css ? '<div class="nano-action-desc">' + nanoEsc(css) + '</div>' : '')
+            var done = a.status === 'done';
+            var failed = a.status === 'failed';
+            var busy = a.status === 'running';
+            var head = busy ? '执行中…'
+                : (failed ? ('✗ 失败：' + (a.error || ''))
+                : (done ? ('✓ ' + title() + ' 已执行') : title()));
+            var collapsed = done || failed;
+            box.innerHTML = '<div class="nano-action-title' + (done ? ' done' : '') + (failed ? ' failed' : '') + '">'
+                + nanoEsc(head)
+                + (css ? ' <span class="nano-expand">' + (collapsed ? '展开' : '收起') + '</span>' : '')
+                + '</div>'
+                + (css ? '<div class="nano-action-desc"' + (collapsed ? ' hidden' : '') + '>' + nanoEsc(css) + '</div>' : '')
                 + '<div class="nano-action-btns">'
                 + (css ? '<button class="nano-copy">复制</button>' : '')
-                + '<button class="nano-skip">取消</button><button class="nano-run">立即执行</button></div>';
+                + '<button class="nano-skip">' + (done ? '移除' : '取消') + '</button>'
+                + '<button class="nano-run">' + (failed ? '重试' : (done ? '重新执行' : '立即执行')) + '</button>'
+                + '</div>';
+            var exp = box.querySelector('.nano-expand');
+            if (exp) exp.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var desc = box.querySelector('.nano-action-desc');
+                if (!desc) return;
+                desc.hidden = !desc.hidden;
+                exp.textContent = desc.hidden ? '展开' : '收起';
+            });
             var cp = box.querySelector('.nano-copy');
             if (cp) cp.addEventListener('click', function () {
                 var ok = function () { cp.textContent = '已复制'; setTimeout(function () { cp.textContent = '复制'; }, 1500); };
@@ -4138,17 +4165,15 @@
                 a.status = 'dismissed'; box.remove(); persist();
             });
             box.querySelector('.nano-run').addEventListener('click', async function () {
-                box.innerHTML = '<div class="nano-action-title">执行中…</div>';
+                a.status = 'running'; a.error = ''; paint();
                 try {
                     await window.NanoAssistant.execAction(a);
-                    a.status = 'done'; a.error = '';
-                    persist();
-                    box.innerHTML = '<div class="nano-action-title">✓ ' + nanoEsc(title()) + ' 已执行</div>';
+                    a.status = 'done';
                 } catch (e) {
                     a.status = 'failed'; a.error = String((e && e.message) || e);
-                    persist();
-                    box.innerHTML = '<div class="nano-action-title" style="color:#ff3b30">✗ 失败：' + nanoEsc(a.error) + '</div>';
                 }
+                persist();
+                paint();
             });
         }
         paint();
