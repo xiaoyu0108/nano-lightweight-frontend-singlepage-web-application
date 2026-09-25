@@ -18,7 +18,7 @@
     lines.push('4. 你不能新增页面或改后端逻辑；这类需求要告诉用户需要开发者改源码并重新部署。');
     lines.push('5. 回复尽量简短：先给结论，再给必要步骤。除非用户要求，不要长篇大论。');
     lines.push('6. 做美化/世界书这类修改时【不要读源码】：知识库里已有足够的选择器，直接用即可，并输出 <action> 块。只有用户明确问"这个功能在哪个文件、源码怎么改"时，才 use read_file。');
-    lines.push('7. 需要修改时必须真的输出 <action> 块，绝不要只说"点击下方按钮"却不给 action。');
+    lines.push('7. 需要修改时必须真的输出 <action> 块：只有输出了 <action>，界面才会出现「复制 / 立即执行」按钮。绝不要只说"点击下方按钮 / 已为你改好"却不给 action。如果暂时不确定选择器，就先问清楚，不要假装已经改好。');
     lines.push('');
     lines.push('【执行动作的方式】');
     lines.push('需要真正修改时，在回复里输出代码块（用户会看到确认按钮，确认后才生效）：');
@@ -41,7 +41,8 @@
     lines.push('');
     lines.push('【世界书条目字段】' + (KB.worldbookEntryFields || []).join(', '));
     lines.push('');
-    lines.push('写 CSS 时直接给完整可用的 CSS（用上面的选择器即可，不要为了美化去读源码）。');
+    lines.push('写 CSS 时直接给完整可用的 CSS（用上面的选择器即可，不要为了美化去读源码）。css 字段里可以带换行，直接写多行 CSS 即可。');
+    lines.push('每次要修改样式，都必须：①用一两句话说明你要改什么；②输出一个 <action> 块，css 字段放完整可复制的代码。');
     try {
       var extra = (localStorage.getItem('nano_builtin_prompt') || '').trim();
       if (extra) lines.push('\n【用户自定义内置要求（必须遵守）】\n' + extra);
@@ -49,14 +50,78 @@
     return lines.join('\n');
   }
 
+  // 模型经常把 CSS 里的换行直接写进 JSON 字符串（非法 JSON），这里做容错修复
+  function repairJson(s) {
+    s = String(s || '');
+    var out = '', inStr = false, esc = false;
+    for (var i = 0; i < s.length; i++) {
+      var ch = s[i];
+      if (esc) { out += ch; esc = false; continue; }
+      if (ch === '\\') { out += ch; esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; out += ch; continue; }
+      if (inStr) {
+        if (ch === '\n') { out += '\\n'; continue; }
+        if (ch === '\r') { continue; }
+        if (ch === '\t') { out += '\\t'; continue; }
+      }
+      out += ch;
+    }
+    return out.replace(/,\s*([}\]])/g, '$1');
+  }
+  function firstJsonObject(s) {
+    s = String(s || '');
+    var start = s.indexOf('{');
+    if (start < 0) return null;
+    var depth = 0, inStr = false, esc = false;
+    for (var i = start; i < s.length; i++) {
+      var ch = s[i];
+      if (esc) { esc = false; continue; }
+      if (ch === '\\') { esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) return s.slice(start, i + 1); }
+    }
+    return s.slice(start);
+  }
+  function normalizeAction(o) {
+    if (!o || typeof o !== 'object') return null;
+    var tool = o.tool || o.action || o.name;
+    if (!tool) return null;
+    var args = o.args;
+    if (!args || typeof args !== 'object') {
+      args = {};
+      var skip = { tool: 1, action: 1, name: 1, args: 1 };
+      Object.keys(o).forEach(function (k) { if (!skip[k]) args[k] = o[k]; });
+    }
+    return { tool: String(tool), args: args };
+  }
+  function parseActionJson(json) {
+    var raw = String(json || '').trim()
+      .replace(/^```(?:json|xml|javascript)?/i, '').replace(/```$/, '').trim();
+    var candidates = [raw, repairJson(raw)];
+    var obj = firstJsonObject(raw);
+    if (obj) { candidates.push(obj); candidates.push(repairJson(obj)); }
+    for (var i = 0; i < candidates.length; i++) {
+      try {
+        var o = JSON.parse(candidates[i]);
+        var n = normalizeAction(o);
+        if (n) return n;
+      } catch (e) {}
+    }
+    return null;
+  }
   function parseActions(text) {
     var actions = [];
-    function push(json) {
-      try { var o = JSON.parse(String(json).trim()); if (o && o.tool) actions.push(o); } catch (e) {}
-    }
+    function push(json) { var o = parseActionJson(json); if (o) actions.push(o); }
     var clean = String(text || '').replace(/<action>([\s\S]*?)<\/action>/g, function (_, json) { push(json); return ''; });
-    // 兼容模型用 ```json {...} ``` 包裹动作的情况
-    clean = clean.replace(/```(?:json)?\s*(\{[\s\S]*?"tool"[\s\S]*?\})\s*```/g, function (_, json) { push(json); return ''; });
+    // 兼容模型用 ```json {...} ``` / ``` {...} ``` 包裹动作的情况
+    clean = clean.replace(/```[a-zA-Z]*\s*([\s\S]*?)```/g, function (_, block) {
+      if (!/"tool"|'tool'|"action"|'action'/.test(block)) return _;
+      var obj = firstJsonObject(block);
+      if (obj) { push(obj); return ''; }
+      return _;
+    });
     return { clean: clean.trim(), actions: actions };
   }
 

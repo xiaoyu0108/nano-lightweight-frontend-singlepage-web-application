@@ -125,6 +125,27 @@
     renderRecords(msgs);
   }
 
+  /* ---------- 返回 ---------- */
+  function goBack() {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'closeFullscreen' }, '*');
+      } else if (history.length > 1) {
+        history.back();
+      } else {
+        location.href = 'chat.html';
+      }
+    } catch (e) {}
+  }
+  var nsBackBtn = $('nsBack');
+  if (nsBackBtn) nsBackBtn.addEventListener('click', goBack);
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'pageLoaded', page: 'nano_setting' }, '*');
+      window.parent.postMessage({ type: 'setTitle', title: '纳米设置' }, '*');
+    }
+  } catch (e) {}
+
   /* ---------- 交互 ---------- */
   function compress(file) {
     return new Promise(function (res) {

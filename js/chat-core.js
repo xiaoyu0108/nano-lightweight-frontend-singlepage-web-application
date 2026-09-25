@@ -938,7 +938,8 @@
                         translation: msg.translation || null,
                         imageData: msg.imageData ? { textImage: msg.imageData.textImage, url: msg.imageData.url, desc: msg.imageData.desc, emojiName: msg.imageData.emojiName } : null,
                         think: msg.think || null,
-                        recalled: msg.recalled || false
+                        recalled: msg.recalled || false,
+                        nanoActions: (msg.nanoActions && msg.nanoActions.length) ? msg.nanoActions : null
                     };
                 });
                 localStorage.setItem(getStorageKey(), JSON.stringify(copy));
@@ -955,7 +956,8 @@
                             isVoice: msg.isVoice || false,
                             cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
                             think: msg.think || null,
-                            recalled: msg.recalled || false
+                            recalled: msg.recalled || false,
+                            nanoActions: (msg.nanoActions && msg.nanoActions.length) ? msg.nanoActions : null
                         };
                     });
                     localStorage.setItem(getStorageKey(), JSON.stringify(fallback));
@@ -1935,6 +1937,14 @@
             if (transcript !== undefined) existing.transcript = transcript;
             if (translation !== undefined) existing.translation = translation;
             if (thinkText && !existing.think) existing.think = thinkText;
+        }
+
+        // 纳米助手确认卡：跟随消息持久化，重渲染（新消息/刷新）后依然显示
+        if (isNanoChat && type === 'left' && existing && Array.isArray(existing.nanoActions)) {
+            existing.nanoActions.forEach(function (a) {
+                if (!a || a.status === 'dismissed') return;
+                try { content.appendChild(makeNanoActionCard(a, existing)); } catch (e) {}
+            });
         }
 
         // 左滑直接引用（清理旧的 hide 逻辑）
@@ -4079,40 +4089,83 @@
     }
 
     // ===== 纳米助手：把模型回复里的 <action> 解析成确认卡并执行 =====
+    function nanoEsc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    // 注意：addMessage 返回的 row 在 renderMessages() 重建后已经脱离 DOM，
+    // 必须按消息 id 找回当前真正挂在页面上的那一行，否则确认卡会挂到废弃节点上（用户看不到）。
     function nanoAttachTo(row) {
-        if (row && row.querySelector && row.querySelector('.message-content')) return row.querySelector('.message-content');
+        var id = row && row.dataset && row.dataset.id;
+        if (id) {
+            var live = messageContainer.querySelector('.message-row[data-id="' + id + '"] .message-content');
+            if (live) return live;
+        }
         var rows = messageContainer.querySelectorAll('.message-row.left');
         var last = rows[rows.length - 1];
         return last ? last.querySelector('.message-content') : null;
     }
-    function renderNanoAction(a, row) {
-        var host = nanoAttachTo(row);
-        if (!host) return;
+    function makeNanoActionCard(a, msg) {
         var box = document.createElement('div');
         box.className = 'nano-action';
-        var copyBtn = (a.tool === 'apply_beautify' && a.args && a.args.css) ? '<button class="nano-copy">复制</button>' : '';
-        box.innerHTML = '<div class="nano-action-title">' + (window.NanoAssistant.actionTitle(a) || a.tool) + '</div>'
-            + (a.tool === 'apply_beautify' ? '<div class="nano-action-desc">' + String((a.args && a.args.css) || '').slice(0, 400).replace(/</g, '&lt;') + '</div>' : '')
-            + '<div class="nano-action-btns">' + copyBtn + '<button class="nano-skip">取消</button><button class="nano-run">立即执行</button></div>';
-        host.appendChild(box);
-        var cp = box.querySelector('.nano-copy');
-        if (cp) cp.addEventListener('click', function () {
-            var code = (a.args && a.args.css) || '';
-            try {
-                if (navigator.clipboard) navigator.clipboard.writeText(code).then(function(){ cp.textContent = '已复制'; }, function(){ cp.textContent = '复制失败'; });
-                else { cp.textContent = code; cp.select && cp.select(); }
-            } catch (e) { cp.textContent = '复制失败'; }
-            setTimeout(function () { cp.textContent = '复制'; }, 1500);
-        });
-        box.querySelector('.nano-skip').addEventListener('click', function () { box.remove(); });
-        box.querySelector('.nano-run').addEventListener('click', async function () {
-            try {
-                await window.NanoAssistant.execAction(a);
-                box.innerHTML = '<div class="nano-action-title">✓ ' + (window.NanoAssistant.actionTitle(a) || '') + ' 已执行</div>';
-            } catch (e) {
-                box.innerHTML = '<div class="nano-action-title" style="color:#ff3b30">✗ 失败：' + String(e.message || e).replace(/</g, '&lt;') + '</div>';
-            }
-        });
+        function title() { try { return window.NanoAssistant.actionTitle(a) || a.tool; } catch (e) { return a.tool || '动作'; } }
+        function code() { return (a.tool === 'apply_beautify' && a.args && a.args.css) || ''; }
+        function persist() { try { if (msg) { if (!Array.isArray(msg.nanoActions)) msg.nanoActions = []; saveMessages(); } } catch (e) {} }
+        function paint() {
+            if (a.status === 'done') { box.innerHTML = '<div class="nano-action-title">✓ ' + nanoEsc(title()) + ' 已执行</div>'; return; }
+            if (a.status === 'failed') { box.innerHTML = '<div class="nano-action-title" style="color:#ff3b30">✗ 失败：' + nanoEsc(a.error || '') + '</div>'; return; }
+            var css = code();
+            box.innerHTML = '<div class="nano-action-title">' + nanoEsc(title()) + '</div>'
+                + (css ? '<div class="nano-action-desc">' + nanoEsc(css) + '</div>' : '')
+                + '<div class="nano-action-btns">'
+                + (css ? '<button class="nano-copy">复制</button>' : '')
+                + '<button class="nano-skip">取消</button><button class="nano-run">立即执行</button></div>';
+            var cp = box.querySelector('.nano-copy');
+            if (cp) cp.addEventListener('click', function () {
+                var ok = function () { cp.textContent = '已复制'; setTimeout(function () { cp.textContent = '复制'; }, 1500); };
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(css).then(ok, function () { cp.textContent = '复制失败'; });
+                    } else {
+                        var ta = document.createElement('textarea');
+                        ta.value = css; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                        document.body.appendChild(ta); ta.select();
+                        try { document.execCommand('copy'); ok(); } catch (e) { cp.textContent = '复制失败'; }
+                        ta.remove();
+                    }
+                } catch (e) { cp.textContent = '复制失败'; }
+            });
+            box.querySelector('.nano-skip').addEventListener('click', function () {
+                a.status = 'dismissed'; box.remove(); persist();
+            });
+            box.querySelector('.nano-run').addEventListener('click', async function () {
+                box.innerHTML = '<div class="nano-action-title">执行中…</div>';
+                try {
+                    await window.NanoAssistant.execAction(a);
+                    a.status = 'done'; a.error = '';
+                    persist();
+                    box.innerHTML = '<div class="nano-action-title">✓ ' + nanoEsc(title()) + ' 已执行</div>';
+                } catch (e) {
+                    a.status = 'failed'; a.error = String((e && e.message) || e);
+                    persist();
+                    box.innerHTML = '<div class="nano-action-title" style="color:#ff3b30">✗ 失败：' + nanoEsc(a.error) + '</div>';
+                }
+            });
+        }
+        paint();
+        return box;
+    }
+    function renderNanoAction(a, row) {
+        var msg = null;
+        var id = row && row.dataset && row.dataset.id;
+        if (id) msg = messages.find(function (m) { return m.id === id; }) || null;
+        if (msg) {
+            if (!Array.isArray(msg.nanoActions)) msg.nanoActions = [];
+            msg.nanoActions.push(a);
+            try { saveMessages(); } catch (e) {}
+        }
+        var host = nanoAttachTo(row);
+        if (!host) return;
+        host.appendChild(makeNanoActionCard(a, msg));
     }
     function renderNanoContinue(row, extraContext) {
         var host = nanoAttachTo(row);
