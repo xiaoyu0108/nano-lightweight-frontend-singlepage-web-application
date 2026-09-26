@@ -7,7 +7,7 @@ input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
 input[type=number] { -moz-appearance: textfield !important; appearance: textfield !important; }
 html, body {
-    width: 100%; height: 100%; height: 100dvh; overflow: hidden;
+    width: 100%; height: 100%; overflow: hidden;
     background: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;

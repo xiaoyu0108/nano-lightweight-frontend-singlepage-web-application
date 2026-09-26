@@ -31,8 +31,6 @@
         html, body {
             width: 100%;
             height: 100vh;
-            /* iOS Safari：100vh 会延伸到浏览器底栏后面，dvh 才是真正可见高度 */
-            height: 100dvh;
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -43,7 +41,6 @@
         .app-container {
             width: 100%;
             height: 100vh;
-            height: 100dvh;
             margin: 0;
             background: transparent;
             padding: 0 16px 0 16px;
@@ -218,7 +215,6 @@
             left: 0;
             width: 100%;
             height: 100vh;
-            height: 100dvh;
             background: #ffffff;
             z-index: 100;
             display: none;
@@ -239,7 +235,6 @@
             max-width: 430px;
             margin: 0 auto;
             height: 100vh;
-            height: 100dvh;
             display: flex;
             flex-direction: column;
         }
@@ -1063,6 +1058,15 @@
 
         function showChatInnerFrame() {
             chatInnerFrame.style.display = 'block';
+            // 回到单聊时让内页重读一遍已保存的美化（含头像框），避免实时广播漏掉时样式不生效
+            try {
+                var _cw = chatInnerFrame.contentWindow;
+                if (_cw) {
+                    var _ping = function () { try { _cw.postMessage({ type: 'beautify:refresh' }, '*'); } catch (e) {} };
+                    setTimeout(_ping, 80);
+                    setTimeout(_ping, 420);
+                }
+            } catch (e) {}
             overlayFrame.style.display = 'none';
             hideOtherGenericFrame();
             voiceCallFrame.style.display = 'none';
@@ -1218,11 +1222,14 @@
         try { if (window.visualViewport) window.visualViewport.addEventListener('resize', applySafeTopToFrames); } catch (e) {}
         setTimeout(applySafeTopToFrames, 300);
 
+        // 构建版本号（改这里即可让所有同源页面刷新缓存）
+        var BUILD = 'nano-2026-09-26-02';
+
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
             try {
-                if (!u || /^(https?:|blob:|data:|about:)/i.test(u)) return u;
-                var b = (typeof BUILD !== 'undefined' && BUILD) ? BUILD : '';
+                if (!u || /^(https?:|blob:|data:|about:|file:)/i.test(u)) return u;
+                var b = BUILD || '';
                 if (!b) return u;
                 return u + (u.indexOf('?') === -1 ? '?' : '&') + 'nb=' + encodeURIComponent(b);
             } catch (e) { return u; }
@@ -2881,7 +2888,6 @@
 
     // ===== 版本自愈：构建号变化时注销旧 SW、清缓存并刷新一次（解决 iOS PWA 不更新） =====
     (function nanoSelfHeal() {
-        var BUILD = 'nano-2026-09-25-16';
         var changed = false;
         try {
             changed = localStorage.getItem('nano_build') !== BUILD;

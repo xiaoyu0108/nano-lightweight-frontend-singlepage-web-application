@@ -2195,8 +2195,7 @@ function togglePreview(target) {
   if (!frame) return;
   const needSrc = !frame.getAttribute('src');
   if (needSrc) {
-    // 预览统一用静态示例页（不加载真实联系人/聊天），data-src 在 beautify.html 上配置
-    const src = frame.getAttribute('data-src') || (target === 'chat' ? 'preview-chat.html' : 'preview-global.html');
+    const src = target === 'chat' ? previewChatUrl() : (frame.getAttribute('data-src') || 'index.html');
     frame.setAttribute('src', src);
   }
   if (!meta.bound) {
@@ -2240,11 +2239,17 @@ function buildAvatarCss() {
     scale = Math.max(0, Math.min(60, scale));
     const inset = -scale;
     const url = frame.replace(/"/g, '%22').replace(/\)/g, '%29');
-    css += '.message-avatar,.topbar-avatar,.typing-indicator .ti-avatar{overflow:visible !important;position:relative;}'
+    // 注意：老 iOS WebView 对 inset / background 简写支持不全，这里全用长写 + 逐边偏移，兼容性最好
+    css += '.message-avatar,.topbar-avatar,.typing-indicator .ti-avatar{overflow:visible !important;position:relative !important;}'
       + '.message-avatar img,.topbar-avatar img,.typing-indicator .ti-avatar img{border-radius:inherit !important;}'
       + '.message-avatar::after,.topbar-avatar::after,.typing-indicator .ti-avatar::after{'
-      + 'content:"" !important;position:absolute;inset:' + inset + '%;'
-      + 'background:url("' + url + '") center/contain no-repeat;pointer-events:none;z-index:6;}';
+      + 'content:"" !important;position:absolute !important;'
+      + 'top:' + inset + '% !important;right:' + inset + '% !important;bottom:' + inset + '% !important;left:' + inset + '% !important;'
+      + 'background-image:url("' + url + '") !important;'
+      + 'background-position:center center !important;'
+      + 'background-size:contain !important;'
+      + 'background-repeat:no-repeat !important;'
+      + 'pointer-events:none !important;z-index:9 !important;}';
   }
   return css;
 }

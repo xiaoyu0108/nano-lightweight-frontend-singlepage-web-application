@@ -101,16 +101,18 @@
         if (f && f.parentNode) f.parentNode.appendChild(f);
         var g = getEl('nano-beautify-global');
         if (g && g.parentNode) g.parentNode.appendChild(g);
+        // 头像样式始终放最后，保证头像框不被聊天/全局 CSS 盖掉
+        var a = getEl('nano-beautify-chat-avatar');
+        if (a && a.parentNode) a.parentNode.appendChild(a);
     }
 
     // 头像「方圆 / 大小」调节（美化页滑杆生成，作用聊天内页；优先级高于聊天 CSS）
     function applyChatAvatarCss(css) {
         if (!isChatInterior) return;
         applyStyle('nano-beautify-chat-avatar', css || '');
-        var c = getEl('nano-beautify-chat');
-        if (c && c.parentNode) c.parentNode.appendChild(c);
-        var g = getEl('nano-beautify-global');
-        if (g && g.parentNode) g.parentNode.appendChild(g);
+        // 头像样式必须放在最后，优先级高于聊天 CSS / 全局 CSS，否则头像框会被后面的样式盖掉
+        var a = getEl('nano-beautify-chat-avatar');
+        if (a && a.parentNode) a.parentNode.appendChild(a);
     }
 
     function readCss(key) {
@@ -383,6 +385,12 @@
         if (d && d.type && window.__nanoAppearance) {
             window.__nanoAppearance.applyMessage(d);
         }
+    });
+
+    // 页面重新可见 / 从后台恢复时，重读一次已保存美化，确保头像框等样式不丢
+    window.addEventListener('pageshow', function() { try { applySaved(); } catch (e) {} });
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) { try { applySaved(); } catch (e) {} }
     });
 
     if (document.readyState === 'loading') {

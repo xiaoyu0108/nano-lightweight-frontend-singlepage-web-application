@@ -38,9 +38,9 @@
 <div class="tools"><button class="tool" data-clear="global">清空</button><button class="tool" data-restore="global">还原</button><button class="tool" data-copy="global">复制初始</button><button class="tool apply" data-apply="global">应用</button></div>
 <div class="live-preview" id="globalPreviewCard">
 <div class="lp-head" data-lp="global" role="button" tabindex="0" aria-expanded="false">
-<span class="lp-title">全局预览</span><span class="lp-sub">样式示例 · 点开查看</span><span class="lp-caret">▾</span>
+<span class="lp-title">全局预览</span><span class="lp-sub">真实页面 · 点开查看</span><span class="lp-caret">▾</span>
 </div>
-<div class="lp-body"><iframe class="lp-frame" id="globalPreviewFrame" data-target="global" data-src="preview-global.html" loading="lazy" title="全局预览"></iframe></div>
+<div class="lp-body"><iframe class="lp-frame" id="globalPreviewFrame" data-target="global" data-src="index.html" loading="lazy" title="全局预览"></iframe></div>
 <span id="globalPreview" style="display:none"></span>
 </div>
 <div class="group"><div class="labelrow"><span class="label">预设</span></div><div class="presetrow"><select id="globalPreset"></select><button class="delete" data-delete="global" aria-label="删除">
@@ -69,9 +69,9 @@
 </div>
 <div class="live-preview" id="chatPreviewCard">
 <div class="lp-head" data-lp="chat" role="button" tabindex="0" aria-expanded="false">
-<span class="lp-title">聊天预览</span><span class="lp-sub">单聊 / 群聊样式示例 · 点开查看</span><span class="lp-caret">▾</span>
+<span class="lp-title">聊天预览</span><span class="lp-sub">真实页面 · 点开查看</span><span class="lp-caret">▾</span>
 </div>
-<div class="lp-body"><iframe class="lp-frame" id="chatPreviewFrame" data-target="chat" data-src="preview-chat.html" loading="lazy" title="聊天预览"></iframe></div>
+<div class="lp-body"><iframe class="lp-frame" id="chatPreviewFrame" data-target="chat" data-src="chat_inner.html" loading="lazy" title="聊天预览"></iframe></div>
 <span id="chatPreview" style="display:none"></span>
 </div>
 <div class="group"><div class="labelrow"><span class="label">预设</span></div><div class="presetrow"><select id="chatPreset"></select><button class="delete" data-delete="chat" aria-label="删除">
@@ -129,7 +129,7 @@
 
 <script src="js/nano-global-template.js"></script>
 <script src="js/nano-chat-template.js"></script>
-<script src="js/beautify.js"></script>
+<script src="js/beautify.js?v=20260926b"></script>
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>
 </body>
