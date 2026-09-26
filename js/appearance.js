@@ -120,6 +120,46 @@
         bringAvatarToFront();
         // 强制一次重排：应用美化模板后 iOS Safari 才会重新合成、显示头像框
         try { void (document.body && document.body.offsetHeight); } catch (e) {}
+        enforceAvatarOverflow();
+    }
+
+    // 关键：聊天模板/预设几乎都会给 .message-avatar 写 overflow:hidden，
+    // 一旦应用美化的时机晚于首次绘制，iOS Safari 会把头像框（::after）裁掉。
+    // 这里直接用「行内 !important」把每个头像的 overflow 钉成 visible —— 行内优先级最高，
+    // 任何样式表（含 !important）都盖不掉，彻底解决手机端应用美化后头像框消失。
+    function hasAvatarFrame() {
+        var a = getEl('nano-beautify-chat-avatar');
+        return !!(a && a.textContent && a.textContent.indexOf('::after') !== -1);
+    }
+    function enforceAvatarOverflow() {
+        if (!isChatInterior) return;
+        var nodes;
+        try { nodes = document.querySelectorAll('.message-avatar, .typing-indicator .ti-avatar'); } catch (e) { return; }
+        var on = hasAvatarFrame();
+        for (var i = 0; i < nodes.length; i++) {
+            try {
+                if (on) {
+                    nodes[i].style.setProperty('overflow', 'visible', 'important');
+                    nodes[i].style.setProperty('position', 'relative', 'important');
+                } else {
+                    // 没有头像框时恢复默认裁剪，避免残留行内样式导致头像不圆
+                    nodes[i].style.removeProperty('overflow');
+                    nodes[i].style.removeProperty('position');
+                }
+            } catch (e) {}
+        }
+    }
+
+    var _avatarObserver = null;
+    function watchAvatars() {
+        if (!isChatInterior || _avatarObserver || typeof MutationObserver === 'undefined') return;
+        var scheduled = false;
+        _avatarObserver = new MutationObserver(function () {
+            if (scheduled) return;
+            scheduled = true;
+            setTimeout(function () { scheduled = false; enforceAvatarOverflow(); }, 60);
+        });
+        try { _avatarObserver.observe(document.body || document.documentElement, { childList: true, subtree: true }); } catch (e) {}
     }
 
     function readCss(key) {
@@ -329,6 +369,8 @@
         // 最后再确保头像样式在最后（有些注入会插到它后面）
         try { bringAvatarToFront(); } catch (e) {}
         try { void (document.body && document.body.offsetHeight); } catch (e) {}
+        // 把每个头像的 overflow 钉成 visible（行内 !important），并监听后续新消息
+        try { enforceAvatarOverflow(); watchAvatars(); } catch (e) {}
         var cfg = readFontCfgSync();
         if (cfg) {
             applyFontCfg(cfg);
