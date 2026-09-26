@@ -20,7 +20,8 @@
     lines.push('6. 做美化/世界书这类修改时【不要读源码】：知识库里已有足够的选择器，直接用即可，并输出 <action> 块。只有用户明确问"这个功能在哪个文件、源码怎么改"时，才 use read_file。');
     lines.push('7. 需要修改时必须真的输出 <action> 块：只有输出了 <action>，界面才会出现「复制 / 立即执行」按钮。绝不要只说"点击下方按钮 / 已为你改好"却不给 action。如果暂时不确定选择器，就先问清楚，不要假装已经改好。');
     lines.push('8. 用户发来"表情包 / 图片清单"（一般是「名字：图片链接」的形式）并要求加入表情包时，必须用 add_emoji，绝对不要用 add_worldbook。只有用户明确说要"世界书/设定"时才用 add_worldbook。');
-    lines.push('9. 每次 apply_beautify 都会自动存成一个「可切换的预设」（在对应美化页里能选），所以 name 要起一个简短好认的名字，方便用户之后切换。');
+    lines.push('9. 每次 apply_beautify 都会自动存成一个「可切换的预设」（在对应美化页里能选），所以 name 要起一个简短好认的名字，方便用户之后切换。若用户说「改我那个叫 XX 的预设」，就把 name 填成 XX —— 同名会直接更新那个预设，不会再多出一个。');
+    lines.push('10. 用户让你「用我刚发的图当头像/换成我发的这张」时，用 set_avatar（args:{"useLast":true}），不要用 apply_beautify 硬套图片地址（iOS 上本地图片地址塞进 CSS/JSON 会失效）。');
     lines.push('');
     lines.push('【执行动作的方式】');
     lines.push('需要真正修改时，在回复里输出代码块（用户会看到确认按钮，确认后才生效）：');
@@ -160,24 +161,68 @@
   function broadcast(target, css) {
     try { window.parent.postMessage({ type: 'beautify:apply', target: target, css: css }, '*'); } catch (e) {}
   }
+  // 同名预设直接覆盖（更新），不存在才新建 —— 这样用户说「改我的某个预设」时，
+  // 纳米是修改那一个预设，而不是每问一次就多出一个新预设。
   function savePreset(category, name, code) {
     try {
-      var req = indexedDB.open('BeautifyAppDB');
+      var req = indexedDB.open('BeautifyAppDB', 1);
       req.onupgradeneeded = function (e) {
         var d = e.target.result;
+        // 和 beautify.js 保持一致，两个 store 都要建，否则先由纳米创建库时美化页会缺 settings
         if (!d.objectStoreNames.contains('presets')) d.createObjectStore('presets', { keyPath: 'id', autoIncrement: true });
+        if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'key' });
       };
       req.onsuccess = function () {
         var db = req.result;
         try {
           if (!db.objectStoreNames.contains('presets')) { db.close(); return; }
           var tx = db.transaction('presets', 'readwrite');
-          tx.objectStore('presets').put({ category: category, name: name || '纳米预设', code: code, createdAt: Date.now() });
+          var store = tx.objectStore('presets');
+          var name2 = name || '纳米预设';
+          var all = store.getAll();
+          all.onsuccess = function () {
+            var list = all.result || [];
+            var found = null;
+            for (var i = 0; i < list.length; i++) {
+              if (list[i] && list[i].category === category && list[i].name === name2) { found = list[i]; break; }
+            }
+            if (found) { found.code = code; found.updatedAt = Date.now(); store.put(found); }
+            else store.put({ category: category, name: name2, code: code, createdAt: Date.now() });
+          };
           tx.oncomplete = function () { db.close(); };
           tx.onerror = function () { db.close(); };
         } catch (e) { try { db.close(); } catch (err) {} }
       };
     } catch (e) {}
+  }
+
+  // 心声预设存在它自己的库（NanoVoiceDB/templates），必须写这里，心声面板下拉才会出现该预设。
+  // 之前 apply_beautify(scope:'heart') 只写 BeautifyAppDB，所以用户「加了预设却看不到」。
+  function saveHeartTemplate(name, css) {
+    return new Promise(function (resolve) {
+      try {
+        var req = indexedDB.open('NanoVoiceDB', 1);
+        req.onupgradeneeded = function (e) {
+          var d = e.target.result;
+          if (!d.objectStoreNames.contains('templates')) d.createObjectStore('templates', { keyPath: 'id' });
+        };
+        req.onsuccess = function () {
+          var db = req.result;
+          try {
+            var tx = db.transaction('templates', 'readwrite');
+            var store = tx.objectStore('templates');
+            var key = 'nano_' + String(name || '纳米预设');
+            var g = store.get(key);
+            g.onsuccess = function () {
+              store.put({ id: key, name: String(name || '纳米预设'), css: css });
+            };
+            tx.oncomplete = function () { db.close(); resolve(true); };
+            tx.onerror = function () { db.close(); resolve(false); };
+          } catch (e) { try { db.close(); } catch (err) {} resolve(false); }
+        };
+        req.onerror = function () { resolve(false); };
+      } catch (e) { resolve(false); }
+    });
   }
   function dbExists(name) {
     return new Promise(function (res) {
@@ -323,6 +368,67 @@
     await saveWorldbookData(data);
     return file;
   }
+  // 把当前聊天角色（chat_inner?chat=角色id）的头像写进角色库，真正做到「换头像」。
+  // 之前没有这个能力，所以 iOS 上发图给纳米后它只能说「做了」却执行不出效果。
+  function getChatId() {
+    try { return new URLSearchParams(location.search).get('chat') || NANO_ID; } catch (e) { return NANO_ID; }
+  }
+  function setCharacterAvatar(chatId, url) {
+    return new Promise(function (resolve, reject) {
+      if (!url) { reject(new Error('缺少头像地址（没找到可用的图片）')); return; }
+      try {
+        var req = indexedDB.open('nano_characters_db');
+        req.onupgradeneeded = function (e) {
+          var d = e.target.result;
+          if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' });
+        };
+        req.onsuccess = function () {
+          var db = req.result;
+          try {
+            var tx = db.transaction('characters', 'readwrite');
+            var store = tx.objectStore('characters');
+            var g = store.get(chatId);
+            g.onsuccess = function () {
+              var rec = g.result;
+              if (!rec) { db.close(); reject(new Error('没找到当前角色（这可能不是角色私聊）')); return; }
+              rec.avatar = url;
+              store.put(rec);
+            };
+            g.onerror = function () { db.close(); reject(new Error('读取角色失败')); };
+            tx.oncomplete = function () { db.close(); resolve(true); };
+            tx.onerror = function () { db.close(); reject(new Error('写入角色失败')); };
+          } catch (e) { try { db.close(); } catch (err) {} reject(e); }
+        };
+        req.onerror = function () { reject(new Error('打开角色库失败')); };
+      } catch (e) { reject(e); }
+    });
+  }
+  async function setAvatar(args) {
+    args = args || {};
+    var url = String(args.url || '').trim();
+    if (!url && args.useLast) url = String(window.__nanoLastImage || '').trim();
+    if (!url && args.useLast) {
+      // 兜底：从最近一条用户发来的图片消息里找
+      try {
+        var st = JSON.parse(localStorage.getItem('chat_messages_' + getChatId()) || '[]');
+        for (var i = st.length - 1; i >= 0; i--) {
+          var m = st[i];
+          if (m && m.type === 'right' && m.isImage && m.imageData && m.imageData.url) { url = m.imageData.url; break; }
+        }
+      } catch (e) {}
+    }
+    await setCharacterAvatar(getChatId(), url);
+    // 同页立即预览：顶栏头像 / 正在输入头像先换掉（消息头像会在重新打开聊天时全部刷新）
+    try {
+      var img = document.getElementById('avatarImage');
+      var ph = document.getElementById('avatarPlaceholder');
+      if (img && url) { img.src = url; img.style.display = 'block'; if (ph) ph.style.display = 'none'; }
+      var typing = document.getElementById('typingAvatar');
+      if (typing && url) { typing.innerHTML = '<img src="' + url.replace(/"/g, '') + '" alt="">'; }
+    } catch (e) {}
+    return true;
+  }
+
   async function applyBeautify(scope, name, css) {
     css = String(css || '');
     name = String(name || '').trim() || '纳米预设';
@@ -337,8 +443,9 @@
       savePreset('chat-avatar', name, css); broadcast('chat-avatar', css);
     } else if (scope === 'heart') {
       localStorage.setItem('nano_voice_applied_css', css);
-      savePreset('heart', name, css);
-      try { window.parent.postMessage({ type: 'nanoVoiceCss', css: css }, '*'); } catch (e) {}
+      // 写进心声自己的模板库，心声面板下拉里就能看到并切换
+      await saveHeartTemplate(name, css);
+      try { window.parent.postMessage({ type: 'nanoVoiceCss', css: css, name: name }, '*'); } catch (e) {}
     } else if (scope === 'offline') {
       await setOfflineCss(css);
       savePreset('offline', name, css);
@@ -383,6 +490,7 @@
     if (a.tool === 'add_worldbook') return addWorldbook(args.name, args.entries);
     if (a.tool === 'add_emoji') return addEmoji(args.group || args.name, args.emojis || args.items);
     if (a.tool === 'set_chat_background') return setChatBackground(args.color, args.image);
+    if (a.tool === 'set_avatar') return setAvatar(args);
     if (a.tool === 'open_page') return openPage(args.url);
     if (a.tool === 'read_file') return null;
     throw new Error('未知动作 ' + a.tool);
@@ -392,6 +500,7 @@
     if (a.tool === 'add_worldbook') return '新增世界书：' + (a.args.name || '');
     if (a.tool === 'add_emoji') return '新增表情包分组：' + (a.args.group || a.args.name || '纳米表情') + '（' + (((a.args.emojis || a.args.items || []).length)) + ' 个）';
     if (a.tool === 'set_chat_background') return '更换聊天背景：' + (a.args.image ? '图片' : (a.args.color || '默认'));
+    if (a.tool === 'set_avatar') return '更换角色头像：' + (a.args.url ? '指定图片' : '用刚发送的图片');
     if (a.tool === 'open_page') return '打开页面：' + (a.args.url || '');
     return a.tool;
   }

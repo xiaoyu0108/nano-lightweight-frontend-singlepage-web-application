@@ -938,6 +938,7 @@
                         translation: msg.translation || null,
                         imageData: msg.imageData ? { textImage: msg.imageData.textImage, url: msg.imageData.url, desc: msg.imageData.desc, emojiName: msg.imageData.emojiName } : null,
                         think: msg.think || null,
+                        heart: msg.heart || null,
                         recalled: msg.recalled || false,
                         nanoActions: (msg.nanoActions && msg.nanoActions.length) ? msg.nanoActions : null
                     };
@@ -956,6 +957,7 @@
                             isVoice: msg.isVoice || false,
                             cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
                             think: msg.think || null,
+                            heart: msg.heart || null,
                             recalled: msg.recalled || false,
                             nanoActions: (msg.nanoActions && msg.nanoActions.length) ? msg.nanoActions : null
                         };
@@ -1783,12 +1785,18 @@
         const content = document.createElement('div');
         content.className = 'message-content';
 
-        // 思维链：优先取消息自身保存的，其次取本轮待挂载的
+        // 思维链：优先取消息自身保存的；只有「本轮新加进来的消息」才能消费 pendingTurnThink。
+        // 旧消息在 renderMessages 重建时绝不能抢走本轮思维链，否则思维链会挂到上一轮的消息上，
+        // 表现为「思维链不是每轮刷新 / 总是旧的」。
         const existingThinkMsg = messages.find(m => m.id === rowId);
+        const isNewRow = !id;
         let thinkText = '';
         if (type === 'left') {
-            thinkText = (existingThinkMsg && existingThinkMsg.think) || pendingTurnThink || '';
-            if (thinkText) pendingTurnThink = '';
+            thinkText = (existingThinkMsg && existingThinkMsg.think) || '';
+            if (!thinkText && isNewRow && pendingTurnThink) {
+                thinkText = pendingTurnThink;
+                pendingTurnThink = '';
+            }
         }
 
         if (!recalled) {
@@ -2139,6 +2147,10 @@
     }
 
     function addMessage(type, text, time, status, recalled, isCard, cardData, transcript, translation, quote, isVoice, voiceData, isImage, imageData) {
+        // 记录用户最近发来的图片，供纳米助手 set_avatar 使用（iOS 上模型拿不到图片字节，只能靠这里）
+        try {
+            if (isImage && type === 'right' && imageData && imageData.url) window.__nanoLastImage = imageData.url;
+        } catch (e) {}
         const grouped = !recalled && messages.length > 0 && messages[messages.length - 1].type === type;
         const row = createMessageRow(type, text, time, status, null, recalled, isCard, cardData, transcript, translation, quote, isVoice, voiceData, isImage, imageData, grouped);
         // 角色发来的语音：若配置了 TTS，就自动合成播放（点击气泡可重播）
@@ -3391,6 +3403,18 @@
         if (m.quote && m.quote.text && m.type === 'right') {
             t = t + '（用户正在回复你之前说的：「' + m.quote.text + '」）';
         }
+        // 纳米助手：告诉模型它之前已经执行过哪些改动，避免它每一轮都把同一套 CSS/动作再发一遍
+        if (m.type === 'left' && Array.isArray(m.nanoActions) && m.nanoActions.length) {
+            const done = [];
+            m.nanoActions.forEach(function (a) {
+                if (!a || a.status !== 'done') return;
+                try { done.push(window.NanoAssistant && window.NanoAssistant.actionTitle ? window.NanoAssistant.actionTitle(a) : a.tool); }
+                catch (e) { done.push(a.tool || '动作'); }
+            });
+            if (done.length) {
+                t = (t ? t + '\n' : '') + '（你之前已经执行过：' + done.join('；') + '。除非用户提出新的要求，不要重复执行同一改动。）';
+            }
+        }
         return t;
     }
 
@@ -3577,8 +3601,15 @@
             }
             
             if (userMessages.length === 0) {
-                const desc = describeMsgForAI(messages[messages.length - 1]);
-                userMessages = desc ? [desc] : [userMessage];
+                // 只有当最后一条确实是用户消息时才拿它当输入；否则（例如自动续聊）不能把 AI 的
+                // 上一句当成用户再问一遍，否则模型会对着自己的话重复作答。
+                const lastMsg = messages[messages.length - 1];
+                if (lastMsg && lastMsg.type === 'right') {
+                    const desc = describeMsgForAI(lastMsg);
+                    userMessages = desc ? [desc] : [userMessage];
+                } else {
+                    userMessages = (userMessage && String(userMessage).trim()) ? [userMessage] : ['（请继续）'];
+                }
             }
 
             const history = [];
@@ -3600,9 +3631,13 @@
             let prevCount = 0;
             for (let i = previousMessages.length - 1; i >= 0; i--) {
                 const m = previousMessages[i];
+                // previousMessages 从「最近一条 AI 回复」开始收集，因此它末尾会带上用户刚发的消息；
+                // 而下面的 userMessages 会把同一批用户消息再追加一次。这里只保留 AI 侧历史，
+                // 避免同一句用户消息在请求里出现两次，导致小助手反复对同一句作答。
+                if (m.type !== 'left') continue;
                 const desc = describeMsgForAI(m);
                 if (!m.recalled && desc && prevCount < __memContextLimit) {
-                    history.push({ role: m.type === 'right' ? 'user' : 'assistant', content: desc });
+                    history.push({ role: 'assistant', content: desc });
                     prevCount++;
                 }
             }

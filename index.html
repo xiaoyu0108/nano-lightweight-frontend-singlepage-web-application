@@ -2767,8 +2767,14 @@
                     } catch (e) {}
                 });
             }
+            // 键盘占用的高度 = 布局视口高度 − 可视视口高度 − 可视视口顶部偏移。
+            // 必须减去 offsetTop：iOS 聚焦输入框时会把可视区往上滚，漏掉 offsetTop 会让内页
+            // 收缩过多、输入栏跑到键盘上方留出空隙；反之若 offsetTop 变化而没重算，输入栏会被键盘压住。
+            function kbNow() {
+                return Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+            }
             function update() {
-                const kb = Math.max(0, Math.round(window.innerHeight - vv.height));
+                const kb = kbNow();
                 if (kb === update._last) return;
                 update._last = kb;
                 document.body.classList.toggle('keyboard-open', kb > 120);
@@ -2780,7 +2786,7 @@
             window.addEventListener('message', function (ev) {
                 var d = ev.data;
                 if (d && d.type === 'nanoKeyboardQuery') {
-                    var kb = Math.max(0, Math.round(window.innerHeight - vv.height));
+                    var kb = kbNow();
                     try { ev.source.postMessage({ type: 'nanoKeyboard', kb: kb }, '*'); } catch (e) {}
                 }
             });

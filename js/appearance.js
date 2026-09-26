@@ -84,9 +84,12 @@
         'align-items:center !important;justify-content:center !important;margin:0 auto !important;flex:1 1 auto !important;}' +
         '.message-row.recalled .recall-notice{margin-left:auto !important;margin-right:auto !important;}' +
         // 结构：顶栏贴安全区（不留空隙），底栏避让底部小白条；可用下面两个变量 DIY
-        '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;background:transparent !important;}' +
-        '.multi-select-bar{top:var(--safe-top,0px) !important;}' +
-        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,max(12px,var(--nano-safe-bottom,env(safe-area-inset-bottom,0px)))) !important;background:transparent !important;border:0 !important;box-shadow:none !important;}';
+        // 注意：不要在这里强制 background:transparent —— 那会盖掉用户在「聊天美化」里设置的
+        // 顶栏/底栏背景色（无论加多少 !important 都改不出白底）。背景交给用户 CSS 决定。
+        '.chat-container>.topbar{padding-top:var(--chat-topbar-pad,var(--safe-top,0px)) !important;}' +
+        '.bottom-bar{padding-bottom:var(--chat-bottom-pad,max(12px,var(--nano-safe-bottom,env(safe-area-inset-bottom,0px)))) !important;}' +
+        // 键盘弹出时底部安全区（Home 条）被键盘盖住，不再需要留白，避免输入栏被顶到键盘外看不到字
+        'html.keyboard-open .bottom-bar{padding-bottom:8px !important;}';
 
     function applyChatCss(css) {
         // 聊天 CSS 仅作用于单聊/群聊内页（额外的聊天专用覆盖）
@@ -342,8 +345,9 @@
     // ---- 强制所有底栏贴底（不吃缓存：始终注入，覆盖旧的页面 CSS / 旧预设） ----
     var BOTTOM_FLUSH_FIX =
         'html .bottom-actions,html .nano-index .bottom-actions{bottom:20px !important;padding-bottom:0 !important;}' +
-        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:max(12px,var(--nano-safe-bottom,env(safe-area-inset-bottom,0px))) !important;background:transparent !important;background-image:none !important;border:0 !important;border-top:0 !important;box-shadow:none !important;}' +
-        'html .nano-chat-inner .topbar,html .nano-groups .topbar{background:transparent !important;background-image:none !important;}' +
+        // 只兜底底部安全区留白，不要强制 background/border/shadow —— 否则用户无法给顶栏/底栏设白底
+        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:max(12px,var(--nano-safe-bottom,env(safe-area-inset-bottom,0px))) !important;}' +
+        'html.keyboard-open .bottom-bar,html.keyboard-open .nano-chat-inner .bottom-bar,html.keyboard-open .nano-groups .bottom-bar{padding-bottom:8px !important;}' +
         'html footer.bottom{padding-bottom:0 !important;}' +
         'html .bottom{padding-bottom:0 !important;}' +
         'html .dm-composer{padding-bottom:4px !important;}' +

@@ -61,7 +61,15 @@ function buildThoughtPrompt(charName, userName, messageText) {
 function setupThoughtExpand(el) {
   if (!el || typeof el.setAttribute !== 'function') return;
   const full = (el.textContent || '').trim();
-  const lines = full.split(/\n+/).length;
+  const lines = full.split(/\n/).length;
+  // 「完整显示心声（不折叠）」：快捷 DIY 里勾选后不折叠，换行/加行全部展示
+  let fullThought = false;
+  try { fullThought = !!(JSON.parse(localStorage.getItem('nano_voice_quick') || '{}') || {}).fullThought; } catch (e) {}
+  if (fullThought) {
+    el.classList.remove('collapsed', 'expanded');
+    el.dataset.full = full;
+    return;
+  }
   const needCollapse = full.length > 90 || lines > 4;
   if (!needCollapse) {
     el.classList.remove('collapsed');
@@ -81,7 +89,7 @@ function setupThoughtExpand(el) {
       this.textContent = this.dataset.full || this.textContent;
       this.classList.add('collapsed');
       this.classList.remove('expanded');
-      const lines2 = (this.textContent || '').split(/\n+/).length;
+      const lines2 = (this.textContent || '').split(/\n/).length;
       if ((this.textContent || '').length > 90 || lines2 > 4) {
         this.append(' （点击展开）');
       }
@@ -382,6 +390,9 @@ function setupThoughtExpand(el) {
     // 内置提示词
     const bp = $('ivBuiltinPrompt');
     if (bp) bp.value = (function () { try { return localStorage.getItem('nano_heart_builtin_prompt') || ''; } catch (e) { return ''; } })();
+    // 折叠设置变化后，立刻按新设置重排当前心声（换行/加行是否完整显示）
+    const th = $('ivThought');
+    if (th && (th.textContent || '').trim()) setupThoughtExpand(th);
     // 面板控件回填
     const sa = $('ivShowAvatar'), sn = $('ivShowName'), ar = $('ivAvatarRight');
     if (sa) sa.checked = !c.hideAvatar;
@@ -390,6 +401,8 @@ function setupThoughtExpand(el) {
     const ss = $('ivShowSubject'), sm = $('ivShowMeta');
     if (ss) ss.checked = !c.hideSubject;
     if (sm) sm.checked = !c.hideMeta;
+    const ft = $('ivShowFullThought');
+    if (ft) ft.checked = !!c.fullThought;
     const hu = $('ivHideUnread');
     if (hu) hu.checked = !!c.hideUnread;
     const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
@@ -406,6 +419,8 @@ function setupThoughtExpand(el) {
       const ss = $('ivShowSubject'), sm = $('ivShowMeta');
       c.hideSubject = ss ? !ss.checked : false;
       c.hideMeta = sm ? !sm.checked : false;
+      const ft = $('ivShowFullThought');
+      c.fullThought = ft ? !!ft.checked : false;
       const hu = $('ivHideUnread');
       c.hideUnread = hu ? !!hu.checked : false;
       const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
@@ -646,12 +661,24 @@ function setupThoughtExpand(el) {
 
     // 导入功能
     $('ivImportBtn').addEventListener('click', function() { $('ivFileInput').click(); });
-    // 娜娜助手下发心声 CSS：立即应用并持久化
+    // 娜娜助手下发心声 CSS：立即应用并持久化；若它同时写了预设，刷新下拉并选中
     window.addEventListener('message', function (e) {
       var d = e.data;
       if (d && d.type === 'nanoVoiceCss') {
         applyCustomCSS(d.css || '');
         saveAppliedCss(d.css || '');
+        try {
+          (async function () {
+            await initDefaultTemplate();
+            var target = currentTemplateId || 'default';
+            if (d.name) {
+              var all = await getAllTemplates();
+              var hit = all.find(function (t) { return t.name === d.name; });
+              if (hit) target = hit.id;
+            }
+            await renderSelectOnly(target);
+          })();
+        } catch (err) {}
       }
     });
     // 导出当前选中的预设（分享图标）

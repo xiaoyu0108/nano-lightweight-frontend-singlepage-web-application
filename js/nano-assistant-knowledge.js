@@ -33,10 +33,10 @@ window.NANO_ASSISTANT_KB = {
     },
     {
       id: 'heart', name: '心声美化',
-      storage: 'localStorage: nano_voice_applied_css',
+      storage: 'localStorage: nano_voice_applied_css（同时写心声模板库 NanoVoiceDB/templates，预设名可直接用 name 覆盖更新）',
       target: 'heart',
-      desc: '心声弹层。根容器 .nano-voice-modal；可隐藏/移动头像、昵称、收件信息、主题、正文，隐藏红点。',
-      selectors: ['.nano-voice-modal', '.nano-voice-modal .iv-avatar', '.iv-name', '.iv-meta', '.iv-subject', '.iv-content', '.iv-thought', '.iv-unread']
+      desc: '心声弹层。根容器 .nano-voice-modal；可隐藏/移动头像、昵称、收件信息、主题、正文，隐藏红点；也可以自由加行/换行：用 ::after/::before + content（换行写 \\A 并配 white-space:pre）在 .iv-content、.iv-thought、.iv-subject 上追加内容，或改 .iv-content 的最小高度、内边距。',
+      selectors: ['.nano-voice-modal', '.nano-voice-modal .iv-avatar', '.iv-name', '.iv-meta', '.iv-subject', '.iv-subject-text', '.iv-content', '.iv-content-label', '.iv-thought', '.iv-unread']
     },
     {
       id: 'offline', name: '线下美化',
@@ -93,10 +93,11 @@ window.NANO_ASSISTANT_KB = {
 
   // 助手可以下发的动作（写进 <action>...</action> 代码块）
   commands: [
-    { tool: 'apply_beautify', args: { scope: 'global|chat|chat-avatar|heart|offline', name: '预设名', css: '完整 CSS' }, note: '覆盖对应美化，并自动存成可切换预设；用户可随时恢复默认' },
+    { tool: 'apply_beautify', args: { scope: 'global|chat|chat-avatar|heart|offline', name: '预设名', css: '完整 CSS' }, note: '覆盖对应美化并存成可切换预设；若同名预设已存在则直接更新它（用户说「改我的某个预设」时，name 填那个预设的名字即可）' },
     { tool: 'add_worldbook', args: { name: '世界书名', entries: [{ title: '条目名', keywords: '触发词', content: '内容' }] }, note: '新增一本世界书（仅当用户明确要设定/世界书时用）' },
     { tool: 'add_emoji', args: { group: '分组名', emojis: [{ name: '表情名', url: '图片地址' }] }, note: '把「名字:图片链接」清单加入表情包（用户说加表情包时用这个，不要用 add_worldbook）' },
     { tool: 'set_chat_background', args: { color: '#ffffff', image: '图片URL（可选）' }, note: '直接更换当前聊天背景（颜色或图片）；用户说“换背景”优先用这个' },
+    { tool: 'set_avatar', args: { useLast: true }, note: '把当前角色头像换成用户刚发送的图片（用户在纳米聊天里发图后说「用这张当头像」时用这个，不要用 apply_beautify）；也可用 url 指定图片地址' },
     { tool: 'read_file', args: { path: 'js/chat-core.js' }, note: '只读，用于准确回答/给出修改步骤' },
     { tool: 'open_page', args: { url: 'beautify.html' }, note: '帮用户打开对应页面' }
   ]
