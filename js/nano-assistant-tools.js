@@ -440,6 +440,16 @@
       savePreset('chat', name, css); broadcast('chat', css);
     } else if (scope === 'chat-avatar') {
       localStorage.setItem('beautify_chat_avatar', css);
+      // 顺带把头像框地址写进 nano_avatar_frame，实时聊天才会插入真实叠加元素
+      try {
+        var fm = css.match(/url\(["']?([^"')]+)["']?\)/i);
+        if (fm && fm[1]) {
+          var sc = css.match(/top\s*:\s*(-?\d+)%/i) || css.match(/left\s*:\s*(-?\d+)%/i);
+          localStorage.setItem('nano_avatar_frame', JSON.stringify({ url: fm[1], scale: sc ? Math.abs(parseInt(sc[1], 10)) : 16 }));
+        } else {
+          localStorage.removeItem('nano_avatar_frame');
+        }
+      } catch (e) {}
       savePreset('chat-avatar', name, css); broadcast('chat-avatar', css);
     } else if (scope === 'heart') {
       localStorage.setItem('nano_voice_applied_css', css);

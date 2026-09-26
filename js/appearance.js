@@ -120,19 +120,40 @@
         bringAvatarToFront();
         // 强制一次重排：应用美化模板后 iOS Safari 才会重新合成、显示头像框
         try { void (document.body && document.body.offsetHeight); } catch (e) {}
-        enforceAvatarOverflow();
+        applyFrameElements();
     }
 
-    // 关键：聊天模板/预设几乎都会给 .message-avatar 写 overflow:hidden，
-    // 一旦应用美化的时机晚于首次绘制，iOS Safari 会把头像框（::after）裁掉。
-    // 这里直接用「行内 !important」把每个头像的 overflow 钉成 visible —— 行内优先级最高，
-    // 任何样式表（含 !important）都盖不掉，彻底解决手机端应用美化后头像框消失。
-    function hasAvatarFrame() {
-        var a = getEl('nano-beautify-chat-avatar');
-        return !!(a && a.textContent && a.textContent.indexOf('::after') !== -1);
+    // 头像框不再依赖 ::after（会被模板的 overflow/z-index 裁切或盖住），改为给每个头像
+    // 插入一个「真实叠加元素」<span class="nano-avatar-frame">，用行内样式画框。
+    function getFrameConfig() {
+        try {
+            var raw = localStorage.getItem('nano_avatar_frame');
+            if (raw) {
+                var o = JSON.parse(raw);
+                if (o && String(o.url || '').trim()) return o;
+            }
+        } catch (e) {}
+        try {
+            var cfg = JSON.parse(localStorage.getItem('beautify_chat_avatar_cfg') || 'null');
+            if (cfg && String(cfg.frameUrl || '').trim()) {
+                return { url: cfg.frameUrl, scale: cfg.frameScale, radius: cfg.radius, size: cfg.size };
+            }
+        } catch (e) {}
+        // 兜底：从旧的/纳米写入的 CSS 字符串里解析头像框地址
+        try {
+            var css = localStorage.getItem('beautify_chat_avatar') || '';
+            if (/::after/i.test(css)) {
+                var m = css.match(/url\(["']?([^"')]+)["']?\)/i);
+                if (m && m[1]) {
+                    var sm = css.match(/top\s*:\s*(-?\d+)%/i) || css.match(/left\s*:\s*(-?\d+)%/i);
+                    return { url: m[1], scale: sm ? Math.abs(parseInt(sm[1], 10)) : 16 };
+                }
+            }
+        } catch (e) {}
+        return null;
     }
 
-    // 直接用「原始配置」重建头像 CSS（不依赖美化页存下来的字符串，避免旧字符串/旧选择器导致不生效）
+    // 只用 CSS 负责「方圆 / 大小」；头像框由真实元素负责
     function buildAvatarCssFromCfg() {
         var cfg = null;
         try { cfg = JSON.parse(localStorage.getItem('beautify_chat_avatar_cfg') || 'null'); } catch (e) {}
@@ -146,43 +167,50 @@
             'html body.nano-groups .typing-indicator .ti-avatar'
         ];
         var avImgs = avs.map(function (x) { return x + ' img'; });
-        var css = avs.join(',') + '{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
+        return avs.join(',') + '{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
             + avImgs.join(',') + '{border-radius:' + r + ' !important;}';
-        var frame = String(cfg.frameUrl || '').trim();
-        if (frame) {
-            var scale = parseInt(cfg.frameScale, 10);
+    }
+
+    function applyFrameElements() {
+        if (!isChatInterior) return;
+        var fc = getFrameConfig();
+        var nodes;
+        try { nodes = document.querySelectorAll('.message-avatar, .typing-indicator .ti-avatar'); } catch (e) { return; }
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            var existing = null;
+            for (var c = 0; c < node.children.length; c++) {
+                if (node.children[c] && node.children[c].className === 'nano-avatar-frame') { existing = node.children[c]; break; }
+            }
+            if (!fc) {
+                if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+                try { node.style.removeProperty('overflow'); node.style.removeProperty('position'); } catch (e) {}
+                continue;
+            }
+            var scale = parseInt(fc.scale, 10);
             if (isNaN(scale)) scale = 16;
             scale = Math.max(0, Math.min(60, scale));
             var inset = -scale;
-            var url = frame.replace(/"/g, '%22').replace(/\)/g, '%29');
-            css += avs.join(',') + '{overflow:visible !important;position:relative !important;'
-                + 'transform:translateZ(0) !important;-webkit-backface-visibility:hidden !important;}'
-                + avImgs.join(',') + '{border-radius:inherit !important;}'
-                + avs.map(function (x) { return x + '::after'; }).join(',') + '{'
-                + 'content:"" !important;position:absolute !important;'
+            var url = String(fc.url).replace(/"/g, '%22').replace(/\)/g, '%29');
+            var el = existing || document.createElement('span');
+            el.className = 'nano-avatar-frame';
+            el.setAttribute('aria-hidden', 'true');
+            el.style.cssText = 'position:absolute !important;display:block !important;'
                 + 'top:' + inset + '% !important;right:' + inset + '% !important;bottom:' + inset + '% !important;left:' + inset + '% !important;'
                 + 'background-image:url("' + url + '") !important;background-position:center center !important;'
                 + 'background-size:contain !important;background-repeat:no-repeat !important;'
-                + 'pointer-events:none !important;z-index:2147483000 !important;}';
-        }
-        return css;
-    }
-    function enforceAvatarOverflow() {
-        if (!isChatInterior) return;
-        var nodes;
-        try { nodes = document.querySelectorAll('.message-avatar, .typing-indicator .ti-avatar'); } catch (e) { return; }
-        var on = hasAvatarFrame();
-        for (var i = 0; i < nodes.length; i++) {
+                + 'pointer-events:none !important;z-index:2147483000 !important;';
+            if (!existing) node.appendChild(el);
             try {
-                if (on) {
-                    nodes[i].style.setProperty('overflow', 'visible', 'important');
-                    nodes[i].style.setProperty('position', 'relative', 'important');
-                } else {
-                    // 没有头像框时恢复默认裁剪，避免残留行内样式导致头像不圆
-                    nodes[i].style.removeProperty('overflow');
-                    nodes[i].style.removeProperty('position');
-                }
+                node.style.setProperty('overflow', 'visible', 'important');
+                node.style.setProperty('position', 'relative', 'important');
             } catch (e) {}
+            // 原头像内容保持圆形
+            var kids = node.querySelectorAll('img, span');
+            for (var k = 0; k < kids.length; k++) {
+                if (kids[k] === el) continue;
+                try { kids[k].style.setProperty('border-radius', 'inherit', 'important'); } catch (e) {}
+            }
         }
     }
 
@@ -193,7 +221,7 @@
         _avatarObserver = new MutationObserver(function () {
             if (scheduled) return;
             scheduled = true;
-            setTimeout(function () { scheduled = false; enforceAvatarOverflow(); }, 60);
+            setTimeout(function () { scheduled = false; applyFrameElements(); }, 60);
         });
         try { _avatarObserver.observe(document.body || document.documentElement, { childList: true, subtree: true }); } catch (e) {}
     }
@@ -412,8 +440,8 @@
         // 最后再确保头像样式在最后（有些注入会插到它后面）
         try { bringAvatarToFront(); } catch (e) {}
         try { void (document.body && document.body.offsetHeight); } catch (e) {}
-        // 把每个头像的 overflow 钉成 visible（行内 !important），并监听后续新消息
-        try { enforceAvatarOverflow(); watchAvatars(); } catch (e) {}
+        // 给每个头像插入头像框叠加元素（行内 !important），并监听后续新消息
+        try { applyFrameElements(); watchAvatars(); } catch (e) {}
         var cfg = readFontCfgSync();
         if (cfg) {
             applyFontCfg(cfg);

@@ -2243,30 +2243,9 @@ function buildAvatarCss() {
   let css = avs.join(',') + '{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
     + avImgs.join(',') + '{border-radius:' + r + ' !important;}';
 
-  // 头像框：把扣好的透明 PNG 叠在「消息头像」上，按头像比例自动适配（往外扩一圈）。
-  // 注意：顶栏头像不加框（它是设置按钮）。
-  const frame = String(avatarState.frameUrl || '').trim();
-  if (frame) {
-    let scale = parseInt(avatarState.frameScale, 10);
-    if (isNaN(scale)) scale = 16;
-    scale = Math.max(0, Math.min(60, scale));
-    const inset = -scale;
-    const url = frame.replace(/"/g, '%22').replace(/\)/g, '%29');
-    // 老 iOS WebView 对 inset / background 简写支持不全，这里全用长写 + 逐边偏移，兼容性最好
-    // translateZ(0) 强制图层：修 iOS Safari 的「border-radius + overflow:hidden 后改 visible
-    // 仍把 ::after 裁掉」的合成 bug（初始 UI 没这问题、应用美化模板后才出现）。
-    css += avs.join(',') + '{overflow:visible !important;position:relative !important;'
-      + 'transform:translateZ(0) !important;-webkit-backface-visibility:hidden !important;}'
-      + avImgs.join(',') + '{border-radius:inherit !important;}'
-      + avs.map(function (x) { return x + '::after'; }).join(',') + '{'
-      + 'content:"" !important;position:absolute !important;'
-      + 'top:' + inset + '% !important;right:' + inset + '% !important;bottom:' + inset + '% !important;left:' + inset + '% !important;'
-      + 'background-image:url("' + url + '") !important;'
-      + 'background-position:center center !important;'
-      + 'background-size:contain !important;'
-      + 'background-repeat:no-repeat !important;'
-      + 'pointer-events:none !important;z-index:2147483000 !important;}';
-  }
+  // 头像框不再写进 CSS：改由 appearance.js 给每个头像插入真实叠加元素 <span class="nano-avatar-frame">
+  // （真实元素 + 行内样式，不会被聊天模板的 overflow/z-index 裁掉或盖住）。
+  // 这里只负责「方圆 / 大小」。
   return css;
 }
 
@@ -2282,6 +2261,13 @@ function applyAvatarTune() {
   try {
     localStorage.setItem('beautify_chat_avatar', previewAvatarCss);
     localStorage.setItem('beautify_chat_avatar_cfg', JSON.stringify(avatarState));
+    // 头像框单独存一份原始配置，appearance.js 用它插入真实叠加元素（不依赖 CSS）
+    localStorage.setItem('nano_avatar_frame', JSON.stringify({
+      url: String(avatarState.frameUrl || '').trim(),
+      scale: avatarState.frameScale,
+      radius: avatarState.radius,
+      size: avatarState.size
+    }));
   } catch (e) {}
   // 广播给聊天内页（父框架会再转发给各 iframe）
   if (window.parent !== window) {

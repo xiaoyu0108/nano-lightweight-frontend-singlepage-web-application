@@ -709,6 +709,7 @@
             try {
                 localStorage.removeItem('beautify_chat_avatar');
                 localStorage.removeItem('beautify_chat_avatar_cfg');
+                localStorage.removeItem('nano_avatar_frame');
             } catch (e) {}
             try {
                 var frames = document.querySelectorAll('iframe');
