@@ -2228,23 +2228,20 @@ const avatarState = { radius: 50, size: 36, frameUrl: '', frameScale: 16 };
 function buildAvatarCss() {
   const r = (avatarState.radius != null ? avatarState.radius : 50) + '%';
   const s = (avatarState.size != null ? avatarState.size : 36) + 'px';
-  // 消息头像 / 正在输入头像：用高优先级选择器，避免被聊天模板（.nano-chat-inner .message-avatar）盖掉
+  // 只作用于「气泡/卡片前面的消息头像」和「正在输入头像」；
+  // 顶栏头像（设置按钮）与此调节无关，完全不碰。
+  // 选择器用 body.nano-chat-inner（body 自身就带这个 class），保证优先级高于聊天模板的
+  // `.nano-chat-inner .message-avatar`，之前写成 `body .nano-chat-inner ...`（多了空格）匹配不到任何元素。
   const avs = [
-    'html body .nano-chat-inner .message-avatar',
-    'html body .nano-groups .message-avatar',
-    'html body .nano-chat-inner .typing-indicator .ti-avatar',
-    'html body .nano-groups .typing-indicator .ti-avatar'
+    'html body.nano-chat-inner .message-avatar',
+    'html body.nano-groups .message-avatar',
+    'html body.nano-chat-inner .typing-indicator .ti-avatar',
+    'html body.nano-groups .typing-indicator .ti-avatar'
   ];
   const avImgs = avs.map(function (x) { return x + ' img'; });
-  // 顶栏头像（其实是设置按钮）：只跟随「方圆 / 大小」，不加头像框
-  const tops = ['html .nano-chat-inner .topbar-avatar', 'html .nano-groups .topbar-avatar'];
-  const topKids = tops.map(function (x) { return x + ' img'; })
-    .concat(tops.map(function (x) { return x + ' > span'; }));
 
   let css = avs.join(',') + '{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
-    + avImgs.join(',') + '{border-radius:' + r + ' !important;}'
-    + tops.join(',') + '{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
-    + topKids.join(',') + '{border-radius:' + r + ' !important;}';
+    + avImgs.join(',') + '{border-radius:' + r + ' !important;}';
 
   // 头像框：把扣好的透明 PNG 叠在「消息头像」上，按头像比例自动适配（往外扩一圈）。
   // 注意：顶栏头像不加框（它是设置按钮）。
