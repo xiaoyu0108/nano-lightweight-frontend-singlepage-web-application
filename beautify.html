@@ -38,9 +38,9 @@
 <div class="tools"><button class="tool" data-clear="global">清空</button><button class="tool" data-restore="global">还原</button><button class="tool" data-copy="global">复制初始</button><button class="tool apply" data-apply="global">应用</button></div>
 <div class="live-preview" id="globalPreviewCard">
 <div class="lp-head" data-lp="global" role="button" tabindex="0" aria-expanded="false">
-<span class="lp-title">全局预览</span><span class="lp-sub">真实页面 · 点开查看</span><span class="lp-caret">▾</span>
+<span class="lp-title">全局预览</span><span class="lp-sub">样式示例 · 点开查看</span><span class="lp-caret">▾</span>
 </div>
-<div class="lp-body"><iframe class="lp-frame" id="globalPreviewFrame" data-target="global" data-src="index.html" loading="lazy" title="全局预览"></iframe></div>
+<div class="lp-body"><iframe class="lp-frame" id="globalPreviewFrame" data-target="global" data-src="preview-global.html" loading="lazy" title="全局预览"></iframe></div>
 <span id="globalPreview" style="display:none"></span>
 </div>
 <div class="group"><div class="labelrow"><span class="label">预设</span></div><div class="presetrow"><select id="globalPreset"></select><button class="delete" data-delete="global" aria-label="删除">
@@ -61,15 +61,17 @@
 </div>
 <div class="tools"><button class="tool" data-clear="chat">清空</button><button class="tool" data-restore="chat">还原</button><button class="tool" data-copy="chat">复制初始</button><button class="tool apply" data-apply="chat">应用</button></div>
 <div class="tune-card">
-<div class="labelrow"><span class="label">头像调节（方圆 / 大小）</span></div>
+<div class="labelrow"><span class="label">头像调节（方圆 / 大小 / 头像框）</span></div>
 <div class="tune-row"><span class="tune-label">方圆</span><input type="range" class="tune-slider" id="avatarRadius" min="0" max="50" step="1" value="50"><span class="tune-val" id="avatarRadiusVal">50%</span></div>
 <div class="tune-row"><span class="tune-label">大小</span><input type="range" class="tune-slider" id="avatarSize" min="20" max="80" step="1" value="36"><span class="tune-val" id="avatarSizeVal">36px</span></div>
+<div class="tune-row"><span class="tune-label">头像框 PNG</span><input type="text" id="avatarFrameUrl" placeholder="粘贴扣好的透明 PNG 链接" style="flex:1;min-width:0;padding:8px 10px;border:1px solid rgba(60,60,67,0.12);border-radius:10px;font-size:13px;background:#fff;color:#1c1c1e;outline:none"></div>
+<div class="tune-row"><span class="tune-label">框大小</span><input type="range" class="tune-slider" id="avatarFrameScale" min="0" max="40" step="1" value="16"><span class="tune-val" id="avatarFrameScaleVal">16%</span></div>
 </div>
 <div class="live-preview" id="chatPreviewCard">
 <div class="lp-head" data-lp="chat" role="button" tabindex="0" aria-expanded="false">
-<span class="lp-title">聊天预览</span><span class="lp-sub">真实页面 · 点开查看</span><span class="lp-caret">▾</span>
+<span class="lp-title">聊天预览</span><span class="lp-sub">单聊 / 群聊样式示例 · 点开查看</span><span class="lp-caret">▾</span>
 </div>
-<div class="lp-body"><iframe class="lp-frame" id="chatPreviewFrame" data-target="chat" data-src="chat_inner.html" loading="lazy" title="聊天预览"></iframe></div>
+<div class="lp-body"><iframe class="lp-frame" id="chatPreviewFrame" data-target="chat" data-src="preview-chat.html" loading="lazy" title="聊天预览"></iframe></div>
 <span id="chatPreview" style="display:none"></span>
 </div>
 <div class="group"><div class="labelrow"><span class="label">预设</span></div><div class="presetrow"><select id="chatPreset"></select><button class="delete" data-delete="chat" aria-label="删除">

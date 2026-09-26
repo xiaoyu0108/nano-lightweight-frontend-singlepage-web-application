@@ -30,7 +30,11 @@ button, input, textarea { font: inherit; outline: none; }
   gap: 16px;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  /* 顶部/底部留出安全区 + 聊天顶栏/底栏高度，避免卡片被上下栏遮挡 */
+  padding: calc(var(--safe-top, 0px) + 64px) 20px calc(var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)) + 64px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(30px) saturate(160%);
   -webkit-backdrop-filter: blur(30px) saturate(160%);
@@ -39,13 +43,32 @@ button, input, textarea { font: inherit; outline: none; }
 .nano-voice-layer.active {
   display: flex;
 }
+/* 打开美化面板时关掉嵌套毛玻璃，避免 iOS 上严重卡顿 */
+.nano-voice-layer.customizing {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.28);
+}
+.nano-voice-layer.customizing .nano-voice-modal {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.97);
+}
+.nano-voice-layer.customizing .iv-customize {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
 
 /* 弹窗卡片 */
 .nano-voice-modal {
   position: relative;
   width: min(400px, calc(100vw - 24px));
-  max-height: min(700px, calc(100vh - 120px));
-  overflow: hidden;
+  /* 同时避开上下安全区与聊天顶/底栏，超高时卡片内部滚动而不是被裁掉 */
+  max-height: min(700px, calc(100vh - var(--safe-top, 0px) - var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)) - 150px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(36px) saturate(190%);
   -webkit-backdrop-filter: blur(36px) saturate(190%);
@@ -69,19 +92,20 @@ button, input, textarea { font: inherit; outline: none; }
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
 }
 
-/* ----- 发件人 ----- */
+/* ----- 发件人（默认：头像居中放大 + 昵称独立成行） ----- */
 .iv-header {
   position: relative;
   z-index: 2;
-  padding: 18px 22px 14px;
+  padding: 28px 22px 18px;
   background: rgba(255, 255, 255, 0.30);
   border-bottom: 1px solid var(--iv-separator);
   border-radius: var(--iv-radius) var(--iv-radius) 0 0;
+  text-align: center;
 }
-.iv-sender { display: flex; align-items: center; }
+.iv-sender { display: flex; align-items: center; flex-direction: column; }
 .iv-avatar {
-  /* 可用 --iv-avatar-size 自由调整大小（快捷 DIY 的「头像大小」就是改这个变量） */
-  width: var(--iv-avatar-size, 48px); height: var(--iv-avatar-size, 48px); flex: 0 0 var(--iv-avatar-size, 48px);
+  /* 改 .nano-voice-modal 上的 --iv-avatar-size / --iv-avatar-radius 即可自由调整头像大小与圆角 */
+  width: var(--iv-avatar-size, 72px); height: var(--iv-avatar-size, 72px); flex: 0 0 var(--iv-avatar-size, 72px);
   border-radius: var(--iv-avatar-radius, 50%); overflow: hidden;
   background: rgba(240, 240, 245, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.7);
@@ -89,13 +113,13 @@ button, input, textarea { font: inherit; outline: none; }
   display: flex; align-items: center; justify-content: center;
 }
 .iv-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.iv-avatar-fallback { color: #6c6c70; font-size: calc(var(--iv-avatar-size, 48px) * 0.42); font-weight: 500; }
-.iv-sender-info { min-width: 0; flex: 1; margin-left: 14px; }
+.iv-avatar-fallback { color: #6c6c70; font-size: calc(var(--iv-avatar-size, 72px) * 0.42); font-weight: 500; }
+.iv-sender-info { min-width: 0; flex: none; margin-left: 0; margin-top: 12px; text-align: center; }
 .iv-caption { color: var(--iv-secondary); font-size: 11px; font-weight: 500; letter-spacing: 0.2px; margin-bottom: 2px; }
-.iv-name { font-family: var(--iv-serif); font-size: 20px; font-weight: 600; line-height: 1.2; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1c1c1e; }
-.iv-unread { width: 8px; height: 8px; flex: 0 0 8px; margin-left: 12px; border-radius: 50%; background: var(--iv-red); box-shadow: 0 0 0 4px var(--iv-red-soft); }
+.iv-name { font-family: var(--iv-serif); font-size: 22px; font-weight: 600; line-height: 1.25; letter-spacing: 0.2px; white-space: normal; overflow-wrap: anywhere; color: #1c1c1e; }
+.iv-unread { width: 8px; height: 8px; flex: 0 0 8px; margin-left: 0; margin-top: 10px; border-radius: 50%; background: var(--iv-red); box-shadow: 0 0 0 4px var(--iv-red-soft); }
 
-.iv-meta { margin-top: 12px; display: grid; grid-template-columns: 48px 1fr; row-gap: 4px; font-size: 12px; line-height: 1.4; color: #3a3a3c; }
+.iv-meta { margin-top: 14px; display: grid; grid-template-columns: auto auto; justify-content: center; column-gap: 6px; row-gap: 4px; font-size: 12px; line-height: 1.4; color: #3a3a3c; }
 .iv-meta-key { color: var(--iv-secondary); font-weight: 400; letter-spacing: 0.2px; }
 .iv-meta-value { min-width: 0; color: #1c1c1e; font-weight: 450; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .iv-meta-value.user-name { color: #007aff; font-weight: 500; }
@@ -107,14 +131,15 @@ button, input, textarea { font: inherit; outline: none; }
   background: rgba(255, 255, 255, 0.15);
   border-bottom: 1px solid var(--iv-separator);
 }
+.iv-subject { text-align: center; }
 .iv-subject-label { color: var(--iv-secondary); font-size: 10px; font-weight: 600; letter-spacing: 1.8px; text-transform: uppercase; margin-bottom: 4px; }
-.iv-subject-text { color: #1c1c1e; font-family: var(--iv-serif); font-size: 17px; font-weight: 600; line-height: 1.35; letter-spacing: 0.3px; }
+.iv-subject-text { color: #1c1c1e; font-family: var(--iv-serif); font-size: 17px; font-weight: 600; line-height: 1.35; letter-spacing: 0.3px; text-align: center; }
 
 /* ----- 内容 • 心声 ----- */
 .iv-content {
   position: relative; z-index: 2;
-  min-height: 240px;
-  padding: 18px 22px 24px 22px;
+  min-height: 200px;
+  padding: 20px 24px 26px 24px;
   background: radial-gradient(circle at 90% 10%, rgba(0, 122, 255, 0.02), transparent 40%), rgba(255, 255, 255, 0.10);
   border-radius: 0 0 var(--iv-radius) var(--iv-radius);
 }

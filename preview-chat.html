@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>聊天样式预览</title>
+<link rel="stylesheet" href="css/chat-inner.css">
+<style>
+  html, body { height: auto !important; position: static !important; overflow: visible !important; background: #f2f2f7 !important; }
+  body { padding: 14px 12px 40px; -webkit-font-smoothing: antialiased; }
+  .pv-page-title { max-width: 430px; margin: 0 auto 10px; font: 600 15px/1.4 -apple-system, "PingFang SC", sans-serif; color: #1c1c1e; }
+  .pv-section { max-width: 430px; margin: 18px auto 8px; font: 600 12px/1.4 -apple-system, "PingFang SC", sans-serif; color: #8e8e93; letter-spacing: .4px; }
+  .pv-card { max-width: 430px; margin: 0 auto; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 34px rgba(0,0,0,.08); }
+  .chat-container { height: auto !important; max-width: 430px; margin: 0 auto; }
+  .message-scroll { overflow: visible !important; padding: 14px 12px 18px !important; }
+  .pv-card .bottom-bar { display: flex; }
+  /* 群聊昵称行（对齐 groups.css 的样式，方便预览） */
+  .msg-name-line { margin: 0 0 3px 2px; font: 500 11px/1.2 -apple-system, "PingFang SC", sans-serif; color: #8e8e93; }
+  .msg-name-line .n-name { color: #3a3a3c; font-weight: 600; }
+  .pv-tip { max-width: 430px; margin: 6px auto 0; text-align: center; font: 400 11px/1.5 -apple-system, "PingFang SC", sans-serif; color: #aeaeb2; }
+</style>
+</head>
+<body>
+  <div class="pv-page-title">聊天样式预览 · 静态示例</div>
+
+  <div class="pv-section">单聊 · 文字 / 翻译 / 引用 / 语音 / 图片 / 卡片 / 撤回</div>
+  <div class="pv-card">
+    <div class="chat-container">
+      <div class="message-scroll" id="messageContainer">
+        <div class="date-label">今天 14:20</div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>L</span></div>
+          <div class="message-content">
+            <div class="bubble other">你好呀，这是聊天美化预览～</div>
+          </div>
+        </div>
+
+        <div class="message-row right">
+          <div class="message-avatar"><span>我</span></div>
+          <div class="message-content">
+            <div class="bubble me">收到，气泡样式看得很清楚！</div>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>L</span></div>
+          <div class="message-content">
+            <div class="bubble other">带翻译的气泡</div>
+            <span class="translation-text">Translated text preview</span>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>L</span></div>
+          <div class="message-content">
+            <div class="quote-block left">
+              <span class="quote-fold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14l-4-4 4-4"/></svg></span>
+              <span class="quote-name">L</span><span class="quote-text">被引用的内容</span>
+            </div>
+            <div class="bubble other">引用之后的回复气泡</div>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>L</span></div>
+          <div class="message-content">
+            <div class="voice-bubble left">
+              <span class="play-icon"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg></span>
+              <span class="voice-wave"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></span>
+              <span class="voice-duration">3"</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="message-row right">
+          <div class="message-avatar"><span>我</span></div>
+          <div class="message-content">
+            <div class="voice-bubble right">
+              <span class="play-icon"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg></span>
+              <span class="voice-wave"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></span>
+              <span class="voice-duration">5"</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>L</span></div>
+          <div class="message-content">
+            <div class="image-bubble left"><img alt="图片" src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='150'%3E%3Crect width='220' height='150' fill='%23d9d9e3'/%3E%3Ctext x='110' y='80' font-size='14' fill='%238e8e93' text-anchor='middle'%3E图片气泡%3C/text%3E%3C/svg%3E"></div>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>L</span></div>
+          <div class="message-content">
+            <div class="bubble-card left transfer">
+              <div class="card-main">
+                <div class="icon-wrap"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg></div>
+                <div><div class="card-title">转账</div><div class="card-sub">¥ 20.00</div></div>
+              </div>
+              <div class="card-footer"><span class="card-footer-text">请收款</span>
+                <div class="card-actions"><button class="card-btn">领取</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="message-row right">
+          <div class="message-avatar"><span>我</span></div>
+          <div class="message-content">
+            <div class="bubble-card right gift">
+              <div class="card-main">
+                <div class="icon-wrap"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 7h-3V5a3 3 0 0 0-6 0 3 3 0 0 0-6 0v2H5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1Z"/></svg></div>
+                <div><div class="card-title">礼物</div><div class="card-sub">送出一份心意</div></div>
+              </div>
+              <div class="card-footer"><span class="card-footer-text">已送出</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="message-row recalled"><div class="recall-notice">对方撤回了一条消息</div></div>
+
+        <div class="message-row sys-notice"><div class="message-content"><div class="recall-notice">系统提示：会话已保存</div></div></div>
+      </div>
+      <footer class="bottom-bar">
+        <button class="more-btn" aria-label="更多"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <div class="input-shell"><input type="text" placeholder="输入消息…" disabled></div>
+        <button class="send-btn" aria-label="发送"><svg viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8z"/></svg></button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="pv-section">群聊 · 多角色 / 昵称行 / 分组气泡</div>
+  <div class="pv-card">
+    <div class="chat-container">
+      <div class="message-scroll">
+        <div class="date-label">今天 14:26</div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>美</span></div>
+          <div class="message-content">
+            <div class="msg-name-line"><span class="n-name">小美</span></div>
+            <div class="bubble other">大家晚上有空吗？想约个饭</div>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar" style="visibility:hidden"><span>美</span></div>
+          <div class="message-content">
+            <div class="bubble other grouped">顺便把上次的照片给你们</div>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>哲</span></div>
+          <div class="message-content">
+            <div class="msg-name-line"><span class="n-name">阿哲</span></div>
+            <div class="bubble other">我可以！几点，老地方？</div>
+          </div>
+        </div>
+
+        <div class="message-row right">
+          <div class="message-avatar"><span>我</span></div>
+          <div class="message-content">
+            <div class="bubble me">七点行吗，我先订位</div>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar"><span>柚</span></div>
+          <div class="message-content">
+            <div class="msg-name-line"><span class="n-name">柚子</span></div>
+            <div class="bubble other">带我一个，稍晚一点到～</div>
+          </div>
+        </div>
+
+        <div class="message-row left">
+          <div class="message-avatar" style="visibility:hidden"><span>哲</span></div>
+          <div class="message-content">
+            <div class="bubble other grouped">@柚子 给你留个位置</div>
+          </div>
+        </div>
+      </div>
+      <footer class="bottom-bar">
+        <button class="more-btn" aria-label="更多"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <div class="input-shell"><input type="text" placeholder="输入消息…" disabled></div>
+        <button class="send-btn" aria-label="发送"><svg viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8z"/></svg></button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="pv-tip">这是固定示例，不会显示你的真实聊天内容</div>
+</body>
+</html>

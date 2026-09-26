@@ -2195,7 +2195,8 @@ function togglePreview(target) {
   if (!frame) return;
   const needSrc = !frame.getAttribute('src');
   if (needSrc) {
-    const src = target === 'chat' ? previewChatUrl() : (frame.getAttribute('data-src') || 'index.html');
+    // 预览统一用静态示例页（不加载真实联系人/聊天），data-src 在 beautify.html 上配置
+    const src = frame.getAttribute('data-src') || (target === 'chat' ? 'preview-chat.html' : 'preview-global.html');
     frame.setAttribute('src', src);
   }
   if (!meta.bound) {
@@ -2220,19 +2221,38 @@ const avatarRadiusEl = document.getElementById('avatarRadius');
 const avatarSizeEl = document.getElementById('avatarSize');
 const avatarRadiusVal = document.getElementById('avatarRadiusVal');
 const avatarSizeVal = document.getElementById('avatarSizeVal');
-const avatarState = { radius: 50, size: 36 };
+const avatarFrameUrlEl = document.getElementById('avatarFrameUrl');
+const avatarFrameScaleEl = document.getElementById('avatarFrameScale');
+const avatarFrameScaleVal = document.getElementById('avatarFrameScaleVal');
+const avatarState = { radius: 50, size: 36, frameUrl: '', frameScale: 16 };
 
 function buildAvatarCss() {
   const r = (avatarState.radius != null ? avatarState.radius : 50) + '%';
   const s = (avatarState.size != null ? avatarState.size : 36) + 'px';
-  return '.message-avatar,.topbar-avatar{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
+  let css = '.message-avatar,.topbar-avatar{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
     + '.message-avatar img,.topbar-avatar img,.typing-indicator .ti-avatar{border-radius:' + r + ' !important;}'
     + '.typing-indicator .ti-avatar{width:' + s + ' !important;height:' + s + ' !important;}';
+  // 头像框：把扣好的透明 PNG 叠在头像上，按头像比例自动适配（inset 为负，向外扩一圈）
+  const frame = String(avatarState.frameUrl || '').trim();
+  if (frame) {
+    let scale = parseInt(avatarState.frameScale, 10);
+    if (isNaN(scale)) scale = 16;
+    scale = Math.max(0, Math.min(60, scale));
+    const inset = -scale;
+    const url = frame.replace(/"/g, '%22').replace(/\)/g, '%29');
+    css += '.message-avatar,.topbar-avatar,.typing-indicator .ti-avatar{overflow:visible !important;position:relative;}'
+      + '.message-avatar img,.topbar-avatar img,.typing-indicator .ti-avatar img{border-radius:inherit !important;}'
+      + '.message-avatar::after,.topbar-avatar::after,.typing-indicator .ti-avatar::after{'
+      + 'content:"" !important;position:absolute;inset:' + inset + '%;'
+      + 'background:url("' + url + '") center/contain no-repeat;pointer-events:none;z-index:6;}';
+  }
+  return css;
 }
 
 function syncAvatarLabels() {
   if (avatarRadiusVal) avatarRadiusVal.textContent = avatarState.radius + '%';
   if (avatarSizeVal) avatarSizeVal.textContent = avatarState.size + 'px';
+  if (avatarFrameScaleVal) avatarFrameScaleVal.textContent = avatarState.frameScale + '%';
 }
 
 let avatarSyncTimer = null;
@@ -2259,12 +2279,20 @@ function onAvatarInput() {
   avatarState.size = avatarSizeEl ? parseInt(avatarSizeEl.value) : 36;
   if (isNaN(avatarState.radius)) avatarState.radius = 50;
   if (isNaN(avatarState.size)) avatarState.size = 36;
+  avatarState.frameUrl = avatarFrameUrlEl ? avatarFrameUrlEl.value.trim() : (avatarState.frameUrl || '');
+  avatarState.frameScale = avatarFrameScaleEl ? parseInt(avatarFrameScaleEl.value) : avatarState.frameScale;
+  if (isNaN(avatarState.frameScale)) avatarState.frameScale = 16;
   syncAvatarLabels();
   applyAvatarTune();
 }
 
 if (avatarRadiusEl) avatarRadiusEl.addEventListener('input', onAvatarInput);
 if (avatarSizeEl) avatarSizeEl.addEventListener('input', onAvatarInput);
+if (avatarFrameUrlEl) {
+  avatarFrameUrlEl.addEventListener('input', onAvatarInput);
+  avatarFrameUrlEl.addEventListener('change', onAvatarInput);
+}
+if (avatarFrameScaleEl) avatarFrameScaleEl.addEventListener('input', onAvatarInput);
 
 // 载入已保存的头像调节
 (function loadAvatarTune() {
@@ -2273,9 +2301,13 @@ if (avatarSizeEl) avatarSizeEl.addEventListener('input', onAvatarInput);
     const cfg = JSON.parse(localStorage.getItem('beautify_chat_avatar_cfg') || 'null');
     if (cfg && typeof cfg.radius === 'number') avatarState.radius = cfg.radius;
     if (cfg && typeof cfg.size === 'number') avatarState.size = cfg.size;
+    if (cfg && typeof cfg.frameUrl === 'string') avatarState.frameUrl = cfg.frameUrl;
+    if (cfg && typeof cfg.frameScale === 'number') avatarState.frameScale = cfg.frameScale;
   } catch (e) {}
   if (avatarRadiusEl) avatarRadiusEl.value = avatarState.radius;
   if (avatarSizeEl) avatarSizeEl.value = avatarState.size;
+  if (avatarFrameUrlEl) avatarFrameUrlEl.value = avatarState.frameUrl || '';
+  if (avatarFrameScaleEl) avatarFrameScaleEl.value = avatarState.frameScale;
   syncAvatarLabels();
   previewAvatarCss = buildAvatarCss();
 })();

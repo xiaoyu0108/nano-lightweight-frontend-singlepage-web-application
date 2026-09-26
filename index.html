@@ -31,6 +31,8 @@
         html, body {
             width: 100%;
             height: 100vh;
+            /* iOS Safari：100vh 会延伸到浏览器底栏后面，dvh 才是真正可见高度 */
+            height: 100dvh;
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -41,6 +43,7 @@
         .app-container {
             width: 100%;
             height: 100vh;
+            height: 100dvh;
             margin: 0;
             background: transparent;
             padding: 0 16px 0 16px;
@@ -215,6 +218,7 @@
             left: 0;
             width: 100%;
             height: 100vh;
+            height: 100dvh;
             background: #ffffff;
             z-index: 100;
             display: none;
@@ -235,6 +239,7 @@
             max-width: 430px;
             margin: 0 auto;
             height: 100vh;
+            height: 100dvh;
             display: flex;
             flex-direction: column;
         }

@@ -100,22 +100,19 @@ function setupThoughtExpand(el) {
 }
 
   // ===== 默认模板（高度可 DIY）=====
-  const DEFAULT_CSS = `/* iOS邮件 · 默认模板（高度 DIY）
+  const DEFAULT_CSS = `/* ============================================================
+   默认 · 居中大头像（iOS 邮件风）— 常用 DIY 已直接写进模板
    ------------------------------------------------------------
-   常用「自由 DIY」速查（直接改下面任意值即可，也可整段替换）：
-   · 头像大小 / 圆角：改 .nano-voice-modal 上的 --iv-avatar-size / --iv-avatar-radius
-   · 头像居中变大：.iv-sender{flex-direction:column;align-items:center;text-align:center}
-                    .iv-sender-info{margin-left:0;margin-top:10px;text-align:center}
-   · 昵称换行：.iv-sender{flex-wrap:wrap} .iv-sender-info{flex:1 1 100%;margin-left:0;margin-top:8px}
-   · 加一行文字：往 .iv-deco-top / .iv-deco-bottom / .iv-extra-text 里用 content 追加，
-                 换行用 "\\A" 并配 white-space:pre-wrap；
-                 用伪元素时记得先 .iv-deco-top{display:block;padding:8px 22px 0}
-   · 加装饰贴图：#ivDecoTop / #ivDecoBottom 在「快捷 DIY」里可直接填 <img src="...">
-                 或用 .nano-voice-modal::before{content:url("https://.../sticker.png")}
-   · 加角标/水印：.iv-content::after{content:"Nano";position:absolute;right:16px;bottom:12px;opacity:.35}
-   ------------------------------------------------------------ */
+   · 头像大小 / 圆角：改 .nano-voice-modal 的 --iv-avatar-size / --iv-avatar-radius
+   · 想恢复「左头像」经典版：在「模板管理」里选「经典 · 左头像 iOS邮件」
+   · 加一行文字：.iv-extra-text{display:block} + .iv-extra-text::before{content:"..."}
+                 （换行写 "\\A" 并配 white-space:pre-wrap）
+   · 加装饰贴图：.iv-deco-top / .iv-deco-bottom 默认 display:none，
+                 想用时设成 display:block 再配 ::before{content:url("图片地址")}
+   · 加角标 / 水印：.iv-content::after{content:"Nano";position:absolute;right:16px;bottom:12px;opacity:.35}
+   ============================================================ */
 .nano-voice-modal {
-  --iv-avatar-size: 48px;
+  --iv-avatar-size: 72px;
   --iv-avatar-radius: 50%;
   background: rgba(255, 255, 255, 0.78);
   border-radius: 20px;
@@ -129,14 +126,23 @@ function setupThoughtExpand(el) {
   border-radius: 20px 20px 0 0;
 }
 .iv-avatar {
-  width: var(--iv-avatar-size, 48px);
-  height: var(--iv-avatar-size, 48px);
-  flex: 0 0 var(--iv-avatar-size, 48px);
+  width: var(--iv-avatar-size, 72px);
+  height: var(--iv-avatar-size, 72px);
+  flex: 0 0 var(--iv-avatar-size, 72px);
   background: rgba(240, 240, 245, 0.6);
   border-radius: var(--iv-avatar-radius, 50%);
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
+/* 头像居中 + 昵称独立成行（想恢复左对齐就删掉这一段） */
+.iv-sender { flex-direction: column; align-items: center; text-align: center; }
+.iv-sender-info { flex: none; margin-left: 0; margin-top: 12px; text-align: center; }
+.iv-name { white-space: normal; overflow-wrap: anywhere; font-size: 22px; }
+.iv-unread { margin-left: 0; margin-top: 10px; }
+.iv-meta { grid-template-columns: auto auto; justify-content: center; column-gap: 6px; }
+.iv-subject { text-align: center; }
+.iv-subject-text { text-align: center; }
+.iv-content { min-height: 200px; padding: 20px 24px 26px; }
 /* DIY 装饰层 / 附加文字（默认空不占位；填了内容或加 .on 才显示）。
    注意：若用 CSS 的 ::after/::before 追加装饰，请把 .iv-deco-top / .iv-deco-bottom 设为 display:block。 */
 .iv-deco { position: relative; z-index: 6; pointer-events: none; display: none; }
@@ -229,6 +235,42 @@ function setupThoughtExpand(el) {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), inset 0 1px 1px rgba(255, 255, 255, 0.7);
 }`;
 
+  // ===== 内置模板 2：经典 · 左头像 iOS邮件（旧版默认外观） =====
+  const CLASSIC_CSS = `/* 经典 · 左头像 iOS邮件 */
+.nano-voice-modal { --iv-avatar-size: 48px; --iv-avatar-radius: 50%; }
+.iv-header { padding: 18px 22px 14px; text-align: left; }
+.iv-sender { flex-direction: row; align-items: center; }
+.iv-sender-info { flex: 1; margin-left: 14px; margin-top: 0; text-align: left; }
+.iv-name { font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.iv-unread { margin-left: 12px; margin-top: 0; }
+.iv-meta { grid-template-columns: 48px 1fr; justify-content: start; column-gap: 0; }
+.iv-subject { text-align: left; }
+.iv-subject-text { text-align: left; }
+.iv-content { min-height: 240px; padding: 18px 22px 24px; }`;
+
+  // ===== 内置模板 3：极简 · 无边框 =====
+  const MINIMAL_CSS = `/* 极简 · 无边框 */
+.nano-voice-modal {
+  --iv-avatar-size: 56px;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.10);
+}
+.iv-header, .iv-subject, .iv-content { background: transparent; }
+.iv-header { border-bottom: 1px solid rgba(60, 60, 67, 0.08); }
+.iv-subject { border-bottom: 1px solid rgba(60, 60, 67, 0.08); }
+.iv-thought { font-family: var(--iv-sans); }`;
+
+  // ===== 内置模板列表（首次自动写入，且在模板管理里不可删除/改名） =====
+  const BUILTIN_TEMPLATES = [
+    { id: 'default', name: '默认 · 居中大头像', css: DEFAULT_CSS },
+    { id: 'builtin_classic', name: '经典 · 左头像 iOS邮件', css: CLASSIC_CSS },
+    { id: 'builtin_minimal', name: '极简 · 无边框', css: MINIMAL_CSS }
+  ];
+  function isBuiltinTemplate(id) {
+    return BUILTIN_TEMPLATES.some(function (b) { return b.id === id; });
+  }
+
   // ===== IndexedDB 工具 =====
   const DB_NAME = 'NanoVoiceDB';
   const STORE_NAME = 'templates';
@@ -285,20 +327,20 @@ function setupThoughtExpand(el) {
 
   async function initDefaultTemplate() {
     const all = await getAllTemplates();
-    const hasDefault = all.some(t => t.id === 'default');
-    if (!hasDefault) {
-      await saveTemplate('default', '默认 · iOS邮件', DEFAULT_CSS);
-    } else {
-      // 一次性迁移：旧版“默认 · 狂野草书”默认模板统一升级为“默认 · iOS邮件”+ 完整默认样式
-      const tpl = all.find(t => t.id === 'default');
-      const isOld = tpl && (
-        (tpl.name && String(tpl.name).indexOf('狂野草书') !== -1) ||
-        (tpl.css && String(tpl.css).indexOf('狂野草书') !== -1) ||
-        (tpl.css && String(tpl.css).indexOf('Snell Roundhand') !== -1)
-      );
-      if (isOld) {
-        await saveTemplate('default', '默认 · iOS邮件', DEFAULT_CSS);
-      }
+    const byId = {};
+    all.forEach(function (t) { byId[t.id] = t; });
+    // 内置模板：缺失才补齐，绝不覆盖用户自己保存的模板
+    for (var i = 0; i < BUILTIN_TEMPLATES.length; i++) {
+      var b = BUILTIN_TEMPLATES[i];
+      if (!byId[b.id]) await saveTemplate(b.id, b.name, b.css);
+    }
+    // 旧版默认模板（狂野草书 / 老 iOS邮件）统一升级为新的「居中大头像」默认模板
+    const def = byId['default'];
+    if (def) {
+      const css = String(def.css || '');
+      const isOld = css.indexOf('居中大头像') === -1 ||
+        css.indexOf('狂野草书') !== -1 || css.indexOf('Snell Roundhand') !== -1;
+      if (isOld) await saveTemplate('default', '默认 · 居中大头像', DEFAULT_CSS);
     }
   }
 
@@ -404,17 +446,6 @@ function setupThoughtExpand(el) {
     if (c.hideMeta) css += '.nano-voice-modal .iv-meta{display:none !important;}\n';
     if (c.hideUnread) css += '.nano-voice-modal .iv-unread{display:none !important;}\n';
     if (c.avatarRight) css += '.iv-sender{flex-direction:row-reverse;}\n.iv-sender-info{margin-left:0;margin-right:14px;text-align:right;}\n.iv-unread{margin-left:0;margin-right:12px;}\n';
-    // 头像居中 / 放大
-    if (c.avatarCenter) css += '.nano-voice-modal .iv-sender{flex-direction:column;align-items:center;text-align:center;}\n' +
-      '.nano-voice-modal .iv-sender-info{margin-left:0;margin-top:10px;text-align:center;}\n' +
-      '.nano-voice-modal .iv-unread{margin-left:0;margin-top:10px;}\n';
-    if (c.avatarSize) {
-      const s = Math.max(24, Math.min(200, parseInt(c.avatarSize, 10) || 0));
-      if (s) css += '.nano-voice-modal{--iv-avatar-size:' + s + 'px;}\n';
-    }
-    // 昵称独立成行：把头像下方的信息整块换行显示
-    if (c.nameNewline) css += '.nano-voice-modal .iv-sender{flex-wrap:wrap;}\n' +
-      '.nano-voice-modal .iv-sender-info{flex:1 1 100%;margin-left:0;margin-top:8px;}\n';
     let tag = document.getElementById('nanoVoiceQuickCSS');
     if (!tag) {
       tag = document.createElement('style');
@@ -422,19 +453,6 @@ function setupThoughtExpand(el) {
       document.body.appendChild(tag);
     }
     tag.textContent = css;
-
-    // 附加文字 / 顶部·底部装饰（文字或 HTML，如 <img> 贴图）
-    const setHtml = function (id, html) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const has = !!(html && String(html).trim());
-      el.innerHTML = has ? String(html) : '';
-      el.classList.toggle('on', has);
-    };
-    setHtml('ivDecoTop', c.decoTopHtml);
-    setHtml('ivDecoBottom', c.decoBottomHtml);
-    const exEl = document.getElementById('ivExtraText');
-    if (exEl) exEl.textContent = c.extraText || '';
     // 自定义「美化 / 取消」按钮文案
     const bf = $('ivBeautify'), ex = $('ivExit');
     if (bf) {
@@ -463,14 +481,6 @@ function setupThoughtExpand(el) {
     if (ft) ft.checked = !!c.fullThought;
     const hu = $('ivHideUnread');
     if (hu) hu.checked = !!c.hideUnread;
-    const ac = $('ivAvatarCenter'), nn = $('ivNameNewline'), avs = $('ivAvatarSize');
-    if (ac) ac.checked = !!c.avatarCenter;
-    if (nn) nn.checked = !!c.nameNewline;
-    if (avs) avs.value = c.avatarSize || '';
-    const exIn = $('ivExtraTextInput'), dtp = $('ivDecoTopHtml'), dbm = $('ivDecoBottomHtml');
-    if (exIn) exIn.value = c.extraText || '';
-    if (dtp) dtp.value = c.decoTopHtml || '';
-    if (dbm) dbm.value = c.decoBottomHtml || '';
     const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
     if (bl) bl.value = c.beautifyLabel || '';
     if (el) el.value = c.exitLabel || '';
@@ -489,14 +499,6 @@ function setupThoughtExpand(el) {
       c.fullThought = ft ? !!ft.checked : false;
       const hu = $('ivHideUnread');
       c.hideUnread = hu ? !!hu.checked : false;
-      const ac = $('ivAvatarCenter'), nn = $('ivNameNewline'), avs = $('ivAvatarSize');
-      c.avatarCenter = ac ? !!ac.checked : false;
-      c.nameNewline = nn ? !!nn.checked : false;
-      c.avatarSize = avs ? avs.value.trim() : '';
-      const exIn = $('ivExtraTextInput'), dtp = $('ivDecoTopHtml'), dbm = $('ivDecoBottomHtml');
-      c.extraText = exIn ? exIn.value : '';
-      c.decoTopHtml = dtp ? dtp.value : '';
-      c.decoBottomHtml = dbm ? dbm.value : '';
       const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
       c.beautifyLabel = bl ? bl.value.trim() : '';
       c.exitLabel = el ? el.value.trim() : '';
@@ -515,7 +517,9 @@ function setupThoughtExpand(el) {
   // ===== 关闭弹窗 =====
   function closeVoice() {
     const layer = $('nanoVoiceLayer');
-    layer.classList.remove('active');
+    layer.classList.remove('active', 'customizing');
+    const panel = $('ivCustomize');
+    if (panel) panel.classList.remove('show');
     try { window.parent.postMessage({ type: 'NANO_INNER_VOICE_CLOSE' }, '*'); } catch(e) {}
   }
 
@@ -597,9 +601,14 @@ function setupThoughtExpand(el) {
       if (e.target === this) closeVoice();
     });
 
-    // 美化面板开关
+    // 美化面板开关（打开时关掉毛玻璃，iOS 不卡）
+    const setCustomizing = function (on) {
+      const layer = $('nanoVoiceLayer');
+      if (layer) layer.classList.toggle('customizing', !!on);
+    };
     $('ivBeautify').addEventListener('click', async function() {
       $('ivCustomize').classList.add('show');
+      setCustomizing(true);
       await initDefaultTemplate();
       // 未选中任何模板时，回退到默认模板，并把默认 UI 的 css 代码载入输入框
       const target = currentTemplateId || 'default';
@@ -607,6 +616,7 @@ function setupThoughtExpand(el) {
     });
     $('ivCustomizeClose').addEventListener('click', function() {
       $('ivCustomize').classList.remove('show');
+      setCustomizing(false);
     });
 
     // 下拉切换
@@ -638,7 +648,7 @@ function setupThoughtExpand(el) {
     $('ivRenameTemplate').addEventListener('click', async function() {
       const id = $('ivTemplateSelect').value;
       if (!id) { alert('请先选择一个预设'); return; }
-      if (id === 'default') { alert('默认模板不可修改'); return; }
+      if (isBuiltinTemplate(id)) { alert('内置模板不可修改，请另存为新模板'); return; }
 
       const all = await getAllTemplates();
       const tpl = all.find(t => t.id === id);
@@ -674,7 +684,7 @@ function setupThoughtExpand(el) {
     $('ivDeleteTemplate').addEventListener('click', async function() {
       const id = $('ivTemplateSelect').value;
       if (!id) { alert('请先选择一个预设'); return; }
-      if (id === 'default') { alert('默认模板不可删除'); return; }
+      if (isBuiltinTemplate(id)) { alert('内置模板不可删除'); return; }
       const all = await getAllTemplates();
       const tpl = all.find(t => t.id === id);
       if (!tpl) return;
@@ -710,6 +720,7 @@ function setupThoughtExpand(el) {
         await saveCurrentToTemplate();
       }
       $('ivCustomize').classList.remove('show');
+      setCustomizing(false);
     });
 
     // 恢复默认：还原初始 UI，并同步让 CSS 覆盖输入栏恢复为初始 UI 的 css 代码
@@ -719,8 +730,8 @@ function setupThoughtExpand(el) {
       saveAppliedCss('');
       document.querySelector('.iv-thought').style.cssText = '';
       document.querySelector('.nano-voice-modal').style.cssText = '';
-      // 同步把 CSS 覆盖输入栏恢复为「最新的内置 DIY 模板」代码（旧版默认模板会升级过来）
-      await saveTemplate('default', '默认 · iOS邮件', DEFAULT_CSS);
+      // 同步把 CSS 覆盖输入栏恢复为「最新的内置模板」代码（旧版默认模板会升级过来）
+      await saveTemplate('default', '默认 · 居中大头像', DEFAULT_CSS);
       const all = await getAllTemplates();
       const defaultTpl = all.find(t => t.id === 'default');
       if (defaultTpl) {
@@ -731,6 +742,7 @@ function setupThoughtExpand(el) {
         isInternalChange = false;
       }
       $('ivCustomize').classList.remove('show');
+      setCustomizing(false);
     });
 
     // 导入功能
