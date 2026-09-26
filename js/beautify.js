@@ -2265,7 +2265,7 @@ function buildAvatarCss() {
       + 'background-position:center center !important;'
       + 'background-size:contain !important;'
       + 'background-repeat:no-repeat !important;'
-      + 'pointer-events:none !important;z-index:9 !important;}';
+      + 'pointer-events:none !important;z-index:2147483000 !important;}';
   }
   return css;
 }

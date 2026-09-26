@@ -131,6 +131,42 @@
         var a = getEl('nano-beautify-chat-avatar');
         return !!(a && a.textContent && a.textContent.indexOf('::after') !== -1);
     }
+
+    // 直接用「原始配置」重建头像 CSS（不依赖美化页存下来的字符串，避免旧字符串/旧选择器导致不生效）
+    function buildAvatarCssFromCfg() {
+        var cfg = null;
+        try { cfg = JSON.parse(localStorage.getItem('beautify_chat_avatar_cfg') || 'null'); } catch (e) {}
+        if (!cfg) return '';
+        var r = (typeof cfg.radius === 'number' ? cfg.radius : 50) + '%';
+        var s = (typeof cfg.size === 'number' ? cfg.size : 36) + 'px';
+        var avs = [
+            'html body.nano-chat-inner .message-avatar',
+            'html body.nano-groups .message-avatar',
+            'html body.nano-chat-inner .typing-indicator .ti-avatar',
+            'html body.nano-groups .typing-indicator .ti-avatar'
+        ];
+        var avImgs = avs.map(function (x) { return x + ' img'; });
+        var css = avs.join(',') + '{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
+            + avImgs.join(',') + '{border-radius:' + r + ' !important;}';
+        var frame = String(cfg.frameUrl || '').trim();
+        if (frame) {
+            var scale = parseInt(cfg.frameScale, 10);
+            if (isNaN(scale)) scale = 16;
+            scale = Math.max(0, Math.min(60, scale));
+            var inset = -scale;
+            var url = frame.replace(/"/g, '%22').replace(/\)/g, '%29');
+            css += avs.join(',') + '{overflow:visible !important;position:relative !important;'
+                + 'transform:translateZ(0) !important;-webkit-backface-visibility:hidden !important;}'
+                + avImgs.join(',') + '{border-radius:inherit !important;}'
+                + avs.map(function (x) { return x + '::after'; }).join(',') + '{'
+                + 'content:"" !important;position:absolute !important;'
+                + 'top:' + inset + '% !important;right:' + inset + '% !important;bottom:' + inset + '% !important;left:' + inset + '% !important;'
+                + 'background-image:url("' + url + '") !important;background-position:center center !important;'
+                + 'background-size:contain !important;background-repeat:no-repeat !important;'
+                + 'pointer-events:none !important;z-index:2147483000 !important;}';
+        }
+        return css;
+    }
     function enforceAvatarOverflow() {
         if (!isChatInterior) return;
         var nodes;
@@ -352,7 +388,14 @@
             applyChatCss(migrateChatCss(readCss('beautify_chat_v2')));
         } catch (e) {}
         try {
-            applyChatAvatarCss(readCss('beautify_chat_avatar'));
+            // 配置里有头像框就用「原始配置重建」（避免美化页存下来的旧 CSS 字符串/旧选择器不生效）；
+            // 配置里没有框则沿用已保存的 CSS 字符串。
+            var _acfg = null;
+            try { _acfg = JSON.parse(localStorage.getItem('beautify_chat_avatar_cfg') || 'null'); } catch (e) {}
+            var _avCss = (_acfg && String(_acfg.frameUrl || '').trim())
+                ? buildAvatarCssFromCfg()
+                : readCss('beautify_chat_avatar');
+            applyChatAvatarCss(_avCss);
         } catch (e) {}
         try {
             applyGlobalCss(unlockScrollCss(migrateGlobalCss(readCss('beautify_global_v2'))));
