@@ -2228,10 +2228,26 @@ const avatarState = { radius: 50, size: 36, frameUrl: '', frameScale: 16 };
 function buildAvatarCss() {
   const r = (avatarState.radius != null ? avatarState.radius : 50) + '%';
   const s = (avatarState.size != null ? avatarState.size : 36) + 'px';
-  let css = '.message-avatar,.topbar-avatar{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
-    + '.message-avatar img,.topbar-avatar img,.typing-indicator .ti-avatar{border-radius:' + r + ' !important;}'
-    + '.typing-indicator .ti-avatar{width:' + s + ' !important;height:' + s + ' !important;}';
-  // 头像框：把扣好的透明 PNG 叠在头像上，按头像比例自动适配（inset 为负，向外扩一圈）
+  // 消息头像 / 正在输入头像：用高优先级选择器，避免被聊天模板（.nano-chat-inner .message-avatar）盖掉
+  const avs = [
+    'html body .nano-chat-inner .message-avatar',
+    'html body .nano-groups .message-avatar',
+    'html body .nano-chat-inner .typing-indicator .ti-avatar',
+    'html body .nano-groups .typing-indicator .ti-avatar'
+  ];
+  const avImgs = avs.map(function (x) { return x + ' img'; });
+  // 顶栏头像（其实是设置按钮）：只跟随「方圆 / 大小」，不加头像框
+  const tops = ['html .nano-chat-inner .topbar-avatar', 'html .nano-groups .topbar-avatar'];
+  const topKids = tops.map(function (x) { return x + ' img'; })
+    .concat(tops.map(function (x) { return x + ' > span'; }));
+
+  let css = avs.join(',') + '{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
+    + avImgs.join(',') + '{border-radius:' + r + ' !important;}'
+    + tops.join(',') + '{border-radius:' + r + ' !important;width:' + s + ' !important;height:' + s + ' !important;}'
+    + topKids.join(',') + '{border-radius:' + r + ' !important;}';
+
+  // 头像框：把扣好的透明 PNG 叠在「消息头像」上，按头像比例自动适配（往外扩一圈）。
+  // 注意：顶栏头像不加框（它是设置按钮）。
   const frame = String(avatarState.frameUrl || '').trim();
   if (frame) {
     let scale = parseInt(avatarState.frameScale, 10);
@@ -2239,10 +2255,10 @@ function buildAvatarCss() {
     scale = Math.max(0, Math.min(60, scale));
     const inset = -scale;
     const url = frame.replace(/"/g, '%22').replace(/\)/g, '%29');
-    // 注意：老 iOS WebView 对 inset / background 简写支持不全，这里全用长写 + 逐边偏移，兼容性最好
-    css += '.message-avatar,.topbar-avatar,.typing-indicator .ti-avatar{overflow:visible !important;position:relative !important;}'
-      + '.message-avatar img,.topbar-avatar img,.typing-indicator .ti-avatar img{border-radius:inherit !important;}'
-      + '.message-avatar::after,.topbar-avatar::after,.typing-indicator .ti-avatar::after{'
+    // 老 iOS WebView 对 inset / background 简写支持不全，这里全用长写 + 逐边偏移，兼容性最好
+    css += avs.join(',') + '{overflow:visible !important;position:relative !important;}'
+      + avImgs.join(',') + '{border-radius:inherit !important;}'
+      + avs.map(function (x) { return x + '::after'; }).join(',') + '{'
       + 'content:"" !important;position:absolute !important;'
       + 'top:' + inset + '% !important;right:' + inset + '% !important;bottom:' + inset + '% !important;left:' + inset + '% !important;'
       + 'background-image:url("' + url + '") !important;'

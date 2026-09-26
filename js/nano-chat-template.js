@@ -568,18 +568,37 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    .nano-chat-inner .message-row.right .message-avatar { display: none; }
 */
 
-/* 配方 C：把顶栏「头像」从设置按钮上剥离、独立位移（设置逻辑不变）
-   .nano-chat-inner .topbar-avatar { overflow: visible; }
-   .nano-chat-inner .topbar-avatar img, .nano-chat-inner .topbar-avatar > span {
-     position: absolute; left: 50%; top: 50%;
-     width: 44px; height: 44px; border-radius: 50%;
-     transform: translate(-50%, -50%) translate(56px, 0);   // 往右移 56px
-     box-shadow: 0 2px 8px rgba(0,0,0,.15);
+/* 配方 C：把顶栏「头像」从设置按钮上剥离成独立覆盖装饰，可自由移动；
+   设置按钮原地不动、照样能点（头像只是它的覆盖装饰）。
+   原理：头像图片/占位文字脱离按钮的布局流（position:fixed），按钮只留一个透明点击区。
+   —— 想移动头像只改 left / right / top；不想要阴影就删掉 box-shadow。
+
+   .nano-chat-inner .topbar-avatar,
+   .nano-groups .topbar-avatar {
+     position: relative !important;           // 设置按钮留在顶栏原位
+     overflow: visible !important;
+     background: transparent !important;
+     border: none !important;
+     box-shadow: none !important;
+     backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
    }
-   // 隐藏头像，只留空设置按钮：
-   .nano-chat-inner .topbar-avatar img, .nano-chat-inner .topbar-avatar > span { display: none; }
-   // 设置按钮本身也移动：
-   .nano-chat-inner .topbar-avatar { order: -1; }
+   .nano-chat-inner .topbar-avatar > img,
+   .nano-chat-inner .topbar-avatar > span,
+   .nano-groups .topbar-avatar > img,
+   .nano-groups .topbar-avatar > span {
+     position: fixed !important;              // 固定定位 = 可放到屏幕任意位置
+     left: auto !important;
+     right: 16px;                             // ← 改这里可左右移动头像
+     top: calc(var(--safe-top, 0px) + 10px);  // ← 改这里可上下移动头像
+     width: 52px !important; height: 52px !important;
+     border-radius: 50% !important;
+     object-fit: cover;
+     z-index: 26 !important;
+     pointer-events: none !important;         // 装饰层不挡点击，点击仍落到设置按钮
+     box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+   }
+   // 可选：给透明的设置按钮自己加个可见图标（设置自己渲染）
+   // .nano-chat-inner .topbar-avatar::before { content: "⚙"; font-size: 18px; color: #8e8e93; }
 */
 
 /* 配方 D：气泡尾巴规则 / 已读 / 时间
