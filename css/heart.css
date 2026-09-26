@@ -80,15 +80,16 @@ button, input, textarea { font: inherit; outline: none; }
 }
 .iv-sender { display: flex; align-items: center; }
 .iv-avatar {
-  width: 48px; height: 48px; flex: 0 0 48px;
-  border-radius: 50%; overflow: hidden;
+  /* 可用 --iv-avatar-size 自由调整大小（快捷 DIY 的「头像大小」就是改这个变量） */
+  width: var(--iv-avatar-size, 48px); height: var(--iv-avatar-size, 48px); flex: 0 0 var(--iv-avatar-size, 48px);
+  border-radius: var(--iv-avatar-radius, 50%); overflow: hidden;
   background: rgba(240, 240, 245, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
   display: flex; align-items: center; justify-content: center;
 }
 .iv-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.iv-avatar-fallback { color: #6c6c70; font-size: 20px; font-weight: 500; }
+.iv-avatar-fallback { color: #6c6c70; font-size: calc(var(--iv-avatar-size, 48px) * 0.42); font-weight: 500; }
 .iv-sender-info { min-width: 0; flex: 1; margin-left: 14px; }
 .iv-caption { color: var(--iv-secondary); font-size: 11px; font-weight: 500; letter-spacing: 0.2px; margin-bottom: 2px; }
 .iv-name { font-family: var(--iv-serif); font-size: 20px; font-weight: 600; line-height: 1.2; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1c1c1e; }
@@ -162,6 +163,24 @@ button, input, textarea { font: inherit; outline: none; }
   height: 0;
   margin: 0;
 }
+
+/* ===== DIY 装饰层 / 附加文字（默认空不占位；填了内容或加 .on 才显示） ===== */
+.iv-deco { position: relative; z-index: 6; pointer-events: none; display: none; }
+.iv-deco.on { display: block; }
+.iv-deco-top.on { padding: 8px 22px 0; }
+.iv-deco-bottom.on { padding: 0 22px 10px; }
+.iv-deco img { max-width: 100%; height: auto; display: block; }
+.iv-deco-top img { margin: 0 auto; }
+.iv-deco .my-sticker { display: block; margin: 0 auto; }
+.iv-extra-text {
+  margin-top: 12px; padding-top: 8px;
+  border-top: 1px dashed var(--iv-separator);
+  color: var(--iv-secondary);
+  font-family: var(--iv-serif);
+  font-size: 13px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+}
+.iv-extra-text:empty { display: none; }
 
 /* 底部按钮（位于心声卡片外部下侧） */
 .iv-content-actions {
@@ -261,12 +280,12 @@ button, input, textarea { font: inherit; outline: none; }
 .iv-quick-field-title { font-size: 12px; color: var(--iv-secondary, #8e8e93); font-weight: 600; }
 .iv-quick-field-row { display: flex; gap: 8px; }
 .iv-quick-field-row input[type="text"] { flex: 1 1 0; width: auto; min-width: 0; }
-.iv-quick input[type="text"], .iv-quick textarea {
+.iv-quick input[type="text"], .iv-quick input[type="number"], .iv-quick textarea {
   width: 100%; border: 1px solid rgba(60,60,67,0.12); background: rgba(255,255,255,0.7);
   border-radius: 10px; padding: 9px 10px; font-size: 13px; font-family: inherit;
   color: #1c1c1e; outline: none;
 }
-.iv-quick input[type="text"]:focus, .iv-quick textarea:focus { border-color: rgba(0,122,255,0.5); background: #fff; }
+.iv-quick input[type="text"]:focus, .iv-quick input[type="number"]:focus, .iv-quick textarea:focus { border-color: rgba(0,122,255,0.5); background: #fff; }
 .iv-quick textarea { min-height: 68px; resize: vertical; line-height: 1.5; }
 .iv-quick-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
 .iv-import-btn {

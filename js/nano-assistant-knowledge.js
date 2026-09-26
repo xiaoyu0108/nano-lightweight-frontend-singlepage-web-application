@@ -35,8 +35,8 @@ window.NANO_ASSISTANT_KB = {
       id: 'heart', name: '心声美化',
       storage: 'localStorage: nano_voice_applied_css（同时写心声模板库 NanoVoiceDB/templates，预设名可直接用 name 覆盖更新）',
       target: 'heart',
-      desc: '心声弹层。根容器 .nano-voice-modal；可隐藏/移动头像、昵称、收件信息、主题、正文，隐藏红点；也可以自由加行/换行：用 ::after/::before + content（换行写 \\A 并配 white-space:pre）在 .iv-content、.iv-thought、.iv-subject 上追加内容，或改 .iv-content 的最小高度、内边距。',
-      selectors: ['.nano-voice-modal', '.nano-voice-modal .iv-avatar', '.iv-name', '.iv-meta', '.iv-subject', '.iv-subject-text', '.iv-content', '.iv-content-label', '.iv-thought', '.iv-unread']
+      desc: '心声弹层，高度可 DIY。根容器 .nano-voice-modal；头像大小/圆角用变量 --iv-avatar-size / --iv-avatar-radius；头像居中：.iv-sender{flex-direction:column;align-items:center;text-align:center}；昵称换行：.iv-sender{flex-wrap:wrap} + .iv-sender-info{flex:1 1 100%}。装饰层 .iv-deco-top / .iv-deco-bottom（默认 display:none；用伪元素加内容前先设 display:block）和附加文字 .iv-extra-text。加行/换行用 ::after/::before + content（换行写 \\A 并配 white-space:pre）。加贴图可用 content:url("图片地址") 或 #ivDecoTop/#ivDecoBottom。',
+      selectors: ['.nano-voice-modal', '.iv-sender', '.iv-sender-info', '.nano-voice-modal .iv-avatar', '.iv-name', '.iv-meta', '.iv-subject', '.iv-subject-text', '.iv-content', '.iv-content-label', '.iv-thought', '.iv-extra-text', '.iv-deco-top', '.iv-deco-bottom', '#ivDecoTop', '#ivDecoBottom', '.iv-unread']
     },
     {
       id: 'offline', name: '线下美化',

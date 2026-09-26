@@ -23,7 +23,8 @@ function buildImpressionPrompt(charName) {
 要求：用第三人称，描写的句子要像电影画面一样有质感，直接写画面。
 【严禁】以"男/女/他/她/男人/女人/男的/女的/这男人/这女人"等性别或人称词开头或作前缀（例如绝不能写"男靠在窗边""女穿着衬衫"）。
 不要使用关联词（如"因为…所以…"、"虽然…但是…"、"既…又…"等）。
-严禁出现"小姑娘/小东西/小家伙/小丫头/小可爱/女孩/姑娘/丫头/女人"等油腻称呼与霸总腔。
+严禁出现"小姑娘/小东西/小家伙/小丫头/小可爱/女孩/姑娘/丫头/女人/这女人/这丫头"等油腻称呼与霸总腔。
+严禁霸总网文式的生理特写：低吼、揉碎、掐腰、红着眼、哑声、眸色一沉、危险地眯眼、喉结滚动等；也不要身体部位特写或性暗示。
 
 示例："坐在窗边，白衬衫微敞，指尖轻叩桌面"
 示例二："窝在沙发角落，灰色卫衣的帽子压得很低，盯着手机发呆"
@@ -47,6 +48,7 @@ function buildThoughtPrompt(charName, userName, messageText) {
 7. 严禁出现"小姑娘/小东西/小家伙/小丫头/小可爱/女孩/姑娘/丫头/女人"等油腻称呼与霸总腔
 8. 严禁催促、命令、安排对方的生活（如催吹头发、起床、睡觉、吃饭、喝水、吃药、早点休息）
 9. 严禁替对方说话或预设对方的回答、反应；严禁凭空给对方添加胃病等任何病症，除非设定里明确写了
+10. 严禁霸道油腻/霸总网文腔：小姑娘、小东西、小丫头、丫头、女人、这女人、低吼、揉碎、掐腰、红着眼、哑声、眸色一沉、你是我的、逃不掉、宠你、乖、听话、让我好好疼你、我接住你、我等你慢慢说、别怕有我在 等一律禁止；不写占有欲、命令口吻、露骨或性暗示。写完自查一遍，出现即重写。
 
 现在请写出${charName}的心理活动：`;
 
@@ -97,9 +99,24 @@ function setupThoughtExpand(el) {
   });
 }
 
-  // ===== 默认模板 =====
-  const DEFAULT_CSS = `/* iOS邮件 · 默认模板 */
+  // ===== 默认模板（高度可 DIY）=====
+  const DEFAULT_CSS = `/* iOS邮件 · 默认模板（高度 DIY）
+   ------------------------------------------------------------
+   常用「自由 DIY」速查（直接改下面任意值即可，也可整段替换）：
+   · 头像大小 / 圆角：改 .nano-voice-modal 上的 --iv-avatar-size / --iv-avatar-radius
+   · 头像居中变大：.iv-sender{flex-direction:column;align-items:center;text-align:center}
+                    .iv-sender-info{margin-left:0;margin-top:10px;text-align:center}
+   · 昵称换行：.iv-sender{flex-wrap:wrap} .iv-sender-info{flex:1 1 100%;margin-left:0;margin-top:8px}
+   · 加一行文字：往 .iv-deco-top / .iv-deco-bottom / .iv-extra-text 里用 content 追加，
+                 换行用 "\\A" 并配 white-space:pre-wrap；
+                 用伪元素时记得先 .iv-deco-top{display:block;padding:8px 22px 0}
+   · 加装饰贴图：#ivDecoTop / #ivDecoBottom 在「快捷 DIY」里可直接填 <img src="...">
+                 或用 .nano-voice-modal::before{content:url("https://.../sticker.png")}
+   · 加角标/水印：.iv-content::after{content:"Nano";position:absolute;right:16px;bottom:12px;opacity:.35}
+   ------------------------------------------------------------ */
 .nano-voice-modal {
+  --iv-avatar-size: 48px;
+  --iv-avatar-radius: 50%;
   background: rgba(255, 255, 255, 0.78);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -112,11 +129,28 @@ function setupThoughtExpand(el) {
   border-radius: 20px 20px 0 0;
 }
 .iv-avatar {
+  width: var(--iv-avatar-size, 48px);
+  height: var(--iv-avatar-size, 48px);
+  flex: 0 0 var(--iv-avatar-size, 48px);
   background: rgba(240, 240, 245, 0.6);
-  border-radius: 50%;
+  border-radius: var(--iv-avatar-radius, 50%);
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
+/* DIY 装饰层 / 附加文字（默认空不占位；填了内容或加 .on 才显示）。
+   注意：若用 CSS 的 ::after/::before 追加装饰，请把 .iv-deco-top / .iv-deco-bottom 设为 display:block。 */
+.iv-deco { position: relative; z-index: 6; pointer-events: none; display: none; }
+.iv-deco.on { display: block; }
+.iv-deco-top.on { padding: 8px 22px 0; }
+.iv-deco-bottom.on { padding: 0 22px 10px; }
+.iv-deco img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+.iv-extra-text {
+  margin-top: 12px; padding-top: 8px;
+  border-top: 1px dashed rgba(60, 60, 67, 0.12);
+  color: #8e8e93; font-size: 13px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+}
+.iv-extra-text:empty { display: none; }
 .iv-caption {
   color: #8e8e93;
   font-size: 11px;
@@ -370,6 +404,17 @@ function setupThoughtExpand(el) {
     if (c.hideMeta) css += '.nano-voice-modal .iv-meta{display:none !important;}\n';
     if (c.hideUnread) css += '.nano-voice-modal .iv-unread{display:none !important;}\n';
     if (c.avatarRight) css += '.iv-sender{flex-direction:row-reverse;}\n.iv-sender-info{margin-left:0;margin-right:14px;text-align:right;}\n.iv-unread{margin-left:0;margin-right:12px;}\n';
+    // 头像居中 / 放大
+    if (c.avatarCenter) css += '.nano-voice-modal .iv-sender{flex-direction:column;align-items:center;text-align:center;}\n' +
+      '.nano-voice-modal .iv-sender-info{margin-left:0;margin-top:10px;text-align:center;}\n' +
+      '.nano-voice-modal .iv-unread{margin-left:0;margin-top:10px;}\n';
+    if (c.avatarSize) {
+      const s = Math.max(24, Math.min(200, parseInt(c.avatarSize, 10) || 0));
+      if (s) css += '.nano-voice-modal{--iv-avatar-size:' + s + 'px;}\n';
+    }
+    // 昵称独立成行：把头像下方的信息整块换行显示
+    if (c.nameNewline) css += '.nano-voice-modal .iv-sender{flex-wrap:wrap;}\n' +
+      '.nano-voice-modal .iv-sender-info{flex:1 1 100%;margin-left:0;margin-top:8px;}\n';
     let tag = document.getElementById('nanoVoiceQuickCSS');
     if (!tag) {
       tag = document.createElement('style');
@@ -377,6 +422,19 @@ function setupThoughtExpand(el) {
       document.body.appendChild(tag);
     }
     tag.textContent = css;
+
+    // 附加文字 / 顶部·底部装饰（文字或 HTML，如 <img> 贴图）
+    const setHtml = function (id, html) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const has = !!(html && String(html).trim());
+      el.innerHTML = has ? String(html) : '';
+      el.classList.toggle('on', has);
+    };
+    setHtml('ivDecoTop', c.decoTopHtml);
+    setHtml('ivDecoBottom', c.decoBottomHtml);
+    const exEl = document.getElementById('ivExtraText');
+    if (exEl) exEl.textContent = c.extraText || '';
     // 自定义「美化 / 取消」按钮文案
     const bf = $('ivBeautify'), ex = $('ivExit');
     if (bf) {
@@ -405,6 +463,14 @@ function setupThoughtExpand(el) {
     if (ft) ft.checked = !!c.fullThought;
     const hu = $('ivHideUnread');
     if (hu) hu.checked = !!c.hideUnread;
+    const ac = $('ivAvatarCenter'), nn = $('ivNameNewline'), avs = $('ivAvatarSize');
+    if (ac) ac.checked = !!c.avatarCenter;
+    if (nn) nn.checked = !!c.nameNewline;
+    if (avs) avs.value = c.avatarSize || '';
+    const exIn = $('ivExtraTextInput'), dtp = $('ivDecoTopHtml'), dbm = $('ivDecoBottomHtml');
+    if (exIn) exIn.value = c.extraText || '';
+    if (dtp) dtp.value = c.decoTopHtml || '';
+    if (dbm) dbm.value = c.decoBottomHtml || '';
     const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
     if (bl) bl.value = c.beautifyLabel || '';
     if (el) el.value = c.exitLabel || '';
@@ -423,6 +489,14 @@ function setupThoughtExpand(el) {
       c.fullThought = ft ? !!ft.checked : false;
       const hu = $('ivHideUnread');
       c.hideUnread = hu ? !!hu.checked : false;
+      const ac = $('ivAvatarCenter'), nn = $('ivNameNewline'), avs = $('ivAvatarSize');
+      c.avatarCenter = ac ? !!ac.checked : false;
+      c.nameNewline = nn ? !!nn.checked : false;
+      c.avatarSize = avs ? avs.value.trim() : '';
+      const exIn = $('ivExtraTextInput'), dtp = $('ivDecoTopHtml'), dbm = $('ivDecoBottomHtml');
+      c.extraText = exIn ? exIn.value : '';
+      c.decoTopHtml = dtp ? dtp.value : '';
+      c.decoBottomHtml = dbm ? dbm.value : '';
       const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
       c.beautifyLabel = bl ? bl.value.trim() : '';
       c.exitLabel = el ? el.value.trim() : '';
@@ -645,8 +719,8 @@ function setupThoughtExpand(el) {
       saveAppliedCss('');
       document.querySelector('.iv-thought').style.cssText = '';
       document.querySelector('.nano-voice-modal').style.cssText = '';
-      // 同步把 CSS 覆盖输入栏恢复为默认模板（初始 UI）的 css 代码
-      await initDefaultTemplate();
+      // 同步把 CSS 覆盖输入栏恢复为「最新的内置 DIY 模板」代码（旧版默认模板会升级过来）
+      await saveTemplate('default', '默认 · iOS邮件', DEFAULT_CSS);
       const all = await getAllTemplates();
       const defaultTpl = all.find(t => t.id === 'default');
       if (defaultTpl) {
@@ -760,10 +834,11 @@ function setupThoughtExpand(el) {
   window.__heart = {
     open: openVoice,
     close: closeVoice,
-    getPrompt: function(charName, userName) {
-      return THOUGHT_PROMPT
-        .replace(/\{\{char\}\}/g, charName || '角色')
-        .replace(/\{\{user\}\}/g, userName || '用户');
+    getPrompt: function(charName, userName, messageText) {
+      return buildThoughtPrompt(charName || '角色', userName || '用户', messageText || '');
+    },
+    getImpressionPrompt: function(charName) {
+      return buildImpressionPrompt(charName || '角色');
     },
     // 更新数据（不打开弹窗）
     update: function(data) {
