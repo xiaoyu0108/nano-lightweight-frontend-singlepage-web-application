@@ -65,6 +65,13 @@
     function applyGlobalCss(css) {
         if (!isGlobalTargetPage()) return;
         applyStyle('nano-beautify-global', css || '');
+        bringAvatarToFront();
+    }
+
+    // 头像样式永远放最后，优先级最高（否则头像框会被聊天/全局 CSS 盖掉）
+    function bringAvatarToFront() {
+        var a = getEl('nano-beautify-chat-avatar');
+        if (a && a.parentNode) a.parentNode.appendChild(a);
     }
 
     // 结构修复：撤回 / 系统提示 / 居中卡片一律居中。
@@ -102,8 +109,7 @@
         var g = getEl('nano-beautify-global');
         if (g && g.parentNode) g.parentNode.appendChild(g);
         // 头像样式始终放最后，保证头像框不被聊天/全局 CSS 盖掉
-        var a = getEl('nano-beautify-chat-avatar');
-        if (a && a.parentNode) a.parentNode.appendChild(a);
+        bringAvatarToFront();
     }
 
     // 头像「方圆 / 大小」调节（美化页滑杆生成，作用聊天内页；优先级高于聊天 CSS）
@@ -111,8 +117,9 @@
         if (!isChatInterior) return;
         applyStyle('nano-beautify-chat-avatar', css || '');
         // 头像样式必须放在最后，优先级高于聊天 CSS / 全局 CSS，否则头像框会被后面的样式盖掉
-        var a = getEl('nano-beautify-chat-avatar');
-        if (a && a.parentNode) a.parentNode.appendChild(a);
+        bringAvatarToFront();
+        // 强制一次重排：应用美化模板后 iOS Safari 才会重新合成、显示头像框
+        try { void (document.body && document.body.offsetHeight); } catch (e) {}
     }
 
     function readCss(key) {
@@ -319,6 +326,9 @@
         try {
             applyFlushFix();
         } catch (e) {}
+        // 最后再确保头像样式在最后（有些注入会插到它后面）
+        try { bringAvatarToFront(); } catch (e) {}
+        try { void (document.body && document.body.offsetHeight); } catch (e) {}
         var cfg = readFontCfgSync();
         if (cfg) {
             applyFontCfg(cfg);

@@ -2253,7 +2253,10 @@ function buildAvatarCss() {
     const inset = -scale;
     const url = frame.replace(/"/g, '%22').replace(/\)/g, '%29');
     // 老 iOS WebView 对 inset / background 简写支持不全，这里全用长写 + 逐边偏移，兼容性最好
-    css += avs.join(',') + '{overflow:visible !important;position:relative !important;}'
+    // translateZ(0) 强制图层：修 iOS Safari 的「border-radius + overflow:hidden 后改 visible
+    // 仍把 ::after 裁掉」的合成 bug（初始 UI 没这问题、应用美化模板后才出现）。
+    css += avs.join(',') + '{overflow:visible !important;position:relative !important;'
+      + 'transform:translateZ(0) !important;-webkit-backface-visibility:hidden !important;}'
       + avImgs.join(',') + '{border-radius:inherit !important;}'
       + avs.map(function (x) { return x + '::after'; }).join(',') + '{'
       + 'content:"" !important;position:absolute !important;'
