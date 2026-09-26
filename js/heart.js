@@ -59,44 +59,11 @@ function buildThoughtPrompt(charName, userName, messageText) {
     return prompt;
 }
 
-// 心声手记：默认只显示 4 行，超长折叠，点击展开全部
+// 心声手记：不折叠。框够高就完整显示，内容太长时在心声区域内滑动（滚动条已隐藏）
 function setupThoughtExpand(el) {
   if (!el || typeof el.setAttribute !== 'function') return;
-  const full = (el.textContent || '').trim();
-  const lines = full.split(/\n/).length;
-  // 「完整显示心声（不折叠）」：快捷 DIY 里勾选后不折叠，换行/加行全部展示
-  let fullThought = false;
-  try { fullThought = !!(JSON.parse(localStorage.getItem('nano_voice_quick') || '{}') || {}).fullThought; } catch (e) {}
-  if (fullThought) {
-    el.classList.remove('collapsed', 'expanded');
-    el.dataset.full = full;
-    return;
-  }
-  const needCollapse = full.length > 90 || lines > 4;
-  if (!needCollapse) {
-    el.classList.remove('collapsed');
-    return;
-  }
-  el.dataset.full = full;
-  el.classList.add('collapsed');
-  if (window.__thoughtExpandHooked) return;
-  window.__thoughtExpandHooked = true;
-  el.addEventListener('click', function() {
-    if (this.classList.contains('collapsed')) {
-      this.textContent = this.dataset.full || this.textContent;
-      this.classList.remove('collapsed');
-      this.classList.add('expanded');
-      this.append(' （点击收起）');
-    } else {
-      this.textContent = this.dataset.full || this.textContent;
-      this.classList.add('collapsed');
-      this.classList.remove('expanded');
-      const lines2 = (this.textContent || '').split(/\n/).length;
-      if ((this.textContent || '').length > 90 || lines2 > 4) {
-        this.append(' （点击展开）');
-      }
-    }
-  });
+  el.classList.remove('collapsed', 'expanded');
+  el.dataset.full = (el.textContent || '').trim();
 }
 
   // ===== 默认模板（高度可 DIY）=====
@@ -477,8 +444,6 @@ function setupThoughtExpand(el) {
     const ss = $('ivShowSubject'), sm = $('ivShowMeta');
     if (ss) ss.checked = !c.hideSubject;
     if (sm) sm.checked = !c.hideMeta;
-    const ft = $('ivShowFullThought');
-    if (ft) ft.checked = !!c.fullThought;
     const hu = $('ivHideUnread');
     if (hu) hu.checked = !!c.hideUnread;
     const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
@@ -495,8 +460,6 @@ function setupThoughtExpand(el) {
       const ss = $('ivShowSubject'), sm = $('ivShowMeta');
       c.hideSubject = ss ? !ss.checked : false;
       c.hideMeta = sm ? !sm.checked : false;
-      const ft = $('ivShowFullThought');
-      c.fullThought = ft ? !!ft.checked : false;
       const hu = $('ivHideUnread');
       c.hideUnread = hu ? !!hu.checked : false;
       const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');

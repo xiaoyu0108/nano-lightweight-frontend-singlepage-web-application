@@ -156,7 +156,15 @@ button, input, textarea { font: inherit; outline: none; }
   transform: none;
   text-shadow: none;
   white-space: pre-wrap; word-break: break-word; padding: 4px 0;
+  /* 不折叠：框够高就完整显示，太长就在心声区域内滑动（滚动条隐藏） */
+  max-height: 52vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
+.iv-thought::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+.nano-voice-modal::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
 .iv-thought::after {
   content: "";
   display: inline-block;

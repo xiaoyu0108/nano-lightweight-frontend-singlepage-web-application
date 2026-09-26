@@ -635,7 +635,7 @@
                 (document.head || document.documentElement).appendChild(s);
             }
             if (!window.NANO_GLOBAL_TEMPLATE) load('js/nano-global-template.js');
-            if (!window.NANO_CHAT_TEMPLATE) load('js/nano-chat-template.js');
+            if (!window.NANO_CHAT_TEMPLATE) load('js/nano-chat-template.js?v=20260926i');
             finish();
         });
         return beautyTemplatesReady;

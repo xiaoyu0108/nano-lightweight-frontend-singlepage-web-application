@@ -1761,6 +1761,11 @@
         row.className = 'message-row ' + type;
         row.dataset.id = rowId;
         row.dataset.type = type;
+        // 时间小字用（美化模板 time 配方读取）
+        if (time) row.dataset.time = time;
+        // 同一侧连续消息（不论气泡/图片/表情包/卡片）：给整行打标记，
+        // 美化里可用 .grouped-row 做「头像只显示一次」等效果
+        if (grouped) row.classList.add('grouped-row');
         if (recalled) row.classList.add('recalled');
         if (isCard && cardData && cardData.centered) row.classList.add('centered');
         // 系统提示（一起听等）：居中灰框，不带气泡

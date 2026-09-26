@@ -557,15 +557,19 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    }
 */
 
-/* 配方 B：头像框 / 隐藏头像 / 只显示一次头像
-   // 圆形头像框（box-shadow 不会被 overflow 裁掉）
-   .nano-chat-inner .message-avatar, .nano-chat-inner .topbar-avatar { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ff6fa0; }
-   // 隐藏头像但保留点击区域（设置按钮仍可点）
-   .nano-chat-inner .message-avatar { visibility: hidden; }
-   // 只显示一次头像：连发续行（.grouped）隐藏头像（需要较新 Safari 的 :has）
-   .nano-chat-inner .message-row:has(.bubble.grouped) .message-avatar { visibility: hidden; }
-   // 只显示对方头像、隐藏自己的头像
-   .nano-chat-inner .message-row.right .message-avatar { display: none; }
+/* 配方 B：头像显示方式（任选其一；.grouped-row 表示与上一条同侧，
+   不管是气泡 / 图片 / 表情包 / 卡片 / 语音都算连续，四选一即可）
+   // ① 每条都显示（默认，什么都不用写）
+   // ② 只显示一次：同侧连续消息里，后面的隐藏头像（保留占位，对齐不跑）
+   .nano-chat-inner .message-row.grouped-row .message-avatar,
+   .nano-groups .message-row.grouped-row .message-avatar { visibility: hidden; }
+   // ③ 完全不显示头像（连占位都不留）
+   .nano-chat-inner .message-avatar, .nano-groups .message-avatar { display: none; }
+   // ④ 只显示对方头像、隐藏自己的
+   .nano-chat-inner .message-row.right .message-avatar,
+   .nano-groups .message-row.right .message-avatar { display: none; }
+   // ⑤ 圆形头像框（box-shadow 不依赖 overflow，任何模板都不会被裁）
+   .nano-chat-inner .message-avatar { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ff6fa0; }
 */
 
 /* 配方 C：把顶栏「头像」从设置按钮上剥离成独立覆盖装饰，可自由移动；
@@ -607,12 +611,17 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    // 全部不要尾巴
    .bubble.other::after, .bubble.me::after,
    .voice-bubble.left::before, .voice-bubble.right::before { display: none !important; }
-   // 气泡上方加「时间」（静态示例；真实时间需 JS 提供 data 属性）
-   .nano-chat-inner .bubble::before {
-     content: "12:00"; position: absolute; top: -14px; left: 4px; font-size: 10px; color: #aeaeb2;
+   // 气泡旁边加「时间」小字：chat-core 已把时间写到行上 data-time，直接用 attr() 读取
+   .nano-chat-inner .message-row[data-time] .message-content::before,
+   .nano-groups .message-row[data-time] .message-content::before {
+     content: attr(data-time); position: absolute; top: -13px; left: 2px;
+     font-size: 10px; color: #aeaeb2; white-space: nowrap;
    }
-   // 消息下方加「已读」
-   .nano-chat-inner .message-row.right .message-content::after {
+   .nano-chat-inner .message-row.right[data-time] .message-content::before,
+   .nano-groups .message-row.right[data-time] .message-content::before { left: auto; right: 2px; }
+   // 自己消息下方加「已读」小字
+   .nano-chat-inner .message-row.right .message-content::after,
+   .nano-groups .message-row.right .message-content::after {
      content: "已读"; font-size: 10px; color: #34c759; margin-top: 2px;
    }
 */

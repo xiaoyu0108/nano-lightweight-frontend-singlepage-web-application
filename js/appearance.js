@@ -171,30 +171,68 @@
             + avImgs.join(',') + '{border-radius:' + r + ' !important;}';
     }
 
-    function applyFrameElements() {
+    // 头像框图片预加载 + 失败重试（避免「转几秒然后空白」）
+    var _frameImg = { url: '', ok: false, down: false, tries: 0, work: '' };
+    function preloadFrame(url) {
+        if (!url) return;
+        if (_frameImg.url === url && (_frameImg.ok || _frameImg.down)) return;
+        _frameImg = { url: url, ok: false, down: false, tries: 0, work: url };
+        var attempt = function () {
+            var img = new Image();
+            img.decoding = 'async';
+            var bust = _frameImg.tries > 0 ? (url + (url.indexOf('?') === -1 ? '?' : '&') + 'nr=' + _frameImg.tries) : url;
+            img.onload = function () {
+                _frameImg.ok = true;
+                _frameImg.work = bust;
+                applyFrameElements(true); // 用可用的地址重画一次
+            };
+            img.onerror = function () {
+                _frameImg.tries++;
+                if (_frameImg.tries < 3) setTimeout(attempt, 600 * _frameImg.tries);
+                else { _frameImg.down = true; }
+            };
+            try { img.src = bust; } catch (e) {}
+        };
+        attempt();
+    }
+
+    function findFrameChild(node) {
+        for (var c = 0; c < node.children.length; c++) {
+            if (node.children[c] && node.children[c].className === 'nano-avatar-frame') return node.children[c];
+        }
+        return null;
+    }
+
+    var _frameSig = '';
+    function applyFrameElements(force) {
         if (!isChatInterior) return;
         var fc = getFrameConfig();
         var nodes;
         try { nodes = document.querySelectorAll('.message-avatar, .typing-indicator .ti-avatar'); } catch (e) { return; }
+        var sig = fc ? (String(fc.url) + '|' + fc.scale + '|' + (_frameImg.url === String(fc.url) ? _frameImg.work : '')) : '';
+        var sigChanged = (sig !== _frameSig);
+        if (sigChanged) _frameSig = sig;
+        if (fc) preloadFrame(String(fc.url));
+        var srcUrl = (fc && _frameImg.url === String(fc.url) && _frameImg.work) ? _frameImg.work : (fc ? String(fc.url) : '');
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
-            var existing = null;
-            for (var c = 0; c < node.children.length; c++) {
-                if (node.children[c] && node.children[c].className === 'nano-avatar-frame') { existing = node.children[c]; break; }
-            }
+            var existing = findFrameChild(node);
             if (!fc) {
                 if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-                try { node.style.removeProperty('overflow'); node.style.removeProperty('position'); } catch (e) {}
+                try { if (node.style.overflow) node.style.removeProperty('overflow'); if (node.style.position) node.style.removeProperty('position'); } catch (e) {}
                 continue;
             }
+            // 已处理过、配置没变、且节点已有框：直接跳过，避免每次 DOM 变动都重写样式导致卡顿
+            if (!force && !sigChanged && existing && existing.dataset.sig === sig) continue;
             var scale = parseInt(fc.scale, 10);
             if (isNaN(scale)) scale = 16;
             scale = Math.max(0, Math.min(60, scale));
             var inset = -scale;
-            var url = String(fc.url).replace(/"/g, '%22').replace(/\)/g, '%29');
+            var url = String(srcUrl).replace(/"/g, '%22').replace(/\)/g, '%29');
             var el = existing || document.createElement('span');
             el.className = 'nano-avatar-frame';
             el.setAttribute('aria-hidden', 'true');
+            el.dataset.sig = sig;
             el.style.cssText = 'position:absolute !important;display:block !important;'
                 + 'top:' + inset + '% !important;right:' + inset + '% !important;bottom:' + inset + '% !important;left:' + inset + '% !important;'
                 + 'background-image:url("' + url + '") !important;background-position:center center !important;'
