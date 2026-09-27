@@ -2,6 +2,63 @@
 (function () {
     'use strict';
 
+    // ===== 一次性清理：早期把 base64 图片（头像/bg/聊天图片）写进了 localStorage，
+    // 会把配额（约 5MB）塞满，导致之后所有设置（通知开关、Bark 密钥等）都写不进去。
+    // 这里清掉可安全重建的部分，腾出空间。=====
+    function storageHasRoom() {
+        try { localStorage.setItem('nano_quota_probe', '1'); localStorage.removeItem('nano_quota_probe'); return true; }
+        catch (e) { return false; }
+    }
+    function deepStripDataUrls(obj, counter) {
+        if (!obj || typeof obj !== 'object') return;
+        if (Array.isArray(obj)) { obj.forEach(function (v) { deepStripDataUrls(v, counter); }); return; }
+        Object.keys(obj).forEach(function (k) {
+            var v = obj[k];
+            if (typeof v === 'string') {
+                if (v.indexOf('data:image') === 0 || v.indexOf('data:audio') === 0 || v.indexOf('data:video') === 0) {
+                    obj[k] = null; counter.n++;
+                }
+            } else if (v && typeof v === 'object') {
+                deepStripDataUrls(v, counter);
+            }
+        });
+    }
+    function sweepBigStorage() {
+        try {
+            if (localStorage.getItem('nano_storage_swept_v3') === '1' && storageHasRoom()) return;
+            var keys = [];
+            for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+            keys.forEach(function (k) {
+                if (!k) return;
+                try {
+                    // 这几类都有 IndexedDB 完整备份，去掉 localStorage 里的 base64 不会丢数据
+                    if (k.indexOf('chat_messages_') === 0 || k.indexOf('group_msgs_') === 0 || k.indexOf('nano_ins_chat_') === 0) {
+                        var arr = JSON.parse(localStorage.getItem(k) || 'null');
+                        if (Array.isArray(arr)) {
+                            var c = { n: 0 };
+                            deepStripDataUrls(arr, c);
+                            if (c.n) localStorage.setItem(k, JSON.stringify(arr));
+                        }
+                    } else if (k === 'nano_moments_data') {
+                        // 朋友圈图片只在 localStorage，保留最新 12 条的图片，其余清掉
+                        var posts = JSON.parse(localStorage.getItem(k) || 'null');
+                        if (Array.isArray(posts)) {
+                            var changed = false;
+                            posts.forEach(function (p, idx) {
+                                if (idx >= 12 && p && Array.isArray(p.images) && p.images.length) { p.images = []; changed = true; }
+                            });
+                            if (changed) localStorage.setItem(k, JSON.stringify(posts));
+                        }
+                    } else if (k.indexOf('nanoMomentsCover_') === 0) {
+                        if ((localStorage.getItem(k) || '').indexOf('data:') === 0) localStorage.removeItem(k);
+                    }
+                } catch (e) {}
+            });
+            try { localStorage.setItem('nano_storage_swept_v3', '1'); } catch (e) {}
+        } catch (e) {}
+    }
+    sweepBigStorage();
+
     var ENABLE_KEY = 'nano_notify_enabled';
     var SOUND_KEY = 'nano_notify_sound';
     var DEFAULT_SOUND = 'ding';
@@ -118,8 +175,20 @@
     function barkKey() {
         try { return (localStorage.getItem(BARK_KEY) || '').trim(); } catch (e) { return ''; }
     }
+    function barkKeyAsync() {
+        var local = barkKey();
+        if (local) return Promise.resolve(local);
+        if (typeof localforage === 'undefined') return Promise.resolve('');
+        return localforage.getItem(BARK_KEY).then(function (v) { return String(v || '').trim(); }).catch(function () { return ''; });
+    }
     function setBarkKey(key) {
-        try { localStorage.setItem(BARK_KEY, String(key || '').trim()); } catch (e) {}
+        key = String(key || '').trim();
+        var ok = false;
+        try { localStorage.setItem(BARK_KEY, key); ok = true; } catch (e) { ok = false; }
+        if (typeof localforage !== 'undefined') {
+            try { localforage.setItem(BARK_KEY, key); } catch (e) {}
+        }
+        return ok;
     }
     function barkPush(title, body, opts) {
         var key = barkKey();
@@ -220,6 +289,7 @@
         setChannelSound: setChannelSound,
         soundFor: soundFor,
         barkKey: barkKey,
+        barkKeyAsync: barkKeyAsync,
         setBarkKey: setBarkKey,
         barkPush: barkPush
     };

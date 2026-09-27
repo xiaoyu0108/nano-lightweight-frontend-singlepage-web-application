@@ -944,7 +944,13 @@
                         voiceData: msg.voiceData ? { duration: msg.voiceData.duration } : null,
                         transcript: msg.transcript || null,
                         translation: msg.translation || null,
-                        imageData: msg.imageData ? { textImage: msg.imageData.textImage, url: msg.imageData.url, desc: msg.imageData.desc, emojiName: msg.imageData.emojiName } : null,
+                        imageData: msg.imageData ? {
+                            textImage: msg.imageData.textImage,
+                            // 只保留普通 URL；base64 图片体积会把 localStorage 撑爆，交给 IndexedDB 存
+                            url: (typeof msg.imageData.url === 'string' && msg.imageData.url.indexOf('data:') !== 0) ? msg.imageData.url : null,
+                            desc: msg.imageData.desc,
+                            emojiName: msg.imageData.emojiName
+                        } : null,
                         think: msg.think || null,
                         heart: msg.heart || null,
                         recalled: msg.recalled || false,

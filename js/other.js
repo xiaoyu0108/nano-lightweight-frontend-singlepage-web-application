@@ -71,10 +71,17 @@
     var barkKeyTest = document.getElementById('barkKeyTest');
     if (barkKeyInput && window.NanoNotify) {
         barkKeyInput.value = NanoNotify.barkKey ? NanoNotify.barkKey() : '';
+        // 本地 localStorage 存不下时，从 IndexedDB 兜底读回
+        if (NanoNotify.barkKeyAsync) {
+            NanoNotify.barkKeyAsync().then(function (k) {
+                if (k && !barkKeyInput.value) barkKeyInput.value = k;
+            });
+        }
         if (barkKeySave) {
             barkKeySave.addEventListener('click', function () {
-                NanoNotify.setBarkKey(barkKeyInput.value);
-                alert(barkKeyInput.value.trim() ? '已保存 Bark 密钥' : '已清空 Bark 密钥');
+                var ok = NanoNotify.setBarkKey(barkKeyInput.value);
+                if (!barkKeyInput.value.trim()) { alert('已清空 Bark 密钥'); return; }
+                alert(ok ? '已保存 Bark 密钥' : '保存到了本地数据库（浏览器存储已满），仍可正常使用');
             });
         }
         if (barkKeyTest) {
