@@ -112,10 +112,42 @@
         } catch (e) {}
     }
 
+    // ===== Bark：iPhone 系统推送（国内直连，无需梯子/FCM）=====
+    // 在「更多 → 其他」或控制台执行 NanoNotify.setBarkKey('你的Bark密钥') 即可开启。
+    var BARK_KEY = 'nano_bark_key';
+    function barkKey() {
+        try { return (localStorage.getItem(BARK_KEY) || '').trim(); } catch (e) { return ''; }
+    }
+    function setBarkKey(key) {
+        try { localStorage.setItem(BARK_KEY, String(key || '').trim()); } catch (e) {}
+    }
+    function barkPush(title, body, opts) {
+        var key = barkKey();
+        if (!key) return;
+        opts = opts || {};
+        // key 可以只填 Bark 的 key，也可以填自建服务器完整地址（http 开头）
+        var base = key.indexOf('http') === 0 ? key.replace(/\/+$/, '') : ('https://api.day.app/' + encodeURIComponent(key));
+        var url = base + '/' + encodeURIComponent(title || 'Nano') + '/' + encodeURIComponent(String(body || '').slice(0, 150));
+        var q = ['group=' + encodeURIComponent('Nano'), 'level=active'];
+        var target = opts.target || '';
+        if (target) {
+            try {
+                var appUrl = location.origin + location.pathname + '?open=' + encodeURIComponent(target);
+                q.push('url=' + encodeURIComponent(appUrl));
+            } catch (e) {}
+        }
+        try { fetch(url + '?' + q.join('&'), { mode: 'no-cors' }).catch(function () {}); } catch (e) {}
+    }
+
     function notify(title, body, opts) {
         opts = opts || {};
         if (!enabled() && !opts.force) return;
         playSound(soundFor(opts));
+        // Bark：应用退到后台/锁屏时，通过苹果推送弹真正的系统通知（国内可用）
+        try {
+            var hidden = (typeof document !== 'undefined') && (document.hidden || document.visibilityState === 'hidden');
+            if (barkKey() && (hidden || opts.force || opts.bark)) barkPush(title, body, opts);
+        } catch (e) {}
         // 前台可见时补一个「应用内横幅」：iOS 上 new Notification 不可用，只有它能看见
         try {
             if (window.parent !== window && document.visibilityState === 'visible') {
@@ -186,6 +218,9 @@
         channels: CHANNELS,
         channelSound: channelSound,
         setChannelSound: setChannelSound,
-        soundFor: soundFor
+        soundFor: soundFor,
+        barkKey: barkKey,
+        setBarkKey: setBarkKey,
+        barkPush: barkPush
     };
 })();

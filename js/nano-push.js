@@ -4,8 +4,9 @@
  * 服务器只需负责「到点把通知发到手机」，通知内容由本地调用 schedule() 预约。
  *
  * 用法（在控制台或你自己的设置页里）：
- *   NanoPush.setup('https://你的-worker.workers.dev', '你的VAPID公钥');  // 只需一次
- *   NanoPush.enable();                                                   // 需在用户点击后调用
+ *   NanoPush.setup('https://你的-worker.workers.dev', '你的VAPID公钥');        // 只需一次
+ *   NanoPush.setup('https://...workers.dev', 'VAPID公钥', '你的PUSH_TOKEN');  // 若服务器设了 token
+ *   NanoPush.enable();                                                       // 需在用户点击后调用
  *   NanoPush.schedule([{ at: Date.now() + 60000, title: '某某', body: '在吗？', target: 'chat:角色id' }]);
  */
 (function () {
@@ -14,18 +15,20 @@
     var DEFAULT_SW = 'sw.js';
 
     function readConfig() {
-        var endpoint = '', vapid = '';
+        var endpoint = '', vapid = '', token = '';
         try {
             endpoint = (localStorage.getItem('nano_push_endpoint') || '').trim();
             vapid = (localStorage.getItem('nano_push_vapid') || '').trim();
+            token = (localStorage.getItem('nano_push_token') || '').trim();
         } catch (e) {}
-        return { endpoint: endpoint.replace(/\/+$/, ''), vapid: vapid };
+        return { endpoint: endpoint.replace(/\/+$/, ''), vapid: vapid, token: token };
     }
 
-    function saveConfig(endpoint, vapid) {
+    function saveConfig(endpoint, vapid, token) {
         try {
             localStorage.setItem('nano_push_endpoint', String(endpoint || '').trim().replace(/\/+$/, ''));
             localStorage.setItem('nano_push_vapid', String(vapid || '').trim());
+            localStorage.setItem('nano_push_token', String(token || '').trim());
         } catch (e) {}
     }
 
@@ -49,9 +52,12 @@
     }
 
     function postJSON(url, data) {
+        var headers = { 'Content-Type': 'application/json' };
+        var cfg = readConfig();
+        if (cfg.token) headers['X-Push-Token'] = cfg.token;
         return fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify(data)
         }).then(function (r) { return r.json().catch(function () { return {}; }); });
     }
@@ -120,7 +126,7 @@
     }
 
     window.NanoPush = {
-        setup: function (endpoint, vapid) { saveConfig(endpoint, vapid); return readConfig(); },
+        setup: function (endpoint, vapid, token) { saveConfig(endpoint, vapid, token); return readConfig(); },
         enable: enable,
         disable: disable,
         schedule: schedule,

@@ -1,0 +1,17 @@
+name = "nano-push"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+preview_urls = false
+workers_dev = true
+
+kv_namespaces = [
+  { binding = "PUSH_KV", id = "2bd6299b03c442bd81cbf023ec6cfb92" }
+]
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+# 定时提醒（北京时间，必须是 5 分钟的整数倍），到点会发 Bark 通知
+[vars]
+REMIND_TIMES = "09:00,12:30,20:00,23:00"
+REMIND_TEXT = "有人想你了，点开看看～"

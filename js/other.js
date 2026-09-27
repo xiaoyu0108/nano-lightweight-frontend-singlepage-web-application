@@ -65,6 +65,28 @@
         notifyToggle.addEventListener('change', function () { applyNotify(this.checked); });
     }
 
+    // ===== Bark：iPhone 后台推送 =====
+    var barkKeyInput = document.getElementById('barkKeyInput');
+    var barkKeySave = document.getElementById('barkKeySave');
+    var barkKeyTest = document.getElementById('barkKeyTest');
+    if (barkKeyInput && window.NanoNotify) {
+        barkKeyInput.value = NanoNotify.barkKey ? NanoNotify.barkKey() : '';
+        if (barkKeySave) {
+            barkKeySave.addEventListener('click', function () {
+                NanoNotify.setBarkKey(barkKeyInput.value);
+                alert(barkKeyInput.value.trim() ? '已保存 Bark 密钥' : '已清空 Bark 密钥');
+            });
+        }
+        if (barkKeyTest) {
+            barkKeyTest.addEventListener('click', function () {
+                NanoNotify.setBarkKey(barkKeyInput.value);
+                if (!NanoNotify.barkKey()) { alert('请先填写 Bark 密钥'); return; }
+                NanoNotify.barkPush('测试推送', '收到就说明配置成功 ✓', { force: true });
+                alert('已发送，请查看 iPhone 通知');
+            });
+        }
+    }
+
     function buildSounds() {
         if (!soundSelect || !window.NanoNotify) return;
         soundSelect.innerHTML = '';
