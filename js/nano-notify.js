@@ -222,19 +222,7 @@
             var hidden = (typeof document !== 'undefined') && (document.hidden || document.visibilityState === 'hidden');
             if (barkKey() && (hidden || opts.force || opts.bark)) barkPush(title, body, opts);
         } catch (e) {}
-        // 前台可见时补一个「应用内横幅」：iOS 上 new Notification 不可用，只有它能看见
-        try {
-            if (window.parent !== window && document.visibilityState === 'visible') {
-                window.parent.postMessage({
-                    type: 'appNotify',
-                    app: opts.app || (opts.channel === 'music' ? 'music' : ''),
-                    title: title || 'Nano',
-                    body: String(body || ''),
-                    icon: opts.icon || '',
-                    target: opts.target || ''
-                }, '*');
-            }
-        } catch (e) {}
+        // 已按要求去掉应用内的黑色横幅（appNotify）；前台只保留提示音 + 未读红点
         var payload = {
             body: String(body || '').slice(0, 120),
             tag: opts.tag || ('nano-' + Date.now()),

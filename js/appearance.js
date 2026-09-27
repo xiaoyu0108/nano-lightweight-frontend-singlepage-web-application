@@ -515,7 +515,10 @@
         'html .bottom{padding-bottom:0 !important;}' +
         'html .dm-composer{padding-bottom:4px !important;}' +
         'html .mm-viewer-bar{padding-bottom:4px !important;}' +
-        'html .comment-input,html .chat-input-bar{padding-bottom:4px !important;}';
+        'html .comment-input,html .chat-input-bar{padding-bottom:4px !important;}' +
+        // 底栏改为悬浮在页面之上：留白放进各页面自身，避免外壳出现与主题不符的白边
+        'html body.nano-chat .app-content,html body.nano-chat .container,html body.nano-chat #chatList,html body.nano-chat .chat-list{padding-bottom:96px !important;}' +
+        'html body.nano-api .app-content,html body.nano-api .container,html body.nano-more .app-content,html body.nano-more .container,html body.nano-discover .app-content,html body.nano-discover .container{padding-bottom:96px !important;}';
     function applyFlushFix() { applyStyle('nano-flush-fix', BOTTOM_FLUSH_FIX); }
 
     // ---- 供父框架 / 其它模块调用的入口 ----

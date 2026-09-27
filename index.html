@@ -58,7 +58,7 @@
             overflow: hidden;
             min-height: 0;
             padding-top: 0;
-            padding-bottom: calc(96px + var(--safe-inset-bottom));
+            padding-bottom: 0;
         }
 
         .top-bar {
@@ -1017,8 +1017,36 @@
 
         function restoreBottomBar() {
             bottomBar.classList.remove('hidden');
-            appContent.style.paddingBottom = 'calc(96px + var(--safe-inset-bottom))';
+            appContent.style.paddingBottom = '0';
         }
+
+        // 让底栏留白区域的颜色跟随当前页面，避免出现一条与主题不符的白边
+        function syncShellBg() {
+            try {
+                var bgEl = document.querySelector('.bg');
+                if (!bgEl) return;
+                var bi = bgEl.style.backgroundImage;
+                if (bi && bi !== 'none' && bi !== '') return; // 用户设了自定义壁纸就保留
+                var frame = document.querySelector('.iframe-container.active iframe');
+                var doc = frame && frame.contentDocument;
+                if (!doc || !doc.body) return;
+                var c = '';
+                try { c = getComputedStyle(doc.body).backgroundColor; } catch (e) {}
+                if (!c || c === 'transparent' || c === 'rgba(0, 0, 0, 0)') {
+                    try { c = getComputedStyle(doc.documentElement).backgroundColor; } catch (e) {}
+                }
+                if (c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)') bgEl.style.backgroundColor = c;
+            } catch (e) {}
+        }
+        try {
+            document.querySelectorAll('.iframe-container iframe').forEach(function (f) {
+                f.addEventListener('load', function () {
+                    try { if (f.closest('.iframe-container.active')) syncShellBg(); } catch (e) {}
+                });
+            });
+            window.addEventListener('load', function () { setTimeout(syncShellBg, 300); setTimeout(syncShellBg, 900); });
+            document.addEventListener('visibilitychange', function () { if (!document.hidden) syncShellBg(); });
+        } catch (e) {}
 
         function switchPage(page) {
             if (currentPage === page) return;
@@ -1040,6 +1068,9 @@
             if (target) target.classList.add('active');
 
             currentPage = page;
+
+            setTimeout(syncShellBg, 60);
+            setTimeout(syncShellBg, 500);
 
             document.querySelectorAll('.capsule-btn').forEach(btn => {
                 btn.classList.remove('active-btn');

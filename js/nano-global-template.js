@@ -179,7 +179,7 @@ html, body {
   overflow: hidden;
   min-height: 0;
   padding-top: 0;
-  padding-bottom: calc(96px + var(--safe-inset-bottom, 0px));
+  padding-bottom: 0;
 }
 .nano-index .iframe-container {
   flex: 1;

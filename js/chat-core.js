@@ -2806,8 +2806,9 @@
     function notifyCharMessage(preview) {
         try {
             const title = displayName || chatName || '新消息';
+            // 交给 NanoBadge 统一处理：前台看这个会话时不打扰，后台才通知（避免重复推送两条）
             if (window.NanoBadge) window.NanoBadge.incoming(chatId, title, preview, { target: 'chat:' + chatId, channel: 'chat' });
-            if (window.NanoNotify) window.NanoNotify.notify(title, preview, { target: 'chat:' + chatId, channel: 'chat' });
+            else if (window.NanoNotify) window.NanoNotify.notify(title, preview, { target: 'chat:' + chatId, channel: 'chat' });
         } catch (e) {}
     }
     // 供「更多 → 其他」显示自动生成的倒计时
