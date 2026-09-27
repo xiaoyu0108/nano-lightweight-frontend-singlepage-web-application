@@ -69,6 +69,12 @@
     var barkKeyInput = document.getElementById('barkKeyInput');
     var barkKeySave = document.getElementById('barkKeySave');
     var barkKeyTest = document.getElementById('barkKeyTest');
+    var barkStatus = document.getElementById('barkStatus');
+    function setBarkStatus(msg, isErr) {
+        if (!barkStatus) return;
+        barkStatus.textContent = msg;
+        barkStatus.style.color = isErr ? '#d9534f' : '#8e8e93';
+    }
     if (barkKeyInput && window.NanoNotify) {
         barkKeyInput.value = NanoNotify.barkKey ? NanoNotify.barkKey() : '';
         // 本地 localStorage 存不下时，从 IndexedDB 兜底读回
@@ -79,17 +85,28 @@
         }
         if (barkKeySave) {
             barkKeySave.addEventListener('click', function () {
-                var ok = NanoNotify.setBarkKey(barkKeyInput.value);
-                if (!barkKeyInput.value.trim()) { alert('已清空 Bark 密钥'); return; }
-                alert(ok ? '已保存 Bark 密钥' : '保存到了本地数据库（浏览器存储已满），仍可正常使用');
+                var k = (barkKeyInput.value || '').trim();
+                var ok = NanoNotify.setBarkKey(k);
+                if (!k) { setBarkStatus('已清空 Bark 密钥'); return; }
+                setBarkStatus(ok ? '已保存 Bark 密钥 ✓' : '已存到本地数据库（浏览器存储已满），可正常使用');
             });
         }
         if (barkKeyTest) {
             barkKeyTest.addEventListener('click', function () {
-                NanoNotify.setBarkKey(barkKeyInput.value);
-                if (!NanoNotify.barkKey()) { alert('请先填写 Bark 密钥'); return; }
-                NanoNotify.barkPush('测试推送', '收到就说明配置成功 ✓', { force: true });
-                alert('已发送，请查看 iPhone 通知');
+                var k = (barkKeyInput.value || '').trim();
+                if (!k) { setBarkStatus('请先填写 Bark 密钥', true); return; }
+                NanoNotify.setBarkKey(k);
+                setBarkStatus('发送中…');
+                NanoNotify.barkPush('测试推送', '收到就说明配置成功 ✓', { force: true }, k).then(function (r) {
+                    if (r && r.ok && r.resp && Number(r.resp.code) === 200) {
+                        setBarkStatus('已发送，请查看 iPhone 通知 ✓');
+                    } else if (r && r.ok) {
+                        setBarkStatus('已发送（未收到就检查：Bark 里本设备的通知权限、密钥是否正确）');
+                    } else {
+                        var detail = (r && r.resp && (r.resp.message || r.resp.code)) || (r && r.error) || '未知';
+                        setBarkStatus('发送失败：' + detail + '（可把密钥直接拼成 https://api.day.app/密钥/测试/收到 在 Safari 打开自测）', true);
+                    }
+                });
             });
         }
     }

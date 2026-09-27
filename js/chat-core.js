@@ -3027,6 +3027,7 @@
         addMessage('right', '', timeStr, null, false, false, null, transcript || null, null, null,
             true, { duration: dur });
         messageInput.value = '';
+        hideEmojiRecommend();
         isWaitingForReply = true;
         sendBtn.classList.add('reply-mode');
         sendBtn.innerHTML = '<i class="fas fa-reply"></i>';
@@ -3311,6 +3312,7 @@
         // 普通文字消息
         addMessage('right', text, timeStr, null, false, false, null, null, null, quoteObj);
         messageInput.value = '';
+        hideEmojiRecommend();
         isWaitingForReply = true;
         sendBtn.classList.add('reply-mode');
         sendBtn.innerHTML = '<i class="fas fa-reply"></i>';

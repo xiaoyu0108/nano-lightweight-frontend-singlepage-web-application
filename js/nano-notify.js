@@ -190,22 +190,27 @@
         }
         return ok;
     }
-    function barkPush(title, body, opts) {
-        var key = barkKey();
-        if (!key) return;
+    function barkPush(title, body, opts, keyOverride) {
+        var key = String(keyOverride || barkKey() || '').trim();
+        if (!key) return Promise.resolve({ ok: false, error: 'no-key' });
         opts = opts || {};
-        // key 可以只填 Bark 的 key，也可以填自建服务器完整地址（http 开头）
         var base = key.indexOf('http') === 0 ? key.replace(/\/+$/, '') : ('https://api.day.app/' + encodeURIComponent(key));
-        var url = base + '/' + encodeURIComponent(title || 'Nano') + '/' + encodeURIComponent(String(body || '').slice(0, 150));
+        var full = base + '/' + encodeURIComponent(title || 'Nano') + '/' + encodeURIComponent(String(body || '').slice(0, 150));
         var q = ['group=' + encodeURIComponent('Nano'), 'level=active'];
         var target = opts.target || '';
         if (target) {
-            try {
-                var appUrl = location.origin + location.pathname + '?open=' + encodeURIComponent(target);
-                q.push('url=' + encodeURIComponent(appUrl));
-            } catch (e) {}
+            try { q.push('url=' + encodeURIComponent(location.origin + location.pathname + '?open=' + encodeURIComponent(target))); } catch (e) {}
         }
-        try { fetch(url + '?' + q.join('&'), { mode: 'no-cors' }).catch(function () {}); } catch (e) {}
+        var url = full + '?' + q.join('&');
+        return fetch(url, { cache: 'no-store' }).then(function (r) {
+            return r.json().catch(function () { return {}; });
+        }).then(function (j) {
+            return { ok: !(j && j.code && Number(j.code) !== 200), resp: j };
+        }).catch(function () {
+            // 读取响应被 CORS 拦截时，退化成不可读请求再发一次（请求仍会送达 Bark）
+            try { fetch(url, { mode: 'no-cors' }).catch(function () {}); } catch (e) {}
+            return { ok: true, cors: true };
+        });
     }
 
     function notify(title, body, opts) {
