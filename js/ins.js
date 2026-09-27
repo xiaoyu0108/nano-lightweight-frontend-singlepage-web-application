@@ -332,25 +332,81 @@ function buildPostImagePrompt(post) {
     '。要求：真实感强的照片风格，构图自然，光影舒服，不要文字、不要水印。';
 }
 
-async function generateInsImage(prompt) {
+async function generateInsImage(prompt, opts) {
   const cfg = await apiGet('nano_api_config');
   const imgUrl = cfg && (cfg.imgUrl || '').trim();
   const imgKey = cfg && (cfg.imgKey || '').trim();
   const imgModel = cfg && (cfg.imgModel || '').trim();
   if (!imgUrl || !imgKey || !imgModel) throw new Error('未配置生图 API');
   let base = imgUrl.replace(/\/+$/, '');
+  if (/\/images\/generations$/i.test(base)) base = base.replace(/\/images\/generations$/i, '');
   if (!/\/v\d+$/i.test(base) && !/\/chat\/completions$/i.test(base)) base += '/v1';
-  const endpoint = base.replace(/\/+$/, '') + '/images/generations';
+  base = base.replace(/\/+$/, '');
+  const endpoint = base + '/images/generations';
+  const editsEndpoint = base + '/images/edits';
+
+  // ===== 锁脸参考 + 人种护栏（角色设了锁脸就走图生图）=====
+  let faceRef = '';
+  let subject = '';
+  if (opts && opts.charId) {
+    try {
+      const raw = localStorage.getItem('chat_setting_faceRef_' + opts.charId);
+      if (raw) { try { faceRef = JSON.parse(raw); } catch (e) { faceRef = raw; } }
+    } catch (e) {}
+  }
+  if (opts && opts.char) {
+    const ch = opts.char;
+    const bits = [];
+    const nat = String(ch.nationality || '').trim();
+    const sex = String(ch.gender || '').trim();
+    if (nat && nat !== '未知' && nat !== '未设定') bits.push('国籍/人种：' + nat);
+    if (sex && sex !== '未知') bits.push('性别：' + sex);
+    if (bits.length) subject = '画面主角是「' + (ch.name || '角色') + '」（' + bits.join('，') + '）。必须严格按此国籍/人种与性别特征绘制，禁止画成其他国籍或西方人。';
+  }
+
   let pos = '';
   try {
     const pr = await apiGet('nano_api_prompts');
     if (pr && Array.isArray(pr.positive)) pos = pr.positive.join('，');
   } catch (e) {}
-  const full = (pos ? pos + '，' : '') + prompt;
+
+  // 有锁脸参考优先走图生图 /images/edits（multipart），失败再退回文生图
+  if (faceRef && String(faceRef).indexOf('data:') === 0) {
+    try {
+      const fc = faceRef.indexOf(',');
+      const fbin = atob(faceRef.slice(fc + 1));
+      const fu8 = new Uint8Array(fbin.length);
+      for (let fi = 0; fi < fbin.length; fi++) fu8[fi] = fbin.charCodeAt(fi);
+      const fmime = (faceRef.slice(5, fc).split(';')[0]) || 'image/png';
+      const ffd = new FormData();
+      ffd.append('model', imgModel);
+      ffd.append('prompt', [pos, prompt, subject].filter(Boolean).join('，'));
+      ffd.append('n', '1');
+      ffd.append('size', '1024x1024');
+      ffd.append('image', new Blob([fu8], { type: fmime }), 'face.png');
+      const fr = await fetch(editsEndpoint, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + imgKey },
+        body: ffd
+      });
+      if (fr.ok) {
+        const fd = await fr.json();
+        const fit = fd && fd.data && fd.data[0];
+        if (fit && fit.b64_json) return await shrinkDataURL('data:image/png;base64,' + fit.b64_json);
+        if (fit && fit.url) {
+          try { return await shrinkDataURL(await urlToDataURL(fit.url)); } catch (e) { return fit.url; }
+        }
+      }
+    } catch (e) { console.warn('[INS生图] 锁脸图生图失败，改用普通生图:', e && e.message); }
+  }
+
+  const full = (pos ? pos + '，' : '') + (subject ? subject + '，' : '') + prompt;
+  const body = { model: imgModel, prompt: full, n: 1, size: '1024x1024' };
+  if (faceRef) { body.image = faceRef; body.reference_image = [faceRef]; body.input_reference_image = [faceRef]; }
   const resp = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + imgKey },
-    body: JSON.stringify({ model: imgModel, prompt: full, n: 1, size: '1024x1024' })
+    body: JSON.stringify(body)
   });
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
   const data = await resp.json();
@@ -427,7 +483,9 @@ async function maybeGeneratePostImages(made) {
     else prob = insImageSettings.npc ? 0.22 : 0;
     if (prob <= 0 || Math.random() > prob) continue;
     try {
-      const url = await generateInsImage(buildPostImagePrompt(p));
+      const authorChar = getSelectableChars().find(c => c && normName(c.name) === normName(p.user));
+      const genOpts = authorChar ? { charId: String(authorChar.id || authorChar.name), char: authorChar } : null;
+      const url = await generateInsImage(buildPostImagePrompt(p), genOpts);
       if (url) { p.image = url; p.genPrompt = p.title || p.body || ''; budget--; }
     } catch (e) {
       if (!firstErr) firstErr = (e && e.message ? e.message : String(e));

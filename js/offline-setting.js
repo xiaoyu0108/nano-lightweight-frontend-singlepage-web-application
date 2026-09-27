@@ -89,7 +89,7 @@ const CSS_PRESETS_ID = 'css_presets';
 const COT_PRESETS_ID = 'cot_presets';
 const MESSAGES_STORE = 'messages';
 
-let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', autoSummary: true, memThreshold: 5 };
+let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', autoSummary: true, memThreshold: 5, nsfw: false };
 let ruleGroups = [];
 let stylePresets = [];
 let cssPresets = [];
@@ -1076,6 +1076,8 @@ function updateSummary() {
   document.getElementById('cssValue').textContent = settings.customCSS ? '已自定义' : '默认';
   document.getElementById('wordCount').value = settings.wordCount || '';
   document.getElementById('person').value = settings.person || 'auto';
+  const nsfwSwitch = document.getElementById('nsfwSwitch');
+  if (nsfwSwitch) nsfwSwitch.classList.toggle('on', settings.nsfw === true);
 }
 
 function fillSettings() {
@@ -1133,6 +1135,17 @@ autoSummarySwitch.addEventListener('click', function() {
   setAutoSwitchUI();
   showToast(settings.autoSummary ? '自动总结已开启' : '自动总结已关闭');
 });
+
+// ===== 成人向尺度（线下 NSFW） =====
+const nsfwSwitch = document.getElementById('nsfwSwitch');
+if (nsfwSwitch) {
+  nsfwSwitch.addEventListener('click', function() {
+    settings.nsfw = !nsfwSwitch.classList.contains('on');
+    saveSettings();
+    nsfwSwitch.classList.toggle('on', settings.nsfw);
+    showToast(settings.nsfw ? '成人向尺度已开启' : '成人向尺度已关闭');
+  });
+}
 document.getElementById('memorySummaryOpen').onclick = function() {
   const inp = document.getElementById('memThresholdInput');
   inp.value = settings.memThreshold || localStorage.getItem('offline_mem_threshold') || '5';

@@ -1285,7 +1285,16 @@
             if (m.isTip) {
                 history.push({ role:'user', content:'（系统提示）' + desc });
             } else if (m.type === 'right') {
-                history.push({ role:'user', content: desc });
+                var imgUrl = (m.isImage && m.imageData && typeof m.imageData.url === 'string' && m.imageData.url.indexOf('data:image') === 0) ? m.imageData.url : null;
+                if (imgUrl) {
+                    // 把用户发的图片真正发给模型（多模态），否则模型只能看到「用户发了一张图片」的文字
+                    history.push({ role:'user', content:[
+                        { type:'text', text: desc },
+                        { type:'image_url', image_url:{ url: imgUrl } }
+                    ]});
+                } else {
+                    history.push({ role:'user', content: desc });
+                }
             } else {
                 var who = getMember(m.senderId);
                 var name = who ? (who.nick || who.name) : '群友';

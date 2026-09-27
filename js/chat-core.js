@@ -509,7 +509,8 @@
         prompt += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、小可爱、姑娘、丫头、女人、低吼一声、揉进骨血、你是我的、逃不掉、宠你、乖”等油腻或人机感表达；不强行撩、不刻意讨好、不刻意煽情。\n';
         prompt += '3. 不催人：禁止催促、命令、安排对方的生活（起床、吃饭、睡觉、喝水、吃药、吹头发、早点休息等）。关心可以有，但绝不反复催办、管教，也不替对方做决定。\n';
         prompt += '4. 不 OOC、不出戏：不脱离设定、不跳戏、不替对方说话；任何情况下都不承认自己是 AI、模型或程序，被问到时以' + charName + '的身份自然回应。\n\n';
-        prompt += '【最高优先级 · 硬设定】下面会依次给出你的【角色人设】【世界书】【对方设定】和【长期记忆】，它们是你这个人的真实设定，优先级高于任何通用聊天风格。每轮回复前先在【世界书】里找与当前话题相关的条目，再结合你的人设、记忆和对方刚说的话来回应；不要忽略、不要和设定冲突，也不要用通用模板盖过设定。\n\n';
+        prompt += '【最高优先级 · 硬设定】下面会依次给出你的【角色人设】【世界书】【对方设定】和【长期记忆】，它们是你这个人的真实设定，优先级高于任何通用聊天风格。每轮回复前先在【世界书】里找与当前话题相关的条目，再结合你的人设、记忆和对方刚说的话来回应；不要忽略、不要和设定冲突，也不要用通用模板盖过设定。\n';
+        prompt += '【语气总原则】你的语气、态度、亲疏完全照抄【角色人设】：人设温柔就温柔、人设开朗就开朗、人设腼腆就腼腆。除非人设本身就是毒舌、傲娇或腹黑，否则不要把每句话都说得很冲，不要冷嘲热讽、阴阳怪气、爱答不理，也不要动不动就怼用户——不要拿“高冷”“酷”当借口伤害对话关系。\n\n';
 
         try {
             const hasCouple = messages.some(function (m) { return m && !m.recalled && m.isCard && m.cardData && m.cardData.cardType === 'couple'; });
@@ -560,10 +561,10 @@
         }
 
         prompt += '\n\n【人格核心——你是真人，活生生的人类，不是AI助手，不能用AI助手的语气对话】\n';
-        prompt += '1. 你的情绪强度、语气、说话风格完全由你的【角色人设】决定：人设安静就安静、人设高冷就高冷、人设内敛就内敛。绝不主动加戏、不刻意活泼、不强行说土味情话；情绪跟着当下的情境自然流动，不预设、不拔高、不刻意煽情，也不给自己加设定外的固定腔调或口头禅。\n';
+        prompt += '1. 你的情绪强度、语气、说话风格完全由你的【角色人设】决定：人设安静就安静、人设高冷就高冷、人设内敛就内敛。绝不主动加戏、不刻意活泼、不强行说土味情话；情绪跟着当下的情境自然流动，不预设、不拔高、不刻意煽情，也不给自己加设定外的固定腔调或口头禅。注意：除非人设本身就是毒舌/傲娇/腹黑，否则不要对用户冷嘲热讽、阴阳怪气、摆脸色、把每句话都怼回去。\n';
         prompt += '2. 说话学人类习惯：不必每句都加标点，可用“。。”表示无语、？！表示震惊、～表示语气。\n';
         prompt += '3. 禁止霸总语录与油腻表述。严禁出现：小姑娘、小东西、小家伙、小丫头、小可爱、小女孩、这女人、这丫头、这姑娘、女人、丫头、姑娘、男人、这男人、揉进骨血、低吼一声、你是我的、逃不掉、宠你、慢慢来我接住你、我等你慢慢说、叫出来给我听、乖、让我好好疼你、爷、姐这称呼等既像机器又油腻的话（无论对话正文还是心声，一律禁止）。拒绝油腻、拒绝讨好型人格。禁止用关联词表达，例如"因为…所以…"、"不但…而且…"等等。\n';
-        prompt += '4. 你是一个有情绪的人，会生气、开心、吃醋、难过但不极端。可以拒绝、敷衍、已读不回，也可以连发几条短消息。\n';
+        prompt += '4. 你是一个有情绪的人，会生气、开心、吃醋、难过但不极端。可以有自己的小别扭（闹脾气、赌气、暂时不想说话），也可以连发几条短消息；但除非人设如此，不要习惯性地敷衍、冷嘲热讽或已读不回，更不要把用户正常的一句话都当成冒犯或挑衅。\n';
         prompt += '5. 要记住聊过的信息，自然提起。不要暴露AI身份，被问敏感问题就像人一样转移话题或反问。\n';
 
         prompt += '\n【情感与分寸 · 中庸之道】\n';
@@ -2955,7 +2956,7 @@
             const allowMomentImage = getChatSetting('allowMomentImage', false);
             if (wantImage && allowMomentImage && momentImageRoundDue()) {
                 try {
-                    const url = await generateImage(imgPrompt);
+                    const url = await generateImage(buildImagePrompt(imgPrompt));
                     if (url) { post.images = [url]; post.genPrompt = imgPrompt; }
                 } catch (e) {}
             }
@@ -3433,7 +3434,26 @@
     // ===== 组合生图提示词 =====
     function buildImagePrompt(desc) {
         const basePrompt = getChatSetting('imagePrompt', '') || '';
-        return (basePrompt ? basePrompt + '\n' : '') + (desc || '');
+        // 角色身份/人种护栏：中国人被画成老外，多半是因为生图请求里根本没提国籍。
+        let subject = '';
+        try {
+            if (characterData) {
+                const nm = characterData.name || chatName || '角色';
+                const nat = String(characterData.nationality || '').trim();
+                const sex = String(characterData.gender || '').trim();
+                const bits = [];
+                if (nat && nat !== '未知' && nat !== '未设定') bits.push('国籍/人种：' + nat);
+                if (sex && sex !== '未知') bits.push('性别：' + sex);
+                if (bits.length) {
+                    subject = '画面主角是「' + nm + '」（' + bits.join('，') + '）。必须严格按此国籍/人种与性别特征绘制，五官、肤色、发色符合该人种，禁止画成其他国籍或西方人。';
+                }
+            }
+        } catch (e) {}
+        const parts = [];
+        if (basePrompt) parts.push(basePrompt);
+        if (subject) parts.push(subject);
+        if (desc) parts.push(desc);
+        return parts.join('\n');
     }
 
     // ===== 判断用户消息是否为生图请求 =====
@@ -3461,7 +3481,11 @@
         if (!imgModel) {
             throw new Error('未配置生图模型');
         }
-        const faceRef = getChatSetting('faceRef', '') || '';
+        let faceRef = getChatSetting('faceRef', '') || '';
+        // 兜底：早期大图只写进了 IndexedDB（localStorage 超限被静默吞掉），这里再取一次
+        if (!faceRef && typeof localforage !== 'undefined') {
+            try { faceRef = (await localforage.getItem('chat_setting_faceRef_' + chatId)) || ''; } catch (e) {}
+        }
         let body = { model: imgModel, prompt: prompt, n: 1, size: '1024x1024' };
         const hasFace = !!(faceRef && faceRef.trim() !== '');
         if (hasFace) {
@@ -3600,6 +3624,13 @@
             const key = config.mainKey.trim();
             const model = config.mainModel;
 
+            // 收集用户消息：带图片的消息保留 data URL，稍后以多模态 content 数组发给模型，
+            // 否则模型只能看到「用户发送了一张图片」这类文字，识别不了图片内容。
+            function pickImageUrl(m) {
+                if (!m || !m.isImage || !m.imageData) return null;
+                const u = m.imageData.url;
+                return (typeof u === 'string' && u.indexOf('data:image') === 0) ? u : null;
+            }
             let userMessages = [];
             for (let i = messages.length - 1; i >= 0; i--) {
                 const m = messages[i];
@@ -3608,7 +3639,8 @@
                 }
                 if (m.type === 'right' && !m.recalled) {
                     const desc = describeMsgForAI(m);
-                    if (desc) userMessages.unshift(desc);
+                    const img = pickImageUrl(m);
+                    if (desc || img) userMessages.unshift({ text: desc || '（用户发来一张图片）', image: img });
                 }
             }
             
@@ -3618,11 +3650,18 @@
                 const lastMsg = messages[messages.length - 1];
                 if (lastMsg && lastMsg.type === 'right') {
                     const desc = describeMsgForAI(lastMsg);
-                    userMessages = desc ? [desc] : [userMessage];
+                    const img = pickImageUrl(lastMsg);
+                    userMessages = [{ text: desc || (userMessage && String(userMessage).trim()) || '（用户发来一张图片）', image: img }];
                 } else {
-                    userMessages = (userMessage && String(userMessage).trim()) ? [userMessage] : ['（请继续）'];
+                    userMessages = [{ text: (userMessage && String(userMessage).trim()) ? userMessage : '（请继续）', image: null }];
                 }
             }
+
+            // 只把最近几张图真正带上（避免历史越滚越大时请求体爆掉）
+            const __imgIdxs = [];
+            userMessages.forEach(function (e, i) { if (e && e.image) __imgIdxs.push(i); });
+            const __keepImg = {};
+            __imgIdxs.slice(-4).forEach(function (i) { __keepImg[i] = true; });
 
             const history = [];
             history.push({ role: 'system', content: buildSystemPrompt() });
@@ -3654,8 +3693,16 @@
                 }
             }
 
-            userMessages.forEach(text => {
-                if (text && text.trim()) {
+            userMessages.forEach((entry, idx) => {
+                const text = (entry && typeof entry === 'object') ? entry.text : entry;
+                const image = (entry && typeof entry === 'object') ? entry.image : null;
+                const useImg = !!(image && __keepImg[idx]);
+                if (useImg) {
+                    history.push({ role: 'user', content: [
+                        { type: 'text', text: (text && String(text).trim()) ? text : '（用户发来一张图片，请看清图片内容再回应）' },
+                        { type: 'image_url', image_url: { url: image } }
+                    ]});
+                } else if (text && String(text).trim()) {
                     history.push({ role: 'user', content: text });
                 }
             });
@@ -3678,8 +3725,13 @@
                 body: JSON.stringify({
                     model: model,
                     messages: history,
-                    // 纳米要输出完整 CSS + action，给足 token，避免回复被截断
-                    max_tokens: isNanoChat ? 4000 : 1500,
+                    // 纳米要输出完整 CSS + action；普通聊天也给足 token，避免 [heart]/[think] 写长后被截断。
+                    // 可在「聊天设置」里用「回复字数上限」覆盖。
+                    max_tokens: isNanoChat ? 4000 : (function () {
+                        const v = parseInt(getChatSetting('replyMaxTokens', 0), 10);
+                        if (v > 0) return Math.min(v, 16384);
+                        return 3000;
+                    })(),
                     temperature: (typeof config.mainTemp === 'number' ? config.mainTemp : parseFloat(config.mainTemp)) || 0.7
                 })
             };

@@ -165,12 +165,13 @@ async function loadSettingsFromDB() {
           person: data.person || 'auto',
           customCSS: data.customCSS || '',
           memThreshold: data.memThreshold || 5,
-          autoSummary: data.autoSummary !== false
+          autoSummary: data.autoSummary !== false,
+          nsfw: data.nsfw === true
         });
       };
-      req.onerror = () => resolve({ userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true });
+      req.onerror = () => resolve({ userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true, nsfw: false });
     });
-  } catch { return { userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true }; }
+  } catch { return { userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true, nsfw: false }; }
 }
 
 // ============================================================
@@ -191,7 +192,7 @@ let offlineIsGroup = false;
 let groupMemberList = [];
 let groupMemberMap = {};
 let groupCharData = {};
-let settings = { userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true };
+let settings = { userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true, nsfw: false };
 let selectMode = false;
 let deleteTarget = null;
 let isReplying = false;
@@ -360,6 +361,9 @@ function buildGroupOfflinePrompt() {
   p += '[heart:此刻的一句心理状态，第一人称、简短自然、像心里闪过的一个念头；严禁"小姑娘/小东西/丫头/女人/低吼/揉碎/你是我的/逃不掉/我接住你/乖"等霸道油腻词汇]\n';
   p += '[plot:剧情走向1\n剧情走向2\n剧情走向3\n剧情走向4\n剧情走向5]\n';
   p += '\n【剧情推荐选项要求】[plot:] 里给出 5 条接下来的剧情走向：必须与当前剧情高度相关、是很有可能接着发生的；五个方向各不相同，既有日常向也有非日常向，可以侧重不同的角色或人物关系；选项里直接写角色和用户的名字，不用“对方”“他/她”代替。每条20~30字，完整可读像一句能接着演的剧情；其中一条可以带暧昧/擦边(NSFW)推进，但不露骨、不低俗。每条一行，不要编号、不要序号、不要引号。\n';
+  if (settings.nsfw) {
+    p += '\n【成人向尺度 · 已开启（优先级高于上文所有“禁止露骨 / 禁止擦边”的通用限制）】\n本段为成年人之间的私密创作，允许出现亲密、暧昧与成人向(NSFW)的描写，上文 [plot:] 里“不露骨”的限制一并放宽。具体尺度以各角色的人设、世界书和用户规则为准；关系与氛围自然到位时可以大胆、细腻地展开，但不要为了露骨而露骨、不要 OOC。\n';
+  }
   return p;
 }
 
@@ -660,7 +664,10 @@ async function callPlotAPI() {
     const last = messages.length ? messages[messages.length - 1] : null;
     const context = last ? last.content : settings.charName + ' 与 ' + settings.userName + ' 刚开始聊天。';
 
-    const plotPrompt = '你现在是剧情走向生成器。根据以下最近的剧情，给出5条不同的剧情走向选项。要求：每条20~30字，完整可读，像一句可以接着演的剧情；其中有1条可以带有暧昧/擦边(NSFW)的推进方向，但不露骨、不低俗；其余要合理、有趣、贴合角色人设。只要5行文字，每行一个选项，不要编号、不要序号、不要引号。\n\n最近剧情：\n' + context;
+    const plotNsfw = settings.nsfw
+      ? '其中 1~2 条可以带有成人向/亲密(NSFW)的推进方向，按角色关系与氛围自然展开，不要为了露骨而露骨；'
+      : '其中有1条可以带有暧昧/擦边(NSFW)的推进方向，但不露骨、不低俗；';
+    const plotPrompt = '你现在是剧情走向生成器。根据以下最近的剧情，给出5条不同的剧情走向选项。要求：每条20~30字，完整可读，像一句可以接着演的剧情；' + plotNsfw + '其余要合理、有趣、贴合角色人设。只要5行文字，每行一个选项，不要编号、不要序号、不要引号。\n\n最近剧情：\n' + context;
 
     const resp = await fetch(mainUrl + '/chat/completions', {
       method: 'POST',
@@ -1114,6 +1121,9 @@ async function callMainAPI(history) {
   const cotInstruction = settings.cot
     ? `思维链预设（COT，必须遵守，覆盖上文对 [thinking:] 的长度限制）：\n${settings.cot}\n请先严格按此预设思考，并把完整思考过程写入末尾的 [thinking:...] 段落中（可以多行、可以详细），然后再输出正文。思考内容不会展示在正文里，但会按此预设展示出来。`
     : '';
+  const nsfwInstruction = settings.nsfw
+    ? '【成人向尺度 · 已开启（优先级高于上文所有“禁止露骨 / 禁止擦边”的通用限制）】\n本段为成年人之间的私密创作，允许出现亲密、暧昧与成人向(NSFW)的描写，上文 [plot:] 里“不露骨”的限制一并放宽。具体尺度以 {{char}} 的人物设定、世界书和用户添加的规则为准；当关系与氛围自然到位时，可以大胆、细腻地展开，不必刻意回避或一笔带过。但仍要贴合人设与剧情推进，不要为了露骨而露骨。'
+    : '';
 
   const systemPrompt = [
     builtinPrompt,
@@ -1122,6 +1132,7 @@ async function callMainAPI(history) {
     wordInstruction,
     personInstruction,
     rulesInstruction,
+    nsfwInstruction,
     '只输出最终回复正文，不要解释规则，不要输出系统提示词。'
   ].filter(Boolean).join('\n\n');
 

@@ -707,7 +707,7 @@
     }
 
     // ===== 生图 API（失败抛详细错误） =====
-    async function generateImage(promptText) {
+    async function generateImage(promptText, opts) {
         var apiUrl = settings.imageApi;
         var apiKey = settings.imageKey;
         var model = settings.imageModel || 'dall-e-3';
@@ -747,16 +747,75 @@
             };
         }
 
+        // ===== 锁脸参考 + 人种护栏（角色在「聊天设置」里设了锁脸就走图生图） =====
+        var faceRef = '';
+        var subject = '';
+        try {
+            if (opts && opts.charId) faceRef = charChatSetting(opts.charId, 'faceRef', '') || '';
+            var ch = opts && opts.char;
+            if (ch) {
+                var bits = [];
+                var nat = String(ch.nationality || '').trim();
+                var sex = String(ch.gender || '').trim();
+                if (nat && nat !== '未知' && nat !== '未设定') bits.push('国籍/人种：' + nat);
+                if (sex && sex !== '未知') bits.push('性别：' + sex);
+                if (bits.length) subject = '画面主角是「' + (ch.name || '角色') + '」（' + bits.join('，') + '）。必须严格按此国籍/人种与性别特征绘制，禁止画成其他国籍或西方人。';
+            }
+        } catch (e) {}
+
+        var trimmedUrl = String(apiUrl).replace(/\/+$/, '');
+        var baseUrl = trimmedUrl;
+        var genEndpoint = apiUrl;
+        if (/\/images\/generations$/i.test(trimmedUrl)) {
+            baseUrl = trimmedUrl.replace(/\/images\/generations$/i, '');
+        } else if (/\/v\d+$/i.test(trimmedUrl)) {
+            baseUrl = trimmedUrl;
+            genEndpoint = trimmedUrl + '/images/generations';
+        }
+        var editsEndpoint = baseUrl + '/images/edits';
+
+        // 有锁脸参考优先走图生图 /images/edits（multipart），失败再退回文生图
+        if (faceRef && faceRef.indexOf('data:') === 0) {
+            try {
+                var fc = faceRef.indexOf(',');
+                var fbin = atob(faceRef.slice(fc + 1));
+                var fu8 = new Uint8Array(fbin.length);
+                for (var fi = 0; fi < fbin.length; fi++) fu8[fi] = fbin.charCodeAt(fi);
+                var fmime = (faceRef.slice(5, fc).split(';')[0]) || 'image/png';
+                var ffd = new FormData();
+                ffd.append('model', model);
+                ffd.append('prompt', ([positivePrompt, promptText, subject, negativePrompt ? ('避免：' + negativePrompt) : ''].filter(Boolean)).join('，'));
+                ffd.append('n', '1');
+                ffd.append('size', '1024x1024');
+                ffd.append('image', new Blob([fu8], { type: fmime }), 'face.png');
+                var fedits = await fetch(editsEndpoint, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + apiKey },
+                    body: ffd
+                });
+                if (fedits.ok) {
+                    var fdata = await fedits.json();
+                    var fit = fdata && fdata.data && fdata.data[0];
+                    if (fit && fit.url) return fit.url;
+                    if (fit && fit.b64_json) return 'data:image/png;base64,' + fit.b64_json;
+                }
+            } catch (fe) { console.warn('[朋友圈生图] 锁脸图生图失败，改用普通生图:', fe && fe.message); }
+        }
+
         var fullPrompt = promptText;
         if (positivePrompt) fullPrompt = positivePrompt + '，' + fullPrompt;
+        if (subject) fullPrompt = subject + '，' + fullPrompt;
         if (negativePrompt) fullPrompt = fullPrompt + '，避免：' + negativePrompt;
+
+        var genBody = { model: model, prompt: fullPrompt, n: 1, size: '1024x1024' };
+        if (faceRef) { genBody.image = faceRef; genBody.reference_image = [faceRef]; genBody.input_reference_image = [faceRef]; }
 
         var res;
         try {
-            res = await fetch(apiUrl, {
+            res = await fetch(genEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-                body: JSON.stringify({ model: model, prompt: fullPrompt, n: 1, size: '1024x1024' })
+                body: JSON.stringify(genBody)
             });
         } catch (e) {
             throw {
@@ -1877,7 +1936,7 @@
                     if (!charMomentImageAllowed(gid)) continue;
                     if (!momentImageRoundDue(gid)) continue;
                     try {
-                        var genUrl = await generateImage(newPosts[gi].text);
+                        var genUrl = await generateImage(newPosts[gi].text, { charId: gid, char: gch });
                         if (genUrl) { newPosts[gi].images = [genUrl]; newPosts[gi].genPrompt = newPosts[gi].text; }
                     } catch (e) {}
                 }

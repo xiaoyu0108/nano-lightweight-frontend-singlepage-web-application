@@ -49,6 +49,57 @@
         }
     }
 
+    // 读取锁脸参考：localStorage 优先，其次回退到 IndexedDB（旧的大图只写进了 IDB）
+    function getFaceRefAsync() {
+        var local = getSetting('faceRef', '');
+        if (local) return Promise.resolve(local);
+        if (typeof localforage === 'undefined') return Promise.resolve('');
+        return localforage.getItem(getStorageKey('faceRef')).then(function(v) {
+            return v || '';
+        }).catch(function() { return ''; });
+    }
+
+    // 把参考图压缩到合理尺寸，避免整张手机照片（数 MB）撑爆 localStorage 配额导致保存静默失败
+    function compressImageFile(file, maxSize, quality) {
+        return new Promise(function(resolve) {
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                var img = new Image();
+                img.onload = function() {
+                    try {
+                        var w = img.width, h = img.height;
+                        var scale = Math.min(1, (maxSize || 640) / Math.max(w, h));
+                        var cw = Math.max(1, Math.round(w * scale));
+                        var ch = Math.max(1, Math.round(h * scale));
+                        var canvas = document.createElement('canvas');
+                        canvas.width = cw; canvas.height = ch;
+                        var ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, cw, ch);
+                        resolve(canvas.toDataURL('image/jpeg', quality || 0.82));
+                    } catch (e) { resolve(ev.target.result); }
+                };
+                img.onerror = function() { resolve(ev.target.result); };
+                img.src = ev.target.result;
+            };
+            reader.onerror = function() { resolve(null); };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function applyFacePreview(url) {
+        if (url) {
+            faceStatus.textContent = '已设置';
+            facePreviewBox.style.backgroundImage = 'url(' + url + ')';
+            facePreviewBox.style.backgroundSize = 'cover';
+            facePreviewBox.style.backgroundPosition = 'center';
+            facePreviewBox.textContent = '';
+        } else {
+            faceStatus.textContent = '未设置';
+            facePreviewBox.style.backgroundImage = 'none';
+            facePreviewBox.textContent = '未上传参考图';
+        }
+    }
+
     // ===== DOM 引用 =====
     var displayNickname = document.getElementById('displayNickname');
     var displayUserId = document.getElementById('displayUserId');
@@ -154,17 +205,18 @@
         var prompt = getSetting('imagePrompt', '');
         promptStatus.textContent = prompt ? shortPromptText(prompt) : '未设置';
 
-        var face = getSetting('faceRef', '');
-        if (face) {
-            faceStatus.textContent = '已设置';
-            facePreviewBox.style.backgroundImage = 'url(' + face + ')';
-            facePreviewBox.style.backgroundSize = 'cover';
-            facePreviewBox.style.backgroundPosition = 'center';
-            facePreviewBox.textContent = '';
-        } else {
-            faceStatus.textContent = '未设置';
-            facePreviewBox.style.backgroundImage = 'none';
-            facePreviewBox.textContent = '未上传参考图';
+        getFaceRefAsync().then(function(label) {
+            applyFacePreview(label);
+        });
+
+        var rmt = document.getElementById('replyMaxTokens');
+        if (rmt) {
+            var rmtVal = parseInt(getSetting('replyMaxTokens', 0), 10) || 0;
+            rmt.value = rmtVal > 0 ? rmtVal : '';
+            rmt.addEventListener('change', function() {
+                var v = parseInt(rmt.value, 10);
+                setSetting('replyMaxTokens', (v > 0 ? v : 0));
+            });
         }
 
         var autoMsg = getSetting('autoMsg', false);
@@ -639,7 +691,11 @@
 
     // ===== 锁脸 =====
     function openFaceModal() {
-        faceModal.classList.add('active');
+        // 每次打开都从存储里回填，避免页面上预览为空时误把已保存的参考图清掉
+        getFaceRefAsync().then(function(url) {
+            applyFacePreview(url);
+            faceModal.classList.add('active');
+        });
     }
 
     function saveFace() {
@@ -651,10 +707,10 @@
                 faceStatus.textContent = '已设置';
             }
         } else {
-            setSetting('faceRef', '');
-            faceStatus.textContent = '未设置';
-            facePreviewBox.style.backgroundImage = 'none';
-            facePreviewBox.textContent = '未上传参考图';
+            // 预览为空不代表要删除：可能只是还没回填，保持原值不动
+            getFaceRefAsync().then(function(existing) {
+                applyFacePreview(existing);
+            });
         }
         faceModal.classList.remove('active');
     }
@@ -829,17 +885,20 @@
     faceConfirm.addEventListener('click', saveFace);
     faceUpload.addEventListener('change', function(e) {
         var file = e.target.files[0];
+        var input = this;
         if (file) {
-            var reader = new FileReader();
-            reader.onload = function(ev) {
-                facePreviewBox.style.backgroundImage = 'url(' + ev.target.result + ')';
-                facePreviewBox.style.backgroundSize = 'cover';
-                facePreviewBox.style.backgroundPosition = 'center';
-                facePreviewBox.textContent = '';
-            };
-            reader.readAsDataURL(file);
+            compressImageFile(file, 640, 0.82).then(function(dataUrl) {
+                if (dataUrl) {
+                    facePreviewBox.style.backgroundImage = 'url(' + dataUrl + ')';
+                    facePreviewBox.style.backgroundSize = 'cover';
+                    facePreviewBox.style.backgroundPosition = 'center';
+                    facePreviewBox.textContent = '';
+                }
+                input.value = '';
+            });
+        } else {
+            this.value = '';
         }
-        this.value = '';
     });
 
     // ===== 主动功能事件绑定 =====

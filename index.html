@@ -58,7 +58,7 @@
             overflow: hidden;
             min-height: 0;
             padding-top: 0;
-            padding-bottom: 80px;
+            padding-bottom: calc(96px + var(--safe-inset-bottom));
         }
 
         .top-bar {
@@ -1017,7 +1017,7 @@
 
         function restoreBottomBar() {
             bottomBar.classList.remove('hidden');
-            appContent.style.paddingBottom = '80px';
+            appContent.style.paddingBottom = 'calc(96px + var(--safe-inset-bottom))';
         }
 
         function switchPage(page) {
@@ -2910,18 +2910,29 @@
         } catch (e) {}
     })();
 
-    // ===== Service Worker：暂时停用，保证每次都加载最新代码（解决 iOS PWA 缓存旧版本） =====
+    // ===== Service Worker =====
+    // 未配置后台推送时：保持注销，保证每次都加载最新代码（解决 iOS PWA 缓存旧版本）。
+    // 配置了推送服务器后：注册 sw.js（后台推送必须依赖 Service Worker）。
     try {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (rs) {
-                return Promise.all(rs.map(function (r) { return r.unregister(); }));
-            }).catch(function () {});
+            var __pushCfg = false;
+            try {
+                __pushCfg = !!(localStorage.getItem('nano_push_endpoint') && localStorage.getItem('nano_push_vapid'));
+            } catch (e) {}
+            if (__pushCfg) {
+                navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () {});
+            } else {
+                navigator.serviceWorker.getRegistrations().then(function (rs) {
+                    return Promise.all(rs.map(function (r) { return r.unregister(); }));
+                }).catch(function () {});
+            }
         }
     } catch (e) {}
 </script>
 <script src="js/api-float.js?v=20260926h"></script>
 <script src="js/aux-memory.js"></script>
 <script src="js/nano-notify.js"></script>
+<script src="js/nano-push.js"></script>
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js"></script>
 </div>
