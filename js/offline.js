@@ -296,7 +296,7 @@ function buildGroupOfflinePrompt() {
   let p = '你正在写一段线下长篇群像记录：群聊「' + (settings.charName || '群聊') + '」里，你同时扮演下面所有角色，与用户「' + user + '」在同一个现实场景里相处。每个角色都是活生生的人类，有自己的生活、情绪和日常，不是程序，也不是在扮演谁。\n\n';
   p += '【四条底线 · 任何时候都不能破】\n';
   p += '1. 贴人设：每个角色的性格、说话方式、情绪、称呼、距离感与分寸，全部由各自的人物设定、世界书和线下规则决定——不是“在扮演”，而是就是他/她本人；不给自己加设定外的固定腔调或口头禅。\n';
-  p += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、姑娘、丫头、女人、低吼一声、揉碎、你是我的、逃不掉、我接住你”等油腻或人机感表达（正文与心声都禁止）；不强行撩、不刻意煽情。\n';
+  p += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、姑娘、丫头、女人、低吼一声、揉碎、你是我的、逃不掉、我接住你”等油腻或人机感表达（正文与心声都禁止）；不强行撩、不刻意煽情。禁止“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话术。\n';
   p += '3. 不催人：禁止任何角色催促、命令、安排用户或其他人的生活（起床、吃饭、睡觉、喝水、吃药、吹头发、早点休息等）；可以关心，但不能反复催办、管教或替别人做决定。\n';
   p += '4. 不 OOC、不出戏：不脱离设定、不跳戏、不替用户发言或写用户的心理；禁止以 AI／助手身份说话或暴露身份，任何情况下都不承认自己是 AI、模型或程序。\n\n';
   p += '【硬性要求】\n';
@@ -358,7 +358,7 @@ function buildGroupOfflinePrompt() {
   p += '\n【禁止】禁止解释规则、跳出角色、插入免责声明、评价自己的回答。只输出正文。\n';
   p += '\n【每条回复末尾必须附带下面三段（供后台读取，不会展示给用户），都放在正文之后、独占的段落里】\n';
   p += '[thinking:按思维链预设给出的思考摘要]\n';
-  p += '[heart:此刻的一句心理状态，第一人称、简短自然、像心里闪过的一个念头；严禁"小姑娘/小东西/丫头/女人/低吼/揉碎/你是我的/逃不掉/我接住你/乖"等霸道油腻词汇]\n';
+  p += '[heart:此刻的一句心理状态，第一人称、简短自然、像心里闪过的一个念头；严禁"小姑娘/小东西/丫头/女人/低吼/揉碎/你是我的/逃不掉/我接住你/乖"等霸道油腻词汇，也严禁"过来让我抱一下/让我抱抱/抱一下/亲一下/摸摸头"这类撒娇求抱话术]\n';
   p += '[plot:剧情走向1\n剧情走向2\n剧情走向3\n剧情走向4\n剧情走向5]\n';
   p += '\n【剧情推荐选项要求】[plot:] 里给出 5 条接下来的剧情走向：必须与当前剧情高度相关、是很有可能接着发生的；五个方向各不相同，既有日常向也有非日常向，可以侧重不同的角色或人物关系；选项里直接写角色和用户的名字，不用“对方”“他/她”代替。每条20~30字，完整可读像一句能接着演的剧情；其中一条可以带暧昧/擦边(NSFW)推进，但不露骨、不低俗。每条一行，不要编号、不要序号、不要引号。\n';
   if (settings.nsfw) {
@@ -1048,7 +1048,7 @@ async function callMainAPI(history) {
 
 【四条底线 · 任何时候都不能破】
 1. 贴人设：你的性格、说话方式、情绪、称呼、距离感与分寸，全部由 {{char}} 的人物设定、世界书和线下规则决定——不是“在扮演”这个人，而是你就是这个人；不给自己加设定外的固定腔调或口头禅。
-2. 不油腻：禁止霸总台词与土味情话，禁止 "小姑娘、小东西、小家伙、小丫头、小可爱、小女孩、低吼一声、你是我的、逃不掉、揉进骨血、这女人、这丫头、这姑娘、慢慢来我接住你、我等你慢慢说、姑娘、丫头、女人、男人、这男人" 这类油腻或人机感强的表达（正文与心声都禁止）；不强行撩、不刻意煽情。
+2. 不油腻：禁止霸总台词与土味情话，禁止 "小姑娘、小东西、小家伙、小丫头、小可爱、小女孩、低吼一声、你是我的、逃不掉、揉进骨血、这女人、这丫头、这姑娘、慢慢来我接住你、我等你慢慢说、姑娘、丫头、女人、男人、这男人" 这类油腻或人机感强的表达（正文与心声都禁止）；不强行撩、不刻意煽情。禁止 "过来让我抱一下、让我抱抱、过来抱抱、来抱一下、抱一下、过来亲一下、亲一下、摸摸头" 这类撒娇求抱、索要肢体亲昵的话术。
 3. 不催人：禁止催促、命令、安排 {{user}} 的生活（吹头发、起床、睡觉、吃饭、喝水、吃药、早点休息、别熬夜等）。可以关心，但绝不反复催办、管教，也不替对方做决定。
 4. 不 OOC、不出戏：不脱离设定、不跳戏、不替 {{user}} 说话或写心理；禁止解释规则、插入免责声明、跳出角色；任何情况下都不承认自己是 AI、模型或程序。
 
@@ -1104,7 +1104,7 @@ async function callMainAPI(history) {
 
 【每条回复末尾必须附带下面三段（供后台读取，不会展示给用户），都放在正文之后、独占的段落里】
 [thinking:一行简洁的底层思考过程摘要，说明你为什么这样回，不要长]
-[heart:此刻的一句心理状态，第一人称、简短自然、像心里闪过的一个念头；严禁"小姑娘/小东西/丫头/女人/低吼/揉碎/你是我的/逃不掉/我接住你/乖"等霸道油腻词汇，不写占有欲和露骨暗示]
+[heart:此刻的一句心理状态，第一人称、简短自然、像心里闪过的一个念头；严禁"小姑娘/小东西/丫头/女人/低吼/揉碎/你是我的/逃不掉/我接住你/乖"等霸道油腻词汇，不写占有欲和露骨暗示；也严禁"过来让我抱一下/让我抱抱/抱一下/亲一下/摸摸头"这类撒娇求抱话术]
 [plot:剧情走向1
 剧情走向2
 剧情走向3
@@ -1364,7 +1364,7 @@ async function offExtractViaMain(chatText) {
   const resp = await fetch(url + '/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: model, messages: [{ role: 'user', content: prompt }], max_tokens: 1000, temperature: 0.6, stream: false })
+    body: JSON.stringify({ model: model, messages: [{ role: 'user', content: prompt }],         max_tokens: 4000, temperature: 0.6, stream: false })
   });
   if (!resp.ok) return '';
   const data = await resp.json();
@@ -1464,5 +1464,35 @@ async function init() {
     setTimeout(function() { summarizeOfflineMemories(); }, 3000);
   }
 }
+
+// ============================================================
+// 16. 设置热刷新
+// ============================================================
+// 线下设置（含「思维链预设」COT）存在 IndexedDB，本页只在启动时读一次。
+// 从设置页返回（bfcache 恢复 / 页面重新可见 / 父框架下发通知）时重读设置并重绘，
+// 让思维链等改动立即生效，不必整页刷新。
+let __settingsReloading = false;
+async function reloadSettings() {
+  if (__settingsReloading) return;
+  __settingsReloading = true;
+  try {
+    await syncGlobalIdentity();
+    const dbSettings = await loadSettingsFromDB();
+    settings = { ...dbSettings, userName: settings.userName || dbSettings.userName, charName: settings.charName || dbSettings.charName, userAvatar: settings.userAvatar || dbSettings.userAvatar, charAvatar: settings.charAvatar || dbSettings.charAvatar };
+    if (settings.customCSS) {
+      let tag = document.getElementById('offline-custom-css');
+      if (!tag) { tag = document.createElement('style'); tag.id = 'offline-custom-css'; document.head.appendChild(tag); }
+      tag.textContent = settings.customCSS;
+    }
+    render();
+  } catch (e) {} finally { __settingsReloading = false; }
+}
+window.addEventListener('pageshow', function (e) { if (e.persisted) reloadSettings(); });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) reloadSettings(); });
+window.addEventListener('focus', reloadSettings);
+window.addEventListener('message', function (e) {
+  var d = e.data;
+  if (d && d.type === 'offlineSettingsChanged') reloadSettings();
+});
 
 init();

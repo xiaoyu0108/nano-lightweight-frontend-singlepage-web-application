@@ -54,6 +54,24 @@
             icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
             color: '#5B6CFF'
         },
+        {
+            id: 'familycard',
+            label: '亲属卡',
+            icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
+            color: '#AF52DE'
+        },
+        {
+            id: 'takeout',
+            label: '外卖',
+            icon: '<path d="M3 11h18"/><path d="M12 3a8 8 0 0 0-8 8h16a8 8 0 0 0-8-8z"/><path d="M4 15h16l-1 5H5z"/>',
+            color: '#FF8A00'
+        },
+        {
+            id: 'location',
+            label: '定位',
+            icon: '<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
+            color: '#32ADE6'
+        },
     ];
 
     // 旧版本曾加入过「接收/结束一起听」，这里移除，避免老用户菜单里残留
@@ -252,6 +270,7 @@
             case 'transfer':
                 document.getElementById('transferAmount').value = '';
                 document.getElementById('transferNote').value = '';
+                (function () { var ts = document.getElementById('transferSource'); if (ts) ts.value = 'bank'; })();
                 document.getElementById('transferPopup').classList.add('active');
                 setTimeout(function() {
                     document.getElementById('transferAmount').focus();
@@ -260,6 +279,7 @@
             case 'gift':
                 document.getElementById('giftNameInput').value = '';
                 document.getElementById('giftNoteInput').value = '';
+                (function () { var ga = document.getElementById('giftAmount'); if (ga) ga.value = ''; })();
                 document.getElementById('giftPopup').classList.add('active');
                 setTimeout(function() {
                     document.getElementById('giftNameInput').focus();
@@ -270,6 +290,7 @@
                 document.getElementById('imagePreview').src = '';
                 document.getElementById('imageTextInput').value = '';
                 document.getElementById('imageFileInput').value = '';
+                (function () { var t = document.getElementById('imgTabText'); if (t) t.click(); })();
                 document.getElementById('imagePopup').classList.add('active');
                 break;
             case 'voicecall':
@@ -328,6 +349,48 @@
                 } else {
                     window.location.href = 'offline.html';
                 }
+                break;
+            case 'familycard':
+                if (window.parent !== window) {
+                    let qsFc = '';
+                    try {
+                        const sp = new URLSearchParams(window.location.search);
+                        const cid = sp.get('chat');
+                        const nm = sp.get('name');
+                        if (cid) qsFc += 'chat=' + encodeURIComponent(cid);
+                        if (nm) qsFc += (qsFc ? '&' : '') + 'name=' + encodeURIComponent(nm);
+                    } catch (e) {}
+                    window.parent.postMessage({
+                        type: 'openFullscreen',
+                        url: 'family-card.html' + (qsFc ? '?' + qsFc : ''),
+                        title: '亲属卡',
+                        source: 'chat_inner'
+                    }, '*');
+                } else {
+                    window.location.href = 'family-card.html';
+                }
+                break;
+            case 'takeout':
+                document.getElementById('takeoutFood').value = '';
+                document.getElementById('takeoutShop').value = '';
+                document.getElementById('takeoutPrice').value = '';
+                document.getElementById('takeoutNote').value = '';
+                document.getElementById('takeoutPopup').classList.add('active');
+                setTimeout(function() { document.getElementById('takeoutFood').focus(); }, 100);
+                break;
+            case 'location':
+                (function () {
+                    var p = document.getElementById('locationPlace'); if (p) p.value = '';
+                    var d = document.getElementById('locationDistance'); if (d) d.value = '';
+                    var d2 = document.getElementById('locationRealDistance'); if (d2) d2.value = '';
+                    var s = document.getElementById('locationStatus'); if (s) s.textContent = '未定位';
+                    var l = document.getElementById('locMapLabel'); if (l) l.textContent = '未选择地点';
+                    var vt = document.querySelector('#locationPopup .vs-tab[data-loc="virtual"]'); if (vt) vt.click();
+                })();
+                document.getElementById('locationPopup').classList.add('active');
+                setTimeout(function() {
+                    var p = document.getElementById('locationPlace'); if (p) p.focus();
+                }, 100);
                 break;
             case 'heart':
                 window.__chat.showAlert('提示', '心声功能开发中...');

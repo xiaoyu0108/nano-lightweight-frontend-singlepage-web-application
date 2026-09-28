@@ -339,6 +339,56 @@ html.keyboard-open .chat-container {
 .bubble-card.invite .card-btn:active { background: #000; }
 .bubble-card.invite .card-btn.return-btn { background: #ececf0; color: #555; }
 .bubble-card.invite .card-btn.return-btn:active { background: #e0e0e5; }
+/* 亲属卡卡片：白底 + 紫色主按钮，与红色挂断等区分 */
+.bubble-card.familycard { background: #fff; color: #111; }
+.bubble-card.familycard .icon-wrap { background: rgba(175,82,222,0.14); color: #AF52DE; }
+.bubble-card.familycard .card-title { color: #1c1c1e; }
+.bubble-card.familycard .card-footer { border-top: 1px solid rgba(0,0,0,0.06); }
+.bubble-card.familycard .card-btn { background: #AF52DE; color: #fff; }
+.bubble-card.familycard .card-btn:active { background: #9333c4; }
+.bubble-card.familycard .card-btn { background: #AF52DE; color: #fff; }
+.bubble-card.familycard .card-btn.return-btn { background: #ececf0; color: #555; }
+.bubble-card.familycard .card-btn.return-btn:active { background: #e0e0e5; }
+/* 亲属卡处理结果卡（已接受/已拒绝）：变灰，和转账一致 */
+.bubble-card.familycard.response,
+.bubble-card.familycard.rejected { background: #DCDCDC; color: #8a8a8a; }
+.bubble-card.familycard.response .icon-wrap,
+.bubble-card.familycard.rejected .icon-wrap { background: rgba(0,0,0,0.06); color: #8a8a8a; }
+.bubble-card.familycard.response .card-title,
+.bubble-card.familycard.rejected .card-title { color: #8a8a8a; }
+.bubble-card.familycard.response .card-footer,
+.bubble-card.familycard.rejected .card-footer { border-top-color: rgba(0,0,0,0.08); }
+
+/* 外卖卡片 */
+.bubble-card.takeout { background: #fff; color: #111; }
+.bubble-card.takeout .icon-wrap { background: rgba(255,138,0,0.14); color: #FF8A00; }
+.bubble-card.takeout .card-footer { border-top: 1px solid rgba(0,0,0,0.06); }
+.bubble-card.takeout .card-btn { background: #FF8A00; color: #fff; }
+.bubble-card.takeout .card-btn:active { background: #e07a00; }
+.bubble-card.takeout .card-btn.return-btn { background: #ececf0; color: #555; }
+.bubble-card.takeout.response,
+.bubble-card.takeout.accepted,
+.bubble-card.takeout.rejected { background: #DCDCDC; color: #8a8a8a; }
+.bubble-card.takeout.response .icon-wrap,
+.bubble-card.takeout.accepted .icon-wrap,
+.bubble-card.takeout.rejected .icon-wrap { background: rgba(0,0,0,0.06); color: #8a8a8a; }
+.bubble-card.takeout.response .card-footer,
+.bubble-card.takeout.accepted .card-footer,
+.bubble-card.takeout.rejected .card-footer { border-top-color: rgba(0,0,0,0.08); }
+
+/* 定位卡片：上方地点+距离，下方地图，小方形 */
+.bubble-card.location { padding: 0; background: #fff; color: #111; width: 200px; }
+.loc-bubble-head { padding: 10px 12px 8px; }
+.loc-bubble-place {
+    font-size: 14px; font-weight: 600; color: #1c1c1e;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.loc-bubble-dist { font-size: 11px; color: #8e8e93; margin-top: 3px; }
+.loc-bubble-map {
+    position: relative; height: 108px; overflow: hidden;
+    background: linear-gradient(135deg, #e8f1ea, #dbe8f2 55%, #eef3f7);
+}
+.loc-bubble-map .loc-map-pin svg { width: 30px; height: 30px; }
 .bubble-card.call { background: #fff; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
 .bubble-card.call .icon-wrap { background: rgba(0,122,255,0.1); }
 .bubble-card.call.missed .icon-wrap { background: rgba(255,59,48,0.1); }
@@ -757,49 +807,61 @@ html.keyboard-open .chat-container {
 }
 .ios-alert-button:active { opacity: 0.7; transform: scale(0.96); }
 
-/* ===== 内嵌弹窗 ===== */
+/* ===== 内嵌弹窗（样式对齐「发送语音」底部弹窗） ===== */
 .ios-popup-overlay {
     display: none;
     position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 200;
-    background: rgba(0,0,0,0.10);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    align-items: center;
+    inset: 0;
+    z-index: 300;
+    background: rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    align-items: flex-end;
     justify-content: center;
-    padding: 20px;
 }
 .ios-popup-overlay.active { display: flex; }
 .ios-popup-card {
-    width: min(320px, calc(100vw - 40px));
-    background: rgba(242, 242, 247, 0.92);
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-    border-radius: 20px;
-    overflow: hidden;
-    border: 0.5px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08);
-    animation: popupFadeIn 0.25s ease-out;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.14);
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: 90vh;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+    animation: popupSlideUp 0.24s ease;
 }
-@keyframes popupFadeIn {
-    from { opacity: 0; transform: scale(0.92) translateY(12px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
+@keyframes popupSlideUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
-.ios-popup-header { padding: 20px 16px 12px; text-align: center; }
-.ios-popup-title { font-size: 17px; font-weight: 600; letter-spacing: -0.4px; color: #000; }
-.ios-popup-subtitle { font-size: 13px; color: #8e8e93; margin-top: 4px; }
-.ios-popup-body { padding: 0 16px 16px; }
+/* 隐藏数字输入的上下箭头和所有滚动条 */
+.ios-popup-overlay input[type=number]::-webkit-outer-spin-button,
+.ios-popup-overlay input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.ios-popup-overlay, .ios-popup-card, .ios-popup-body, .ios-popup-input,
+.ios-popup-overlay * { scrollbar-width: none; -ms-overflow-style: none; }
+.ios-popup-overlay::-webkit-scrollbar, .ios-popup-card::-webkit-scrollbar,
+.ios-popup-body::-webkit-scrollbar, .ios-popup-overlay *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.ios-popup-header { padding: 0 0 14px; text-align: left; }
+.ios-popup-title { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; color: #1c1c1e; }
+.ios-popup-subtitle { font-size: 12px; color: #8e8e93; margin-top: 3px; }
+.ios-popup-body { padding: 0; }
 .ios-popup-input-group {
     background: #ffffff;
     border-radius: 12px;
-    border: 0.5px solid rgba(60, 60, 67, 0.12);
+    border: 0.5px solid rgba(60, 60, 67, 0.10);
     overflow: hidden;
 }
 .ios-popup-row {
     display: flex;
     align-items: center;
-    padding: 12px 14px;
+    padding: 13px 14px;
     position: relative;
 }
 .ios-popup-row:not(:last-child)::after {
@@ -809,30 +871,62 @@ html.keyboard-open .chat-container {
     right: 0;
     bottom: 0;
     height: 0.5px;
-    background: rgba(60, 60, 67, 0.12);
+    background: rgba(60, 60, 67, 0.10);
 }
-.ios-popup-label { font-size: 15px; font-weight: 500; color: #000; width: 72px; flex-shrink: 0; }
+.ios-popup-label { font-size: 14px; font-weight: 500; color: #1c1c1e; width: 64px; flex-shrink: 0; }
 .ios-popup-input {
     width: 100%; border: none; outline: none; background: transparent;
-    font-family: inherit; font-size: 15px; color: #000;
+    font-family: inherit; font-size: 15px; color: #1c1c1e;
 }
 .ios-popup-input::placeholder { color: #c7c7cc; }
-.ios-popup-actions {
-    display: flex;
-    border-top: 0.5px solid rgba(60, 60, 67, 0.12);
-}
+.ios-popup-actions { display: flex; gap: 10px; margin-top: 16px; }
 .ios-popup-btn {
-    flex: 1; height: 48px; border: none; background: transparent;
-    font-family: inherit; font-size: 17px; cursor: pointer;
+    flex: 1; border: none; border-radius: 12px; padding: 13px 0;
+    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    transition: background 0.15s;
+    transition: opacity 0.15s;
 }
-.ios-popup-btn:active { background: rgba(0,0,0,0.06); }
-.ios-popup-btn-cancel { color: #007aff; font-weight: 400; border-right: 0.5px solid rgba(60, 60, 67, 0.12); }
-.ios-popup-btn-confirm { color: #007aff; font-weight: 600; }
+.ios-popup-btn:active { opacity: 0.8; }
+.ios-popup-btn-cancel { background: rgba(120, 120, 128, 0.12); color: #1c1c1e; }
+.ios-popup-btn-confirm { background: #007aff; color: #ffffff; }
+
+/* 定位弹窗：Google 地图风格预览 + 虚拟/真实 tab */
+.loc-tabs { display: flex; gap: 6px; padding: 0 16px 10px; }
+.loc-tab {
+    flex: 1; border: none; background: rgba(0,0,0,0.05); color: #55555a;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    padding: 8px 0; border-radius: 10px; cursor: pointer;
+}
+.loc-tab.active { background: #32ADE6; color: #fff; }
+.loc-map {
+    position: relative; height: 150px; border-radius: 14px; overflow: hidden; margin-bottom: 12px;
+    background: linear-gradient(135deg, #e8f1ea, #dbe8f2 55%, #eef3f7);
+    border: 1px solid rgba(60, 60, 67, 0.08);
+}
+.loc-map-grid {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(120,140,160,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(120,140,160,0.12) 1px, transparent 1px);
+    background-size: 26px 26px;
+}
+.loc-map-road { position: absolute; background: rgba(255,255,255,0.85); box-shadow: 0 0 0 1px rgba(150,160,170,0.25); }
+.loc-map-road-a { left: -10%; top: 58%; width: 120%; height: 14px; transform: rotate(-7deg); }
+.loc-map-road-b { left: 38%; top: -10%; width: 14px; height: 120%; transform: rotate(6deg); }
+.loc-map-pin { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -100%); color: #EA4335; }
+.loc-map-pin svg { width: 34px; height: 34px; fill: rgba(234,67,53,0.12); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.2)); }
+.loc-map-label {
+    position: absolute; left: 10px; right: 10px; bottom: 8px;
+    background: rgba(255,255,255,0.94); border-radius: 8px; padding: 6px 10px;
+    font-size: 12px; color: #1c1c1e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.loc-get { display: flex; align-items: center; gap: 8px; flex: 1; }
+.loc-get-btn {
+    border: none; background: #32ADE6; color: #fff; font-family: inherit;
+    font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 10px; cursor: pointer;
+}
+.loc-status { font-size: 12px; color: #8e8e93; }
 
 /* 编辑消息弹窗（美化） */
-.edit-card { width: min(346px, calc(100vw - 36px)); }
+.edit-card { width: 100%; max-width: 480px; }
 .edit-card .ios-popup-header { padding: 22px 18px 12px; }
 .edit-body { padding: 0 16px 16px; }
 .edit-textarea {
@@ -1030,7 +1124,7 @@ html.keyboard-open .chat-container {
     .input-shell { min-height: 38px; }
     .emoji-btn, .voice-btn { width: 28px; height: 28px; font-size: 15px; }
     .send-btn { font-size: 15px; }
-    .ios-popup-card { width: min(280px, calc(100vw - 32px)); }
+    .ios-popup-card { width: 100%; max-width: 100%; padding-left: 14px; padding-right: 14px; }
 }
 
 /* ===== 通话记录弹窗 ===== */

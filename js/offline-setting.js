@@ -1248,7 +1248,19 @@ document.getElementById('summarizeOfflineMemoryBtn').onclick = async function() 
   }
 };
 
-document.querySelectorAll('[data-close]').forEach(b => b.onclick = function() { closeSheet(this.dataset.close); });
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = function() {
+  var what = this.dataset.close;
+  // 思维链预设弹窗：点「完成」也要落库，否则编辑了 COT 但只关弹窗、未点页面「保存」会静默丢失
+  if (what === 'cotSheet') {
+    try {
+      var cotEl = document.getElementById('cotText');
+      if (cotEl) settings.cot = cotEl.value.trim();
+      saveSettings();
+      updateSummary();
+    } catch (e) {}
+  }
+  closeSheet(what);
+});
 document.querySelectorAll('.sheet-backdrop').forEach(b => b.addEventListener('click', function(e) { if (e.target === this) closeSheet(this.id); }));
 
 // ============================================================

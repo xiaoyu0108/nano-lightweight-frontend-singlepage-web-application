@@ -30,7 +30,7 @@
 
         html, body {
             width: 100%;
-            height: 100vh;
+            height: var(--app-h, 100vh);
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -40,7 +40,7 @@
 
         .app-container {
             width: 100%;
-            height: 100vh;
+            height: var(--app-h, 100vh);
             margin: 0;
             background: transparent;
             padding: 0 16px 0 16px;
@@ -214,7 +214,7 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 100vh;
+            height: var(--app-h, 100vh);
             background: #ffffff;
             z-index: 100;
             display: none;
@@ -234,7 +234,7 @@
             width: 100%;
             max-width: 430px;
             margin: 0 auto;
-            height: 100vh;
+            height: var(--app-h, 100vh);
             display: flex;
             flex-direction: column;
         }
@@ -1219,7 +1219,7 @@
             'music.html', 'voice-call.html', 'storage.html', 'backup.html', 'other.html', 'more.html',
             'discover.html', 'api.html', 'moments.html', 'ins.html', 'inner-setting.html', 'beautify.html',
             'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
-            'phone.html', 'assistant.html', 'nano-setting.html'];
+            'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html'];
         // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
         function applySafeFallback(f) {
             try {
@@ -1254,7 +1254,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-09-26-09';
+        var BUILD = 'nano-2026-09-28-01';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -1329,7 +1329,7 @@
                 if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
                     overlayFrame.src = url;
                 }
-                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html'];
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
                 if (noOuterHeader) {
@@ -2154,6 +2154,18 @@
 
                 if (!floatBall) createFloatBall();
                 if (floatBall) {
+                    // 兜底：保存的位置可能越界（旋转/换机型），或节点被移除过，重新挂回并夹进可视区
+                    try {
+                        if (!floatBall.parentNode) document.body.appendChild(floatBall);
+                        floatBall.style.position = 'fixed';
+                        const r = floatBall.getBoundingClientRect();
+                        if (r.left < 0 || r.top < 0 || r.right > window.innerWidth || r.bottom > window.innerHeight) {
+                            floatBall.style.left = '';
+                            floatBall.style.top = '';
+                            floatBall.style.right = '20px';
+                            floatBall.style.bottom = '120px';
+                        }
+                    } catch (e) {}
                     floatBall.style.display = 'flex';
                     isFloatBallVisible = true;
                 }
@@ -2182,7 +2194,9 @@
                 const currentSeconds = callSeconds;
                 hideFloatBall();
                 const frame = document.getElementById('voiceCallFrame');
-                if (voiceCallKeptAlive && frameBase(frame) === 'voice-call.html') {
+                // 只要通话帧还活着（没被置回 about:blank），就从悬浮球直接续接原通话，绝不重载/重连
+                if (frame && frame.contentWindow && frameBase(frame) === 'voice-call.html') {
+                    voiceCallKeptAlive = true;
                     overlayFrame.style.display = 'none';
             hideOtherGenericFrame();
                     chatInnerFrame.style.display = 'none';
@@ -2643,6 +2657,19 @@
                 }
             }
 
+            // 亲属卡：页面在 overlay 里发起，必须转给正在打开的单聊内页（chatInnerFrame）
+            if (data.type === 'NANO_FAMILY_CARD_SUBMIT' || data.type === 'NANO_FAMILY_CARD_RESULT' || data.type === 'NANO_FAMILY_SPEND_NOTICE') {
+                const frame = document.getElementById('chatInnerFrame');
+                if (frame && frameBase(frame) === 'chat_inner.html') {
+                    try { frame.contentWindow.postMessage(data, '*'); } catch (e) {}
+                } else {
+                    const chatIframe = getChatInnerIframe();
+                    if (chatIframe && chatIframe.contentWindow) {
+                        try { chatIframe.contentWindow.postMessage(data, '*'); } catch (e) {}
+                    }
+                }
+            }
+
             if (data.type === 'NANO_VOICE_CALL_CARD') {
                 const frame = document.getElementById('chatInnerFrame');
                 if (frame && frameBase(frame) === 'chat_inner.html') {
@@ -2834,6 +2861,36 @@
                 }
             });
             setTimeout(update, 300);
+        })();
+
+        // ===== iOS：外壳高度跟随“键盘上方的可视区域” =====
+        // 把 visualViewport.height 写进 --app-h，键盘弹出时整个外壳变矮，
+        // 输入栏自然贴到键盘上方，不再被 iOS 顶偏后切掉一半。
+        (function syncAppHeight() {
+            if (!window.visualViewport) return;
+            var vv = window.visualViewport;
+            var root = document.documentElement;
+            var rafId = 0;
+            function apply() {
+                try { root.style.setProperty('--app-h', Math.round(vv.height) + 'px'); } catch (e) {}
+                try { window.scrollTo(0, 0); } catch (e) {}
+            }
+            function schedule() {
+                if (rafId) return;
+                rafId = requestAnimationFrame(function () { rafId = 0; apply(); });
+            }
+            vv.addEventListener('resize', schedule);
+            vv.addEventListener('scroll', schedule);
+            // 键盘收起（输入框 blur / focusout）后延迟 100ms 再补一次，恢复整屏、底部不留白
+            function restore() { setTimeout(apply, 100); }
+            window.addEventListener('blur', restore, true);
+            document.addEventListener('focusout', restore, true);
+            // 内页（同源 iframe）输入框聚焦/失焦会 postMessage 查询键盘高度，这里顺带刷新一次
+            window.addEventListener('message', function (ev) {
+                var d = ev.data;
+                if (d && d.type === 'nanoKeyboardQuery') setTimeout(apply, 100);
+            });
+            apply();
         })();
     })();
 

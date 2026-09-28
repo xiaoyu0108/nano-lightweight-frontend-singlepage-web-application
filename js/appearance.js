@@ -492,12 +492,19 @@
     var TOP_SHIFT_SEL = '.top-bar,.navbar,.nav-bar,.memory-topbar,.topbar,.page-topbar,.overlay-header,.status';
     var BOTTOM_SHIFT_SEL = '.bottom-actions,.bottom-bar,footer.bottom,.bottom,' +
         '.dm-composer,.mm-viewer-bar,.comment-input,.chat-input-bar,.ins-emoji-panel';
+    // index 外壳自己的底栏（.bottom-actions）保持贴底不动：上调后它下面会露出
+    // .app 的透明区域，出现一条与主题不符的空隙。其它页面（含线下的 .bottom、
+    // chat_inner/groups 的 .bottom-bar）照常跟随「底栏位置」上调。
+    var BOTTOM_SHIFT_SEL_NO_ACTIONS = '.bottom-bar,footer.bottom,.bottom,' +
+        '.dm-composer,.mm-viewer-bar,.comment-input,.chat-input-bar,.ins-emoji-panel';
     function applyShift(kind, px) {
         var key = kind === 'top' ? 'nanoTopShift' : 'nanoBottomShift';
         var v = parseInt(px, 10);
         if (isNaN(v)) { try { v = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) { v = 0; } }
         var varName = kind === 'top' ? '--nano-top-shift' : '--nano-bottom-shift';
-        var sel = kind === 'top' ? TOP_SHIFT_SEL : BOTTOM_SHIFT_SEL;
+        var isIndexShell = !!(document.body && document.body.classList.contains('nano-index'));
+        var sel = kind === 'top' ? TOP_SHIFT_SEL
+            : (isIndexShell ? BOTTOM_SHIFT_SEL_NO_ACTIONS : BOTTOM_SHIFT_SEL);
         applyStyle('nano-' + kind + '-shift',
             ':root{' + varName + ':' + v + 'px;}' +
             sel + '{transform:translateY(var(' + varName + ',0px)) !important;}');

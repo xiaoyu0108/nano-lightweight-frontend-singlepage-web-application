@@ -5,6 +5,23 @@
     const transferNote = document.getElementById('transferNote');
     const transferCancel = document.getElementById('transferCancel');
     const transferConfirm = document.getElementById('transferConfirm');
+    const transferSource = document.getElementById('transferSource');
+
+    function chatIdNow() {
+        try { return new URLSearchParams(window.location.search).get('chat') || 'default'; } catch (e) { return 'default'; }
+    }
+    // 找一张对方出资、且已开启的亲属卡（亲密付）
+    function getActiveCharCard() {
+        try {
+            var S = window.NanoFamilyCardStore;
+            if (!S) return null;
+            var cs = S.read(chatIdNow());
+            for (var i = 0; i < cs.length; i++) {
+                if (cs[i].issuer === 'char' && cs[i].holder === 'user' && cs[i].status === 'active') return cs[i];
+            }
+        } catch (e) {}
+        return null;
+    }
 
     transferCancel.addEventListener('click', function() {
         transferPopup.classList.remove('active');
@@ -59,6 +76,19 @@
             footer: '已发送',
             status: 'pending'
         };
+        // 支付方式：我的银行卡（默认）/ 亲密付（走对方亲属卡，对方会知道这笔支出）
+        var source = transferSource ? transferSource.value : 'bank';
+        if (source === 'family') {
+            var fc = getActiveCharCard();
+            if (!fc) { window.__chat.showAlert('提示', '没有可用的亲密付（对方亲属卡）'); return; }
+            var S = window.NanoFamilyCardStore;
+            if (S) {
+                S.charSpend(chatIdNow(), '亲密付 · 转账给 ' + (window.__chat.displayName || '对方'), parseFloat(amount));
+                S.update(chatIdNow(), fc.id, { spent: Number(fc.spent || 0) + parseFloat(amount) });
+            }
+            cardData.paidBy = 'family';
+            try { window.__chat.addSystemNotice('你使用对方的亲属卡（亲密付）消费了 ¥' + parseFloat(amount).toFixed(2)); } catch (e) {}
+        }
         window.__chat.addMessage('right', '', timeStr, null, false, true, cardData);
         window.__chat.saveMessages();
         transferPopup.classList.remove('active');

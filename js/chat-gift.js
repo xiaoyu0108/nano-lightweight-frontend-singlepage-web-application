@@ -3,6 +3,7 @@
     const giftPopup = document.getElementById('giftPopup');
     const giftNameInput = document.getElementById('giftNameInput');
     const giftNoteInput = document.getElementById('giftNoteInput');
+    const giftAmountInput = document.getElementById('giftAmount');
     const giftCancel = document.getElementById('giftCancel');
     const giftConfirm = document.getElementById('giftConfirm');
 
@@ -13,6 +14,7 @@
     giftConfirm.addEventListener('click', function() {
         const name = giftNameInput.value.trim();
         const note = giftNoteInput.value.trim();
+        const amount = Math.max(0, Math.round((parseFloat(giftAmountInput && giftAmountInput.value) || 0) * 100) / 100);
         if (!name) {
             window.__chat.showAlert('提示', '请输入礼物名称');
             return;
@@ -24,7 +26,8 @@
         const cardData = {
             cardType: 'gift',
             title: name,
-            sub: '来自 ' + window.__chat.currentUserName + (note ? ' · ' + note : ''),
+            sub: '来自 ' + window.__chat.currentUserName + (amount > 0 ? ' · ¥' + amount.toFixed(2) : '') + (note ? ' · ' + note : ''),
+            amount: amount > 0 ? ('¥' + amount.toFixed(2)) : '',
             footer: '点击领取',
             status: 'pending'
         };

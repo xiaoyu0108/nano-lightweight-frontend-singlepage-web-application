@@ -88,6 +88,10 @@
                         <input type="text" class="ios-popup-input" id="giftNameInput" placeholder="请输入礼物名称..." maxlength="20" />
                     </div>
                     <div class="ios-popup-row">
+                        <span class="ios-popup-label">金额</span>
+                        <input type="number" step="0.01" class="ios-popup-input" id="giftAmount" placeholder="0.00（选填）" />
+                    </div>
+                    <div class="ios-popup-row">
                         <span class="ios-popup-label">寄语</span>
                         <input type="text" class="ios-popup-input" id="giftNoteInput" placeholder="添加赠送寄语..." maxlength="30" />
                     </div>
@@ -100,30 +104,40 @@
         </div>
     </div>
 
-    <!-- 图片弹窗 -->
+    <!-- 图片弹窗（文字图 / 真实图片 tab） -->
     <div class="ios-popup-overlay" id="imagePopup">
         <div class="ios-popup-card">
             <div class="ios-popup-header">
                 <div class="ios-popup-title">发送图片</div>
-                <div class="ios-popup-subtitle">选取照片或输入文字生成图片</div>
+                <div class="ios-popup-subtitle">选择一种图片方式</div>
+            </div>
+            <div class="vs-tabs">
+                <button class="vs-tab active" id="imgTabText">文字图</button>
+                <button class="vs-tab" id="imgTabFile">真实图片</button>
             </div>
             <div class="ios-popup-body">
-                <div class="ios-popup-input-group">
-                    <div class="ios-popup-row">
-                        <span class="ios-popup-label">相册</span>
-                        <div class="ios-photo-picker">
-                            <label for="imageFileInput" class="ios-picker-btn">
-                                <span>选择照片...</span>
-                            </label>
-                            <input type="file" id="imageFileInput" accept="image/*" style="display:none;" />
-                            <div class="ios-img-preview-box" id="imagePreviewBox">
-                                <img id="imagePreview" src="" alt="预览">
-                            </div>
+                <div id="imgPaneText">
+                    <div class="ios-popup-input-group">
+                        <div class="ios-popup-row">
+                            <span class="ios-popup-label">文字</span>
+                            <input type="text" class="ios-popup-input" id="imageTextInput" placeholder="输入文字自动生成图片..." maxlength="50" />
                         </div>
                     </div>
-                    <div class="ios-popup-row">
-                        <span class="ios-popup-label">文字图片</span>
-                        <input type="text" class="ios-popup-input" id="imageTextInput" placeholder="输入文字自动生成图片..." maxlength="50" />
+                </div>
+                <div id="imgPaneFile" style="display:none;">
+                    <div class="ios-popup-input-group">
+                        <div class="ios-popup-row">
+                            <span class="ios-popup-label">相册</span>
+                            <div class="ios-photo-picker">
+                                <label for="imageFileInput" class="ios-picker-btn">
+                                    <span>选择照片...</span>
+                                </label>
+                                <input type="file" id="imageFileInput" accept="image/*" style="display:none;" />
+                                <div class="ios-img-preview-box" id="imagePreviewBox">
+                                    <img id="imagePreview" src="" alt="预览">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -151,11 +165,108 @@
                         <span class="ios-popup-label">备注</span>
                         <input type="text" class="ios-popup-input" id="transferNote" placeholder="添加转账备注..." maxlength="30" />
                     </div>
+                    <div class="ios-popup-row">
+                        <span class="ios-popup-label">支付</span>
+                        <select class="ios-popup-input" id="transferSource">
+                            <option value="bank">我的银行卡</option>
+                            <option value="family">亲密付（对方亲属卡）</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="ios-popup-actions">
                 <button class="ios-popup-btn ios-popup-btn-cancel" id="transferCancel" data-close>取消</button>
                 <button class="ios-popup-btn ios-popup-btn-confirm" id="transferConfirm">转账</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 外卖弹窗 -->
+    <div class="ios-popup-overlay" id="takeoutPopup">
+        <div class="ios-popup-card">
+            <div class="ios-popup-header">
+                <div class="ios-popup-title">点外卖</div>
+                <div class="ios-popup-subtitle">填写外卖信息，发送给对方</div>
+            </div>
+            <div class="ios-popup-body">
+                <div class="ios-popup-input-group">
+                    <div class="ios-popup-row">
+                        <span class="ios-popup-label">食品</span>
+                        <input type="text" class="ios-popup-input" id="takeoutFood" placeholder="例如 麻辣烫、奶茶..." maxlength="30" />
+                    </div>
+                    <div class="ios-popup-row">
+                        <span class="ios-popup-label">店铺</span>
+                        <input type="text" class="ios-popup-input" id="takeoutShop" placeholder="店铺名称..." maxlength="30" />
+                    </div>
+                    <div class="ios-popup-row">
+                        <span class="ios-popup-label">价格</span>
+                        <input type="number" step="0.01" class="ios-popup-input" id="takeoutPrice" placeholder="0.00" />
+                    </div>
+                    <div class="ios-popup-row">
+                        <span class="ios-popup-label">备注</span>
+                        <input type="text" class="ios-popup-input" id="takeoutNote" placeholder="口味 / 留言..." maxlength="40" />
+                    </div>
+                </div>
+            </div>
+            <div class="ios-popup-actions">
+                <button class="ios-popup-btn ios-popup-btn-cancel" id="takeoutCancel" data-close>取消</button>
+                <button class="ios-popup-btn ios-popup-btn-confirm" id="takeoutConfirm">下单</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 定位弹窗（底部弹起 · 虚拟/真实 tab） -->
+    <div class="ios-popup-overlay" id="locationPopup">
+        <div class="ios-popup-card">
+            <div class="ios-popup-header">
+                <div class="ios-popup-title">发送定位</div>
+                <div class="ios-popup-subtitle">选择一个地点，可附带距离</div>
+            </div>
+            <div class="vs-tabs">
+                <button class="vs-tab active" data-loc="virtual">虚拟定位</button>
+                <button class="vs-tab" data-loc="real">真实定位</button>
+            </div>
+            <div class="ios-popup-body">
+                <div class="loc-map">
+                    <div class="loc-map-grid"></div>
+                    <div class="loc-map-road loc-map-road-a"></div>
+                    <div class="loc-map-road loc-map-road-b"></div>
+                    <div class="loc-map-pin">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+                    </div>
+                    <div class="loc-map-label" id="locMapLabel">未选择地点</div>
+                </div>
+                <div id="locPaneVirtual">
+                    <div class="ios-popup-input-group">
+                        <div class="ios-popup-row">
+                            <span class="ios-popup-label">地点</span>
+                            <input type="text" class="ios-popup-input" id="locationPlace" placeholder="例如 长沙·五一广场" maxlength="40" />
+                        </div>
+                        <div class="ios-popup-row">
+                            <span class="ios-popup-label">距离</span>
+                            <input type="number" class="ios-popup-input" id="locationDistance" placeholder="距你多少米（选填）" />
+                        </div>
+                    </div>
+                </div>
+                <div id="locPaneReal" style="display:none;">
+                    <div class="ios-popup-input-group">
+                        <div class="ios-popup-row">
+                            <span class="ios-popup-label">定位</span>
+                            <div class="loc-get">
+                                <button type="button" class="loc-get-btn" id="locationRealBtn">获取当前位置</button>
+                                <span class="loc-status" id="locationStatus">未定位</span>
+                            </div>
+                        </div>
+                        <div class="ios-popup-row">
+                            <span class="ios-popup-label">距离</span>
+                            <input type="number" class="ios-popup-input" id="locationRealDistance" placeholder="距你多少米（选填）" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="ios-popup-actions">
+                <button class="ios-popup-btn ios-popup-btn-cancel" id="locationCancel" data-close>取消</button>
+                <button class="ios-popup-btn ios-popup-btn-confirm" id="locationConfirm">发送</button>
             </div>
         </div>
     </div>
@@ -298,11 +409,13 @@
 <script src="js/nano-tts.js"></script>
 <script src="js/nano-assistant-knowledge.js"></script>
 <script src="js/nano-assistant-tools.js?v=20260926h"></script>
+<script src="js/family-card-store.js"></script>
 <script src="js/chat-core.js?v=20260926i"></script>
 <script src="js/chat-transfer.js"></script>
 <script src="js/chat-gift.js"></script>
 <script src="js/chat-image.js"></script>
 <script src="js/chat-more.js"></script>
+<script src="js/chat-place.js"></script>
 <script src="js/chat-voice.js"></script>
 <script src="js/heart.js?v=20260926i"></script>
 

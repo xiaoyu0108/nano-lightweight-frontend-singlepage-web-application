@@ -26,13 +26,28 @@
     var lastX = 0, lastY = 0;
     var tracking = false;
 
+    // 必须真正落在可视区内：页面常用 transform 把浮层移出屏幕来隐藏，
+    // 这种元素的 rect 仍然有宽高，只判断尺寸会误判为可见。
+    function inViewport(r) {
+        var vw = window.innerWidth || 1, vh = window.innerHeight || 1;
+        return r.right > 0 && r.bottom > 0 && r.left < vw && r.top < vh;
+    }
+    // 可见 = 自身尺寸正常 + 在可视区内 + 自身及所有祖先都不透明 + 自身可点击。
+    // 页面常用 opacity:0 隐藏浮层（此时子按钮自身 opacity 仍是 1），
+    // 只看自身 opacity 会点到隐藏的关闭/返回按钮。
     function isVisible(el) {
         if (!el || !el.getBoundingClientRect) return false;
         var r = el.getBoundingClientRect();
         if (r.width < 1 || r.height < 1) return false;
-        var cs = window.getComputedStyle(el);
-        if (!cs || cs.display === 'none' || cs.visibility === 'hidden') return false;
-        if (parseFloat(cs.opacity || '1') === 0) return false;
+        if (!inViewport(r)) return false;
+        var node = el;
+        for (var i = 0; node && node.nodeType === 1 && i < 40; i++, node = node.parentElement) {
+            var cs = window.getComputedStyle(node);
+            if (!cs) return false;
+            if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+            if (parseFloat(cs.opacity || '1') === 0) return false;
+            if (node === el && cs.pointerEvents === 'none') return false;
+        }
         return true;
     }
 
@@ -79,8 +94,12 @@
             if (cs.display === 'none' || cs.visibility === 'hidden') continue;
             if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
             if (parseFloat(cs.zIndex || '0') < 10) continue;
+            // opacity:0 / pointer-events:none 的浮层是“隐藏但占位”的幽灵层，不能算打开
+            if (parseFloat(cs.opacity || '1') === 0) continue;
+            if (cs.pointerEvents === 'none') continue;
             var r = el.getBoundingClientRect();
             if (r.width < window.innerWidth * 0.6 || r.height < window.innerHeight * 0.4) continue;
+            if (!inViewport(r)) continue;
             layer = el;
         }
         return layer;

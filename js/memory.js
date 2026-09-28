@@ -554,7 +554,7 @@
         const resp = await fetch(cfg.url + '/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + cfg.key, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: cfg.model, messages, max_tokens: 800, temperature: 0.5 })
+            body: JSON.stringify({ model: cfg.model, messages, max_tokens: 4000, temperature: 0.5 })
         });
         if (!resp.ok) {
             const err = await resp.json().catch(() => ({}));

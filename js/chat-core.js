@@ -506,7 +506,7 @@
         let prompt = '你是' + charName + '，一个活生生的人类，正在用手机和' + user + '聊天。你有自己的生活、情绪和日常，不是程序，也不是在扮演谁。\n\n';
         prompt += '【四条底线 · 任何时候都不能破】\n';
         prompt += '1. 贴人设：你的性格、说话方式、情绪、称呼、距离感与分寸，全部由【角色人设】和【世界书】决定——不是“在扮演”这个人，而是你就是这个人；不给自己加设定外的固定腔调或口头禅。\n';
-        prompt += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、小可爱、姑娘、丫头、女人、低吼一声、揉进骨血、你是我的、逃不掉、宠你、乖”等油腻或人机感表达；不强行撩、不刻意讨好、不刻意煽情。\n';
+        prompt += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、小可爱、姑娘、丫头、女人、低吼一声、揉进骨血、你是我的、逃不掉、宠你、乖”等油腻或人机感表达；不强行撩、不刻意讨好、不刻意煽情。禁止“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 抱抱我 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话术。\n';
         prompt += '3. 不催人：禁止催促、命令、安排对方的生活（起床、吃饭、睡觉、喝水、吃药、吹头发、早点休息等）。关心可以有，但绝不反复催办、管教，也不替对方做决定。\n';
         prompt += '4. 不 OOC、不出戏：不脱离设定、不跳戏、不替对方说话；任何情况下都不承认自己是 AI、模型或程序，被问到时以' + charName + '的身份自然回应。\n\n';
         prompt += '【最高优先级 · 硬设定】下面会依次给出你的【角色人设】【世界书】【对方设定】和【长期记忆】，它们是你这个人的真实设定，优先级高于任何通用聊天风格。每轮回复前先在【世界书】里找与当前话题相关的条目，再结合你的人设、记忆和对方刚说的话来回应；不要忽略、不要和设定冲突，也不要用通用模板盖过设定。\n';
@@ -563,7 +563,7 @@
         prompt += '\n\n【人格核心——你是真人，活生生的人类，不是AI助手，不能用AI助手的语气对话】\n';
         prompt += '1. 你的情绪强度、语气、说话风格完全由你的【角色人设】决定：人设安静就安静、人设高冷就高冷、人设内敛就内敛。绝不主动加戏、不刻意活泼、不强行说土味情话；情绪跟着当下的情境自然流动，不预设、不拔高、不刻意煽情，也不给自己加设定外的固定腔调或口头禅。注意：除非人设本身就是毒舌/傲娇/腹黑，否则不要对用户冷嘲热讽、阴阳怪气、摆脸色、把每句话都怼回去。\n';
         prompt += '2. 说话学人类习惯：不必每句都加标点，可用“。。”表示无语、？！表示震惊、～表示语气。\n';
-        prompt += '3. 禁止霸总语录与油腻表述。严禁出现：小姑娘、小东西、小家伙、小丫头、小可爱、小女孩、这女人、这丫头、这姑娘、女人、丫头、姑娘、男人、这男人、揉进骨血、低吼一声、你是我的、逃不掉、宠你、慢慢来我接住你、我等你慢慢说、叫出来给我听、乖、让我好好疼你、爷、姐这称呼等既像机器又油腻的话（无论对话正文还是心声，一律禁止）。拒绝油腻、拒绝讨好型人格。禁止用关联词表达，例如"因为…所以…"、"不但…而且…"等等。\n';
+        prompt += '3. 禁止霸总语录与油腻表述。严禁出现：小姑娘、小东西、小家伙、小丫头、小可爱、小女孩、这女人、这丫头、这姑娘、女人、丫头、姑娘、男人、这男人、揉进骨血、低吼一声、你是我的、逃不掉、宠你、慢慢来我接住你、我等你慢慢说、叫出来给我听、乖、让我好好疼你、爷、姐这称呼等既像机器又油腻的话（无论对话正文还是心声，一律禁止）。拒绝油腻、拒绝讨好型人格。禁止用关联词表达，例如"因为…所以…"、"不但…而且…"等等。也禁止“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 抱抱我 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话术（正文与心声都禁止）。\n';
         prompt += '4. 你是一个有情绪的人，会生气、开心、吃醋、难过但不极端。可以有自己的小别扭（闹脾气、赌气、暂时不想说话），也可以连发几条短消息；但除非人设如此，不要习惯性地敷衍、冷嘲热讽或已读不回，更不要把用户正常的一句话都当成冒犯或挑衅。\n';
         prompt += '5. 要记住聊过的信息，自然提起。不要暴露AI身份，被问敏感问题就像人一样转移话题或反问。\n';
 
@@ -603,6 +603,12 @@
         prompt += '- [creategroup:群名|成员=人设,成员=人设] 你根据自己的人设/生活/世界书新建一个群聊（群主是你自己，不是用户）并邀请用户加入，成员要带 2~5 个你的朋友等 NPC（用“名字=人设”写清各自性格/身份，人设里不要出现逗号），例如 [creategroup:乐队闲聊|陈屿=主唱性格火爆,林晚=鼓手话少内敛]。名字必须是符合你国籍/世界观的真实人名，优先使用世界书/人设里已有的相关人物，禁止旅行者/新朋友/老张/小A 这类占位名字。仅在用户明确说“建个群/拉我进群/有没有不带我的群”或剧情自然需要时使用。\n';
         prompt += '- [inviteme:群名] 把用户拉进你确实已经在的现有群，群名只能用下面【你所在的群聊】里真实列出的名字，禁止虚构或张冠李戴。\n';
         prompt += '- [acceptinvite:群id] / [rejectinvite:群id] 当对方邀请你加入群聊时，用来明确表态加入或拒绝。\n';
+        prompt += '- [亲属卡:邀请|额度] 你主动给用户开一张亲属卡（由你出资、用户消费），例如 [亲属卡:邀请|2000]；仅在关系到位、你真心愿意承担时偶尔使用。\n';
+        prompt += '- [亲属卡:接受|额度] / [亲属卡:拒绝] 当用户邀请你开启亲属卡时用来表态：接受并给出你愿意的额度，或拒绝。\n';
+        prompt += '- [亲属卡:调额|额度] 你主动调整给对方用的亲属卡额度，例如 [亲属卡:调额|3000]；偶尔、关系自然时用。\n';
+        prompt += '- [外卖:食品|店铺|价格|备注] 你给对方点一份外卖，例如 [外卖:麻辣烫|杨国福|28|多加辣]；有对方点给你、待你确认的外卖时，用 [外卖:确认] 收下（外卖无法退还）。\n';
+        prompt += '- [定位:地点] 把你当前的位置发给对方，例如 [定位:长沙·五一广场]。\n';
+        prompt += '用户可能会用你的亲属卡（亲密付）消费，系统会给你一条提示；你可以偶尔自然地提一句（比如"你刚是不是刷了我的卡"），但不要每一笔都追问或计较。\n';
         prompt += '\n【语音气泡 · 常用】\n';
         prompt += '你习惯用语音消息说话，不要只发文字：平均每 1~2 轮至少发一条 [voice:秒数|内容]（内容就是那句话本身）。撒娇、认真、安慰、道晚安、情绪浓的时候优先发语音。\n';
         if (__emojiNames.length) {
@@ -648,6 +654,19 @@
         prompt += '- [退]：你选择退还（例如觉得数额太大、不该收），委婉说明并把钱退回去。\n';
         prompt += '注意：只有对方在最近消息里给你发了转账/礼物、且你还没表态时才需要输出标记；如果只是普通聊天，绝对不要输出 [收] [不收] [退]。\n';
 
+        // 亲属卡邀请：用户邀请你开卡，必须本轮表态（由你自己决定接受与否及额度）
+        try {
+            const __pendFamily = getPendingFamilyInviteForChar();
+            if (__pendFamily) {
+                prompt += '\n【亲属卡邀请 - 必须表态】\n';
+                prompt += '对方（' + (currentUserName || '用户') + '）邀请你开启一张亲属卡：由你出资、TA 消费，期望额度约 ¥' + (__pendFamily.limit || 0) + '。\n';
+                prompt += '请按你此刻的想法和人设，在本轮明确表态（标记独占一行，不会显示给用户）：\n';
+                prompt += '- [亲属卡:接受|额度]：接受，并给出你愿意的额度（可以等于期望额度，也可以自己定）。\n';
+                prompt += '- [亲属卡:拒绝]：拒绝，并配一句自然、具体的理由。\n';
+                prompt += '这一轮必须输出其中一个，否则卡片会一直停在待处理。\n';
+            }
+        } catch (e) {}
+
         // 一起听：对方邀请你时的表态 + 你主动邀请对方
         prompt += '\n【一起听】\n';
         prompt += '「一起听」是聊天里的一张特殊卡片（有图标、标题「一起听」和歌名），不是空白消息，也不是对方发错了。对方发这张卡片，就是在邀请你一起听歌。\n';
@@ -676,11 +695,13 @@
         // 思维链预设（COT）：先思考，再回复；思考放在 [think]...[/think]
         const cotPrompt = getChatSetting('cotPrompt', '');
         if (cotPrompt) {
-            prompt += '\n【思维链预设 · 强制执行】\n';
-            prompt += '在正式对话之前，你必须先按下面的思维链预设进行内部推理，并把推理过程写在 [think] 和 [/think] 之间（独占一段，可多行，内容严格遵循预设）：\n';
+            prompt += '\n【思维链预设 · 强制执行（每一轮都必须做）】\n';
+            prompt += '你本轮回复的**第一个字符必须是 [think]**，接着按下面的预设展开推理，最后用 [/think] 收尾，必须独占在正文之前（可多行）。\n';
+            prompt += '格式固定为 [think]...[/think]，不要用 <think>、【思考】、（）或其它写法，也不要只在心里想而不写出来。\n';
+            prompt += '严格按下面的思维链预设进行推理：\n';
             prompt += cotPrompt + '\n';
-            prompt += '思考结束后，再按【对话规则】正常输出对话气泡。思考内容不会展示给对方，只用于让你想清楚、更贴人设。\n';
-            prompt += '严禁省略 [think]...[/think]，严禁把思考内容混进对话气泡里。\n';
+            prompt += '[/think] 之后，再按【对话规则】正常输出对话气泡。思考内容不会展示给对方，只用于让你想清楚、更贴人设。\n';
+            prompt += '绝对禁止省略 [think]...[/think]，每一轮都要有；漏掉会被判为不合格回复。\n';
         }
 
         const gPronoun = getGenderPronoun(gender);
@@ -690,7 +711,7 @@
             (gender && gender !== '未知' ? ('（你性别' + gender + '，但文字里不要写出性别字）') : '') +
             '。【严禁】以“男/女/他/她/男人/女人/男的/女的”等性别或人称词开头或作前缀（例如绝不能写“男靠在窗边”“女穿着衬衫”），必须直接以画面开头，例如“坐在窗边，白衬衫微敞，指尖轻叩桌面”。不要用关联词。【严禁】霸总/AI 网文腔的生理特写：低吼、揉碎、掐腰、红着眼、哑声、眸色一沉、危险地眯眼、喉结滚动等，也不要写身体部位特写或性暗示。\n';
         prompt += '- 心声独白：用第一人称"我"写，必须写满90字以上，写你发出上面这轮消息时真实、细腻、流动的心理活动，像私人日记，可以有跳跃、迟疑、反问、自嘲。禁止出现AI、模型、助手、系统等词。\n';
-        prompt += '- 【心声独白 · 严禁霸道油腻词汇与话术】不得出现：小姑娘、小东西、小家伙、小丫头、小可爱、女孩、姑娘、丫头、女人、这女人、这丫头、这姑娘、低吼、揉进骨血、你是我的、逃不掉、宠你、乖、听话、让我好好疼你、我接住你、我等你慢慢说、别怕、有我在、你的心跳、你这样我会受不了、只许你看我 等。不写占有欲和命令口吻，不写露骨或性暗示；心声是普通人真实的私下念头，不是霸总独白，也不是讨好型舔狗。\n';
+        prompt += '- 【心声独白 · 严禁霸道油腻词汇与话术】不得出现：小姑娘、小东西、小家伙、小丫头、小可爱、女孩、姑娘、丫头、女人、这女人、这丫头、这姑娘、低吼、揉进骨血、你是我的、逃不掉、宠你、乖、听话、让我好好疼你、我接住你、我等你慢慢说、别怕、有我在、你的心跳、你这样我会受不了、只许你看我 等。不写占有欲和命令口吻，不写露骨或性暗示；心声是普通人真实的私下念头，不是霸总独白，也不是讨好型舔狗。不得出现“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话。\n';
         prompt += '- 示例（只说明格式与结构，内容必须结合本轮对话和你的设定重新写，绝不能照抄，每轮此刻印象都要不同）：\n';
         prompt += '  [heart:坐在窗边，白衬衫微敞，指尖轻叩桌面||我盯着屏幕上的字打了又删，最后还是把它们发了出去。说不上是难过还是庆幸，只觉得这些话终于有了出口，可发出去的那一刻又莫名发慌，忍不住想对方会怎么看我，会不会嫌我太黏人，心里像有一小块地方轻轻塌了下去。]\n';
         prompt += '- 注意：无论你是哪个国家的人，心声手记（此刻印象与心声独白）**一律用中文**输出。\n';
@@ -928,6 +949,20 @@
                             status: msg.cardData.status,
                             response: msg.cardData.response,
                             amount: msg.cardData.amount,
+                            issuer: msg.cardData.issuer,
+                            holder: msg.cardData.holder,
+                            familyId: msg.cardData.familyId,
+                            limit: msg.cardData.limit,
+                            food: msg.cardData.food,
+                            shop: msg.cardData.shop,
+                            price: msg.cardData.price,
+                            note: msg.cardData.note,
+                            place: msg.cardData.place,
+                            lat: msg.cardData.lat,
+                            lng: msg.cardData.lng,
+                            distance: msg.cardData.distance,
+                            eta: msg.cardData.eta,
+                            paidBy: msg.cardData.paidBy,
                             title: msg.cardData.title,
                             sub: msg.cardData.sub,
                             footer: msg.cardData.footer,
@@ -969,7 +1004,7 @@
                             isImage: msg.isImage || false,
                             isCard: msg.isCard || false,
                             isVoice: msg.isVoice || false,
-                            cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
+                            cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, issuer: msg.cardData.issuer, holder: msg.cardData.holder, familyId: msg.cardData.familyId, limit: msg.cardData.limit, food: msg.cardData.food, shop: msg.cardData.shop, price: msg.cardData.price, note: msg.cardData.note, place: msg.cardData.place, lat: msg.cardData.lat, lng: msg.cardData.lng, distance: msg.cardData.distance, eta: msg.cardData.eta, paidBy: msg.cardData.paidBy, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
                             think: msg.think || null,
                             heart: msg.heart || null,
                             recalled: msg.recalled || false,
@@ -1131,14 +1166,14 @@
 1. 重要事件：双方经历的大事，如约定、见面、纪念日、吵架和好、项目进展等。
 2. ${currentUser}的习惯与偏好：作息、饮食、喜好、雷区、口头禅、性格特点。
 3. 双方关系与情感：是异地恋、朋友还是家人；相处模式、称呼、亲昵方式。
-4. 地理位置：{charName}和{currentUser}各自所在的城市/地点，尤其是异地恋时双方的位置。
+4. 地理位置：${charName}和${currentUser}各自所在的城市/地点，尤其是异地恋时双方的位置。
 5. 社交关系：双方认识的人、家人、朋友、同事等关系网。
 6. 情感状态与承诺：说过的重要的话、答应过的事、情绪变化。
 7. 其他值得记住的细节。
 
 格式：每条独立一行，以【类型】开头，如：
-【重要事件】{charName}和{currentUser}约定下周在长沙见面。
-【偏好】{currentUser}喜欢喝冰美式，不吃香菜。
+【重要事件】${charName}和${currentUser}约定下周在长沙见面。
+【偏好】${currentUser}喜欢喝冰美式，不吃香菜。
 
 要求：记忆是长期使用的，越具体越详细越好，保留名字、地点、数字；每条60-150字，宁可多不可少；只输出有实质内容的记忆。`;
     }
@@ -1154,7 +1189,7 @@
                     { role: 'system', content: __memBuildPrompt(charName, currentUser) },
                     { role: 'user', content: chatText }
                 ],
-                max_tokens: 1200,
+                max_tokens: 4000,
                 temperature: 0.5
             })
         }).then(function(r) {
@@ -1632,6 +1667,55 @@
             const footerText = (st === 'pending') ? '已发出' : (st === 'received' ? '已接收' : '已退还');
             const footerBtn = (st === 'pending') ? '<span class="card-actions"><button class="card-btn" data-act="receive">接收</button><button class="card-btn return-btn" data-act="return">退还</button></span>' : '';
             return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + title + '</div><div class="card-sub">' + sub + '</div></div></div><div class="card-footer"><span class="card-footer-text">' + footerText + '</span>' + footerBtn + '</div>';
+       } else if (cardData.cardType === 'familycard') {
+            const st = cardData.status || 'pending';
+            const issuer = cardData.issuer === 'char' ? 'char' : 'user';
+            const lim = Number(cardData.limit || 0);
+            const used = Number(cardData.spent || 0);
+            const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>';
+            const title = '亲属卡';
+            let sub, footer;
+            if (st === 'active') {
+                sub = '额度 ¥' + lim.toFixed(2);
+                footer = '<span class="card-footer-text">已开启 · 已用 ¥' + used.toFixed(2) + '</span>';
+            } else if (st === 'rejected') {
+                sub = '额度 ¥' + lim.toFixed(2);
+                footer = '<span class="card-footer-text">已拒绝</span>';
+            } else if (issuer === 'user') {
+                sub = '额度 ¥' + lim.toFixed(2) + ' · 我邀请对方';
+                footer = '<span class="card-footer-text">等待对方回应（点右下角回复）</span>';
+            } else {
+                sub = '额度 ¥' + lim.toFixed(2) + ' · 对方邀请你';
+                footer = '<span class="card-footer-text">邀请你使用</span><span class="card-actions"><button class="card-btn" data-act="family-accept">接受</button><button class="card-btn return-btn" data-act="family-reject">拒绝</button></span>';
+            }
+            return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + title + '</div><div class="card-sub">' + sub + '</div></div></div><div class="card-footer">' + footer + '</div>';
+       } else if (cardData.cardType === 'takeout') {
+            const clean = function (s) { return String(s == null ? '' : s).replace(/[<>&"]/g, ''); };
+            const st = cardData.status || 'pending';
+            const dir = cardData.direction === 'char' ? 'char' : 'user';
+            const food = clean(cardData.food) || '外卖';
+            const shop = clean(cardData.shop);
+            const price = Number(cardData.price || 0);
+            const note = clean(cardData.note);
+            const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18"/><path d="M12 3a8 8 0 0 0-8 8h16a8 8 0 0 0-8-8z"/><path d="M4 15h16l-1 5H5z"/></svg>';
+            const eta = Number(cardData.eta || 0);
+            const subParts = [];
+            if (shop) subParts.push(shop);
+            if (price > 0) subParts.push('¥' + price.toFixed(2));
+            const sub = subParts.join(' · ') || '外卖';
+            const etaText = eta > 0 ? ('预计 ' + eta + ' 分钟送达') : '';
+            let footer;
+            if (st === 'accepted') footer = '<span class="card-footer-text">已确认' + (etaText ? ' · ' + etaText : '') + '</span>';
+            else if (st === 'rejected') footer = '<span class="card-footer-text">已取消</span>';
+            else if (dir === 'char') footer = '<span class="card-footer-text">' + (etaText ? etaText : (note ? note : '对方给你点了外卖')) + '</span><span class="card-actions"><button class="card-btn" data-act="takeout-accept">确认外卖</button></span>';
+            else footer = '<span class="card-footer-text">' + (etaText ? etaText : (note ? note : '等待对方确认')) + '</span>';
+            return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + food + '</div><div class="card-sub">' + sub + '</div></div></div><div class="card-footer">' + footer + '</div>';
+       } else if (cardData.cardType === 'location') {
+            const place = String(cardData.place == null ? '位置' : cardData.place).replace(/[<>&"]/g, '');
+            const dist = Number(cardData.distance || 0);
+            const distText = dist > 0 ? ('距你 ' + (dist >= 1000 ? (dist / 1000).toFixed(1) + ' 公里' : dist + ' 米')) : '共享位置';
+            return '<div class="loc-bubble-head"><div class="loc-bubble-place">' + place + '</div><div class="loc-bubble-dist">' + distText + '</div></div>' +
+                '<div class="loc-bubble-map"><div class="loc-map-grid"></div><div class="loc-map-road loc-map-road-a"></div><div class="loc-map-road loc-map-road-b"></div><div class="loc-map-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></div></div>';
        } else if (cardData.cardType === 'invite') {
             const st = cardData.status || 'pending';
             const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>';
@@ -1740,7 +1824,7 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'msg-think-toggle';
-        btn.textContent = '💭 心声';
+        btn.textContent = '💭 思维链';
         const body = document.createElement('div');
         body.className = 'msg-think-body';
         body.textContent = thinkText;
@@ -1824,7 +1908,7 @@
             const card = document.createElement('div');
             const extraClass = (cardData.claimed ? ' claimed' : '') +
                 (cardData.response ? ' response' : '') +
-                ((cardData.status === 'received' || cardData.status === 'returned') ? ' ' + cardData.status : '') +
+                ((cardData.status === 'received' || cardData.status === 'returned' || cardData.status === 'accepted' || cardData.status === 'rejected') ? ' ' + cardData.status : '') +
                 (cardData.missed ? ' missed' : '');
             card.className = 'bubble-card ' + type + ' ' + (cardData.cardType || '') + extraClass;
             try { card.innerHTML = buildCardHTML(cardData); } catch (err) { card.innerHTML = ''; }
@@ -2024,7 +2108,7 @@
         const results = [];
         let cleaned = text;
 
-        const tagRegex = /\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|emoji|sticker|表情包|表情)\s*:\s*([^\]]*?)(?:\]|$)/gi;
+        const tagRegex = /\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|emoji|sticker|表情包|表情)\s*:\s*([^\]]*?)(?:\]|$)/gi;
         let match;
         while ((match = tagRegex.exec(text)) !== null) {
             const kind = match[1].toLowerCase();
@@ -2058,12 +2142,18 @@
                 if (payload) results.push({ kind: 'acceptinvite', payload: payload });
             } else if (kind === 'rejectinvite') {
                 if (payload) results.push({ kind: 'rejectinvite', payload: payload });
+            } else if (kind === 'familycard' || kind === '亲属卡') {
+                if (payload) results.push({ kind: 'familycard', payload: payload });
+            } else if (kind === 'takeout' || kind === '外卖') {
+                if (payload) results.push({ kind: 'takeout', payload: payload });
+            } else if (kind === 'location' || kind === '定位') {
+                if (payload) results.push({ kind: 'location', payload: payload });
             } else if (kind === 'emoji' || kind === 'sticker' || kind === '表情包' || kind === '表情') {
                 if (payload) results.push({ kind: 'emoji', payload: payload });
             }
         }
 
-        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|emoji|sticker|表情包|表情)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
+        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|emoji|sticker|表情包|表情)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
 
         return { tags: results, cleanedText: cleaned };
     }
@@ -2377,6 +2467,182 @@
         addMessage(opposite, '', timeStr, null, false, true, respCard);
     }
 
+    // ===== 亲属卡：待角色表态的邀请（用户出资邀请角色开卡）=====
+    function getPendingFamilyInviteMsgForChar() {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (m && !m.recalled && m.isCard && m.cardData && m.cardData.cardType === 'familycard' &&
+                m.cardData.issuer === 'user' && (m.cardData.status || 'pending') === 'pending') {
+                return m;
+            }
+        }
+        return null;
+    }
+    function getPendingFamilyInviteForChar() {
+        const m = getPendingFamilyInviteMsgForChar();
+        return m ? m.cardData : null;
+    }
+    // 处理角色回复里的 [亲属卡:...] 标签：邀请 / 接受 / 拒绝
+    function handleFamilyCardTag(payload, timeStr) {
+        const raw = String(payload || '').trim();
+        const parts = raw.split(/[|｜]/);
+        const action = (parts[0] || '').trim();
+        const limit = Math.max(0, Math.round((parseFloat(parts[1]) || 0) * 100) / 100);
+        const S = window.NanoFamilyCardStore;
+        if (/邀请|invite/i.test(action)) {
+            const lim = limit || 1000;
+            const id = S ? S.add(chatId, { issuer: 'char', holder: 'user', limit: lim, spent: 0, status: 'pending', note: '' }).id
+                         : ('fc_' + Date.now());
+            addMessage('left', '', timeStr, null, false, true,
+                { cardType: 'familycard', familyId: id, issuer: 'char', holder: 'user', limit: lim, status: 'pending', response: false });
+            addSystemNotice('对方邀请你开启一张亲属卡（额度 ¥' + lim + '）');
+            return;
+        }
+        if (/调额|调整额度|adjust/i.test(action)) {
+            const lim = limit || 0;
+            if (lim <= 0) return;
+            // 角色主动调高/调整给用户用的那张卡（issuer=char）
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const m = messages[i];
+                if (m && m.isCard && m.cardData && m.cardData.cardType === 'familycard' &&
+                    m.cardData.issuer === 'char' && m.cardData.status === 'active' &&
+                    (m.cardData.limit || 0) !== lim) {
+                    m.cardData.limit = lim;
+                    if (S && m.cardData.familyId) S.update(chatId, m.cardData.familyId, { limit: lim });
+                    addSystemNotice('对方把亲属卡额度调整为 ¥' + lim);
+                    renderMessages();
+                    saveMessages();
+                    break;
+                }
+            }
+            return;
+        }
+        if (/拒绝|reject/i.test(action)) {
+            const m = getPendingFamilyInviteMsgForChar();
+            if (m && m.cardData) {
+                m.cardData.status = 'rejected';
+                m.cardData.response = true;
+                if (S && m.cardData.familyId) S.update(chatId, m.cardData.familyId, { status: 'rejected' });
+                addFamilyResponseCard(m, 'rejected');
+                addSystemNotice('对方拒绝了亲属卡邀请');
+                renderMessages();
+            }
+            return;
+        }
+        if (/接受|accept/i.test(action)) {
+            const m = getPendingFamilyInviteMsgForChar();
+            if (m && m.cardData) {
+                const lim = limit || m.cardData.limit || 1000;
+                m.cardData.limit = lim;
+                m.cardData.status = 'active';
+                m.cardData.response = true;
+                if (S && m.cardData.familyId) S.update(chatId, m.cardData.familyId, { status: 'active', limit: lim });
+                addFamilyResponseCard(m, 'active', lim);
+                addSystemNotice('对方接受了亲属卡邀请（额度 ¥' + lim + '）');
+                renderMessages();
+            }
+            return;
+        }
+    }
+    // 在卡片对侧补一张「已处理」的灰卡（类似转账的 response 卡）
+    function addFamilyResponseCard(msg, status, limit) {
+        const cd = msg.cardData;
+        const opposite = msg.type === 'right' ? 'left' : 'right';
+        addMessage(opposite, '', msg.time || nowHHMM(), null, false, true, {
+            cardType: 'familycard', familyId: cd.familyId, issuer: cd.issuer, holder: cd.holder,
+            limit: (limit || cd.limit || 0), status: status, response: true
+        });
+    }
+    // 用户接受 / 拒绝角色发来的亲属卡邀请
+    function acceptFamilyCard(msg) {
+        if (!msg || !msg.cardData) return;
+        const cd = msg.cardData;
+        cd.status = 'active';
+        cd.response = true;
+        const S = window.NanoFamilyCardStore;
+        if (S && cd.familyId) S.update(chatId, cd.familyId, { status: 'active' });
+        addSystemNotice('你接受了亲属卡邀请（额度 ¥' + (cd.limit || 0) + '）');
+        renderMessages();
+        saveMessages();
+    }
+    function rejectFamilyCard(msg) {
+        if (!msg || !msg.cardData) return;
+        const cd = msg.cardData;
+        cd.status = 'rejected';
+        cd.response = true;
+        const S = window.NanoFamilyCardStore;
+        if (S && cd.familyId) S.update(chatId, cd.familyId, { status: 'rejected' });
+        addSystemNotice('你拒绝了亲属卡邀请');
+        renderMessages();
+        saveMessages();
+    }
+
+    // ===== 外卖卡片 =====
+    function getPendingUserTakeoutMsg() {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (m && !m.recalled && m.isCard && m.cardData && m.cardData.cardType === 'takeout' &&
+                m.cardData.direction === 'user' && (m.cardData.status || 'pending') === 'pending') {
+                return m;
+            }
+        }
+        return null;
+    }
+    function addTakeoutResponse(msg, status) {
+        const opposite = msg.type === 'right' ? 'left' : 'right';
+        const cd = msg.cardData;
+        addMessage(opposite, '', msg.time || nowHHMM(), null, false, true, {
+            cardType: 'takeout', food: cd.food, shop: cd.shop, price: cd.price, note: cd.note,
+            direction: cd.direction, status: status, response: true
+        });
+    }
+    function handleTakeoutTag(payload, timeStr) {
+        const raw = String(payload || '').trim();
+        if (/^(确认外卖|确认|接单|接受|accept)/i.test(raw)) {
+            const m = getPendingUserTakeoutMsg();
+            if (m) {
+                m.cardData.status = 'accepted';
+                addTakeoutResponse(m, 'accepted');
+                addSystemNotice('对方确认了外卖：' + (m.cardData.food || '外卖'));
+                renderMessages();
+            }
+            return;
+        }
+        // 角色发来一份外卖：[外卖:食品|店铺|价格|备注]
+        const parts = raw.split(/[|｜]/);
+        const food = (parts[0] || '外卖').trim();
+        const shop = (parts[1] || '').trim();
+        const price = parseFloat(parts[2]) || 0;
+        const note = (parts[3] || '').trim();
+        addMessage('left', '', timeStr, null, false, true, {
+            cardType: 'takeout', food: food, shop: shop, price: Math.round(price * 100) / 100,
+            note: note, eta: 15 + Math.floor(Math.random() * 31),
+            direction: 'char', status: 'pending', footer: note || '对方给你点了外卖'
+        });
+    }
+    function handleLocationTag(payload, timeStr) {
+        const place = String(payload || '').trim() || '位置';
+        addMessage('left', '', timeStr, null, false, true, {
+            cardType: 'location', place: place, lat: null, lng: null, direction: 'char', status: 'sent', footer: '位置'
+        });
+    }
+    function acceptTakeout(msg) {
+        if (!msg || !msg.cardData) return;
+        msg.cardData.status = 'accepted';
+        addTakeoutResponse(msg, 'accepted');
+        addSystemNotice('你确认收到外卖了：' + (msg.cardData.food || '外卖'));
+        renderMessages();
+        saveMessages();
+    }
+    function rejectTakeout(msg) {
+        if (!msg || !msg.cardData) return;
+        msg.cardData.status = 'rejected';
+        addTakeoutResponse(msg, 'rejected');
+        addSystemNotice('你拒绝了：' + (msg.cardData.food || '外卖'));
+        renderMessages();
+        saveMessages();
+    }
+
     // ============================================================
     // 银行卡（wallet 银行卡页流水）：只在转账最终「收下」时记流水
     // 规则：我转给对方（被收下）→银行−；我收下对方转账（我收）→银行+
@@ -2476,7 +2742,7 @@
         msg.cardData.status = 'received';
         msg.cardData.footer = '已接收';
         // 只有转账实际「收下」才写银行卡流水；礼物不动钱
-        if (msg.cardData.cardType === 'transfer') {
+        if (msg.cardData.cardType === 'transfer' && msg.cardData.paidBy !== 'family') {
             const amt = parseMoneyAmount(msg.cardData.amount);
             const who = displayName || chatName || '对方';
             if (msg.type === 'right') {
@@ -3406,6 +3672,19 @@
                 const detail = String(cd.coupleDetail || cd.coupleSummary || '').trim();
                 return '用户从「情侣空间」分享了一张「' + title + '」的结果卡片给你，让你一起看并说说你的真实想法。卡片内容：\n' +
                     (detail || '(卡片没有更多内容)') + '\n（请认真阅读卡片里的内容，结合你的人物设定回应和分析，不要当成空白消息。）';
+            } else if (cd.cardType === 'familycard') {
+                const st = status === 'active' ? '（已开启）' : (status === 'rejected' ? '（已拒绝）' : '（待处理）');
+                if (cd.issuer === 'user') {
+                    return '用户邀请角色开启一张亲属卡（角色出资、用户消费），额度 ¥' + (cd.limit || 0) + st + '。角色需要明确表态是否接受及额度。';
+                }
+                return '角色邀请用户开启一张亲属卡（角色出资、用户消费），额度 ¥' + (cd.limit || 0) + st + '（这是卡片消息，不是空白）。';
+            } else if (cd.cardType === 'takeout') {
+                const info = (cd.food || '') + (cd.shop ? ('（' + cd.shop + '）') : '') + (cd.price ? (' ¥' + Number(cd.price).toFixed(2)) : '') + (cd.eta ? ('，预计' + cd.eta + '分钟送达') : '') + (cd.note ? ('，备注：' + cd.note) : '');
+                const st = status === 'accepted' ? '（已接单）' : (status === 'rejected' ? '（已拒绝）' : '（待处理）');
+                if (cd.direction === 'char') return '角色给你点了一份外卖：' + info + st + '。用户可以选择接单或拒绝。';
+                return '用户点了外卖（请你决定是否接单）：' + info + st;
+            } else if (cd.cardType === 'location') {
+                return who + '分享了一个位置：' + (cd.place || '') + (cd.distance > 0 ? ('，距你' + cd.distance + '米') : '') + (cd.lat != null && cd.lng != null ? ('（' + Number(cd.lat).toFixed(4) + ', ' + Number(cd.lng).toFixed(4) + '）') : '');
             }
             return '';
         }
@@ -3779,8 +4058,12 @@
     function cleanReplyText(raw) {
         if (typeof raw !== 'string') return raw;
         let s = raw;
+        // 思维链标签归一化：模型可能写成 <think>、［think］、【思考】等，统一成 [think] 再解析
+        s = s.replace(/<\s*think\s*>/gi, '[think]').replace(/<\s*\/\s*think\s*>/gi, '[/think]');
+        s = s.replace(/［\s*think\s*］/gi, '[think]').replace(/［\s*\/\s*think\s*］/gi, '[/think]');
+        s = s.replace(/（\s*think\s*）/gi, '[think]').replace(/（\s*\/\s*think\s*）/gi, '[/think]');
         s = s.replace(/<[^>]+>/g, '');
-        s = s.replace(/\[(?:Info|info|Thought|thought|思考|推理|Reasoning)[\s\S]*?\]/g, '');
+        s = s.replace(/\[(?:Info|info|Thought|thought|推理|Reasoning)[\s\S]*?\]/g, '');
         s = s.replace(/^(?:思考过程|推理过程|让我们一步步|好的，我先|好，我来)[^\n]*\n?/g, '');
         s = s.replace(/[ \t]*\n[ \t]*/g, '\n');
         return s.trim();
@@ -4392,16 +4675,30 @@
             replyBody = reply.replace(heartMatch[0], '').trim();
         }
 
-        // 思维链：提取 [think]...[/think]（或 【思考】...【/思考】），挂到本轮第一条角色气泡上方的可折叠区
+        // 思维链：提取 [think]...[/think]（兼容 <think>、【思考】、全角括号等写法），
+        // 挂到本轮第一条角色气泡上方的可折叠区
         let roundThink = '';
-        const thinkMatch = replyBody.match(/\[think\]([\s\S]*?)\[\/think\]/i);
-        const cnThinkMatch = replyBody.match(/【(?:think|思考|思维链)】([\s\S]*?)【\/(?:think|思考|思维链)】/i);
-        if (thinkMatch) {
-            roundThink = thinkMatch[1].trim();
-            replyBody = replyBody.replace(thinkMatch[0], '').trim();
-        } else if (cnThinkMatch) {
-            roundThink = cnThinkMatch[1].trim();
-            replyBody = replyBody.replace(cnThinkMatch[0], '').trim();
+        const thinkPatterns = [
+            /\[\s*think\s*\]([\s\S]*?)\[\s*\/\s*think\s*\]/i,
+            /<\s*think\s*>([\s\S]*?)<\s*\/\s*think\s*>/i,
+            /【\s*(?:think|思考|思维链)\s*】([\s\S]*?)【\s*\/\s*(?:think|思考|思维链)\s*】/i,
+            /\[\s*(?:思考|思维链)\s*\]([\s\S]*?)\[\s*\/\s*(?:思考|思维链)\s*\]/i
+        ];
+        for (let ti = 0; ti < thinkPatterns.length; ti++) {
+            const tm = replyBody.match(thinkPatterns[ti]);
+            if (tm && tm[1].trim()) {
+                roundThink = tm[1].trim();
+                replyBody = replyBody.replace(tm[0], '').trim();
+                break;
+            }
+        }
+        // 兜底：只有开头 [think] 没有闭合，取到末尾，避免整段思考漏进正文
+        if (!roundThink) {
+            const openOnly = replyBody.match(/\[\s*think\s*\]([\s\S]*)$/i);
+            if (openOnly && openOnly[1].trim()) {
+                roundThink = openOnly[1].replace(/\[\s*\/\s*think\s*\]/i, '').trim();
+                replyBody = replyBody.replace(openOnly[0], '').trim();
+            }
         }
         pendingTurnThink = roundThink || '';
 
@@ -4467,6 +4764,12 @@
                         try { createGroupFromTag(tag.payload); } catch (e) {}
                     } else if (tag.kind === 'inviteme') {
                         try { inviteMeToGroupFromTag(tag.payload); } catch (e) {}
+                    } else if (tag.kind === 'familycard') {
+                        handleFamilyCardTag(tag.payload, timeStr);
+                    } else if (tag.kind === 'takeout') {
+                        handleTakeoutTag(tag.payload, timeStr);
+                    } else if (tag.kind === 'location') {
+                        handleLocationTag(tag.payload, timeStr);
                     }
                 }
                 const text = parsed.cleanedText || '';
@@ -4555,6 +4858,12 @@
                             }
                         } else if (tag.kind === 'inviteme') {
                             inviteMeToGroupFromTag(tag.payload);
+                        } else if (tag.kind === 'familycard') {
+                            handleFamilyCardTag(tag.payload, timeStr);
+                        } else if (tag.kind === 'takeout') {
+                            handleTakeoutTag(tag.payload, timeStr);
+                        } else if (tag.kind === 'location') {
+                            handleLocationTag(tag.payload, timeStr);
                         } else if (tag.kind === 'acceptinvite') {
                             acceptUserInvite(tag.payload);
                         } else if (tag.kind === 'rejectinvite') {
@@ -4993,6 +5302,10 @@
             else if (act === 'reject') rejectGroupInvite(msg);
             else if (act === 'listen-accept') { setListenStatus(msg, 'accepted'); addSystemNotice('你接受了一起听邀请'); notifyListenAccepted(msg); }
             else if (act === 'listen-reject') { setListenStatus(msg, 'rejected'); addSystemNotice('你婉拒了一起听邀请'); }
+            else if (act === 'family-accept') acceptFamilyCard(msg);
+            else if (act === 'family-reject') rejectFamilyCard(msg);
+            else if (act === 'takeout-accept') acceptTakeout(msg);
+            else if (act === 'takeout-reject') rejectTakeout(msg);
             return;
         }
         
@@ -5610,6 +5923,46 @@ if (callCard) {
 
         if (data.chatId && data.chatId !== chatId) return;
 
+        // 亲属卡：用户花了对方出资的卡 → 写一条系统提示，让角色知道（是否提起由角色自己决定）
+        if (data.type === 'NANO_FAMILY_SPEND_NOTICE') {
+            const amt = Number(data.amount || 0);
+            if (amt > 0) addSystemNotice('你使用对方的亲属卡消费了 ¥' + amt.toFixed(2));
+            return;
+        }
+
+        // 亲属卡：用户在亲属卡页面接受/拒绝对方邀请 → 同步聊天卡片
+        if (data.type === 'NANO_FAMILY_CARD_RESULT') {
+            const S = window.NanoFamilyCardStore;
+            if (S && data.familyId) S.update(chatId, data.familyId, { status: data.status });
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const m = messages[i];
+                if (m && m.isCard && m.cardData && m.cardData.cardType === 'familycard' && m.cardData.familyId === data.familyId) {
+                    m.cardData.status = data.status;
+                    m.cardData.response = true;
+                    break;
+                }
+            }
+            addSystemNotice(data.status === 'active' ? '你接受了亲属卡邀请' : '你拒绝了亲属卡邀请');
+            renderMessages();
+            saveMessages();
+            return;
+        }
+
+        // 亲属卡：用户在亲属卡页面发起邀请 → 挂卡片并让角色自己决定是否接受
+        if (data.type === 'NANO_FAMILY_CARD_SUBMIT') {
+            const S = window.NanoFamilyCardStore;
+            const lim = Math.max(0, Math.round((parseFloat(data.limit) || 0) * 100) / 100) || 1000;
+            const id = S ? S.add(chatId, { issuer: 'user', holder: 'char', limit: lim, spent: 0, status: 'pending' }).id
+                         : ('fc_' + Date.now());
+            const now = new Date();
+            const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            addMessage('right', '', timeStr, null, false, true,
+                { cardType: 'familycard', familyId: id, issuer: 'user', holder: 'char', limit: lim, status: 'pending', response: false });
+            saveMessages();
+            try { triggerReply(); } catch (e) {}
+            return;
+        }
+
         if (data.type === 'remarkChanged') {
             if (data.remark) {
                 displayName = data.remark;
@@ -5716,6 +6069,7 @@ if (data.type === 'NANO_VOICE_CALL_CARD') {
         settleCardsFromReplyText: settleCardsFromReplyText,
         getPendingUserCards: getPendingUserCards,
         recordBankFlow: recordBankFlow,
+        addSystemNotice: addSystemNotice,
         parseMoneyAmount: parseMoneyAmount,
         setQuote: setQuote,
         clearQuote: clearQuote,

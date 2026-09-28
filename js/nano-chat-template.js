@@ -290,7 +290,7 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 .nano-chat-inner .image-desc-bubble .idb-text { font-size: 12px; color: #3c4a58; line-height: 1.4; }
 
 /* 2.5 卡片（私聊）
-   HTML：<div class="bubble-card left|right transfer|gift|listen|couple|invite|call|image ...">
+   HTML：<div class="bubble-card left|right transfer|gift|listen|couple|invite|call|image|familycard|takeout|location ...">
            <div class="card-main"><div class="icon-wrap"><svg/></div>
              <div><div class="card-title">…</div><div class="card-sub">…</div></div></div>
            <div class="card-footer"><span class="card-footer-text">…</span>
@@ -347,6 +347,22 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 .nano-chat-inner .bubble-card.call .card-title { font-size: 14px; color: #111; }
 .nano-chat-inner .bubble-card.call.missed .card-title { color: #ff3b30; }
 .nano-chat-inner .bubble-card.call .card-sub { font-size: 11px; color: #999; margin-top: 1px; }
+/* 亲属卡 / 外卖 / 定位卡片（可在「聊天美化」里自由覆盖） */
+.nano-chat-inner .bubble-card.familycard { background: #fff; color: #111; }
+.nano-chat-inner .bubble-card.familycard .icon-wrap { background: rgba(175, 82, 222, 0.14); color: #af52de; }
+.nano-chat-inner .bubble-card.familycard .card-footer { border-top: 1px solid rgba(0, 0, 0, 0.06); }
+.nano-chat-inner .bubble-card.familycard .card-btn { background: #af52de; color: #fff; }
+.nano-chat-inner .bubble-card.familycard .card-btn.return-btn { background: #ececf0; color: #555; }
+.nano-chat-inner .bubble-card.familycard.response, .nano-chat-inner .bubble-card.familycard.rejected { background: #dcdcdc; color: #8a8a8a; }
+.nano-chat-inner .bubble-card.takeout { background: #fff; color: #111; }
+.nano-chat-inner .bubble-card.takeout .icon-wrap { background: rgba(255, 138, 0, 0.14); color: #ff8a00; }
+.nano-chat-inner .bubble-card.takeout .card-footer { border-top: 1px solid rgba(0, 0, 0, 0.06); }
+.nano-chat-inner .bubble-card.takeout .card-btn { background: #ff8a00; color: #fff; }
+.nano-chat-inner .bubble-card.takeout .card-btn.return-btn { background: #ececf0; color: #555; }
+.nano-chat-inner .bubble-card.takeout.response, .nano-chat-inner .bubble-card.takeout.accepted, .nano-chat-inner .bubble-card.takeout.rejected { background: #dcdcdc; color: #8a8a8a; }
+.nano-chat-inner .bubble-card.location { background: #fff; color: #111; }
+.nano-chat-inner .bubble-card.location .icon-wrap { background: rgba(50, 173, 230, 0.14); color: #32ade6; }
+.nano-chat-inner .bubble-card.location .card-footer { border-top: 1px solid rgba(0, 0, 0, 0.06); }
 
 /* 2.6 输入中动画 */
 .nano-chat-inner .typing-indicator { display: none; align-items: flex-end; gap: 8px; padding: 4px 0 6px 0; }

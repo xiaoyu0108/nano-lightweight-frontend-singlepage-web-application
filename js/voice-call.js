@@ -26,6 +26,10 @@
     const answerBtn = document.getElementById('answerBtn');
     const declineBtn = document.getElementById('declineBtn');
     const hangupWrapper = document.getElementById('hangupWrapper');
+    const speakerBtn = document.getElementById('speakerBtn');
+    const recordBtn = document.getElementById('recordBtn');
+    // 免提：开启且配置了 TTS 时，用配置的语音模型把角色的话读出来；关闭则静音。
+    let speakerOn = true;
 
     // ===== 从 URL 获取参数（与 chat_inner 的人设同步） =====
     const urlParams = new URLSearchParams(window.location.search);
@@ -329,6 +333,8 @@ function hideInputArea() {
         isConnecting = true;
         connectStartTime = Date.now();
         callStatus.textContent = '接通中...';
+        // 底部的免提/挂断/录音三个按钮，接通之后才显示
+        if (hangupWrapper) hangupWrapper.style.display = 'none';
         hangupBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="white"><path d="M20 15.5c-1.2 0-2.4-.2-3.6-.6-.3-.1-.7 0-1 .2l-2.2 2.2c-2.8-1.4-5.1-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.2-.6-2.4-.6-3.6 0-.6-.4-1-1-1H4c-.6 0-1 .4-1 1 0 9.4 7.6 17 17 17 .6 0 1-.4 1-1v-3.5c0-.6-.4-1-1-1z"/></svg>';
 
         // 模拟 1.5-3 秒后接通
@@ -339,6 +345,7 @@ connectTimer = setTimeout(function() {
         isConnecting = false;
         isConnected = true;
         callStatus.textContent = '00:00';
+        if (hangupWrapper) hangupWrapper.style.display = '';
         hangupBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="white"><path d="M20 15.5c-1.2 0-2.4-.2-3.6-.6-.3-.1-.7 0-1 .2l-2.2 2.2c-2.8-1.4-5.1-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.2-.6-2.4-.6-3.6 0-.6-.4-1-1-1H4c-.6 0-1 .4-1 1 0 9.4 7.6 17 17 17 .6 0 1-.4 1-1v-3.5c0-.6-.4-1-1-1z"/></svg>';
         startTimer();
         // ✅ 改为屏幕中央小字提示
@@ -471,8 +478,8 @@ function showToast(text) {
         chatArea.insertBefore(el, typingIndicator);
         chatArea.scrollTop = chatArea.scrollHeight;
 
-        // 角色在通话里说的话：若配置了 TTS，就合成语音播出来
-        if (!isUser && window.NanoTTS && text && text.indexOf('出错了') !== 0) {
+        // 角色在通话里说的话：免提开启且配置了 TTS 时，用配置的语音模型合成播出来
+        if (!isUser && speakerOn && window.NanoTTS && text && text.indexOf('出错了') !== 0) {
             try { window.NanoTTS.speak(text); } catch (e) {}
         }
     }
@@ -933,6 +940,67 @@ init();
             history.back();
         }
     });
+
+    // ===== 免提按钮：切换角色语音播报（配置了 TTS 才有效，未配置则无语音）=====
+    if (speakerBtn) {
+        speakerBtn.classList.toggle('active', speakerOn);
+        speakerBtn.addEventListener('click', function() {
+            speakerOn = !speakerOn;
+            speakerBtn.classList.toggle('active', speakerOn);
+            if (speakerOn) {
+                try {
+                    if (window.NanoTTS && window.NanoTTS.isConfigured) {
+                        window.NanoTTS.isConfigured(function(ok) {
+                            if (!ok) showToast('未配置语音模型，免提无语音');
+                        });
+                    }
+                } catch (e) {}
+            } else {
+                try { if (window.NanoTTS) window.NanoTTS.stop(); } catch (e) {}
+            }
+        });
+    }
+
+    // ===== 录音按钮：语音转文字写入输入框 =====
+    let recog = null;
+    let recording = false;
+    function stopRecog() {
+        recording = false;
+        if (recordBtn) recordBtn.classList.remove('recording');
+        try { if (recog) recog.stop(); } catch (e) {}
+        recog = null;
+    }
+    if (recordBtn) {
+        recordBtn.addEventListener('click', function() {
+            if (recording) { stopRecog(); return; }
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SR) { showToast('当前环境不支持语音识别'); return; }
+            try {
+                recog = new SR();
+                recog.lang = 'zh-CN';
+                recog.continuous = true;
+                recog.interimResults = true;
+                recog.onresult = function(ev) {
+                    let finalText = '';
+                    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+                        if (ev.results[i].isFinal) finalText += ev.results[i][0].transcript;
+                    }
+                    if (!finalText) return;
+                    const cur = messageInput.value;
+                    messageInput.value = cur ? (cur + finalText) : finalText;
+                };
+                recog.onerror = function() { stopRecog(); };
+                recog.onend = function() { stopRecog(); };
+                recog.start();
+                recording = true;
+                recordBtn.classList.add('recording');
+                showToast('正在录音，再点一次结束');
+            } catch (e) {
+                stopRecog();
+                showToast('录音启动失败');
+            }
+        });
+    }
 
     // ===== 来电接听 / 拒接 =====
     if (answerBtn) {

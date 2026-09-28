@@ -141,7 +141,7 @@
       body: JSON.stringify({
         model: model,
         messages: [{ role: 'system', content: sys }, { role: 'user', content: userText }],
-        max_tokens: 1200,
+        max_tokens: 4000,
         temperature: 0.5
       })
     }).then(function (r) {
