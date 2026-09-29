@@ -1,8 +1,9 @@
 // ============================================================
 // video-call.js — 视频通话
-// 复用语音通话的交互：计时、缩小成悬浮球、免提(TTS)、录音转文字、
-// 底部输入/回复；新增：本地摄像头、右上角可点击放大/互换的小窗、
-// 摄像头开关（关时小窗显示头像）、AI 通过截图“看到”你这边。
+// 交互对齐语音通话：计时、缩小成悬浮球、免提(TTS)、录音转文字、输入/回复；
+// 新增：本地摄像头（前置镜像）、右上角小窗点击放大/互换、摄像头开关
+// （关时显示“我”的头像）、更换通话背景、AI 通过截图“看到”你这边；
+// 结束/未接会往聊天里插一张「视频通话」卡片（点卡片可看通话内容）。
 // ============================================================
 (function () {
     'use strict';
@@ -12,13 +13,14 @@
     var chatId = q('chat') || 'default';
     var contactName = q('name') || 'AI 助手';
 
-    // ===== DOM =====
     var $ = function (id) { return document.getElementById(id); };
     var stage = $('vcStage');
+    var remoteBox = $('remoteBox');
     var localBox = $('localBox');
     var localVideo = $('localVideo');
     var localOff = $('localOff');
     var localAvatarImg = $('localAvatarImg');
+    var localAvatarSvg = $('localAvatarSvg');
     var remoteAvatar = $('remoteAvatar');
     var remoteAvatarSvg = $('remoteAvatarSvg');
     var chatArea = $('chatArea');
@@ -29,17 +31,17 @@
     var recordBtn = $('recordBtn');
     var cameraBtn = $('cameraBtn');
     var flipBtn = $('flipBtn');
+    var bgBtn = $('bgBtn');
+    var bgPanel = $('bgPanel');
+    var bgUpload = $('bgUpload');
     var minimizeBtn = $('minimizeBtn');
     var hangupBtn = $('hangupBtn');
     var callStatus = $('callStatus');
     var contactNameEl = $('contactName');
-    var visionTag = $('visionTag');
     var toastEl = $('vcToast');
 
-    // ===== 状态 =====
     var messages = [];
     var isWaiting = false;
-    var isConnected = false;
     var callSeconds = 0;
     var timer = null;
     var cameraOn = true;
@@ -47,9 +49,11 @@
     var speakerOn = true;
     var mediaStream = null;
     var charAvatar = '';
+    var userAvatar = '';
     var charPersona = '';
     var displayName = contactName;
-    var lastFrame = '';
+    var ended = false;
+    var BG_KEY = 'video_call_bg';
 
     function toast(msg) {
         if (!toastEl) return;
@@ -59,23 +63,25 @@
         toastEl._t = setTimeout(function () { toastEl.classList.remove('show'); }, 1600);
     }
 
-    // ===== 角色信息（头像/人设）=====
-    function loadCharInfo() {
+    // ===== 角色 / 用户信息 =====
+    function loadInfos() {
         return new Promise(function (resolve) {
             var done = false;
             function finish() { if (!done) { done = true; resolve(); } }
             try {
                 var info = JSON.parse(sessionStorage.getItem('inner_setting_info') || 'null');
                 if (info) {
-                    charAvatar = info.chatAvatar || info.avatar || '';
-                    displayName = info.name || displayName;
+                    charAvatar = info.chatAvatar || info.avatar || charAvatar;
+                    userAvatar = info.userAvatar || userAvatar;
+                    if (info.name) displayName = info.name;
                 }
             } catch (e) {}
             try {
+                userAvatar = userAvatar || localStorage.getItem('nano_user_avatar') || '';
+            } catch (e) {}
+            try {
                 var req = indexedDB.open('nano_characters_db', 1);
-                req.onupgradeneeded = function (e) {
-                    try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {}
-                };
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {} };
                 req.onsuccess = function () {
                     try {
                         var r = req.result.transaction('characters', 'readonly').objectStore('characters').get(chatId);
@@ -84,7 +90,7 @@
                             if (c) {
                                 if (c.avatar) charAvatar = c.avatar;
                                 if (c.name) displayName = c.name;
-                                try { charPersona = JSON.stringify(c).slice(0, 3000); } catch (e) { charPersona = ''; }
+                                try { charPersona = JSON.stringify(c).slice(0, 3000); } catch (e) {}
                             }
                             finish();
                         };
@@ -96,16 +102,38 @@
         });
     }
 
-    function applyAvatar() {
+    function applyAvatars() {
         contactNameEl.textContent = displayName;
         if (charAvatar) {
-            remoteAvatar.src = charAvatar; remoteAvatar.style.display = 'block';
-            remoteAvatarSvg.style.display = 'none';
-            localAvatarImg.src = charAvatar; localAvatarImg.style.display = 'block';
+            remoteAvatar.src = charAvatar; remoteAvatar.style.display = 'block'; remoteAvatarSvg.style.display = 'none';
+        }
+        // 摄像头关掉时，小窗显示「我」的头像
+        if (userAvatar) {
+            localAvatarImg.src = userAvatar; localAvatarImg.style.display = 'block'; localAvatarSvg.style.display = 'none';
         }
     }
 
-    // ===== 消息渲染 =====
+    // ===== 背景 =====
+    function applyBg(val) {
+        var remote = $('remoteBox');
+        if (!val) {
+            remote.style.background = 'radial-gradient(circle at 50% 35%, #2a2f3a, #10131a 70%)';
+        } else if (val.indexOf('data:') === 0 || val.indexOf('http') === 0) {
+            remote.style.background = '#10131a url("' + val + '") center/cover no-repeat';
+        } else {
+            remote.style.background = val;
+        }
+        var opts = bgPanel ? bgPanel.querySelectorAll('.vc-bg-opt') : [];
+        Array.prototype.forEach.call(opts, function (o) { o.classList.toggle('active', (o.getAttribute('data-bg') || '') === (val.indexOf('data:') === 0 ? '__upload__' : val)); });
+    }
+    function loadBg() {
+        var v = '';
+        try { v = localStorage.getItem(BG_KEY) || ''; } catch (e) {}
+        applyBg(v);
+    }
+    function saveBg(v) { try { localStorage.setItem(BG_KEY, v || ''); } catch (e) {} }
+
+    // ===== 消息 =====
     function addMessage(text, isUser) {
         messages.push({ text: text, isUser: !!isUser });
         var el = document.createElement('div');
@@ -118,15 +146,14 @@
         }
     }
 
-    // ===== Prompt =====
     function buildSystemPrompt() {
-        var p = '（这是你和「' + (displayName || '对方') + '」的视频通话。你在通话里自然聊天，口语化、简短，像真人视频通话一样。）\n';
-        p += '用户可能开着摄像头，你能“看到”通话画面；结合你看到的画面自然回应，但不要机械地复述画面。\n';
+        var p = '（这是你和「' + (displayName || '对方') + '」的视频通话。口语化、简短，像真人视频通话一样。）\n';
+        p += '用户可能开着摄像头，你能看到通话画面；结合你看到的画面自然回应，但不要机械复述画面。\n';
         if (charPersona) p += '\n【你的人设】\n' + charPersona + '\n';
         return p;
     }
 
-    // ===== API 配置（IndexedDB 优先）=====
+    // ===== API（主 API，IndexedDB 优先）=====
     function readApiConfig() {
         return new Promise(function (resolve) {
             function fromLS() { try { var raw = localStorage.getItem('nano_api_config'); resolve(raw ? JSON.parse(raw) : null); } catch (e) { resolve(null); } }
@@ -153,44 +180,6 @@
         return { mainUrl: url, mainKey: key, mainModel: model };
     }
 
-    // ===== 摄像头 =====
-    function startCamera() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            toast('当前环境不支持摄像头');
-            setCameraUI(false);
-            return;
-        }
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: false })
-            .then(function (stream) {
-                mediaStream = stream;
-                localVideo.srcObject = stream;
-                localVideo.style.display = 'block';
-                localOff.style.display = 'none';
-                cameraOn = true;
-                setCameraUI(true);
-                visionTag.style.display = '';
-            })
-            .catch(function () {
-                toast('摄像头不可用或无权限');
-                cameraOn = false;
-                setCameraUI(false);
-                visionTag.style.display = 'none';
-            });
-    }
-    function stopCamera() {
-        if (mediaStream) { try { mediaStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {} }
-        mediaStream = null;
-        localVideo.srcObject = null;
-        localVideo.style.display = 'none';
-        localOff.style.display = 'flex';
-        cameraOn = false;
-        setCameraUI(false);
-        visionTag.style.display = 'none';
-    }
-    function setCameraUI(on) {
-        if (cameraBtn) cameraBtn.classList.toggle('off', !on);
-        if (flipBtn) flipBtn.style.display = on ? '' : 'none';
-    }
     function captureFrame() {
         if (!cameraOn || !mediaStream || !localVideo.videoWidth) return '';
         try {
@@ -202,7 +191,6 @@
         } catch (e) { return ''; }
     }
 
-    // ===== 调用 API（带画面）=====
     function callApi(userText) {
         return readApiConfig().then(function (rawCfg) {
             var config = normalizeCfg(rawCfg);
@@ -212,12 +200,10 @@
 
             var msgs = [{ role: 'system', content: buildSystemPrompt() }];
             var slice = messages.slice(-12);
-            slice.pop(); // 去掉刚压入的这条（下面用带画面的版本）
-            slice.forEach(function (m) {
-                if (m.text && m.text.trim()) msgs.push({ role: m.isUser ? 'user' : 'assistant', content: m.text });
-            });
+            slice.pop();
+            slice.forEach(function (m) { if (m.text && m.text.trim()) msgs.push({ role: m.isUser ? 'user' : 'assistant', content: m.text }); });
+
             var frame = captureFrame();
-            lastFrame = frame;
             if (frame) {
                 msgs.push({ role: 'user', content: [{ type: 'text', text: userText || '（看看我这边）' }, { type: 'image_url', image_url: { url: frame } }] });
             } else {
@@ -237,11 +223,18 @@
         });
     }
 
+    function updateReplyMode() {
+        var has = !!(messageInput.value && messageInput.value.trim());
+        replyBtn.classList.toggle('reply-mode', !has);
+        replyBtn.title = has ? '发送' : '回复';
+    }
+
     function triggerReply() {
         if (isWaiting) return;
         var text = messageInput.value.trim();
-        if (text) { addMessage(text, true); messageInput.value = ''; }
-        else { messages.push({ text: '', isUser: true }); }
+        if (text) addMessage(text, true); else messages.push({ text: '', isUser: true });
+        messageInput.value = '';
+        updateReplyMode();
         isWaiting = true;
         replyBtn.classList.add('loading');
         callApi(text).then(function (reply) {
@@ -251,28 +244,84 @@
         });
     }
 
-    // ===== 计时 =====
     function updateStatus() {
         var m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
         var s = String(callSeconds % 60).padStart(2, '0');
         callStatus.textContent = m + ':' + s;
     }
-    function startTimer() {
-        clearInterval(timer);
-        timer = setInterval(function () { callSeconds++; updateStatus(); }, 1000);
+    function startTimer() { clearInterval(timer); timer = setInterval(function () { callSeconds++; updateStatus(); }, 1000); }
+
+    // ===== 摄像头 =====
+    function startCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            toast('当前环境不支持摄像头'); cameraOn = false; setCameraUI(false); return;
+        }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: false })
+            .then(function (stream) {
+                mediaStream = stream;
+                localVideo.srcObject = stream;
+                localVideo.style.display = 'block';
+                localOff.style.display = 'none';
+                cameraOn = true;
+                setCameraUI(true);
+                stage.classList.toggle('mirror', facingMode === 'user');
+            })
+            .catch(function () {
+                toast('摄像头不可用或无权限');
+                cameraOn = false;
+                setCameraUI(false);
+            });
+    }
+    function stopCamera() {
+        if (mediaStream) { try { mediaStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {} }
+        mediaStream = null;
+        localVideo.srcObject = null;
+        localVideo.style.display = 'none';
+        localOff.style.display = 'flex';
+        cameraOn = false;
+        setCameraUI(false);
+    }
+    function setCameraUI(on) {
+        if (cameraBtn) cameraBtn.classList.toggle('off', !on);
+        if (flipBtn) flipBtn.style.display = on ? '' : 'none';
     }
 
-    // ===== 事件绑定 =====
-    localBox.addEventListener('click', function () { stage.classList.toggle('swapped'); });
+    // ===== 通话卡片 =====
+    function sendCallCard() {
+        if (ended) return;
+        ended = true;
+        var out = [];
+        for (var i = 0; i < messages.length; i++) {
+            var m = messages[i];
+            if (m.text && m.text.trim()) out.push({ text: m.text, isUser: m.isUser });
+        }
+        var callId = 'call_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        if (window.parent !== window) {
+            window.parent.postMessage({
+                type: 'NANO_VIDEO_CALL_CARD',
+                chatId: chatId,
+                callId: callId,
+                duration: callSeconds,
+                missed: false,
+                incoming: false,
+                video: true,
+                messages: out
+            }, '*');
+        }
+    }
 
-    cameraBtn.addEventListener('click', function () {
-        if (cameraOn) stopCamera(); else startCamera();
-    });
-    flipBtn.addEventListener('click', function () {
-        facingMode = facingMode === 'user' ? 'environment' : 'user';
-        stopCamera();
-        startCamera();
-    });
+    // ===== 事件 =====
+    // 只有小窗（或已放大的本地窗）点击才互换，避免误触主画面
+    function onBoxClick(which) {
+        var swapped = stage.classList.contains('swapped');
+        if (which === 'local') stage.classList.toggle('swapped');
+        else if (swapped) stage.classList.toggle('swapped');
+    }
+    localBox.addEventListener('click', function () { onBoxClick('local'); });
+    remoteBox.addEventListener('click', function () { onBoxClick('remote'); });
+
+    cameraBtn.addEventListener('click', function () { if (cameraOn) stopCamera(); else startCamera(); });
+    flipBtn.addEventListener('click', function () { facingMode = facingMode === 'user' ? 'environment' : 'user'; stopCamera(); startCamera(); });
 
     speakerBtn.addEventListener('click', function () {
         speakerOn = !speakerOn;
@@ -280,6 +329,21 @@
         if (!speakerOn) { try { if (window.NanoTTS) window.NanoTTS.stop(); } catch (e) {} }
     });
 
+    bgBtn.addEventListener('click', function (e) { e.stopPropagation(); bgPanel.classList.toggle('active'); });
+    if (bgPanel) {
+        bgPanel.addEventListener('click', function (e) {
+            var opt = e.target.closest('.vc-bg-opt');
+            if (opt) { var v = opt.getAttribute('data-bg') || ''; applyBg(v); saveBg(v); bgPanel.classList.remove('active'); }
+        });
+    }
+    if (bgUpload) bgUpload.addEventListener('change', function () {
+        var f = this.files && this.files[0]; if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function (ev) { applyBg(ev.target.result); saveBg(ev.target.result); bgPanel.classList.remove('active'); };
+        reader.readAsDataURL(f); this.value = '';
+    });
+
+    messageInput.addEventListener('input', updateReplyMode);
     replyBtn.addEventListener('click', triggerReply);
     messageInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') triggerReply(); });
 
@@ -292,7 +356,6 @@
         triggerReply();
     });
 
-    // 录音转文字
     var recog = null, recording = false;
     function stopRecog() {
         recording = false;
@@ -312,6 +375,7 @@
                 for (var i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) t += ev.results[i][0].transcript;
                 if (!t) return;
                 messageInput.value = (messageInput.value || '') + t;
+                updateReplyMode();
             };
             recog.onerror = stopRecog;
             recog.onend = stopRecog;
@@ -328,6 +392,7 @@
 
     hangupBtn.addEventListener('click', function () {
         clearInterval(timer);
+        sendCallCard();
         try {
             if (mediaStream) mediaStream.getTracks().forEach(function (t) { t.stop(); });
             if (window.NanoTTS) window.NanoTTS.stop();
@@ -336,7 +401,6 @@
         else history.back();
     });
 
-    // 父页恢复到本通话
     window.addEventListener('message', function (e) {
         var d = e.data;
         if (d && d.type === 'restoreVoiceCall') {
@@ -346,14 +410,12 @@
     });
 
     // ===== 初始化 =====
-    loadCharInfo().then(function () {
-        applyAvatar();
+    loadInfos().then(function () {
+        applyAvatars();
+        loadBg();
         setCameraUI(cameraOn);
+        updateReplyMode();
         startCamera();
-        setTimeout(function () {
-            isConnected = true;
-            callStatus.textContent = '00:00';
-            startTimer();
-        }, 1200);
+        setTimeout(function () { callStatus.textContent = '00:00'; startTimer(); }, 1200);
     });
 })();

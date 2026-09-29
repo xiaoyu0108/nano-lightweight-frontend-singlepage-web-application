@@ -967,6 +967,7 @@
                             sub: msg.cardData.sub,
                             footer: msg.cardData.footer,
                             callId: msg.cardData.callId,
+                            video: msg.cardData.video,
                             duration: msg.cardData.duration,
                             direction: msg.cardData.direction,
                             toName: msg.cardData.toName,
@@ -1004,7 +1005,7 @@
                             isImage: msg.isImage || false,
                             isCard: msg.isCard || false,
                             isVoice: msg.isVoice || false,
-                            cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, issuer: msg.cardData.issuer, holder: msg.cardData.holder, familyId: msg.cardData.familyId, limit: msg.cardData.limit, food: msg.cardData.food, shop: msg.cardData.shop, price: msg.cardData.price, note: msg.cardData.note, place: msg.cardData.place, lat: msg.cardData.lat, lng: msg.cardData.lng, distance: msg.cardData.distance, eta: msg.cardData.eta, paidBy: msg.cardData.paidBy, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
+                            cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, issuer: msg.cardData.issuer, holder: msg.cardData.holder, familyId: msg.cardData.familyId, limit: msg.cardData.limit, food: msg.cardData.food, shop: msg.cardData.shop, price: msg.cardData.price, note: msg.cardData.note, place: msg.cardData.place, lat: msg.cardData.lat, lng: msg.cardData.lng, distance: msg.cardData.distance, eta: msg.cardData.eta, paidBy: msg.cardData.paidBy, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, video: msg.cardData.video, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
                             think: msg.think || null,
                             heart: msg.heart || null,
                             recalled: msg.recalled || false,
@@ -1742,25 +1743,28 @@
             return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + title + '</div><div class="card-sub">' + sub + '</div></div></div><div class="card-footer">' + footer + '</div>';
        } else if (cardData.cardType === 'call') {
     const isMissed = cardData.missed || false;
+    const isVideo = cardData.video || false;
     const duration = cardData.duration || '00:00';
     const callId = cardData.callId || '';
-    
-    let iconColor = '#007AFF';
-    let bgColor = 'rgba(0,122,255,0.12)';
-    let titleText = '语音通话';
+    const PHONE_PATH = '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>';
+    const VIDEO_ICON = '<path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>';
+
+    let iconColor = isVideo ? '#5856D6' : '#007AFF';
+    let bgColor = isVideo ? 'rgba(88,86,214,0.12)' : 'rgba(0,122,255,0.12)';
+    let titleText = isVideo ? '视频通话' : '语音通话';
     let subText = '通话时长 ' + duration;
     
     if (isMissed) {
         iconColor = '#FF3B30';
         bgColor = 'rgba(255,59,48,0.12)';
-        titleText = '未接来电';
+        titleText = isVideo ? '未接视频通话' : '未接来电';
         subText = '对方已取消';
     }
     
     return '<div class="card-main" style="padding: 3px 6px;cursor:pointer;" data-callid="' + callId + '">' +
                 '<div class="icon-wrap" style="background:' + bgColor + ';">' +
                     '<svg viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">' +
-                        '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>' +
+                        (isVideo ? VIDEO_ICON : PHONE_PATH) +
                     '</svg>' +
                 '</div>' +
                 '<div style="flex:1;">' +
@@ -6030,33 +6034,35 @@ if (callCard) {
             // 无需实时处理（构建提示词/生图时读取设置）
         }
 
-        // ===== 接收语音通话卡片 =====
-if (data.type === 'NANO_VOICE_CALL_CARD') {
+        // ===== 接收（语音/视频）通话卡片 =====
+if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD') {
     if (data.chatId && data.chatId !== chatId) return;
-    
+    const isVideo = data.type === 'NANO_VIDEO_CALL_CARD' || !!data.video;
+
     saveCallRecordToDB(data.callId, data.duration, data.missed, data.messages);
-    
+
     const now = new Date();
     const h = String(now.getHours()).padStart(2, '0');
     const m = String(now.getMinutes()).padStart(2, '0');
     const timeStr = h + ':' + m;
-    
+
     const mins = Math.floor(data.duration / 60);
     const secs = data.duration % 60;
     const durationStr = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-    
+
     // 主动来电（AI 打给你）的卡片显示在对方（左）侧；你主动打的显示在自己（右）侧
     const cardSide = data.incoming ? 'left' : 'right';
     addMessage(cardSide, '', timeStr, null, false, true, {
         cardType: 'call',
         callId: data.callId,
         duration: durationStr,
-        missed: data.missed || false
+        missed: data.missed || false,
+        video: isVideo
     });
-    
+
     saveMessages();
     scrollToBottom();
-    console.log('[Chat] 收到语音通话卡片:', data.callId, '未接:', data.missed);
+    console.log('[Chat] 收到通话卡片:', isVideo ? '视频' : '语音', data.callId, '未接:', data.missed);
 }
     });
 

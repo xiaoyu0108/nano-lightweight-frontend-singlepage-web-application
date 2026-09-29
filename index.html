@@ -2672,11 +2672,11 @@
                 }
             }
 
-            if (data.type === 'NANO_VOICE_CALL_CARD') {
+            if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD') {
                 const frame = document.getElementById('chatInnerFrame');
                 if (frame && frameBase(frame) === 'chat_inner.html') {
                     frame.contentWindow.postMessage(data, '*');
-                    console.log('[Index] 转发语音通话卡片到 chat_inner (chatInnerFrame)');
+                    console.log('[Index] 转发通话卡片到 chat_inner (chatInnerFrame)');
                 } else {
                     const chatIframe = getChatInnerIframe();
                     if (chatIframe && chatIframe.contentWindow) {
