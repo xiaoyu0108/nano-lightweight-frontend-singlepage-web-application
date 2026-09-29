@@ -11,6 +11,18 @@
 </head>
 <body class="vc-body">
 
+    <!-- 接通中：居中头像 -->
+    <div class="vc-connecting" id="vcConnecting">
+        <div class="vc-conn-avatar" id="connAvatar">
+            <img id="connAvatarImg" alt="" style="display:none;">
+            <svg id="connAvatarSvg" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+        </div>
+        <div class="vc-conn-name" id="connName">AI 助手</div>
+        <div class="vc-conn-status" id="connStatus">正在接通中...</div>
+    </div>
+
     <!-- 舞台：远端（角色）为主画面，本地摄像头为右上角小窗 -->
     <div class="vc-stage" id="vcStage">
         <div class="vc-remote" id="remoteBox">
@@ -72,15 +84,13 @@
         </svg>
     </button>
 
-    <!-- 背景面板 -->
+    <!-- 背景面板：仅头像 / 黑 / 白 / 图片 -->
     <div class="vc-bg-panel" id="bgPanel">
         <div class="vc-bg-title">通话背景</div>
         <div class="vc-bg-options">
-            <div class="vc-bg-opt active" data-bg=""></div>
-            <div class="vc-bg-opt" data-bg="#1c1c1e"></div>
-            <div class="vc-bg-opt" data-bg="#2a2f3a"></div>
-            <div class="vc-bg-opt" data-bg="#12343b"></div>
-            <div class="vc-bg-opt" data-bg="#3a2a3a"></div>
+            <div class="vc-bg-opt vc-bg-avatar active" id="bgOptAvatar" data-bg="avatar" title="头像"><span>头像</span></div>
+            <div class="vc-bg-opt" data-bg="#000000" title="黑"></div>
+            <div class="vc-bg-opt" data-bg="#ffffff" title="白"></div>
             <label class="vc-bg-upload">
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                 <input type="file" id="bgUpload" accept="image/*" hidden>
@@ -90,6 +100,7 @@
 
     <!-- 字幕消息区 -->
     <div class="vc-chat" id="chatArea"></div>
+    <div class="vc-typing" id="vcTyping"><span></span><span></span><span></span></div>
 
     <!-- 输入区 -->
     <div class="vc-input-area">

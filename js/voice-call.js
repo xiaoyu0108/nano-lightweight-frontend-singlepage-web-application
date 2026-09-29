@@ -87,6 +87,9 @@
         if (characterData && characterData.avatar && characterData.avatar.length > 50) {
             contactAvatar = characterData.avatar;
         }
+        // 头像背景选项的缩略图
+        var avOpt = document.querySelector('.bg-option-avatar');
+        if (avOpt && contactAvatar) avOpt.style.background = '#333 url(' + contactAvatar + ') center/cover';
         contactName.textContent = contactNameParam;
         if (contactAvatar && contactAvatar.trim() !== '') {
             const avatarImg = document.getElementById('contactAvatar');
@@ -102,7 +105,71 @@
     getCharacterData().then(function(char) {
         characterData = char;
         renderContact();
+        // 头像就绪后，若当前是「头像背景」则重新清晰铺满（此回调在同步代码之后执行，安全）
+        if (currentBg === 'avatar' || !currentBg) { try { setBg('avatar'); } catch (e) {} }
     });
+
+    var memText = '', wbText = '';
+    function readMemory() {
+        return new Promise(function (resolve) {
+            try {
+                var req = indexedDB.open('nano_vector_memory_db', 5);
+                req.onupgradeneeded = function (e) {
+                    try {
+                        var d = e.target.result, tx = e.target.transaction;
+                        if (!d.objectStoreNames.contains('memories')) {
+                            var s = d.createObjectStore('memories', { keyPath: 'id' });
+                            s.createIndex('chatId', 'chatId', { unique: false });
+                        } else {
+                            try { var s2 = tx.objectStore('memories'); if (!s2.indexNames.contains('chatId')) s2.createIndex('chatId', 'chatId', { unique: false }); } catch (err) {}
+                        }
+                        if (!d.objectStoreNames.contains('config')) d.createObjectStore('config', { keyPath: 'key' });
+                        if (!d.objectStoreNames.contains('chat_state')) d.createObjectStore('chat_state', { keyPath: 'chatId' });
+                        if (!d.objectStoreNames.contains('chat_messages')) d.createObjectStore('chat_messages', { keyPath: 'chatId' });
+                    } catch (err) {}
+                };
+                req.onsuccess = function () {
+                    try {
+                        var db = req.result;
+                        var r = db.transaction('memories', 'readonly').objectStore('memories').index('chatId').getAll(chatId);
+                        r.onsuccess = function () {
+                            var out = [];
+                            (r.result || []).forEach(function (m) {
+                                var t = m.text || m.content || m.summary || '';
+                                if (t) out.push(String(t));
+                            });
+                            resolve(out);
+                        };
+                        r.onerror = function () { resolve([]); };
+                    } catch (e) { resolve([]); }
+                };
+                req.onerror = function () { resolve([]); };
+            } catch (e) { resolve([]); }
+        });
+    }
+    function readWorldbook() {
+        try {
+            var raw = localStorage.getItem('nano_worldbook_data_v5');
+            if (!raw) return '';
+            var d = JSON.parse(raw);
+            var entries = Array.isArray(d) ? d : (d.entries || d.list || d.data || []);
+            if (!Array.isArray(entries)) entries = [];
+            var out = [];
+            entries.slice(0, 20).forEach(function (e) {
+                if (!e) return;
+                var kw = e.keywords || e.keys || e.name || e.title || '';
+                var ct = e.content || e.text || e.value || e.desc || '';
+                if (ct) out.push((kw ? (kw + '：') : '') + ct);
+            });
+            return out.join('\n').slice(0, 1500);
+        } catch (e) { return ''; }
+    }
+    function loadContext() {
+        return readMemory().then(function (list) {
+            memText = (list || []).slice(-30).join('\n').slice(0, 2000);
+            wbText = readWorldbook();
+        });
+    }
 
     function buildSystemPrompt() {
         const charName = characterData ? characterData.name : contactNameParam;
@@ -113,6 +180,10 @@
             if (characterData.setting) prompt += '\n- 设定：\n' + characterData.setting;
         }
         prompt += '\n\n你正在和用户进行语音通话，保持自然、简洁、真实的回复风格，不要使用 emoji。';
+        prompt += '\n如果你用外语说话，每一句都必须紧跟中文翻译，格式为：外文（中文翻译），一句一行；例如 do you love me（你爱我吗？）。不要只写外文或只写中文，翻译要完整。';
+        prompt += '\n每条消息单独一行，不同气泡之间用换行分隔；不要把多句话挤进同一段。';
+        if (wbText) prompt += '\n【世界书】\n' + wbText;
+        if (memText) prompt += '\n【长期记忆】\n' + memText;
         return prompt;
     }
 
@@ -328,33 +399,106 @@ function hideInputArea() {
 }
 
     // ===== 模拟接通（接通等待） =====
+    // ===== 接通提示音 =====
+    var ringCtx = null, ringTimer = null;
+    function startRing() {
+        try {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            if (!ringCtx) ringCtx = new AC();
+            var tone = function (freq, start, dur, vol) {
+                var o = ringCtx.createOscillator(), g = ringCtx.createGain();
+                o.type = 'sine'; o.frequency.value = freq;
+                var t = ringCtx.currentTime + start;
+                g.gain.setValueAtTime(0.0001, t);
+                g.gain.exponentialRampToValueAtTime(vol || 0.045, t + 0.05);
+                g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+                o.connect(g); g.connect(ringCtx.destination);
+                o.start(t); o.stop(t + dur + 0.03);
+            };
+            var ring = function () { try { tone(587.33, 0, 0.38, 0.045); tone(783.99, 0.44, 0.5, 0.04); } catch (e) {} };
+            ring();
+            ringTimer = setInterval(ring, 2200);
+        } catch (e) {}
+    }
+    function stopRing() {
+        try { clearInterval(ringTimer); } catch (e) {}
+        ringTimer = null;
+        try { if (ringCtx) { ringCtx.close(); ringCtx = null; } } catch (e) { ringCtx = null; }
+    }
+
     function startConnecting() {
         if (isConnected) return;
         isConnecting = true;
         connectStartTime = Date.now();
         callStatus.textContent = '接通中...';
+        document.body.classList.add('connecting');
+        startRing();
         // 底部的免提/挂断/录音三个按钮，接通之后才显示
         if (hangupWrapper) hangupWrapper.style.display = 'none';
         hangupBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="white"><path d="M20 15.5c-1.2 0-2.4-.2-3.6-.6-.3-.1-.7 0-1 .2l-2.2 2.2c-2.8-1.4-5.1-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.2-.6-2.4-.6-3.6 0-.6-.4-1-1-1H4c-.6 0-1 .4-1 1 0 9.4 7.6 17 17 17 .6 0 1-.4 1-1v-3.5c0-.6-.4-1-1-1z"/></svg>';
 
-        // 模拟 1.5-3 秒后接通
-const delay = 1500 + Math.random() * 1500;
-if (connectTimer) clearTimeout(connectTimer);
-connectTimer = setTimeout(function() {
-    if (isConnecting) {
-        isConnecting = false;
-        isConnected = true;
-        callStatus.textContent = '00:00';
-        if (hangupWrapper) hangupWrapper.style.display = '';
-        hangupBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="white"><path d="M20 15.5c-1.2 0-2.4-.2-3.6-.6-.3-.1-.7 0-1 .2l-2.2 2.2c-2.8-1.4-5.1-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.2-.6-2.4-.6-3.6 0-.6-.4-1-1-1H4c-.6 0-1 .4-1 1 0 9.4 7.6 17 17 17 .6 0 1-.4 1-1v-3.5c0-.6-.4-1-1-1z"/></svg>';
-        startTimer();
-        // ✅ 改为屏幕中央小字提示
-        showToast('通话已接通');
-        // ===== 接通后显示输入栏 =====
-        showInputArea();
-        console.log('[语音电话] 已接通');
+        // 接通时长 = 角色「决定接不接」的 API 反应时间（保留最短动画）
+        if (connectTimer) clearTimeout(connectTimer);
+        const minDelay = new Promise(function (r) { setTimeout(r, 2600 + Math.random() * 1400); });
+        Promise.all([decideAnswerRemote(), minDelay]).then(function (arr) {
+            if (!isConnecting) return;
+            const d = arr[0];
+            if (d && d.answer === false) {
+                // 角色拒接（太晚/在忙/不方便等）
+                isConnecting = false;
+                stopRing();
+                document.body.classList.remove('connecting');
+                callStatus.textContent = '对方未接听';
+                showToast('对方未接听');
+                sendVoiceCallCard(true, d.reason);
+                setTimeout(function () {
+                    if (window.parent !== window) window.parent.postMessage({ type: 'voiceCallEnded' }, '*');
+                    else history.back();
+                }, 1600);
+                return;
+            }
+            // 角色接通后先说一句话（写进聊天）
+            if (d && d.say && window.parent !== window) {
+                try { window.parent.postMessage({ type: 'NANO_CALL_REPLY', chatId: chatId, text: d.say }, '*'); } catch (e) {}
+            }
+            isConnecting = false;
+            isConnected = true;
+            stopRing();
+            document.body.classList.remove('connecting');
+            callStatus.textContent = '00:00';
+            if (hangupWrapper) hangupWrapper.style.display = '';
+            hangupBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="white"><path d="M20 15.5c-1.2 0-2.4-.2-3.6-.6-.3-.1-.7 0-1 .2l-2.2 2.2c-2.8-1.4-5.1-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.2-.6-2.4-.6-3.6 0-.6-.4-1-1-1H4c-.6 0-1 .4-1 1 0 9.4 7.6 17 17 17 .6 0 1-.4 1-1v-3.5c0-.6-.4-1-1-1z"/></svg>';
+            startTimer();
+            showToast('通话已接通');
+            showInputArea();
+            console.log('[语音电话] 已接通');
+        });
     }
-}, delay);
+
+    // ===== 角色决定接不接电话（调用主 API，约四分之一概率拒接）=====
+    function decideAnswerRemote() {
+        return readApiConfig().then(function (rawCfg) {
+            const config = normalizeCfg(rawCfg);
+            if (!config) return { answer: true };
+            let base = config.mainUrl.trim();
+            if (!base.endsWith('/v1')) base = base.endsWith('/') ? base + 'v1' : base + '/v1';
+            const sys = buildSystemPrompt() +
+                '\n\n现在用户正在给你打电话。请以你的人设和当前情境判断此刻是否方便接听：如果时间太晚、正在忙、不方便、心情不好等，可以拒接；大约四分之一的情况你会拒接。只输出 JSON：{"answer": true 或 false, "say": "接就写接通后你说的第一句话，拒接就写拒接的一句话理由"}。';
+            return fetch(base + '/chat/completions', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + config.mainKey.trim(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: config.mainModel, messages: [{ role: 'system', content: sys }, { role: 'user', content: '（电话响了）' }], max_tokens: 120, temperature: 0.8 })
+            }).then(function (r) { return r.json(); }).then(function (dd) {
+                const t = (dd.choices && dd.choices[0] && dd.choices[0].message && dd.choices[0].message.content) || '';
+                const m = t.match(/\{[\s\S]*\}/);
+                let obj = null;
+                try { obj = m ? JSON.parse(m[0]) : null; } catch (e) {}
+                const say = (obj && (obj.say || obj.reason)) || '';
+                if (obj && obj.answer === false) return { answer: false, reason: say };
+                return { answer: true, say: say };
+            }).catch(function () { return { answer: true }; });
+        });
     }
 
     // ===== 屏幕中央小字提示 =====
@@ -423,6 +567,47 @@ function showToast(text) {
         return el;
     }
 
+    // ===== 分句 / 分气泡（外文（翻译）不拆）=====
+    function splitSentences(text) {
+        var out = [], cur = '', depth = 0;
+        var enders = '。！？!?；;…，,、';
+        for (var i = 0; i < text.length; i++) {
+            var ch = text[i];
+            if (ch === '（' || ch === '(') depth++;
+            if (ch === '）' || ch === ')') depth = Math.max(0, depth - 1);
+            cur += ch;
+            if (depth === 0 && enders.indexOf(ch) !== -1) { var t = cur.trim(); if (t) out.push(t); cur = ''; }
+        }
+        var rest = cur.trim(); if (rest) out.push(rest);
+        return out;
+    }
+    function splitBubbles(raw) {
+        var out = [];
+        String(raw == null ? '' : raw).split(/\n+/).forEach(function (line) {
+            line = line.trim();
+            if (!line) return;
+            if (line.indexOf('||') !== -1) {
+                var p = line.split('||');
+                var a = (p[0] || '').trim();
+                var b = p.slice(1).join('||').trim();
+                line = a + (b ? ('（' + b + '）') : '');
+            }
+            // 含翻译括号的整句不再拆分
+            if (line.indexOf('（') !== -1 || line.indexOf('(') !== -1) {
+                out.push(line);
+            } else {
+                splitSentences(line).forEach(function (s) { if (s) out.push(s); });
+            }
+        });
+        if (!out.length && raw) out = [String(raw).trim()];
+        return out;
+    }
+    function spokenText(text) {
+        var s = String(text == null ? '' : text);
+        var i = s.indexOf('（');
+        return i > 0 ? s.slice(0, i).trim() : s;
+    }
+
     // ===== 渲染消息 =====
     function renderMessages(msgList) {
         const children = chatArea.children;
@@ -480,7 +665,7 @@ function showToast(text) {
 
         // 角色在通话里说的话：免提开启且配置了 TTS 时，用配置的语音模型合成播出来
         if (!isUser && speakerOn && window.NanoTTS && text && text.indexOf('出错了') !== 0) {
-            try { window.NanoTTS.speak(text); } catch (e) {}
+            try { window.NanoTTS.speak(spokenText(text)); } catch (e) {}
         }
     }
 
@@ -729,7 +914,7 @@ function showToast(text) {
                     body: JSON.stringify({
                         model: model,
                         messages: historyMessages,
-                        max_tokens: 500,
+                        max_tokens: 1500,
                         temperature: 0.85
                     })
                 }).then(function(response) {
@@ -772,7 +957,8 @@ function showToast(text) {
 
         callApi(userMsgs, messages).then(function(reply) {
             hideTyping();
-            addMessage(reply, false);
+            // 分句拆成多条独立气泡
+            splitBubbles(reply).forEach(function(line) { addMessage(line, false); });
             isWaiting = false;
             replyBtn.classList.remove('loading');
         }).catch(function(err) {
@@ -786,42 +972,50 @@ function showToast(text) {
     // ===== 重roll =====
     function handleReroll() {
         if (isWaiting) return;
-
-        let lastAIIndex = -1;
-        for (let i = messages.length - 1; i >= 0; i--) {
-            if (!messages[i].isUser) {
-                lastAIIndex = i;
-                break;
-            }
-        }
-
-        if (lastAIIndex === -1) {
-            triggerReply();
-            return;
-        }
-
-        const allMsgs = chatArea.querySelectorAll('.message.msg-api');
-        if (allMsgs.length > 0) {
-            const last = allMsgs[allMsgs.length - 1];
-            if (last) last.remove();
-        }
-        const aiMsg = messages[lastAIIndex];
-        messages = messages.filter(function(m, idx) {
-            return idx !== lastAIIndex;
-        });
-        if (aiMsg && aiMsg.id) {
-            deleteMessageById(aiMsg.id);
-        }
-
+        // 重roll：删除本轮生成的所有 AI 气泡（末尾连续的非用户消息），不动历史消息
+        let idx = messages.length - 1;
+        while (idx >= 0 && !messages[idx].isUser) idx--;
+        const toRemove = messages.slice(idx + 1);
+        if (!toRemove.length) { triggerReply(); return; }
+        toRemove.forEach(function(m) { if (m && m.id) { try { deleteMessageById(m.id); } catch (e) {} } });
+        messages = messages.slice(0, idx + 1);
+        renderMessages(messages);
         triggerReply();
     }
 
     // ===== 背景切换 =====
+    function setDarkBg(isDark) { try { document.body.classList.toggle('dark-bg', !!isDark); } catch (e) {} }
+
     function setBg(color) {
         currentBg = color;
         customBg = null;
-        document.body.style.background = color;
-        document.body.style.backgroundImage = 'none';
+        if (color === 'avatar') setDarkBg(true);
+        else if (color === '#ffffff') setDarkBg(false);
+        else if (color === '#000000') setDarkBg(true);
+        else {
+            try {
+                var m = /^#?([0-9a-f]{6})$/i.exec(String(color));
+                if (m) {
+                    var n = parseInt(m[1], 16);
+                    var lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+                    setDarkBg(lum < 0.6);
+                }
+            } catch (e) {}
+        }
+        if (color === 'avatar' && contactAvatar) {
+            // 头像背景：清晰铺满
+            document.body.style.backgroundImage = 'url(' + contactAvatar + ')';
+            document.body.style.backgroundSize = 'cover';
+            document.body.style.backgroundPosition = 'center';
+            document.body.style.backgroundRepeat = 'no-repeat';
+            document.body.style.backgroundColor = 'transparent';
+        } else if (color === 'avatar') {
+            document.body.style.background = '#2a2f3a';
+            document.body.style.backgroundImage = 'none';
+        } else {
+            document.body.style.background = color;
+            document.body.style.backgroundImage = 'none';
+        }
         saveBg(color);
 
         document.querySelectorAll('.bg-option').forEach(function(el) {
@@ -833,6 +1027,7 @@ function showToast(text) {
 
     function setCustomBg(imageData) {
         customBg = imageData;
+        setDarkBg(true);
         document.body.style.backgroundImage = 'url(' + imageData + ')';
         document.body.style.backgroundSize = 'cover';
         document.body.style.backgroundPosition = 'center';
@@ -856,7 +1051,7 @@ function showToast(text) {
     }
 
     // ===== 发送语音通话卡片 =====
-    function sendVoiceCallCard(missed) {
+    function sendVoiceCallCard(missed, rejectReason) {
         var messagesForCard = [];
         for (var i = 0; i < messages.length; i++) {
             var m = messages[i];
@@ -879,6 +1074,7 @@ function showToast(text) {
                 duration: missed ? 0 : callSeconds,
                 missed: missed || false,
                 incoming: isIncoming,
+                rejectReason: rejectReason || '',
                 messages: messagesForCard
             }, '*');
             console.log('[语音电话] 已发送通话卡片，类型:', missed ? '未接通' : '已接通', '来电:', isIncoming, '消息数:', messagesForCard.length);
@@ -898,6 +1094,7 @@ function showToast(text) {
 
     // ===== 初始化 =====
     function init() {
+    loadContext();
     updateCallStatus();
 
     loadBg().then(function(bg) {
@@ -915,6 +1112,9 @@ function showToast(text) {
             } else {
                 setBg(bg);
             }
+        } else {
+            // 默认：头像背景
+            setBg('avatar');
         }
     });
 
@@ -941,12 +1141,17 @@ init();
         }
     });
 
-    replyBtn.addEventListener('click', triggerReply);
+    replyBtn.addEventListener('click', function() {
+        // 有字 = 只发送消息；空 = 回复（才调用 API）
+        if (messageInput.value.trim()) sendUserMessage();
+        else triggerReply();
+    });
     rerollBtn.addEventListener('click', handleReroll);
 
     // ===== 挂断按钮 =====
     hangupBtn.addEventListener('click', function() {
         // 停止计时器
+        stopRing();
         clearInterval(callTimer);
         callTimer = null;
 

@@ -45,7 +45,9 @@
             var cs = window.getComputedStyle(node);
             if (!cs) return false;
             if (cs.display === 'none' || cs.visibility === 'hidden') return false;
-            if (parseFloat(cs.opacity || '1') === 0) return false;
+            // 只有元素自身、或“浮层类”祖先（fixed/absolute）的 opacity:0 才算隐藏；
+            // 普通布局容器的淡入动画不应把返回按钮判定为不可见，否则会误退回上一个页面。
+            if (parseFloat(cs.opacity || '1') === 0 && (node === el || cs.position === 'fixed' || cs.position === 'absolute')) return false;
             if (node === el && cs.pointerEvents === 'none') return false;
         }
         return true;

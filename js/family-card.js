@@ -195,6 +195,7 @@
     function invite(limit) {
         if (!S) return;
         var lim = Math.max(0, Math.round((parseFloat(limit) || 0) * 100) / 100);
+        if (lim > 1e9) lim = 1e9; // 上限十亿（以亿为单位）
         if (lim <= 0) { toast('请输入正确的额度'); return; }
         S.add(chatId, { issuer: 'user', holder: 'char', limit: lim, spent: 0, status: 'pending', note: '' });
         postToParent({ type: 'NANO_FAMILY_CARD_SUBMIT', chatId: chatId, name: contactName, limit: lim });
@@ -288,6 +289,7 @@
     $('limitConfirm').addEventListener('click', function () {
         if (!S || !editingId) { limitModal.classList.remove('active'); return; }
         var lim = Math.max(0, Math.round((parseFloat(limitInput.value) || 0) * 100) / 100);
+        if (lim > 1e9) lim = 1e9; // 上限十亿（以亿为单位）
         if (lim <= 0) { toast('请输入正确的额度'); return; }
         S.update(chatId, editingId, { limit: lim });
         limitModal.classList.remove('active');

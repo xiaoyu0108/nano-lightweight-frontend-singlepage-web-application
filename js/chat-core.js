@@ -105,6 +105,16 @@
     const currentUserName = currentUser ? currentUser.name : '我';
     let currentUserAvatar = currentUser ? (currentUser.avatar || '') : '';
 
+    // 情侣头像：用户头像的「聊天内覆盖」。由角色通过 [情侣头像] 设置，
+    // 只作用于当前聊天（不改用户人设），刷新后仍在。
+    function applyUserAvatarOverride() {
+        try {
+            const ua = localStorage.getItem('chat_setting_userAvatar_' + chatId);
+            if (ua) currentUserAvatar = ua;
+        } catch (e) {}
+    }
+    applyUserAvatarOverride();
+
     // 用户人设头像存在 MaskAvatarDB，需异步读取并同步到消息头像
     function getMaskAvatarFromDB(maskId) {
         return new Promise(function(resolve) {
@@ -132,6 +142,7 @@
         getMaskAvatarFromDB(currentUser.id).then(function(dataUrl) {
             if (dataUrl && dataUrl.trim() !== '') {
                 currentUserAvatar = dataUrl;
+                applyUserAvatarOverride();
                 const cu = getCurrentUser();
                 if (cu && cu.id === currentUser.id) {
                     try { renderMessages(); } catch (e) {}
@@ -587,6 +598,7 @@
 
         prompt += '\n【严格输出纪律】\n';
         prompt += '只输出角色本人的对话内容。严禁输出任何思考过程、分析、推理、计划、内部标签、HTML/XML 标签，严禁出现 <xxxx>、[Info、[Thought、[思考、[推理 等字样。每段话直接以第一人称说出，不要带解释性前缀。\n';
+        prompt += '严禁把“心里所想”写进气泡：不要出现括号内心独白或旁白，如（心想：…）、（内心：…）、（其实…）、（他觉得…）、（分析：…）等；气泡里只写角色真正说出口的话和必要的动作/神态描写。\n';
 
         prompt += '\n【特殊消息格式 - 独占一行】\n';
         prompt += '- [reply:引用内容] 例如 [reply:今天天气不错]（选择性引用对方原话）\n';
@@ -594,6 +606,7 @@
         prompt += '- [gift:礼物名称] 例如 [gift:小熊玩偶]\n';
         prompt += '- [voice:秒数|内容] 例如 [voice:8|路上小心]（发语音气泡，内容就是你要说的那句话）\n';
         prompt += '- [call:来电]（给对方打电话，接通后即语音通话）\n';
+        prompt += '- [call:视频]（给对方打视频电话）\n';
         prompt += '- [image:图片描述] 例如 [image:一张夕阳]\n';
         const __emojiNames = getEmojiNamesForPrompt();
         if (__emojiNames.length) {
@@ -608,9 +621,25 @@
         prompt += '- [亲属卡:调额|额度] 你主动调整给对方用的亲属卡额度，例如 [亲属卡:调额|3000]；偶尔、关系自然时用。\n';
         prompt += '- [外卖:食品|店铺|价格|备注] 你给对方点一份外卖，例如 [外卖:麻辣烫|杨国福|28|多加辣]；有对方点给你、待你确认的外卖时，用 [外卖:确认] 收下（外卖无法退还）。\n';
         prompt += '- [定位:地点] 把你当前的位置发给对方，例如 [定位:长沙·五一广场]。\n';
+        prompt += '- [头像:用户照片] 把对方最近发来的照片设成你自己的头像（会裁成方形）；想只取一部分可以写 [头像:用户照片|上方]（可填 上方/下方/左半/右半/中心），也可以写 [头像:我的头像] 用对方当前头像。只在氛围合适、你真想换头像时才偶尔用。\n';
+        prompt += '- [情侣头像:用户照片] 把对方发来的照片裁成一对情侣头像，你们各用一半（默认左右各半，你取左半）；可写 [情侣头像:用户照片|上下] 改成上下切，或在末尾写 左/右/上/下 指定你取哪半。仅关系亲密、你也愿意时偶尔用。\n';
         prompt += '用户可能会用你的亲属卡（亲密付）消费，系统会给你一条提示；你可以偶尔自然地提一句（比如"你刚是不是刷了我的卡"），但不要每一笔都追问或计较。\n';
+        // 线上动描：开启后在气泡之间穿插动作描写
+        if (getChatSetting('actionNarration', false)) {
+            prompt += '\n【线上动描 · 开启】\n';
+            prompt += '开启后**每一轮都必须**在气泡之间穿插动作/神态描写，可以一条或多条，随气泡出现；单独一行输出 [act:描写内容]，例如 [act:歪头看你一眼]。每条 15~20 字，自然、贴合当下、不油腻、不重复；不要写成大段旁白。\n';
+        }
+
         prompt += '\n【语音气泡 · 常用】\n';
-        prompt += '你习惯用语音消息说话，不要只发文字：平均每 1~2 轮至少发一条 [voice:秒数|内容]（内容就是那句话本身）。撒娇、认真、安慰、道晚安、情绪浓的时候优先发语音。\n';
+        // 语音气泡频率：high=每轮2条以上；medium=每轮约1条；low=约2轮1条
+        const __vFreq = getChatSetting('voiceFreq', 'medium');
+        if (__vFreq === 'high') {
+            prompt += '你很爱用语音说话，不要只发文字：**每一轮至少发 2 条以上** [voice:秒数|内容]（内容就是那句话本身）。撒娇、认真、安慰、道晚安、情绪浓的时候优先发语音。\n';
+        } else if (__vFreq === 'low') {
+            prompt += '你偶尔用语音说话：**大约每 2 轮发 1 条** [voice:秒数|内容]（内容就是那句话本身）。撒娇、认真、安慰、道晚安、情绪浓的时候优先发语音。\n';
+        } else {
+            prompt += '你习惯用语音消息说话，不要只发文字：**平均每轮 1 条** [voice:秒数|内容]（内容就是那句话本身）。撒娇、认真、安慰、道晚安、情绪浓的时候优先发语音。\n';
+        }
         if (__emojiNames.length) {
             prompt += '\n【表情包 · 按意思主动发】\n';
             prompt += '你会在合适的时候主动发用户表情包里的表情：[emoji:名称]（独占一行），平均每 2~3 轮至少发一次。看懂当前这句话的意思和情绪，从列表里挑最贴切的一个（开心、无语、委屈、调侃、害羞、生气、赞同等）；不要连着几轮都不发，也不要同一轮发好几张。\n';
@@ -761,8 +790,10 @@
                 if (m.isVoice) voiceRecent++;
                 if (m.imageData && m.imageData.emojiName) emojiRecent++;
             }
-            if (leftSeen > 0 && voiceRecent === 0) {
-                prompt += '\n【本轮要求】最近几轮你都没发语音了，这一轮至少发一条 [voice:秒数|内容]，内容就是你想说的那句话。\n';
+            const __vFreq2 = getChatSetting('voiceFreq', 'medium');
+            const voiceTarget = __vFreq2 === 'high' ? 2 : 1;
+            if (leftSeen > 0 && voiceRecent < voiceTarget) {
+                prompt += '\n【本轮要求】按你的语音频率，这一轮至少发 ' + voiceTarget + ' 条 [voice:秒数|内容]，内容就是你想说的那句话。\n';
             }
             if (leftSeen > 0 && __emojiNames.length && emojiRecent === 0) {
                 prompt += '\n【本轮要求】最近几轮你都没发表情包了，这一轮看懂对方那句话的情绪，从表情列表里挑一个最贴切的发 [emoji:名称]。\n';
@@ -963,6 +994,10 @@
                             distance: msg.cardData.distance,
                             eta: msg.cardData.eta,
                             paidBy: msg.cardData.paidBy,
+                            action: msg.cardData.action,
+                            altName: msg.cardData.altName,
+                            altSetting: msg.cardData.altSetting,
+                            altFirst: msg.cardData.altFirst,
                             title: msg.cardData.title,
                             sub: msg.cardData.sub,
                             footer: msg.cardData.footer,
@@ -1005,7 +1040,7 @@
                             isImage: msg.isImage || false,
                             isCard: msg.isCard || false,
                             isVoice: msg.isVoice || false,
-                            cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, issuer: msg.cardData.issuer, holder: msg.cardData.holder, familyId: msg.cardData.familyId, limit: msg.cardData.limit, food: msg.cardData.food, shop: msg.cardData.shop, price: msg.cardData.price, note: msg.cardData.note, place: msg.cardData.place, lat: msg.cardData.lat, lng: msg.cardData.lng, distance: msg.cardData.distance, eta: msg.cardData.eta, paidBy: msg.cardData.paidBy, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, video: msg.cardData.video, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
+                            cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, issuer: msg.cardData.issuer, holder: msg.cardData.holder, familyId: msg.cardData.familyId, limit: msg.cardData.limit, food: msg.cardData.food, shop: msg.cardData.shop, price: msg.cardData.price, note: msg.cardData.note, place: msg.cardData.place, lat: msg.cardData.lat, lng: msg.cardData.lng, distance: msg.cardData.distance, eta: msg.cardData.eta, paidBy: msg.cardData.paidBy, action: msg.cardData.action, altName: msg.cardData.altName, altSetting: msg.cardData.altSetting, altFirst: msg.cardData.altFirst, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, video: msg.cardData.video, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
                             think: msg.think || null,
                             heart: msg.heart || null,
                             recalled: msg.recalled || false,
@@ -1729,6 +1764,17 @@
             const distText = dist > 0 ? ('距你 ' + (dist >= 1000 ? (dist / 1000).toFixed(1) + ' 公里' : dist + ' 米')) : '共享位置';
             return '<div class="loc-bubble-head"><div class="loc-bubble-place">' + place + '</div><div class="loc-bubble-dist">' + distText + '</div></div>' +
                 '<div class="loc-bubble-map"><div class="loc-map-grid"></div><div class="loc-map-road loc-map-road-a"></div><div class="loc-map-road loc-map-road-b"></div><div class="loc-map-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg></div></div>';
+       } else if (cardData.cardType === 'addfriend') {
+            const st = cardData.status || 'pending';
+            const name = String(cardData.altName || '小号').replace(/[<>&"]/g, '');
+            const setting = String(cardData.altSetting || '').replace(/[<>&"]/g, '');
+            const first = String(cardData.altFirst || '').replace(/[<>&"]/g, '');
+            const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>';
+            let footer;
+            if (st === 'accepted') footer = '<span class="card-footer-text">已添加好友</span>';
+            else if (st === 'rejected') footer = '<span class="card-footer-text">已拒绝</span>';
+            else footer = '<span class="card-footer-text">想加你为好友</span><span class="card-actions"><button class="card-btn" data-act="altfriend-accept">接受</button><button class="card-btn return-btn" data-act="altfriend-reject">拒绝</button></span>';
+            return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + name + '</div><div class="card-sub">' + (setting || '陌生人') + '</div></div></div>' + (first ? '<div class="card-note">' + first + '</div>' : '') + '<div class="card-footer">' + footer + '</div>';
        } else if (cardData.cardType === 'invite') {
             const st = cardData.status || 'pending';
             const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>';
@@ -1877,6 +1923,7 @@
         if (isCard && cardData && cardData.centered) row.classList.add('centered');
         // 系统提示（一起听等）：居中灰框，不带气泡
         if (cardData && cardData.systemNotice) row.classList.add('centered', 'sys-notice');
+        if (cardData && cardData.action) row.classList.add('action-note');
 
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
@@ -2124,7 +2171,7 @@
         const results = [];
         let cleaned = text;
 
-        const tagRegex = /\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|emoji|sticker|表情包|表情)\s*:\s*([^\]]*?)(?:\]|$)/gi;
+        const tagRegex = /\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情)\s*:\s*([^\]]*?)(?:\]|$)/gi;
         let match;
         while ((match = tagRegex.exec(text)) !== null) {
             const kind = match[1].toLowerCase();
@@ -2164,12 +2211,16 @@
                 if (payload) results.push({ kind: 'takeout', payload: payload });
             } else if (kind === 'location' || kind === '定位') {
                 if (payload) results.push({ kind: 'location', payload: payload });
+            } else if (kind === 'act' || kind === '动描') {
+                if (payload) results.push({ kind: 'act', payload: payload });
+            } else if (kind === 'altprobe' || kind === '小号') {
+                if (payload) results.push({ kind: 'altprobe', payload: payload });
             } else if (kind === 'emoji' || kind === 'sticker' || kind === '表情包' || kind === '表情') {
                 if (payload) results.push({ kind: 'emoji', payload: payload });
             }
         }
 
-        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|emoji|sticker|表情包|表情)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
+        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
 
         return { tags: results, cleanedText: cleaned };
     }
@@ -2276,7 +2327,8 @@
         try {
             if (isImage && type === 'right' && imageData && imageData.url) window.__nanoLastImage = imageData.url;
         } catch (e) {}
-        const grouped = !recalled && messages.length > 0 && messages[messages.length - 1].type === type;
+        // 卡片消息永不合并：连续两次通话/转账/外卖等要各自成卡，不能被“同侧合并”吃掉
+        const grouped = !isCard && !recalled && messages.length > 0 && messages[messages.length - 1].type === type;
         const row = createMessageRow(type, text, time, status, null, recalled, isCard, cardData, transcript, translation, quote, isVoice, voiceData, isImage, imageData, grouped);
         // 角色发来的语音：若配置了 TTS，就自动合成播放（点击气泡可重播）
         if (isVoice && type === 'left' && !recalled && window.NanoTTS) {
@@ -2857,6 +2909,278 @@
         });
         try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
     }
+    // 线上动描：居中、小号粗体、约 20 字换行（样式同系统提示框）
+    function addActionNarration(text, timeStr) {
+        const t = String(text || '').trim();
+        if (!t) return;
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        messages.push({
+            id: 'act_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+            type: 'left', text: t, time: timeStr || (h + ':' + m), status: null, recalled: false,
+            isCard: false, cardData: { systemNotice: true, action: true },
+            isVoice: false, voiceData: null, isImage: false, imageData: null,
+            quote: null, transcript: null, translation: null, favorite: false, turn: currentTurn
+        });
+        try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
+    }
+
+    // ===== 头像 / 情侣头像（角色可把用户发的照片设成聊天头像，或裁成一对情侣头像）=====
+    // 只在聊天内生效：角色头像写角色库 + 本地覆盖；用户头像只写本聊天的覆盖，不改用户人设。
+    function getLastUserImage() {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (!m || m.recalled) continue;
+            if (m.type === 'right' && m.isImage && m.imageData && m.imageData.url) return m.imageData.url;
+        }
+        return '';
+    }
+    function loadImageEl(src) {
+        return new Promise(function (resolve, reject) {
+            try {
+                const img = new Image();
+                img.onload = function () { resolve(img); };
+                img.onerror = function () { reject(new Error('图片加载失败')); };
+                img.src = src;
+            } catch (e) { reject(e); }
+        });
+    }
+    // 区域：全图 / 上方 / 下方 / 左半 / 右半 / 中心；裁成正方形（圆形头像用）
+    function cropImageToRegion(src, region) {
+        return loadImageEl(src).then(function (img) {
+            const w = img.naturalWidth || img.width || 1;
+            const h = img.naturalHeight || img.height || 1;
+            let sx = 0, sy = 0, sw = w, sh = h;
+            const r = String(region || '').replace(/[\s|｜]/g, '');
+            if (r.indexOf('上') > -1) { sh = Math.round(h / 2); sy = 0; }
+            else if (r.indexOf('下') > -1) { sh = Math.round(h / 2); sy = h - sh; }
+            else if (r.indexOf('左') > -1) { sw = Math.round(w / 2); sx = 0; }
+            else if (r.indexOf('右') > -1) { sw = Math.round(w / 2); sx = w - sw; }
+            else if (r.indexOf('中') > -1) { sw = Math.round(w * 0.5); sh = Math.round(h * 0.5); sx = Math.round((w - sw) / 2); sy = Math.round((h - sh) / 2); }
+            const side = Math.max(1, Math.min(sw, sh));
+            const cx = Math.round(sx + (sw - side) / 2), cy = Math.round(sy + (sh - side) / 2);
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = side; canvas.height = side;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, cx, cy, side, side, 0, 0, side, side);
+                return canvas.toDataURL('image/jpeg', 0.9);
+            } catch (e) { return src; }
+        });
+    }
+    function saveCharAvatarToDB(id, url) {
+        return new Promise(function (resolve) {
+            try {
+                const req = indexedDB.open('nano_characters_db', 1);
+                req.onupgradeneeded = function (e) {
+                    try { const d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {}
+                };
+                req.onsuccess = function () {
+                    try {
+                        const db = req.result;
+                        const tx = db.transaction('characters', 'readwrite');
+                        const store = tx.objectStore('characters');
+                        const g = store.get(id);
+                        g.onsuccess = function () {
+                            const rec = g.result;
+                            if (rec) { rec.avatar = url; store.put(rec); }
+                        };
+                        tx.oncomplete = function () { db.close(); resolve(true); };
+                        tx.onerror = function () { db.close(); resolve(false); };
+                    } catch (e) { resolve(false); }
+                };
+                req.onerror = function () { resolve(false); };
+            } catch (e) { resolve(false); }
+        });
+    }
+    function applyCharAvatar(url) {
+        if (!url) return;
+        avatarSrc = url;
+        if (characterData) characterData.avatar = url;
+        try {
+            if (avatarImage && url) {
+                avatarImage.src = url;
+                avatarImage.style.display = 'block';
+                if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
+            }
+        } catch (e) {}
+        // 写回角色库（和头像设置同一份数据，角色页/其他聊天也会看到新头像）
+        try { saveCharAvatarToDB((characterData && characterData.id) || chatId, url); } catch (e) {}
+        try { renderMessages(); } catch (e) {}
+    }
+    function applyUserAvatar(url) {
+        if (!url) return;
+        currentUserAvatar = url;
+        try { localStorage.setItem('chat_setting_userAvatar_' + chatId, url); } catch (e) {}
+        try { renderMessages(); } catch (e) {}
+    }
+    // 图片来源：默认用户最近发来的照片；写了「我的头像」则用对方（用户）当前头像
+    function pickAvatarSource(raw) {
+        const kw = String(raw || '');
+        if (/我的头像|对方头像|现有头像/.test(kw)) return currentUserAvatar || getLastUserImage();
+        return getLastUserImage() || currentUserAvatar;
+    }
+    function runSingleAvatar(raw) {
+        const src = pickAvatarSource(raw);
+        if (!src) return;
+        const parts = String(raw || '').split(/[|｜]/);
+        let region = (parts[1] || '').trim();
+        if (!region) {
+            const rm = String(raw || '').match(/上方|下方|左半|右半|中心/);
+            region = rm ? rm[0] : '全图';
+        }
+        cropImageToRegion(src, region).then(function (url) { applyCharAvatar(url || src); })
+            .catch(function () { applyCharAvatar(src); });
+    }
+    function runCoupleAvatar(raw) {
+        const src = pickAvatarSource(raw);
+        if (!src) return;
+        let charHalf = '';
+        const mm = String(raw || '').replace(/上下|左右/g, '').match(/(左|右|上|下)/);
+        if (mm) charHalf = mm[1];
+        const vertical = /上下/.test(String(raw || '')) || charHalf === '上' || charHalf === '下';
+        const firstHalf = vertical ? '上' : '左';
+        const secondHalf = vertical ? '下' : '右';
+        const charRegion = charHalf || firstHalf;
+        const userRegion = (charRegion === firstHalf) ? secondHalf : firstHalf;
+        Promise.all([cropImageToRegion(src, charRegion), cropImageToRegion(src, userRegion)]).then(function (res) {
+            if (res[0]) applyCharAvatar(res[0]);
+            if (res[1]) applyUserAvatar(res[1]);
+        }).catch(function () {});
+    }
+    function settleAvatarFromReplyText(rawText) {
+        return String(rawText || '').replace(/\[(情侣头像|情倡头像|头像)\s*:\s*([^\]]*?)(?:\]|$)/gi, function (_, kind, payload) {
+            try {
+                if (/情侣|情倡/.test(kind)) runCoupleAvatar(payload);
+                else runSingleAvatar(payload);
+            } catch (e) {}
+            return '';
+        });
+    }
+
+    // ===== 小号试探（角色开小号加用户）=====
+    function handleAltProbeTag(payload, timeStr) {
+        const parts = String(payload || '').split(/[|｜]/);
+        const name = (parts[0] || '').trim();
+        if (!name) return;
+        const bio = (parts[1] || '').trim();
+        const first = (parts[2] || '').trim();
+        const alt = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: name, bio: bio, first: first };
+        // 存进 IndexedDB（刷新不丢），并让外层弹出居中弹窗（不在聊天内显示卡片，避免暴露是谁）
+        altProbeStore(alt).then(function () {
+            try { window.parent.postMessage({ type: 'NANO_ALT_PROBE', alt: alt }, '*'); } catch (e) {}
+        });
+    }
+    // 小号试探：待处理记录存 IndexedDB nano_alt_probe_db / pending
+    function altProbeStore(alt) {
+        return new Promise(function (resolve) {
+            try {
+                var req = indexedDB.open('nano_alt_probe_db', 1);
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('pending')) d.createObjectStore('pending', { keyPath: 'key' }); } catch (err) {} };
+                req.onsuccess = function () {
+                    try {
+                        var tx = req.result.transaction('pending', 'readwrite');
+                        tx.objectStore('pending').put({ key: 'current', value: alt, time: Date.now() });
+                        tx.oncomplete = function () { resolve(true); };
+                        tx.onerror = function () { resolve(false); };
+                    } catch (e) { resolve(false); }
+                };
+                req.onerror = function () { resolve(false); };
+            } catch (e) { resolve(false); }
+        });
+    }
+    function createAltCharacter(name, setting) {
+        return new Promise(function (resolve) {
+            try {
+                var req = indexedDB.open('nano_characters_db', 1);
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {} };
+                req.onsuccess = function () {
+                    try {
+                        var db = req.result;
+                        var rec = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: name, avatar: '', gender: '', nationality: '', setting: setting || '' };
+                        var tx = db.transaction('characters', 'readwrite');
+                        tx.objectStore('characters').put(rec);
+                        tx.oncomplete = function () { resolve(rec); };
+                        tx.onerror = function () { resolve(rec); };
+                    } catch (e) { resolve(null); }
+                };
+                req.onerror = function () { resolve(null); };
+            } catch (e) { resolve(null); }
+        });
+    }
+    function acceptAltFriend(msg) {
+        if (!msg || !msg.cardData) return;
+        const cd = msg.cardData;
+        cd.status = 'accepted';
+        createAltCharacter(cd.altName || '小号', cd.altSetting || '').then(function (rec) {
+            addSystemNotice('你接受了「' + (cd.altName || '小号') + '」的好友申请，已加入聊天列表');
+            try { window.parent.postMessage({ type: 'NANO_FRIEND_ADDED', chatId: rec && rec.id, name: cd.altName }, '*'); } catch (e) {}
+            renderMessages();
+            saveMessages();
+        });
+    }
+    function rejectAltFriend(msg) {
+        if (!msg || !msg.cardData) return;
+        msg.cardData.status = 'rejected';
+        addSystemNotice('你拒绝了「' + (msg.cardData.altName || '小号') + '」的好友申请');
+        renderMessages();
+        saveMessages();
+    }
+
+    // ===== 小号试探：随机独立调用一次 API 生成（不跟随刷新/回复）=====
+    var __altTimer = null;
+    function altProbeLastKey() { return 'alt_probe_last_' + chatId; }
+    function startAltProbeScheduler() {
+        if (__altTimer) return;
+        __altTimer = setInterval(__altProbeTick, 45000);
+        setTimeout(__altProbeTick, 15000 + Math.random() * 20000);
+    }
+    function __altProbeTick() {
+        try {
+            if (!getChatSetting('altProbe', false)) return;
+            if (window.__altProbePending) return;
+            var last = parseInt(localStorage.getItem(altProbeLastKey()) || '0', 10) || 0;
+            if (Date.now() - last < 7 * 24 * 3600 * 1000) return; // 同一角色一周内只小号试探一次
+            if (Math.random() > 0.12) return;               // 每次检查低概率触发
+            __altProbeGenerate();
+        } catch (e) {}
+    }
+    function __altProbeGenerate() {
+        window.__altProbePending = true;
+        getApiConfig().then(function (cfg) {
+            if (!cfg || !cfg.mainUrl || !cfg.mainKey || !cfg.mainModel) { window.__altProbePending = null; return; }
+            var base = cfg.mainUrl.trim();
+            if (!base.endsWith('/v1')) base = base.endsWith('/') ? base + 'v1' : base + '/v1';
+            var sys = '你是「' + (displayName || characterData && characterData.name || '角色') + '」。你本人想注册一个小号去接近/试探用户，用户不会知道这个小号是你。'
+                + '请凭空捏造一个和你本人不同的网名和一句简短简介，不要暴露你是谁、不要提到你本人。只输出 JSON：{"name":"网名","bio":"一句简介"}。';
+            return fetch(base + '/chat/completions', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + String(cfg.mainKey).trim(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: cfg.mainModel, messages: [{ role: 'system', content: sys }, { role: 'user', content: '（生成一个小号）' }], max_tokens: 120, temperature: 1.0 })
+            }).then(function (r) { return r.json(); }).then(function (d) {
+                var t = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
+                var m = t.match(/\{[\s\S]*\}/);
+                var obj = null;
+                try { obj = m ? JSON.parse(m[0]) : null; } catch (e) {}
+                window.__altProbePending = null;
+                if (!obj || !obj.name) return;
+                var alt = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: String(obj.name).slice(0, 20), bio: String(obj.bio || '').slice(0, 60) };
+                localStorage.setItem(altProbeLastKey(), String(Date.now()));
+                window.__altProbePending = alt;
+                return altProbeStore(alt).then(function () {
+                    try { window.parent.postMessage({ type: 'NANO_ALT_PROBE', alt: alt }, '*'); } catch (e) {}
+                });
+            });
+        }).catch(function () { window.__altProbePending = null; });
+    }
+    // 弹窗处理完后解锁，允许下次再随机生成
+    window.addEventListener('message', function (ev) {
+        var d = ev.data;
+        if (d && d.type === 'NANO_ALT_PROBE_DONE') { window.__altProbePending = null; }
+    });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startAltProbeScheduler);
+    else startAltProbeScheduler();
     function notifyListenAccepted(msg) {
         if (window.parent === window) return;
         try {
@@ -3120,18 +3444,21 @@
         return '';
     }
 
+    // 主动发消息：随机间隔（设定的 50%~150%），到点就调一次 API 主动发一条
     function setAutoMsgState(enabled, intervalMinutes) {
-        if (autoMsgTimer) {
-            clearInterval(autoMsgTimer);
-            autoMsgTimer = null;
-        }
-        updateAutoStatus('msg', enabled, parseInt(intervalMinutes, 10) || 8);
+        if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
+        window.__autoMsgEnabled = !!enabled;
+        window.__autoMsgMins = Math.max(1, parseInt(intervalMinutes, 10) || 8);
+        updateAutoStatus('msg', enabled, window.__autoMsgMins);
         if (!enabled) return;
-        const mins = Math.max(1, parseInt(intervalMinutes, 10) || 8);
-        autoMsgTimer = setInterval(function() {
-            updateAutoStatus('msg', true, mins);
-            if (isProcessingApi || isWaitingForReply) return;
-            // 后台（页面隐藏/切走）也照样生成并推送，不再跳过
+        scheduleNextAutoMsg();
+    }
+    function scheduleNextAutoMsg() {
+        if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
+        if (!window.__autoMsgEnabled) return;
+        const base = window.__autoMsgMins || 8;
+        const ms = Math.max(30 * 1000, Math.round(base * (0.5 + Math.random()) * 60 * 1000));
+        autoMsgTimer = setTimeout(function() {
             (async function() {
                 if (isProcessingApi || isWaitingForReply) return;
                 isProcessingApi = true;
@@ -3144,7 +3471,8 @@
                 } catch (e) {
                 } finally { isProcessingApi = false; }
             })();
-        }, mins * 60 * 1000);
+            scheduleNextAutoMsg();
+        }, ms);
     }
 
     // ===== 主动发朋友圈：按设定间隔自动调用 API 生成并写入朋友圈 =====
@@ -3260,14 +3588,94 @@
             try {
                 if (window.NanoNotify) window.NanoNotify.notify(displayName || '朋友圈', (displayName || '') + ' 发了条朋友圈：' + String(post.text).slice(0, 50), { target: 'moments', channel: 'moment' });
             } catch (e) {}
+            // 应用内淡粉色通知栏
+            try { if (window.parent !== window) window.parent.postMessage({ type: 'NANO_GEN_NOTIFY', title: '朋友圈已更新', body: (displayName || '') + '：' + String(post.text).slice(0, 40) }, '*'); } catch (e) {}
         } finally { isProcessingApi = false; }
     }
-    function setAutoMomentState(enabled, intervalMinutes) {
-        if (autoMomentTimer) { clearInterval(autoMomentTimer); autoMomentTimer = null; }
-        updateAutoStatus('moment', enabled, parseInt(intervalMinutes, 10) || 12);
+    // 随机自动发「照片」动态（社交活跃度开启时可能与朋友圈交替出现）
+    async function postAutoPhoto() {
+        if (isProcessingApi) return;
+        isProcessingApi = true;
+        try {
+            const obj = await generateAutoMoment();
+            if (!obj) return;
+            const cap = String(obj.text || '').slice(0, 200);
+            const prompt = String(obj.imagePrompt || obj.text || '随手拍').slice(0, 100);
+            const post = {
+                id: 'photo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+                author: displayName || chatName || '角色',
+                avatar: avatarSrc || '',
+                text: cap,
+                images: [],
+                time: new Date().toISOString(),
+                location: obj.location || '',
+                likes: [],
+                comments: [],
+                isPhoto: true
+            };
+            const allowMomentImage = getChatSetting('allowMomentImage', false);
+            if (allowMomentImage) {
+                try {
+                    const url = await generateImage(buildImagePrompt(prompt));
+                    if (url) { post.images = [url]; post.genPrompt = prompt; }
+                } catch (e) {}
+            }
+            if (!post.images || !post.images.length) post.imageText = prompt;
+            post.maskId = getCurrentMaskId();
+            await saveMomentPost(post);
+            try { if (window.parent !== window) window.parent.postMessage({ type: 'momentsDataUpdated' }, '*'); } catch (e) {}
+            try { if (window.parent !== window) window.parent.postMessage({ type: 'NANO_GEN_NOTIFY', title: '新照片', body: (displayName || '') + '：' + cap.slice(0, 40) }, '*'); } catch (e) {}
+        } finally { isProcessingApi = false; }
+    }
+
+    // 随机主动生成一张照片直接发给用户（生图；没有生图能力就不发）
+    async function postAutoImage() {
+        if (isProcessingApi) return;
+        isProcessingApi = true;
+        try {
+            const obj = await generateAutoMoment();
+            const prompt = String((obj && (obj.imagePrompt || obj.text)) || '随手拍').slice(0, 100);
+            let url = '';
+            if (getChatSetting('allowMomentImage', false)) {
+                try { url = await generateImage(buildImagePrompt(prompt)); } catch (e) {}
+            }
+            if (!url) return;
+            addMessage('left', '', nowHHMM(), null, false, false, null, null, null, null, false, null, true, { url: url, desc: prompt });
+            saveMessages();
+            try { notifyCharMessage('[照片] ' + prompt.slice(0, 40)); } catch (e) {}
+            try { if (window.parent !== window) window.parent.postMessage({ type: 'NANO_GEN_NOTIFY', title: '收到新照片', body: (displayName || '') + ' 发来一张照片' }, '*'); } catch (e) {}
+        } finally { isProcessingApi = false; }
+    }
+
+    // 随机自动发朋友圈：按小时设置，实际间隔取该值的 50%~150%（更有活人感）
+    function setAutoMomentState(enabled, intervalHours) {
+        if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
+        window.__autoMomentEnabled = !!enabled;
+        window.__autoMomentHours = Math.max(0.5, parseFloat(intervalHours) || 12);
+        updateAutoStatus('moment', enabled, Math.round(window.__autoMomentHours * 60));
         if (!enabled) return;
-        const mins = Math.max(1, parseInt(intervalMinutes, 10) || 12);
-        autoMomentTimer = setInterval(function() { updateAutoStatus('moment', true, mins); postAutoMoment(); }, mins * 60 * 1000);
+        scheduleNextAutoMoment();
+    }
+    function scheduleNextAutoMoment() {
+        if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
+        if (!window.__autoMomentEnabled) return;
+        const baseH = window.__autoMomentHours || 12;
+        const randH = baseH * (0.5 + Math.random());          // 0.5x ~ 1.5x
+        const ms = Math.max(5 * 60 * 1000, Math.round(randH * 3600 * 1000));
+        autoMomentTimer = setTimeout(function () {
+            try {
+                // 社交活跃度开启时，随机：朋友圈动态 / 朋友圈照片 / 直接发照片给用户
+                if (getChatSetting('autoSocial', false)) {
+                    const r = Math.random();
+                    if (r < 0.34) postAutoMoment();
+                    else if (r < 0.67) postAutoPhoto();
+                    else postAutoImage();
+                } else {
+                    postAutoMoment();
+                }
+            } catch (e) {}
+            scheduleNextAutoMoment();
+        }, ms);
     }
 
     // ===== 发送语音气泡弹窗 =====
@@ -3622,8 +4030,9 @@
     }
 
     // ===== AI 主动来电（点击回复后由 AI 根据对话内容通过 [call:] 触发）=====
-    function triggerIncomingCall(scenario) {
-        const url = 'voice-call.html?chat=' + encodeURIComponent(chatId) +
+    function triggerIncomingCall(scenario, video) {
+        const page = video ? 'video-call.html' : 'voice-call.html';
+        const url = page + '?chat=' + encodeURIComponent(chatId) +
                     '&name=' + encodeURIComponent(displayName) +
                     '&incoming=1';
         if (window.parent !== window) {
@@ -3631,13 +4040,14 @@
                 type: 'aiProactiveVoiceCall',
                 chatId: chatId,
                 name: displayName,
-                scenario: scenario || '通话'
+                scenario: scenario || '通话',
+                video: !!video
             }, '*');
         } else {
             // iframe 环境兜底：直接打开来电页面
             try { window.open(url, '_blank'); } catch (e) {}
         }
-        console.log('[Chat] 触发 AI 主动来电，场景', scenario || '通话');
+        console.log('[Chat] 触发 AI 主动来电，场景', scenario || '通话', video ? '(视频)' : '');
     }
 
     // ===== 把消息转成 AI 能理解的文字 =====
@@ -3674,7 +4084,9 @@
                 if (status === 'returned') return who + (m.type === 'right' ? '送出的礼物已被退还' : '收到的礼物已退还') + '：' + name;
                 return who + (m.type === 'right' ? '赠送了礼物' : '送了礼物') + '：' + name;
             } else if (cd.cardType === 'call') {
-                return who + (cd.missed ? ' 的语音电话未接听' : ' 进行了一次语音通话');
+                const kind = cd.video ? '视频通话' : '语音通话';
+                if (cd.missed) return who + ' 的' + kind + '未被接听';
+                return who + ' 和对方已经进行过一次' + kind + '（已接通，时长 ' + (cd.duration || '00:00') + '）';
             } else if (cd.cardType === 'invite') {
                 const st = status === 'accepted' ? '（已同意）' : (status === 'rejected' ? '（已拒绝）' : '（待处理）');
                 const dir = cd.direction === 'user' ? '用户邀请你加入群聊' : ((cd.fromName || '角色') + '邀请用户加入群聊');
@@ -3704,6 +4116,9 @@
                 return '用户点了外卖（请你决定是否接单）：' + info + st;
             } else if (cd.cardType === 'location') {
                 return who + '分享了一个位置：' + (cd.place || '') + (cd.distance > 0 ? ('，距你' + cd.distance + '米') : '') + (cd.lat != null && cd.lng != null ? ('（' + Number(cd.lat).toFixed(4) + ', ' + Number(cd.lng).toFixed(4) + '）') : '');
+            } else if (cd.cardType === 'addfriend') {
+                const st = status === 'accepted' ? '（用户已接受，已成为好友）' : (status === 'rejected' ? '（用户已拒绝）' : '（待用户处理）');
+                return '你开的一个小号「' + (cd.altName || '小号') + '」向用户发起了加好友申请' + st + '（这是一张卡片消息，不是空白）。';
             }
             return '';
         }
@@ -4729,6 +5144,9 @@
         // AI 对「一起听邀请」表态（[一起听]/[不听]），或主动邀请用户（[邀请一起听]）
         const listenSettle = settleListenFromReplyText(replyBody);
         replyBody = listenSettle.body;
+
+        // 头像 / 情侣头像：角色把用户发来的照片设成自己的头像，或裁成一对情侣头像
+        replyBody = settleAvatarFromReplyText(replyBody);
         // 主回复没表态 → 兜底单独问一次，保证邀请卡片一定会变成接受/婉拒
         if (!listenSettle.settled && getPendingListenUserCards().length > 0) {
             decideListenInviteFallback();
@@ -4778,7 +5196,7 @@
                     } else if (tag.kind === 'gift') {
                         addMessage('left', '', timeStr, null, false, true, { cardType: 'gift', title: '送出礼物', sub: tag.payload || '一份心意', footer: '点击领取' });
                     } else if (tag.kind === 'call') {
-                        triggerIncomingCall('通话');
+                        triggerIncomingCall('通话', /视频/.test(String(tag.payload || '')));
                     } else if (tag.kind === 'creategroup') {
                         try { createGroupFromTag(tag.payload); } catch (e) {}
                     } else if (tag.kind === 'inviteme') {
@@ -4789,6 +5207,10 @@
                         handleTakeoutTag(tag.payload, timeStr);
                     } else if (tag.kind === 'location') {
                         handleLocationTag(tag.payload, timeStr);
+                    } else if (tag.kind === 'act') {
+                        addActionNarration(tag.payload, timeStr);
+                    } else if (tag.kind === 'altprobe') {
+                        handleAltProbeTag(tag.payload, timeStr);
                     }
                 }
                 const text = parsed.cleanedText || '';
@@ -4883,6 +5305,10 @@
                             handleTakeoutTag(tag.payload, timeStr);
                         } else if (tag.kind === 'location') {
                             handleLocationTag(tag.payload, timeStr);
+                        } else if (tag.kind === 'act') {
+                            addActionNarration(tag.payload, timeStr);
+                        } else if (tag.kind === 'altprobe') {
+                            handleAltProbeTag(tag.payload, timeStr);
                         } else if (tag.kind === 'acceptinvite') {
                             acceptUserInvite(tag.payload);
                         } else if (tag.kind === 'rejectinvite') {
@@ -5306,7 +5732,7 @@
     });
 
     messageScroll.addEventListener('click', function(e) {
-        const actionBtn = e.target.closest('.card-btn[data-act]');
+        const actionBtn = e.target.closest('.card-btn[data-act], .tk-bubble-btn[data-act]');
         if (actionBtn) {
             const row = actionBtn.closest('.message-row');
             if (!row) return;
@@ -5323,6 +5749,8 @@
             else if (act === 'listen-reject') { setListenStatus(msg, 'rejected'); addSystemNotice('你婉拒了一起听邀请'); }
             else if (act === 'family-accept') acceptFamilyCard(msg);
             else if (act === 'family-reject') rejectFamilyCard(msg);
+            else if (act === 'altfriend-accept') acceptAltFriend(msg);
+            else if (act === 'altfriend-reject') rejectAltFriend(msg);
             else if (act === 'takeout-accept') acceptTakeout(msg);
             else if (act === 'takeout-reject') rejectTakeout(msg);
             return;
@@ -6027,11 +6455,22 @@ if (callCard) {
                 setAutoMsgState(getChatSetting('autoMsg', false), data.interval);
             }
         } else if (data.type === 'autoMomentChanged') {
-            setAutoMomentState(!!data.enabled, data.interval);
+            setAutoMomentState(!!data.enabled || getChatSetting('autoSocial', false), data.interval);
+        } else if (data.type === 'autoSocialChanged') {
+            setAutoMomentState(getChatSetting('autoMoment', false) || !!data.enabled, data.interval || getChatSetting('autoMomentInterval', 12));
         } else if (data.type === 'autoMomentIntervalChanged') {
-            if (autoMomentTimer) setAutoMomentState(getChatSetting('autoMoment', false), data.interval);
+            if (autoMomentTimer || getChatSetting('autoSocial', false)) setAutoMomentState(getChatSetting('autoMoment', false) || getChatSetting('autoSocial', false), data.interval);
         } else if (data.type === 'timeAwareChanged' || data.type === 'allowImageChanged' || data.type === 'allowMomentImageChanged') {
             // 无需实时处理（构建提示词/生图时读取设置）
+        }
+
+        // 角色接通电话后说的第一句话
+        if (data.type === 'NANO_CALL_REPLY') {
+            if (data.chatId && data.chatId !== chatId) return;
+            const _n = new Date();
+            const _t = String(_n.getHours()).padStart(2, '0') + ':' + String(_n.getMinutes()).padStart(2, '0');
+            addMessage('left', String(data.text || '喂？'), _t, null, false, false);
+            return;
         }
 
         // ===== 接收（语音/视频）通话卡片 =====
@@ -6059,6 +6498,11 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
         missed: data.missed || false,
         video: isVideo
     });
+
+    // 角色拒接时，把他拒接的理由作为一句话发出来
+    if (data.rejectReason && String(data.rejectReason).trim()) {
+        addMessage('left', String(data.rejectReason).trim(), timeStr, null, false, false);
+    }
 
     saveMessages();
     scrollToBottom();
@@ -6148,7 +6592,7 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
             // 启动主动发消息定时（若之前已开启）
             try { setAutoMsgState(getChatSetting('autoMsg', false), getChatSetting('autoMsgInterval', 8)); } catch (e) {}
             // 启动主动发朋友圈定时（若之前已开启）
-            try { setAutoMomentState(getChatSetting('autoMoment', false), getChatSetting('autoMomentInterval', 12)); } catch (e) {}
+            try { setAutoMomentState(getChatSetting('autoMoment', false) || getChatSetting('autoSocial', false), getChatSetting('autoMomentInterval', 12)); } catch (e) {}
             console.log('[Chat] 缓存加载完成，消息数:', messages.length);
             refreshMemoryHints();
             try { if (window.NanoBadge) window.NanoBadge.setContext(chatId); } catch (e) {}

@@ -157,6 +157,10 @@
 
     function enableLocal() {
         setFlag(true);
+        // 关键：运行时才开启保活时，也要挂上「首次触摸解锁音频」的监听。
+        // 之前只有在页面加载时就已经开启才会 bindUnlock，导致后来打开保活的用户
+        // 的 play() 被 iOS 拦截、之后也没有手势来续播，保活实际从未跑起来。
+        bindUnlock();
         play();
         setMediaSession();
         requestWakeLock();

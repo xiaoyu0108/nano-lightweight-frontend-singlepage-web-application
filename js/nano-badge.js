@@ -64,6 +64,15 @@
     }
     function setForeground(on) { ctx.foreground = !!on; if (on) { activity(ctx.chatId); markRead(ctx.chatId); } }
 
+    // 切到后台/锁屏时，立刻把「前台」标记关掉。
+    // 否则 ctx.foreground 一直是 true，后台（保活）生成的角色消息会被当成
+    // 「你正在看这个聊天」而被 incoming() 静默丢弃 —— 这就是切走 App 收不到 Bark 推送的原因。
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', function () {
+            setForeground(!document.hidden);
+        });
+    }
+
     window.addEventListener('message', function (e) {
         var d = e.data;
         if (!d || typeof d !== 'object') return;

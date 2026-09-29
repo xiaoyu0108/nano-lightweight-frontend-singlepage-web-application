@@ -172,17 +172,28 @@
     // ===== Bark：iPhone 系统推送（国内直连，无需梯子/FCM）=====
     // 在「更多 → 其他」或控制台执行 NanoNotify.setBarkKey('你的Bark密钥') 即可开启。
     var BARK_KEY = 'nano_bark_key';
+    // localStorage 写满时密钥可能只写进了 IndexedDB，这里缓存一份，保证 notify() 同步取得到
+    var barkCache = '';
     function barkKey() {
-        try { return (localStorage.getItem(BARK_KEY) || '').trim(); } catch (e) { return ''; }
+        try {
+            var v = (localStorage.getItem(BARK_KEY) || '').trim();
+            return v || barkCache;
+        } catch (e) { return barkCache; }
     }
     function barkKeyAsync() {
-        var local = barkKey();
-        if (local) return Promise.resolve(local);
+        var local = '';
+        try { local = (localStorage.getItem(BARK_KEY) || '').trim(); } catch (e) {}
+        if (local) { barkCache = local; return Promise.resolve(local); }
         if (typeof localforage === 'undefined') return Promise.resolve('');
-        return localforage.getItem(BARK_KEY).then(function (v) { return String(v || '').trim(); }).catch(function () { return ''; });
+        return localforage.getItem(BARK_KEY).then(function (v) {
+            var k = String(v || '').trim();
+            if (k) barkCache = k;
+            return k;
+        }).catch(function () { return ''; });
     }
     function setBarkKey(key) {
         key = String(key || '').trim();
+        barkCache = key;
         var ok = false;
         try { localStorage.setItem(BARK_KEY, key); ok = true; } catch (e) { ok = false; }
         if (typeof localforage !== 'undefined') {
@@ -269,6 +280,11 @@
             }
         } catch (e) {}
     }
+
+    // 启动时把 IndexedDB 里的 Bark 密钥读进缓存（localStorage 写满时的兜底），
+    // 这样后台生成消息时 notify() 也能同步拿到密钥并推送。
+    try { barkKeyAsync(); } catch (e) {}
+    try { window.addEventListener('load', function () { barkKeyAsync(); }); } catch (e) {}
 
     window.NanoNotify = {
         notify: notify,

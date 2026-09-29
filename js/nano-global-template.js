@@ -382,11 +382,11 @@ html, body {
 /* ---------- index 语音悬浮球 ---------- */
 .nano-index .voice-float-ball {
   position: fixed;
-  width: 64px;
-  height: 64px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  background: var(--nano-bg);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--nano-line);
+  background: linear-gradient(145deg, #34c759, #12a150);
+  box-shadow: 0 8px 24px rgba(18, 161, 80, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   cursor: grab;
   z-index: 99999;
   display: none;
@@ -398,11 +398,29 @@ html, body {
   touch-action: none;
   transition: transform 0.15s, box-shadow 0.15s;
 }
+.nano-index .voice-float-ball.is-video {
+  background: linear-gradient(145deg, #5ac8fa, #0a84ff);
+  box-shadow: 0 8px 24px rgba(10, 132, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.nano-index .voice-float-ball::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid rgba(52, 199, 89, 0.5);
+  animation: voiceBallPulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+.nano-index .voice-float-ball.is-video::after { border-color: rgba(10, 132, 255, 0.5); }
+@keyframes voiceBallPulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
 .nano-index .voice-float-ball:active { cursor: grabbing; transform: scale(0.92); }
 .nano-index .voice-float-ball .ball-icon {
   width: 24px;
   height: 24px;
-  stroke: #34c759;
+  stroke: #ffffff;
   stroke-width: 2.5;
   fill: none;
   stroke-linecap: round;
@@ -411,8 +429,8 @@ html, body {
 }
 .nano-index .voice-float-ball .ball-time {
   font-size: 10px;
-  color: var(--nano-text);
-  font-weight: 600;
+  color: #ffffff;
+  font-weight: 700;
   letter-spacing: 0.5px;
   margin-top: 1px;
   pointer-events: none;

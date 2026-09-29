@@ -355,11 +355,11 @@
 
         .voice-float-ball {
             position: absolute;
-            width: 64px;
-            height: 64px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
-            background: #ffffff;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+            background: linear-gradient(145deg, #34c759, #12a150);
+            box-shadow: 0 8px 24px rgba(18, 161, 80, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.4);
             cursor: grab;
             z-index: 99999;
             display: none;
@@ -372,6 +372,26 @@
             transition: transform 0.15s, box-shadow 0.15s;
         }
 
+        .voice-float-ball.is-video {
+            background: linear-gradient(145deg, #5ac8fa, #0a84ff);
+            box-shadow: 0 8px 24px rgba(10, 132, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+
+        .voice-float-ball::after {
+            content: '';
+            position: absolute;
+            inset: -5px;
+            border-radius: 50%;
+            border: 2px solid rgba(52, 199, 89, 0.5);
+            animation: voiceBallPulse 1.8s ease-out infinite;
+            pointer-events: none;
+        }
+        .voice-float-ball.is-video::after { border-color: rgba(10, 132, 255, 0.5); }
+        @keyframes voiceBallPulse {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+
         .voice-float-ball:active {
             cursor: grabbing;
             transform: scale(0.92);
@@ -380,7 +400,7 @@
         .voice-float-ball .ball-icon {
             width: 24px;
             height: 24px;
-            stroke: #34c759;
+            stroke: #ffffff;
             stroke-width: 2.5;
             fill: none;
             stroke-linecap: round;
@@ -390,8 +410,8 @@
 
         .voice-float-ball .ball-time {
             font-size: 10px;
-            color: #1c1c1e;
-            font-weight: 600;
+            color: #ffffff;
+            font-weight: 700;
             letter-spacing: 0.5px;
             margin-top: 1px;
             pointer-events: none;
@@ -448,6 +468,16 @@
             font-weight: 600;
         }
         .app-notify .an-action:active { background: rgba(255, 255, 255, 0.36); }
+        /* 生成类通知：淡淡粉色系，不用黑色、不用 emoji */
+        .app-notify.pink {
+            background: #ffe9f2;
+            color: #a63b63;
+            box-shadow: 0 12px 30px rgba(214, 51, 108, 0.18);
+        }
+        .app-notify.pink .an-title { color: #a63b63; }
+        .app-notify.pink .an-body { color: #c86f90; }
+        .app-notify.pink .an-action { background: rgba(214, 51, 108, 0.12); color: #c2185b; }
+        .app-notify.pink .an-action:active { background: rgba(214, 51, 108, 0.2); }
 
         .music-float-ball {
             position: absolute;
@@ -1254,7 +1284,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-09-28-01';
+        var BUILD = 'nano-2026-09-29-01';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -1757,7 +1787,11 @@
             el._app = app || '';
             el._action = (opts.action && opts.url) ? { label: opts.action, url: opts.url, title: opts.title || '' } : null;
             el._target = opts.target || '';
-            el.innerHTML = '<div class="an-icon">' + escapeNotifyHtml(opts.icon || ((app === 'music') ? '🎧' : '🔔')) + '</div>' +
+            el.classList.toggle('pink', !!opts.pink);
+            const _iconHtml = opts.pink
+                ? ''
+                : '<div class="an-icon">' + escapeNotifyHtml(opts.icon || ((app === 'music') ? '🎧' : '🔔')) + '</div>';
+            el.innerHTML = _iconHtml +
                 '<div class="an-main"><div class="an-title">' + escapeNotifyHtml(title) + '</div>' +
                 '<div class="an-body">' + escapeNotifyHtml(body) + '</div>' +
                 (el._action ? '<div class="an-actions"><span class="an-action">' + escapeNotifyHtml(el._action.label) + '</span></div>' : '') +
@@ -1777,6 +1811,7 @@
             clearTimeout(appNotifyTimer);
             appNotifyTimer = setTimeout(hideAppNotify, (el._action || el._target) ? 9000 : 5200);
         }
+        window.__nanoAppNotify = showAppNotify;
 
         const refreshState = {};
         const urlSourceMap = {};
@@ -2169,6 +2204,17 @@
                     } catch (e) {}
                     floatBall.style.display = 'flex';
                     isFloatBallVisible = true;
+                    // 按当前通话类型切换悬浮球配色与图标（语音=绿色电话 / 视频=蓝色摄像头）
+                    try {
+                        const isVideo = frameBase(document.getElementById('voiceCallFrame')) === 'video-call.html';
+                        floatBall.classList.toggle('is-video', isVideo);
+                        const icon = floatBall.querySelector('.ball-icon');
+                        if (icon) {
+                            icon.innerHTML = isVideo
+                                ? '<path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>'
+                                : '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>';
+                        }
+                    } catch (e) {}
                 }
                 startCallTimer();
             }
@@ -2195,9 +2241,10 @@
                 const currentSeconds = callSeconds;
                 hideFloatBall();
                 const frame = document.getElementById('voiceCallFrame');
-                // 只要通话帧还活着（没被置回 about:blank），就从悬浮球直接续接原通话，绝不重载/重连
-                const _rb = frameBase(frame);
-                if (frame && frame.contentWindow && (_rb === 'voice-call.html' || _rb === 'video-call.html')) {
+                // 只要通话帧还活着（src 还在、没被置回 about:blank），就从悬浮球直接续接原通话，绝不重载/重连
+                const _src = frame ? (frame.getAttribute('src') || frame.src || '') : '';
+                const _alive = !!frame && !!frame.contentWindow && _src && _src.indexOf('about:blank') === -1;
+                if (_alive || voiceCallKeptAlive) {
                     voiceCallKeptAlive = true;
                     overlayFrame.style.display = 'none';
             hideOtherGenericFrame();
@@ -2352,7 +2399,7 @@
                 }
             }
 
-            const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared', 'nanoTransMode'];
+            const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'autoSocialChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared', 'nanoTransMode'];
             if (innerSettingTypes.indexOf(data.type) !== -1) {
                 const c = document.getElementById('chatInnerFrame');
                 if (c && frameBase(c) === 'chat_inner.html') {
@@ -2672,7 +2719,22 @@
                 }
             }
 
-            if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD') {
+            // 生成类通知（朋友圈/照片/社交等）：淡淡粉色通知栏，不用黑色/emoji
+            if (data.type === 'NANO_GEN_NOTIFY') {
+                try {
+                    if (window.__nanoAppNotify) window.__nanoAppNotify(data.title || '生成成功', data.body || '', 'social', { pink: true });
+                } catch (e) {}
+                return;
+            }
+
+            // 线下美化等：广播给所有 iframe，让已打开的线下页实时重读设置
+            if (data.type === 'offlineSettingsChanged') {
+                document.querySelectorAll('iframe').forEach(function (fr) {
+                    try { if (fr.contentWindow) fr.contentWindow.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {}
+                });
+            }
+
+            if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD' || data.type === 'NANO_CALL_REPLY') {
                 const frame = document.getElementById('chatInnerFrame');
                 if (frame && frameBase(frame) === 'chat_inner.html') {
                     frame.contentWindow.postMessage(data, '*');
@@ -2689,12 +2751,13 @@
             if (data.type === 'aiProactiveVoiceCall') {
                 const chatId = data.chatId || 'default';
                 const name = data.name || 'AI 助手';
-                const url = 'voice-call.html?chat=' + encodeURIComponent(chatId) +
+                const page = data.video ? 'video-call.html' : 'voice-call.html';
+                const url = page + '?chat=' + encodeURIComponent(chatId) +
                            '&name=' + encodeURIComponent(name) +
                            '&incoming=1';
                 console.log('[Index] AI 主动来电:', data.scenario, url);
                 voiceCallKeptAlive = false;
-                openFullscreen(url, '语音电话', false, 'main');
+                openFullscreen(url, data.video ? '视频通话' : '语音电话', false, 'main');
             }
 
             if (data.type === 'syncCallTime') {
@@ -2997,5 +3060,93 @@
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js"></script>
 </div>
+    <!-- 小号试探：居中弹窗（不暴露是谁）-->
+    <div class="alt-probe-overlay" id="altProbeOverlay">
+        <div class="alt-probe-card">
+            <div class="alt-probe-avatar">
+                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+            <div class="alt-probe-name" id="altProbeName">某人</div>
+            <div class="alt-probe-bio" id="altProbeBio">想加你为好友</div>
+            <div class="alt-probe-actions">
+                <button class="alt-probe-btn reject" id="altProbeReject">拒绝</button>
+                <button class="alt-probe-btn accept" id="altProbeAccept">接受</button>
+            </div>
+        </div>
+    </div>
+    <style>
+        .alt-probe-overlay { position: fixed; inset: 0; z-index: 100000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 24px; }
+        .alt-probe-overlay.active { display: flex; }
+        .alt-probe-card { width: min(320px, 100%); background: rgba(255,255,255,0.98); border-radius: 20px; padding: 22px 20px 16px; box-shadow: 0 20px 55px rgba(0,0,0,0.22); text-align: center; }
+        .alt-probe-avatar { width: 72px; height: 72px; margin: 0 auto 12px; border-radius: 50%; background: #e5e5ea; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .alt-probe-avatar svg { width: 40px; height: 40px; fill: #8e8e93; }
+        .alt-probe-name { font-size: 17px; font-weight: 600; color: #1c1c1e; }
+        .alt-probe-bio { font-size: 13px; color: #8e8e93; margin-top: 6px; line-height: 1.5; }
+        .alt-probe-actions { display: flex; gap: 10px; margin-top: 18px; }
+        .alt-probe-btn { flex: 1; border: none; border-radius: 12px; padding: 12px 0; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .alt-probe-btn.reject { background: #f0f0f3; color: #55555a; }
+        .alt-probe-btn.accept { background: #34c759; color: #fff; }
+        .alt-probe-btn:active { opacity: 0.85; }
+    </style>
+    <script>
+    (function () {
+        var overlay = document.getElementById('altProbeOverlay');
+        if (!overlay) return;
+        var current = null;
+        function open(alt) {
+            current = alt;
+            document.getElementById('altProbeName').textContent = alt.name || '某人';
+            document.getElementById('altProbeBio').textContent = alt.bio || '想加你为好友';
+            overlay.classList.add('active');
+        }
+        function close() { overlay.classList.remove('active'); }
+        function clearPending() {
+            try {
+                var req = indexedDB.open('nano_alt_probe_db', 1);
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('pending')) d.createObjectStore('pending', { keyPath: 'key' }); } catch (err) {} };
+                req.onsuccess = function () { try { req.result.transaction('pending', 'readwrite').objectStore('pending').delete('current'); } catch (e) {} };
+            } catch (e) {}
+        }
+        function addFriend(alt) {
+            try {
+                var req = indexedDB.open('nano_characters_db', 1);
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {} };
+                req.onsuccess = function () {
+                    try {
+                        var rec = { id: alt.id || ('alt_' + Date.now()), name: alt.name || '小号', avatar: '', gender: '', nationality: '', setting: alt.bio || '' };
+                        var tx = req.result.transaction('characters', 'readwrite');
+                        tx.objectStore('characters').put(rec);
+                        tx.oncomplete = function () {
+                            // 刷新聊天列表，让新好友出现
+                            try { var f = document.querySelector('.iframe-container.active iframe'); if (f) { f.src = f.src; } } catch (e) {}
+                        };
+                    } catch (e) {}
+                };
+            } catch (e) {}
+        }
+        function tellFramesDone() {
+            try { document.querySelectorAll('iframe').forEach(function (f) { try { f.contentWindow.postMessage({ type: 'NANO_ALT_PROBE_DONE' }, '*'); } catch (e) {} }); } catch (e) {}
+        }
+        document.getElementById('altProbeAccept').addEventListener('click', function () {
+            if (current) addFriend(current);
+            clearPending(); close(); tellFramesDone();
+            try { if (window.__nanoAppNotify) window.__nanoAppNotify('已添加好友', (current && current.name ? current.name : '新好友') + ' 已加入聊天列表', 'social', { pink: true }); } catch (err) {}
+        });
+        document.getElementById('altProbeReject').addEventListener('click', function () { clearPending(); close(); tellFramesDone(); });
+        window.addEventListener('message', function (e) {
+            var d = e.data;
+            if (d && d.type === 'NANO_ALT_PROBE' && d.alt) {
+                open(d.alt);
+                try { if (window.__nanoAppNotify) window.__nanoAppNotify('好友申请', '有个陌生人想加你为好友', 'social', { pink: true }); } catch (err) {}
+            }
+        });
+        // 刷新后仍显示未处理的小号
+        try {
+            var req = indexedDB.open('nano_alt_probe_db', 1);
+            req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('pending')) d.createObjectStore('pending', { keyPath: 'key' }); } catch (err) {} };
+            req.onsuccess = function () { try { var r = req.result.transaction('pending', 'readonly').objectStore('pending').get('current'); r.onsuccess = function () { if (r.result && r.result.value) open(r.result.value); }; } catch (e) {} };
+        } catch (e) {}
+    })();
+    </script>
 </body>
 </html>

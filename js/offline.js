@@ -854,7 +854,9 @@ document.getElementById('settingsBtn').onclick = () => {
 // 返回按钮已移除，由外层页面（chat-inner）负责返回；这里仅兜底
 const backBtnEl = document.getElementById('backBtn');
 if (backBtnEl) {
-  backBtnEl.onclick = () => {
+  backBtnEl.onclick = async () => {
+    // 结束线下：强制补一次总结（把本轮剩余未总结的剧情写进长期记忆）
+    try { if (typeof summarizeOfflineMemories === 'function') await summarizeOfflineMemories(true); } catch (e) {}
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'closeFullscreen' }, '*');
     } else if (history.length > 1) {
@@ -1370,12 +1372,12 @@ async function offExtractViaMain(chatText) {
   const data = await resp.json();
   return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
 }
-async function summarizeOfflineMemories() {
+async function summarizeOfflineMemories(force) {
   if (!offlineChatId || OFF_MEM_BUSY.v) return;
   // 小剧场（番外）不计入记忆
   if (offlineScene !== 'story') return;
-  // 自动总结开关关闭时，自动触发跳过（offline-setting 里的“手动总结”不受影响）
-  if (settings.autoSummary === false) return;
+  // 自动总结开关关闭时，自动触发跳过；force（退出线下时）不受开关和条数阈值限制
+  if (!force && settings.autoSummary === false) return;
   OFF_MEM_BUSY.v = true;
   try {
     const count = parseInt(localStorage.getItem(offMemCountKey()) || '0', 10) || 0;
@@ -1383,7 +1385,7 @@ async function summarizeOfflineMemories() {
     if (count >= rel.length) return;
     const seg = rel.slice(count);
     const threshold = parseInt(settings.memThreshold || localStorage.getItem('offline_mem_threshold') || '5', 10) || 5;
-    if (seg.length < threshold) return;
+    if (!force && seg.length < threshold) return;
     const take = seg.slice(-12);
     const chatText = take.map(m => ((m.role === 'user' ? (settings.userName || '用户') : (m.name || settings.charName || '角色')) + '：' + String(m.content || '').slice(0, 900))).join('\n');
     if (!chatText.trim()) return;

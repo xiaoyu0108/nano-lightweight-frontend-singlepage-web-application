@@ -94,7 +94,7 @@ window.NANO_ASSISTANT_KB = {
   // 助手可以下发的动作（写进 <action>...</action> 代码块）
   commands: [
     { tool: 'apply_beautify', args: { scope: 'global|chat|chat-avatar|heart|offline', name: '预设名', css: '完整 CSS' }, note: '覆盖对应美化并存成可切换预设；若同名预设已存在则直接更新它（用户说「改我的某个预设」时，name 填那个预设的名字即可）' },
-    { tool: 'add_worldbook', args: { name: '世界书名', entries: [{ title: '条目名', keywords: '触发词', content: '内容' }] }, note: '新增一本世界书（仅当用户明确要设定/世界书时用）' },
+    { tool: 'add_worldbook', args: { name: '世界书名', worldbook: '（可选）要填入的已有世界书名或 id，填了就追加条目而不是新建', group: '（可选）分组名', entries: [{ title: '条目名', keywords: '触发词', content: '内容' }] }, note: '新增一本世界书，或把条目追加进已有世界书（worldbook 填书名）；用户发来文件/长文本要求「分条做世界书 / 填入世界书」时用这个，条目多时分批输出多个 action' },
     { tool: 'add_emoji', args: { group: '分组名', emojis: [{ name: '表情名', url: '图片地址' }] }, note: '把「名字:图片链接」清单加入表情包（用户说加表情包时用这个，不要用 add_worldbook）' },
     { tool: 'set_chat_background', args: { color: '#ffffff', image: '图片URL（可选）' }, note: '直接更换当前聊天背景（颜色或图片）；用户说“换背景”优先用这个' },
     { tool: 'set_avatar', args: { useLast: true }, note: '把当前角色头像换成用户刚发送的图片（用户在纳米聊天里发图后说「用这张当头像」时用这个，不要用 apply_beautify）；也可用 url 指定图片地址' },

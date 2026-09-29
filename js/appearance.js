@@ -516,13 +516,14 @@
     var BOTTOM_FLUSH_FIX =
         'html .bottom-actions,html .nano-index .bottom-actions{bottom:20px !important;padding-bottom:0 !important;}' +
         // 只兜底底部安全区留白，不要强制 background/border/shadow —— 否则用户无法给顶栏/底栏设白底
-        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:max(12px,var(--nano-safe-bottom,env(safe-area-inset-bottom,0px))) !important;}' +
-        'html.keyboard-open .bottom-bar,html.keyboard-open .nano-chat-inner .bottom-bar,html.keyboard-open .nano-groups .bottom-bar{padding-bottom:8px !important;}' +
-        'html footer.bottom{padding-bottom:0 !important;}' +
-        'html .bottom{padding-bottom:0 !important;}' +
-        'html .dm-composer{padding-bottom:4px !important;}' +
-        'html .mm-viewer-bar{padding-bottom:4px !important;}' +
-        'html .comment-input,html .chat-input-bar{padding-bottom:4px !important;}' +
+        // 非 index 页面的底部输入栏统一再抬高约 14px（index 自身的 .bottom-actions 不动）
+        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:calc(14px + max(12px,var(--nano-safe-bottom,env(safe-area-inset-bottom,0px)))) !important;}' +
+        'html.keyboard-open .bottom-bar,html.keyboard-open .nano-chat-inner .bottom-bar,html.keyboard-open .nano-groups .bottom-bar{padding-bottom:calc(14px + 8px) !important;}' +
+        'html footer.bottom{padding-bottom:14px !important;}' +
+        'html .bottom{padding-bottom:14px !important;}' +
+        'html .dm-composer{padding-bottom:18px !important;}' +
+        'html .mm-viewer-bar{padding-bottom:18px !important;}' +
+        'html .comment-input,html .chat-input-bar{padding-bottom:18px !important;}' +
         // 底栏改为悬浮在页面之上：留白放进各页面自身，避免外壳出现与主题不符的白边
         'html body.nano-chat .app-content,html body.nano-chat .container,html body.nano-chat #chatList,html body.nano-chat .chat-list{padding-bottom:96px !important;}' +
         'html body.nano-api .app-content,html body.nano-api .container,html body.nano-more .app-content,html body.nano-more .container,html body.nano-discover .app-content,html body.nano-discover .container{padding-bottom:96px !important;}';

@@ -169,6 +169,13 @@
     var allowMomentImageStatus = document.getElementById('allowMomentImageStatus');
     var momentImageFreqItem = document.getElementById('momentImageFreqItem');
     var momentImageFreq = document.getElementById('momentImageFreq');
+    var voiceFreq = document.getElementById('voiceFreq');
+    var actionNarrationToggle = document.getElementById('actionNarrationToggle');
+    var actionNarrationStatus = document.getElementById('actionNarrationStatus');
+    var altProbeToggle = document.getElementById('altProbeToggle');
+    var altProbeStatus = document.getElementById('altProbeStatus');
+    var autoSocialToggle = document.getElementById('autoSocialToggle');
+    var autoSocialStatus = document.getElementById('autoSocialStatus');
 
     // ===== 加载信息 =====
     function loadInfo() {
@@ -244,6 +251,23 @@
         }
         if (momentImageFreq) momentImageFreq.value = getSetting('momentImageFreq', 'medium');
         if (momentImageFreqItem) momentImageFreqItem.style.display = allowMomentImage ? 'flex' : 'none';
+
+        if (voiceFreq) voiceFreq.value = getSetting('voiceFreq', 'medium');
+        var actionNarration = getSetting('actionNarration', false);
+        if (actionNarrationToggle) {
+            actionNarrationToggle.checked = actionNarration;
+            actionNarrationStatus.textContent = actionNarration ? '开启' : '关闭';
+        }
+        var altProbe = getSetting('altProbe', false);
+        if (altProbeToggle) {
+            altProbeToggle.checked = altProbe;
+            altProbeStatus.textContent = altProbe ? '开启' : '关闭';
+        }
+        var autoSocial = getSetting('autoSocial', false);
+        if (autoSocialToggle) {
+            autoSocialToggle.checked = autoSocial;
+            autoSocialStatus.textContent = autoSocial ? '开启' : '关闭';
+        }
     }
 
     function loadBackground() {
@@ -912,6 +936,24 @@
     if (allowMomentImageToggle) allowMomentImageToggle.addEventListener('change', toggleAllowMomentImage);
     if (momentImageFreq) momentImageFreq.addEventListener('change', function() {
         setSetting('momentImageFreq', this.value);
+    });
+    if (voiceFreq) voiceFreq.addEventListener('change', function() {
+        setSetting('voiceFreq', this.value);
+    });
+    if (actionNarrationToggle) actionNarrationToggle.addEventListener('change', function() {
+        setSetting('actionNarration', this.checked);
+        actionNarrationStatus.textContent = this.checked ? '开启' : '关闭';
+    });
+    if (altProbeToggle) altProbeToggle.addEventListener('change', function() {
+        setSetting('altProbe', this.checked);
+        altProbeStatus.textContent = this.checked ? '开启' : '关闭';
+    });
+    if (autoSocialToggle) autoSocialToggle.addEventListener('change', function() {
+        setSetting('autoSocial', this.checked);
+        autoSocialStatus.textContent = this.checked ? '开启' : '关闭';
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'autoSocialChanged', chatId: chatId, enabled: this.checked, interval: parseInt(autoMomentInterval.value) }, '*');
+        }
     });
 
     window.addEventListener('message', function(event) {

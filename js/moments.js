@@ -1705,6 +1705,7 @@
         } finally {
             hideMomentsLoading();
             window.__momentsGenerating = false;
+            try { if (window.parent !== window) window.parent.postMessage({ type: 'NANO_GEN_NOTIFY', title: '朋友圈已更新', body: '新动态生成完成' }, '*'); } catch (e) {}
         }
     };
 

@@ -44,6 +44,20 @@
     lines.push('');
     lines.push('【世界书条目字段】' + (KB.worldbookEntryFields || []).join(', '));
     lines.push('');
+    lines.push('【已有世界书】（用户说「填进某本 / 加到某本 / 追加到某本」时，把 add_worldbook 的 worldbook 填成这本书名）');
+    var books = worldbookNamesForPrompt();
+    if (books.length) books.forEach(function (b) { lines.push('· ' + b.name + '（' + b.count + ' 条）'); });
+    else lines.push('· （暂无世界书，用户要生成时直接新建一本即可）');
+    lines.push('');
+    lines.push('【文件 / 长文本 → 世界书】');
+    lines.push('用户发来「文件」卡片时，卡片后面会附带完整文件内容。当用户要把它做成/填入世界书：');
+    lines.push('1. 把内容拆成多条独立设定，每条一个主题（人物、地点、物品、组织、事件、规则/设定等），不要把整篇塞进一条。');
+    lines.push('2. 每条给：title（3~8 字标题）、keywords（触发关键词，2~6 个，逗号分隔）、content（忠实原文的设定正文，不编造；过长可精简但不丢关键信息）。');
+    lines.push('3. 用 add_worldbook 输出动作：新建一本填 name；加进已有世界书把 worldbook 填成已有书名（书名见上）。');
+    lines.push('4. 条目多时分批输出多个 <action>，每批不超过 15 条，所有批次的 name / worldbook 保持一致。');
+    lines.push('5. 世界书请求只用 add_worldbook，不要用 apply_beautify；也不要用 add_emoji。');
+    lines.push('6. 先简要说明你分了几条、每条标题，再输出动作。');
+    lines.push('');
     lines.push('写 CSS 时直接给完整可用的 CSS（用上面的选择器即可，不要为了美化去读源码）。css 字段里可以带换行，直接写多行 CSS 即可。');
     lines.push('每次要修改样式，都必须：①用一两句话说明你要改什么；②输出一个 <action> 块，css 字段放完整可复制的代码。');
     lines.push('用户说“换背景”时：优先用 set_chat_background（有图片用 args.image，只有颜色用 args.color）；需要更复杂的背景样式时才用 scope=chat 的 CSS（改 .chat-container / .message-scroll / body）。');
@@ -357,16 +371,57 @@
     });
     try { localStorage.setItem('nano_worldbook_data_v5', JSON.stringify(data)); } catch (e) {}
   }
-  async function addWorldbook(name, entries) {
+  // 同步读取已有世界书（localStorage 镜像，与 worldbook.js / saveWorldbookData 保持一致），
+  // 供 systemPrompt 列出书名，模型才能把条目「填入」到指定世界书。
+  function worldbookNamesForPrompt() {
+    try {
+      var raw = localStorage.getItem('nano_worldbook_data_v5');
+      if (!raw) return [];
+      var d = JSON.parse(raw);
+      var files = (d && Array.isArray(d.files)) ? d.files : [];
+      return files.map(function (f) {
+        return { name: String((f && f.name) || '未命名'), count: (f && Array.isArray(f.entries)) ? f.entries.length : 0 };
+      });
+    } catch (e) { return []; }
+  }
+  function ensureGroup(data, groupName) {
+    var gname = String(groupName || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 30);
+    if (!gname) return null;
+    if (!Array.isArray(data.groups)) data.groups = [];
+    var g = data.groups.find(function (x) { return x && x.name === gname; });
+    if (!g) { g = { id: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5), name: gname }; data.groups.push(g); }
+    return g.id;
+  }
+  // 新建世界书，或把条目追加进已有世界书（args.worldbook 填书名或 id）。
+  async function addWorldbook(name, entries, target, group) {
     var data = await getWorldbookData();
     var list = (entries || []).map(normalizeEntry);
-    var file = {
+    if (!list.length) throw new Error('没有可写入的条目（entries 为空）');
+    var targetName = String(target || '').trim();
+    var file = null;
+    if (targetName) {
+      file = (data.files || []).find(function (f) {
+        return f && (f.id === targetName || f.name === targetName);
+      });
+    }
+    if (file) {
+      if (!Array.isArray(file.entries)) file.entries = [];
+      list.forEach(function (e) { file.entries.push(e); });
+      if (group) { var gid = ensureGroup(data, group); if (gid) file.group = gid; }
+      file.size = Math.ceil(JSON.stringify(file.entries).length / 1024) + 'KB';
+      file.ext = file.ext || 'json';
+      await saveWorldbookData(data);
+      return { file: file, created: false, added: list.length };
+    }
+    var gid = group ? ensureGroup(data, group) : null;
+    file = {
       id: 'f_' + Date.now(), name: name || '纳米世界书', entries: list,
-      group: null, scope: 'global', boundCharacters: [], size: Math.ceil(JSON.stringify(list).length / 1024) + 'KB', ext: 'json'
+      group: gid, scope: 'global', boundCharacters: [], size: Math.ceil(JSON.stringify(list).length / 1024) + 'KB', ext: 'json'
     };
+    if (!Array.isArray(data.files)) data.files = [];
     data.files.push(file);
     await saveWorldbookData(data);
-    return file;
+    return { file: file, created: true, added: list.length };
   }
   // 把当前聊天角色（chat_inner?chat=角色id）的头像写进角色库，真正做到「换头像」。
   // 之前没有这个能力，所以 iOS 上发图给纳米后它只能说「做了」却执行不出效果。
@@ -459,6 +514,8 @@
     } else if (scope === 'offline') {
       await setOfflineCss(css);
       savePreset('offline', name, css);
+      // 通知已打开的线下页立即重读设置并套用（不用退出重进）
+      try { window.parent.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {}
     } else {
       throw new Error('未知 scope：' + scope);
     }
@@ -497,7 +554,7 @@
     if (!a || !a.tool) throw new Error('空动作');
     var args = a.args || {};
     if (a.tool === 'apply_beautify') return applyBeautify(args.scope, args.name, args.css);
-    if (a.tool === 'add_worldbook') return addWorldbook(args.name, args.entries);
+    if (a.tool === 'add_worldbook') return addWorldbook(args.name, args.entries, args.worldbook || args.target, args.group);
     if (a.tool === 'add_emoji') return addEmoji(args.group || args.name, args.emojis || args.items);
     if (a.tool === 'set_chat_background') return setChatBackground(args.color, args.image);
     if (a.tool === 'set_avatar') return setAvatar(args);
@@ -507,7 +564,13 @@
   }
   function actionTitle(a) {
     if (a.tool === 'apply_beautify') return '覆盖「' + (a.args.scope || '') + '」美化：' + (a.args.name || '未命名');
-    if (a.tool === 'add_worldbook') return '新增世界书：' + (a.args.name || '');
+    if (a.tool === 'add_worldbook') {
+      var wbTarget = a.args.worldbook || a.args.target;
+      var wbCount = (a.args.entries || []).length;
+      return wbTarget
+        ? '向世界书「' + wbTarget + '」填入 ' + wbCount + ' 条'
+        : '新增世界书：' + (a.args.name || '') + '（' + wbCount + ' 条）';
+    }
     if (a.tool === 'add_emoji') return '新增表情包分组：' + (a.args.group || a.args.name || '纳米表情') + '（' + (((a.args.emojis || a.args.items || []).length)) + ' 个）';
     if (a.tool === 'set_chat_background') return '更换聊天背景：' + (a.args.image ? '图片' : (a.args.color || '默认'));
     if (a.tool === 'set_avatar') return '更换角色头像：' + (a.args.url ? '指定图片' : '用刚发送的图片');
