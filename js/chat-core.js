@@ -3450,7 +3450,32 @@
         window.__autoMsgEnabled = !!enabled;
         window.__autoMsgMins = Math.max(1, parseInt(intervalMinutes, 10) || 8);
         updateAutoStatus('msg', enabled, window.__autoMsgMins);
-        if (!enabled) return;
+        if (!enabled) {
+            try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel('nano_auto_msg:' + chatId); } catch (e) {}
+            return;
+        }
+        scheduleNextAutoMsg();
+    }
+    let lastAutoMsgRunAt = 0;      // 去重：本地定时器与外壳广播同时到点时不重复生成
+    let lastAutoMomentRunAt = 0;
+    function autoMsgTaskId() { return 'nano_auto_msg:' + chatId; }
+    // 真正执行一次主动发消息（本地定时器到点、或外壳统一调度到点都会走到这里）
+    function runScheduledAutoMsg() {
+        lastAutoMsgRunAt = Date.now();
+        if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
+        try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel(autoMsgTaskId()); } catch (e) {}
+        (async function() {
+            if (isProcessingApi || isWaitingForReply) return;
+            isProcessingApi = true;
+            try {
+                const line = await generateProactiveMessage();
+                if (!line) return;
+                addMessage('left', line, nowHHMM(), null, false, false, null, null, null, null);
+                saveMessages();
+                notifyCharMessage(String(line).slice(0, 60));
+            } catch (e) {
+            } finally { isProcessingApi = false; }
+        })();
         scheduleNextAutoMsg();
     }
     function scheduleNextAutoMsg() {
@@ -3458,21 +3483,18 @@
         if (!window.__autoMsgEnabled) return;
         const base = window.__autoMsgMins || 8;
         const ms = Math.max(30 * 1000, Math.round(base * (0.5 + Math.random()) * 60 * 1000));
-        autoMsgTimer = setTimeout(function() {
-            (async function() {
-                if (isProcessingApi || isWaitingForReply) return;
-                isProcessingApi = true;
-                try {
-                    const line = await generateProactiveMessage();
-                    if (!line) return;
-                    addMessage('left', line, nowHHMM(), null, false, false, null, null, null, null);
-                    saveMessages();
-                    notifyCharMessage(String(line).slice(0, 60));
-                } catch (e) {
-                } finally { isProcessingApi = false; }
-            })();
-            scheduleNextAutoMsg();
-        }, ms);
+        // 向外壳注册到期任务：即使本 frame 被切走/销毁，外壳到点也会调用 API 的兜底推送
+        try {
+            if (window.NanoKeepAlive && window.NanoKeepAlive.schedule) {
+                window.NanoKeepAlive.schedule({
+                    id: autoMsgTaskId(), at: Date.now() + ms, type: 'generate', owner: 'autoMsg',
+                    chatId: chatId, title: displayName || chatName || '新消息',
+                    body: '（' + (displayName || chatName || '角色') + ' 想找你说句话）',
+                    target: 'chat:' + chatId
+                });
+            }
+        } catch (e) {}
+        autoMsgTimer = setTimeout(function() { runScheduledAutoMsg(); }, ms);
     }
 
     // ===== 主动发朋友圈：按设定间隔自动调用 API 生成并写入朋友圈 =====
@@ -3653,7 +3675,28 @@
         window.__autoMomentEnabled = !!enabled;
         window.__autoMomentHours = Math.max(0.5, parseFloat(intervalHours) || 12);
         updateAutoStatus('moment', enabled, Math.round(window.__autoMomentHours * 60));
-        if (!enabled) return;
+        if (!enabled) {
+            try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel('nano_auto_moment:' + chatId); } catch (e) {}
+            return;
+        }
+        scheduleNextAutoMoment();
+    }
+    function autoMomentTaskId() { return 'nano_auto_moment:' + chatId; }
+    function runScheduledAutoMoment() {
+        lastAutoMomentRunAt = Date.now();
+        if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
+        try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel(autoMomentTaskId()); } catch (e) {}
+        try {
+            // 社交活跃度开启时，随机：朋友圈动态 / 朋友圈照片 / 直接发照片给用户
+            if (getChatSetting('autoSocial', false)) {
+                const r = Math.random();
+                if (r < 0.34) postAutoMoment();
+                else if (r < 0.67) postAutoPhoto();
+                else postAutoImage();
+            } else {
+                postAutoMoment();
+            }
+        } catch (e) {}
         scheduleNextAutoMoment();
     }
     function scheduleNextAutoMoment() {
@@ -3662,21 +3705,56 @@
         const baseH = window.__autoMomentHours || 12;
         const randH = baseH * (0.5 + Math.random());          // 0.5x ~ 1.5x
         const ms = Math.max(5 * 60 * 1000, Math.round(randH * 3600 * 1000));
-        autoMomentTimer = setTimeout(function () {
-            try {
-                // 社交活跃度开启时，随机：朋友圈动态 / 朋友圈照片 / 直接发照片给用户
-                if (getChatSetting('autoSocial', false)) {
-                    const r = Math.random();
-                    if (r < 0.34) postAutoMoment();
-                    else if (r < 0.67) postAutoPhoto();
-                    else postAutoImage();
-                } else {
-                    postAutoMoment();
-                }
-            } catch (e) {}
-            scheduleNextAutoMoment();
-        }, ms);
+        // 向外壳注册到期任务：切走页面/后台也会继续
+        try {
+            if (window.NanoKeepAlive && window.NanoKeepAlive.schedule) {
+                window.NanoKeepAlive.schedule({
+                    id: autoMomentTaskId(), at: Date.now() + ms, type: 'generate', owner: 'autoMoment',
+                    chatId: chatId, title: displayName || chatName || '朋友圈',
+                    body: '（' + (displayName || chatName || '角色') + ' 发了条新动态）',
+                    target: 'moments'
+                });
+            }
+        } catch (e) {}
+        autoMomentTimer = setTimeout(function() { runScheduledAutoMoment(); }, ms);
     }
+
+    // ===== 外壳统一调度：响应外壳广播的到期任务 =====
+    function handleScheduledTask(task) {
+        if (!task || !task.id) return false;
+        const now = Date.now();
+        const isMsg = (task.owner === 'autoMsg' && window.__autoMsgEnabled && task.chatId === chatId);
+        const isMoment = (task.owner === 'autoMoment' && window.__autoMomentEnabled && task.chatId === chatId);
+        if (!isMsg && !isMoment) return false;
+        // 先回 ack，避免外壳在 1.5 秒后再补一条系统通知（重复推送）
+        try { if (window.parent !== window) window.parent.postMessage({ type: 'nanoTaskAck', id: task.id, task: task }, '*'); } catch (e) {}
+        // 本地定时器刚跑过：这次广播是同一个到期点，忽略生成，但 ack 已发，外壳不会再补通知
+        if (isMsg && now - lastAutoMsgRunAt < 3000) return true;
+        if (isMoment && now - lastAutoMomentRunAt < 3000) return true;
+        if (isMsg) runScheduledAutoMsg(); else runScheduledAutoMoment();
+        return true;
+    }
+    window.addEventListener('message', function (e) {
+        if (e.origin !== location.origin) return;            // 忽略跨源页面伪造的调度消息
+        const d = e && e.data;
+        if (!d || typeof d !== 'object' || d.type !== 'nanoTaskDue' || !d.task) return;
+        try { handleScheduledTask(d.task); } catch (err) {}
+    });
+    // 单页（非 iframe）环境下由本窗口的 keep-alive 直接派发事件
+    window.addEventListener('nanoTaskDue', function (e) {
+        const d = e && e.detail;
+        if (!d || !d.task) return;
+        try { handleScheduledTask(d.task); } catch (err) {}
+    });
+    // 本 frame 被卸载（切换聊天 / 关闭）时，清掉自己注册的到期任务，避免对已离开的会话误推送
+    window.addEventListener('pagehide', function () {
+        try {
+            if (window.NanoKeepAlive && NanoKeepAlive.cancel) {
+                NanoKeepAlive.cancel(autoMsgTaskId());
+                NanoKeepAlive.cancel(autoMomentTaskId());
+            }
+        } catch (e) {}
+    });
 
     // ===== 发送语音气泡弹窗 =====
     function openVoiceSheet() {

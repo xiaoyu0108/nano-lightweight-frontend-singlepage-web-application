@@ -1,35 +1,70 @@
 /* ============================================================
-   keep-alive.js — 保活（切 App / 锁屏后让定时生成继续跑）
+   keep-alive.js — Nano 外壳统一保活 + 定时调度
 
-   原理（iOS PWA 能用的全部手段）：
-     1. 音频保活：循环播放一段「听不见但非静音」的极低音，iOS 会为该页面
-        维持音频会话，页面不会被立刻挂起 → setInterval / fetch / 自动发消息
-        / 自动发朋友圈 得以继续运行。
-     2. MediaSession：让锁屏 / 灵动岛显示「Nano 保活中」，同时让音频会话更稳。
-     3. Wake Lock：前台时保持屏幕常亮（不影响后台，后台靠音频保活）。
-     4. 复活动作：切回前台 / 音频被系统暂停时自动重新播放、重新申请 Wake Lock。
+   作用：让定时任务在切后台 / 锁屏后仍能继续跑。
+   做法：用一段听不见但非静音的音频占住音频会话，页面就不容易被系统挂起；
+        再把心跳挂在音频的播放进度事件上（后台对 setInterval 的降权不影响它）。
+
+   目标：切到别的页面（Nano 是「index 外壳 + iframe 子页」结构）或切后台后，
+        定时任务与推送仍然继续，切页面不丢任务。
+
+   原理：
+     1. 音频保活：循环播放 20Hz 极低音（非静音），iOS 会为该页面维持
+        音频会话，页面不被立刻挂起 → fetch / 定时生成 / 自动消息能继续跑。
+     2. MediaSession：锁屏 / 灵动岛显示「Nano 保活中」，暂停按钮不生效，
+        让系统认为这是一个真实播放器而更稳定。
+     3. 音频 timeupdate 驱动心跳：后台 setInterval 会被降权，改由音频
+        播放进度事件驱动检查（iOS 后台最可靠），另加 5s 定时兜底。
+     4. 持久化调度队列（localStorage: nano_scheduled_tasks）：到期时间写入
+        localStorage，任何页面在 加载 / 回前台 / 心跳 时都会补跑已到期任务，
+        所以「切换页面」不会丢任务与推送。
+     5. 到期执行：
+        · type='notify'   → 直接弹系统通知（NanoNotify → ServiceWorker → Bark）
+        · type='generate' → 广播给正在运行的聊天/朋友圈 iframe，由它调用 API 生成；
+                            若无 frame 认领，则退化为一条系统通知，保证不静默丢推送。
+     6. Wake Lock：前台保持屏幕常亮（不影响后台，后台靠音频保活）。
 
    用法：
-     NanoKeepAlive.start()        // 开启（会写入 nano_keep_alive=1）
-     NanoKeepAlive.stop()         // 关闭
-     NanoKeepAlive.enabled()      // 是否开启
-     NanoKeepAlive.isRunning()    // 音频是否真的在播
+     NanoKeepAlive.start() / stop() / enabled() / isRunning()
+     NanoKeepAlive.schedule({ id, at, type, title, body, target, channel, data })
+     NanoKeepAlive.scheduleNotification(title, body, delayMs, opts)
+     NanoKeepAlive.cancel(id) / tasks() / runDue()
 
    注意：
-   · 音频必须由「用户手势」解锁后才能播放，所以开启后第一次触摸页面会自动 resume。
-   · 子页面（iframe）调用 start() 会转发给主框架，由主框架统一播放，避免多路音频。
+   · 音频必须由「用户手势」解锁后才能播放，所以开启后第一次触摸页面会自动续播。
+   · 子页面（iframe）调用 start() 会转发给主框架，由主框架统一播放，避免多路音频；
+     子页面仍可用 schedule() 写入同一个队列，由外壳统一执行。
+   · 只有顶层窗口（外壳 index.html，或单独打开的子页）运行音频与调度循环，
+     避免多个 iframe 重复弹通知。
    · iOS 不保证永久后台运行：音频被系统掐断后可能被挂起，切回前台会自动恢复。
    ============================================================ */
 (function () {
     'use strict';
 
     var KEY = 'nano_keep_alive';
+    var STATE = 'nano_keep_alive_state';
+    var TASKS = 'nano_scheduled_tasks';
+
+    var TICK_MS = 2000;        // timeupdate 轮询节流：最多 2 秒检查一次
+    var FALLBACK_MS = 5000;    // setInterval 兜底（PC / 无音频事件环境）
+    var ACK_WAIT_MS = 1500;    // generate 任务等待 frame 认领的时间
+    var MAX_TASKS = 50;        // 队列上限，防止 localStorage 被写满
+
+    var isTop = (window.parent === window);
     var audioEl = null;
     var audioUrl = '';
     var wakeLock = null;
     var unlocked = false;
     var restarting = false;
     var mediaSet = false;
+    var lastTick = 0;
+    var fallbackTimer = null;
+    var pendingAck = {};
+    var onDueCbs = [];
+    var lastTasksRaw = null;       // 队列原始字符串缓存：内容没变就跳过 JSON.parse
+    var lastTasksParsed = [];
+    var lastStateRunning = null;   // 心跳状态缓存：只在变化/过期时才写 localStorage
+    var lastStateAt = 0;
 
     function enabled() {
         try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
@@ -38,7 +73,31 @@
         try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
     }
 
-    // 生成一段极短、听不见但非静音的 WAV（20Hz、±1/128 振幅），避免被判定为静音而掐断会话
+    // ===== 调度队列（持久化在 localStorage，跨页面共享）=====
+    function readTasks() {
+        try {
+            var raw = localStorage.getItem(TASKS) || '[]';
+            if (raw === lastTasksRaw) return lastTasksParsed;   // 内容没变：复用缓存，跳过 parse
+            lastTasksRaw = raw;
+            var a = JSON.parse(raw);
+            lastTasksParsed = Array.isArray(a) ? a : [];
+            return lastTasksParsed;
+        } catch (e) { return []; }
+    }
+    function writeTasks(list) {
+        var arr = list || [];
+        var raw = JSON.stringify(arr);
+        try {
+            localStorage.setItem(TASKS, raw);
+            lastTasksRaw = raw;
+            lastTasksParsed = arr;
+        } catch (e) {}
+    }
+    function uid() {
+        return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    // 生成一段极短、听不见但非静音的 WAV（20Hz、8bit），避免被判定为静音而掐断会话
     function wavUrl() {
         if (audioUrl) return audioUrl;
         try {
@@ -72,8 +131,19 @@
             audioEl.src = wavUrl();
             audioEl.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
             (document.body || document.documentElement).appendChild(audioEl);
-            // 只处理「真的停了」的情况；不要监听 suspend/stalled（缓冲时也会触发，
-            // 会导致反复 play/pause，灵动岛/状态一闪一闪）
+
+            // 【核心】用音频播放进度驱动心跳：后台 setInterval 会被降权，timeupdate 不会
+            audioEl.addEventListener('timeupdate', function () {
+                if (!enabled()) return;
+                tick();
+                // 关键修复：防止 iOS 后台播放结束前无法自动 loop，提前 0.4 秒手动倒回
+                var d = audioEl.duration;
+                if (d && d > 0 && (d - audioEl.currentTime) < 0.4) {
+                    try { audioEl.currentTime = 0; } catch (e) {}
+                    play();
+                }
+            });
+            // 只处理「真的停了」的情况；不要监听 suspend/stalled（缓冲时也会触发，会闪）
             ['pause', 'ended'].forEach(function (ev) {
                 audioEl.addEventListener(ev, function () {
                     if (!enabled() || restarting) return;
@@ -81,7 +151,7 @@
                     setTimeout(function () {
                         restarting = false;
                         if (!enabled() || !audioEl.paused) return;
-                        try { audioEl.play().catch(function () {}); } catch (e) {}
+                        play();
                     }, 1200);
                 });
             });
@@ -139,37 +209,183 @@
         try { return !!(audioEl && !audioEl.paused); } catch (e) { return false; }
     }
 
-    // 主框架内部使用：真正开始播放
-    var beatTimer = null;
     function writeState(running) {
-        try { localStorage.setItem('nano_keep_alive_state', JSON.stringify({ running: !!running, at: Date.now() })); } catch (e) {}
+        // 只在播放状态变化、或距上次写入超过 30 秒时才写（读取方 other.js 的过期窗口是 120 秒）
+        var now = Date.now();
+        running = !!running;
+        if (running === lastStateRunning && now - lastStateAt < 30000) return;
+        lastStateRunning = running;
+        lastStateAt = now;
+        try { localStorage.setItem(STATE, JSON.stringify({ running: running, at: now })); } catch (e) {}
     }
-    function startBeat() {
+
+    // ===== 心跳 & 到期执行 =====
+    function tick() {
+        if (!enabled()) return;
+        var now = Date.now();
+        if (now - lastTick < TICK_MS) return;
+        lastTick = now;
         writeState(isRunning());
-        if (beatTimer) return;
-        // 每 20 秒写一次心跳：其它页面据此判断保活是否真的在跑
-        beatTimer = setInterval(function () { writeState(isRunning()); }, 20000);
+        try { window.dispatchEvent(new CustomEvent('systemHeartbeat')); } catch (e) {}
+        runDueTasks(now);
     }
-    function stopBeat() {
-        if (beatTimer) { clearInterval(beatTimer); beatTimer = null; }
-        writeState(false);
+
+    function runDueTasks(now) {
+        if (!isTop) return;                  // 只有外壳负责执行队列，避免多个 iframe 重复弹通知
+        var list = readTasks();
+        if (!list.length) return;
+        var due = [], pending = [];
+        for (var i = 0; i < list.length; i++) {
+            if ((Number(list[i] && list[i].at) || 0) <= now) due.push(list[i]);
+            else pending.push(list[i]);
+        }
+        if (!due.length) return;
+        writeTasks(pending);
+        for (var j = 0; j < due.length; j++) {
+            try { execTask(due[j]); } catch (e) {}
+        }
     }
+
+    function notifyTask(task) {
+        var title = task.title || 'Nano';
+        var body = task.body || '';
+        var tag = task.tag || ('nano-task-' + (task.id || Date.now()));
+        var opts = { force: true, target: task.target || '', channel: task.channel || '', tag: tag };
+        // 优先 NanoNotify：内部会走 ServiceWorker + Bark（后台/锁屏也能到）
+        try {
+            if (window.NanoNotify && window.NanoNotify.notify) { window.NanoNotify.notify(title, body, opts); return; }
+        } catch (e) {}
+        // 兜底：SW showNotification → new Notification
+        try {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                navigator.serviceWorker.ready.then(function (reg) {
+                    try {
+                        if (reg && reg.showNotification) {
+                            reg.showNotification(title, { body: body, tag: tag, data: { target: opts.target } });
+                            return;
+                        }
+                    } catch (e) {}
+                    try { new Notification(title, { body: body, tag: tag }); } catch (e) {}
+                }).catch(function () {});
+                return;
+            }
+            try { new Notification(title, { body: body, tag: tag }); } catch (e) {}
+        } catch (e) {}
+    }
+
+    function fireDue(task, handled) {
+        try { window.dispatchEvent(new CustomEvent('nanoTaskDue', { detail: { task: task, handled: !!handled } })); } catch (e) {}
+        for (var i = 0; i < onDueCbs.length; i++) {
+            try { onDueCbs[i](task, !!handled); } catch (e) {}
+        }
+    }
+
+    // 广播给所有 iframe（聊天/朋友圈 frame 收到后调用 API 生成，并回 ack）
+    function broadcast(task) {
+        var frames;
+        try { frames = document.querySelectorAll('iframe'); } catch (e) { frames = []; }
+        for (var i = 0; i < frames.length; i++) {
+            try {
+                if (frames[i].contentWindow) frames[i].contentWindow.postMessage({ type: 'nanoTaskDue', task: task }, '*');
+            } catch (e) {}
+        }
+    }
+
+    function execGenerate(task) {
+        var id = task.id || uid();
+        var frames;
+        try { frames = document.querySelectorAll('iframe'); } catch (e) { frames = []; }
+
+        // 单页环境（没有 iframe）：任务拥有者就在本窗口，由 fireDue 派发本窗口事件，无需兜底通知
+        if (!frames.length) {
+            fireDue(task, false);
+            return;
+        }
+
+        pendingAck[id] = true;
+        broadcast(task);
+        setTimeout(function () {
+            if (!pendingAck[id]) return;         // 已被某个 frame 认领
+            delete pendingAck[id];
+            // 没有任何 frame 在跑：退化为一条系统通知，保证不静默丢推送
+            notifyTask({ id: id, title: task.title || 'Nano', body: task.body || '到点了', target: task.target, channel: task.channel });
+            fireDue(task, false);
+        }, ACK_WAIT_MS);
+    }
+
+    function execTask(task) {
+        if (!task) return;
+        if (task.type === 'generate') { execGenerate(task); return; }
+        notifyTask(task);
+        fireDue(task, true);
+    }
+
+    // ===== 调度循环 =====
+    function ensureLoop() {
+        if (!isTop) return;
+        if (fallbackTimer) return;
+        fallbackTimer = setInterval(tick, FALLBACK_MS);   // 兜底
+        tick();                                            // 立即跑一次
+    }
+    function stopLoop() {
+        if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
+    }
+
+    // ===== 公共 API =====
+    function schedule(task) {
+        if (!task) return null;
+        var t = Object.assign({}, task);      // 保留 chatId 等调用方字段（generate 任务靠它匹配 frame）
+        t.id = task.id || uid();
+        t.at = Number(task.at) || Date.now();
+        t.type = task.type || 'notify';
+        t.title = task.title || '';
+        t.body = task.body || '';
+        t.target = task.target || '';
+        t.channel = task.channel || '';
+        t.tag = task.tag || '';
+        t.owner = task.owner || '';
+        if (t.chatId === undefined || t.chatId === null) t.chatId = '';
+        if (t.data === undefined) t.data = null;
+
+        var list = readTasks().filter(function (x) { return x && x.id !== t.id; });
+        list.push(t);
+        if (list.length > MAX_TASKS) {        // 队列上限：保留最早到期的 MAX_TASKS 条
+            list.sort(function (a, b) { return (Number(a && a.at) || 0) - (Number(b && b.at) || 0); });
+            list = list.slice(0, MAX_TASKS);
+        }
+        writeTasks(list);
+        if (enabled()) { ensureLoop(); runDueTasks(Date.now()); }
+        return t;
+    }
+    function scheduleNotification(title, body, delayMs, opts) {
+        opts = opts || {};
+        return schedule({
+            id: opts.id, at: Date.now() + (Number(delayMs) || 0), type: 'notify',
+            title: title, body: body, target: opts.target, channel: opts.channel,
+            tag: opts.tag, owner: opts.owner
+        });
+    }
+    function cancel(id) {
+        if (!id) return;
+        writeTasks(readTasks().filter(function (x) { return x && x.id !== id; }));
+    }
+    function tasks() { return readTasks(); }
+    function clear() { writeTasks([]); }
+    function onDue(cb) { if (typeof cb === 'function') onDueCbs.push(cb); }
 
     function enableLocal() {
         setFlag(true);
-        // 关键：运行时才开启保活时，也要挂上「首次触摸解锁音频」的监听。
-        // 之前只有在页面加载时就已经开启才会 bindUnlock，导致后来打开保活的用户
-        // 的 play() 被 iOS 拦截、之后也没有手势来续播，保活实际从未跑起来。
         bindUnlock();
         play();
         setMediaSession();
         requestWakeLock();
-        startBeat();
+        ensureLoop();
     }
 
     function start() {
         setFlag(true);
-        if (window.parent !== window) {
+        if (!isTop) {
             // 子页面：交给主框架统一播放，避免多份音频
             try { window.parent.postMessage({ type: 'keepAlive', enabled: true }, '*'); } catch (e) {}
             return;
@@ -179,13 +395,11 @@
 
     function stop() {
         setFlag(false);
-        stopBeat();
+        stopLoop();
         releaseWakeLock();
-        try {
-            if (navigator.mediaSession) navigator.mediaSession.playbackState = 'paused';
-        } catch (e) {}
+        try { if (navigator.mediaSession) navigator.mediaSession.playbackState = 'paused'; } catch (e) {}
         try { if (audioEl) audioEl.pause(); } catch (e) {}
-        if (window.parent !== window) {
+        if (!isTop) {
             try { window.parent.postMessage({ type: 'keepAlive', enabled: false }, '*'); } catch (e) {}
         }
     }
@@ -195,7 +409,7 @@
         if (unlocked) return;
         unlocked = true;
         var handler = function () {
-            if (enabled()) { play(); setMediaSession(); if (window.parent === window) startBeat(); }
+            if (enabled()) { play(); setMediaSession(); if (isTop) ensureLoop(); }
             document.removeEventListener('touchend', handler, true);
             document.removeEventListener('click', handler, true);
         };
@@ -203,16 +417,46 @@
         document.addEventListener('click', handler, true);
     }
 
-    // 切回前台 / 页面可见性变化时恢复
-    document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible' && enabled() && window.parent === window) {
-            play();
-            setMediaSession();
-            requestWakeLock();
+    // 只信任本应用自己的 frame 发来的回执
+    function isOwnFrameSource(src) {
+        if (!src) return false;
+        var frames;
+        try { frames = document.querySelectorAll('iframe'); } catch (e) { return false; }
+        for (var i = 0; i < frames.length; i++) {
+            try { if (frames[i].contentWindow === src) return true; } catch (e) {}
+        }
+        return false;
+    }
+
+    // frame 认领到期任务后的确认，避免外壳重复弹通知
+    window.addEventListener('message', function (e) {
+        if (e.origin !== location.origin) return;             // 忽略跨源消息
+        var d = e.data;
+        if (!d || typeof d !== 'object') return;
+        if (d.type === 'nanoTaskAck' && d.id && pendingAck[d.id]) {
+            if (!isOwnFrameSource(e.source)) return;          // 只接受本应用 frame 的回执
+            delete pendingAck[d.id];
+            fireDue(d.task || { id: d.id }, true);
         }
     });
+
+    // 切回前台 / 切页面时：恢复播放并补跑已到期任务（这就是「切页面也不丢推送」的关键）
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState !== 'visible' || !enabled() || !isTop) return;
+        play();
+        setMediaSession();
+        requestWakeLock();
+        ensureLoop();
+        runDueTasks(Date.now());
+    });
     window.addEventListener('pageshow', function () {
-        if (enabled() && window.parent === window) { play(); }
+        if (!enabled() || !isTop) return;
+        play();
+        ensureLoop();
+        runDueTasks(Date.now());
+    });
+    window.addEventListener('focus', function () {
+        if (enabled() && isTop) runDueTasks(Date.now());
     });
 
     window.NanoKeepAlive = {
@@ -220,16 +464,24 @@
         isRunning: isRunning,
         start: start,
         stop: stop,
+        schedule: schedule,
+        scheduleNotification: scheduleNotification,
+        cancel: cancel,
+        tasks: tasks,
+        clear: clear,
+        runDue: function () { if (isTop) runDueTasks(Date.now()); },
+        onDue: onDue,
         // 主框架消息处理用
         apply: function (on) { on ? enableLocal() : stop(); },
         unlockAudio: bindUnlock
     };
 
-    // 页面加载时若已开启：主框架自动续播，并对首次触摸做解锁
+    // 页面加载时若已开启：主框架自动续播并补跑；并对首次触摸做解锁
     if (enabled()) {
         bindUnlock();
-        if (window.parent === window) {
+        if (isTop) {
             try { enableLocal(); } catch (e) {}
+            try { runDueTasks(Date.now()); } catch (e) {}
         }
     }
 })();
