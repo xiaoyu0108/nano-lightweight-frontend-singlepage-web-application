@@ -507,7 +507,12 @@
             : (isIndexShell ? BOTTOM_SHIFT_SEL_NO_ACTIONS : BOTTOM_SHIFT_SEL);
         applyStyle('nano-' + kind + '-shift',
             ':root{' + varName + ':' + v + 'px;}' +
-            sel + '{transform:translateY(var(' + varName + ',0px)) !important;}');
+            sel + '{transform:translateY(var(' + varName + ',0px)) !important;}' +
+            // 底栏上移（负值）时会给聊天输入栏留出动态底部留白，避免它压住最后几条气泡
+            (kind === 'bottom'
+                ? ':root{--nano-bottom-overlap:' + (v < 0 ? -v : 0) + 'px;}' +
+                  '.nano-chat-inner .message-scroll{padding-bottom:calc(22px + var(--nano-bottom-overlap,0px)) !important;}'
+                : ''));
     }
     function applyTopShift(px) { applyShift('top', px); }
     function applyBottomShift(px) { applyShift('bottom', px); }

@@ -75,6 +75,15 @@
         barkStatus.textContent = msg;
         barkStatus.style.color = isErr ? '#d9534f' : '#8e8e93';
     }
+    // Bark 推送总开关（关闭后不再向 Bark 发请求）
+    var barkToggle = document.getElementById('barkToggle');
+    if (barkToggle && window.NanoNotify) {
+        barkToggle.checked = (NanoNotify.barkEnabled ? NanoNotify.barkEnabled() : true);
+        barkToggle.addEventListener('change', function () {
+            NanoNotify.setBarkEnabled(this.checked);
+            setBarkStatus(this.checked ? 'Bark 推送已开启' : 'Bark 推送已关闭，不会再向 Bark 推送');
+        });
+    }
     if (barkKeyInput && window.NanoNotify) {
         barkKeyInput.value = NanoNotify.barkKey ? NanoNotify.barkKey() : '';
         // 本地 localStorage 存不下时，从 IndexedDB 兜底读回

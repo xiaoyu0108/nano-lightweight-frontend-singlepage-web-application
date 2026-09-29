@@ -93,7 +93,7 @@ async function sendBarkReminder(env) {
   if (!times.includes(cur)) return;
   const text = env.REMIND_TEXT || '有人想你了，点开看看～';
   const base = String(key).indexOf('http') === 0 ? String(key).replace(/\/+$/, '') : ('https://api.day.app/' + encodeURIComponent(key));
-  const url = base + '/' + encodeURIComponent('你有一条新消息') + '/' + encodeURIComponent(text) + '?group=Nano&level=active';
+  const url = base + '/' + encodeURIComponent('你有一条新消息') + '/' + encodeURIComponent(text) + '?group=Nano&level=passive';
   try { await fetch(url); } catch (e) {}
 }
 

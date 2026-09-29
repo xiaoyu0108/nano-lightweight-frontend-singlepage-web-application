@@ -24,7 +24,7 @@ exports.main_handler = async (event, context) => {
   if (!times.includes(cur)) return '跳过 ' + cur;
 
   const base = key.indexOf('http') === 0 ? key.replace(/\/+$/, '') : ('https://api.day.app/' + encodeURIComponent(key));
-  const url = base + '/' + encodeURIComponent('你有一条新消息') + '/' + encodeURIComponent(text) + '?group=Nano&level=active';
+  const url = base + '/' + encodeURIComponent('你有一条新消息') + '/' + encodeURIComponent(text) + '?group=Nano&level=passive';
 
   await new Promise((resolve) => {
     https.get(url, (res) => { res.resume(); res.on('end', resolve); }).on('error', () => resolve());

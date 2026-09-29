@@ -20,7 +20,25 @@
     }
 
     var ctx = { chatId: '', foreground: false };
-    var lastNotifyAt = {};
+    var notifyBuffer = {};      // chatId -> { title, texts:[], opts, timer }：合并同一轮的多条消息
+    var COALESCE_MS = 1200;     // 攒多久合成一条通知（不再丢弃中间的，只是合并推送）
+
+    function flushNotify(chatId) {
+        var buf = notifyBuffer[chatId];
+        if (!buf) return;
+        delete notifyBuffer[chatId];
+        try {
+            if (!window.NanoNotify || !window.NanoNotify.enabled()) return;
+            var body = buf.texts.join('\n').trim();
+            if (body.length > 200) body = body.slice(0, 200) + '…';
+            window.NanoNotify.notify(buf.title || '新消息', body || '你有一条新消息', buf.opts || {});
+        } catch (e) {}
+    }
+    function cancelNotify(chatId) {
+        var buf = notifyBuffer[chatId];
+        if (buf && buf.timer) { try { clearTimeout(buf.timer); } catch (e) {} }
+        delete notifyBuffer[chatId];
+    }
 
     function markRead(chatId) {
         if (!chatId) return;
@@ -40,29 +58,32 @@
         var isForeground = (ctx.foreground && ctx.chatId === chatId);
         if (isForeground) {
             markRead(chatId);
-        } else {
-            var u = readMap(UNREAD_KEY);
-            u[chatId] = (parseInt(u[chatId] || 0, 10) || 0) + 1;
-            writeMap(UNREAD_KEY, u);
+            return; // 正在看这个聊天时不再弹通知/响铃
         }
-        if (isForeground) return; // 正在看这个聊天时不再弹通知/响铃
-        // 同一会话短时间内只在第一条时通知，避免多行回复刷屏
-        var now = Date.now();
-        if (lastNotifyAt[chatId] && now - lastNotifyAt[chatId] < 2500) return;
-        lastNotifyAt[chatId] = now;
-        try {
-            if (window.NanoNotify && window.NanoNotify.enabled()) {
-                window.NanoNotify.notify(title || '新消息', text || '你有一条新消息', opts || {});
-            }
-        } catch (e) {}
+        var u = readMap(UNREAD_KEY);
+        u[chatId] = (parseInt(u[chatId] || 0, 10) || 0) + 1;
+        writeMap(UNREAD_KEY, u);
+        // 同一轮的多条消息合并成一条通知：中间几条不再被丢掉，也不会刷屏
+        var buf = notifyBuffer[chatId];
+        if (!buf) {
+            buf = notifyBuffer[chatId] = { title: title, texts: [], opts: opts, timer: null };
+            buf.timer = setTimeout(function () { flushNotify(chatId); }, COALESCE_MS);
+        }
+        if (title) buf.title = title;
+        if (opts) buf.opts = opts;
+        if (text) buf.texts.push(String(text));
     }
     function setContext(chatId) {
         ctx.chatId = chatId || '';
         ctx.foreground = true;
         activity(ctx.chatId);
         markRead(ctx.chatId);
+        cancelNotify(ctx.chatId);   // 已经回到这个聊天：取消还没发出去的合并通知
     }
-    function setForeground(on) { ctx.foreground = !!on; if (on) { activity(ctx.chatId); markRead(ctx.chatId); } }
+    function setForeground(on) {
+        ctx.foreground = !!on;
+        if (on) { activity(ctx.chatId); markRead(ctx.chatId); cancelNotify(ctx.chatId); }
+    }
 
     // 切到后台/锁屏时，立刻把「前台」标记关掉。
     // 否则 ctx.foreground 一直是 true，后台（保活）生成的角色消息会被当成

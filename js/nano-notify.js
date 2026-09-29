@@ -172,18 +172,35 @@
     // ===== Bark：iPhone 系统推送（国内直连，无需梯子/FCM）=====
     // 在「更多 → 其他」或控制台执行 NanoNotify.setBarkKey('你的Bark密钥') 即可开启。
     var BARK_KEY = 'nano_bark_key';
+    var BARK_ENABLED = 'nano_bark_enabled';        // Bark 推送总开关（关掉后不再向 Bark 发任何请求）
+    var BARK_LEVEL = 'nano_bark_level';            // Bark 级别：passive=静默不震动（默认），active/timeSensitive/critical
+    var BARK_CLEARED = 'nano_bark_key_cleared';    // 用户主动清空密钥的标记，避免又从 IndexedDB 读回旧密钥
     // localStorage 写满时密钥可能只写进了 IndexedDB，这里缓存一份，保证 notify() 同步取得到
     var barkCache = '';
     function barkKey() {
         try {
+            // 用户主动清空过：以清空为准，忽略内存缓存（否则其它 iframe 仍会用旧密钥继续推送）
+            if (localStorage.getItem(BARK_CLEARED) === '1') return '';
             var v = (localStorage.getItem(BARK_KEY) || '').trim();
             return v || barkCache;
         } catch (e) { return barkCache; }
     }
+    // 其它页面/iframe 清空或修改密钥时，通过 storage 事件同步（localStorage 是同源共享的）
+    try {
+        window.addEventListener('storage', function (e) {
+            if (!e || !e.key || e.key === BARK_KEY || e.key === BARK_CLEARED) {
+                try { barkCache = (localStorage.getItem(BARK_KEY) || '').trim(); } catch (err) { barkCache = ''; }
+            }
+        });
+    } catch (e) {}
     function barkKeyAsync() {
         var local = '';
+        var cleared = false;
         try { local = (localStorage.getItem(BARK_KEY) || '').trim(); } catch (e) {}
+        try { cleared = localStorage.getItem(BARK_CLEARED) === '1'; } catch (e) {}
         if (local) { barkCache = local; return Promise.resolve(local); }
+        // 用户主动清空过：不要再用 IndexedDB 里的旧密钥复活它
+        if (cleared) { barkCache = ''; return Promise.resolve(''); }
         if (typeof localforage === 'undefined') return Promise.resolve('');
         return localforage.getItem(BARK_KEY).then(function (v) {
             var k = String(v || '').trim();
@@ -196,10 +213,26 @@
         barkCache = key;
         var ok = false;
         try { localStorage.setItem(BARK_KEY, key); ok = true; } catch (e) { ok = false; }
+        try { localStorage.setItem(BARK_CLEARED, key ? '0' : '1'); } catch (e) {}
         if (typeof localforage !== 'undefined') {
+            // 清空时必须把 IndexedDB 里的旧值也一并清掉，否则下次启动会读回旧密钥继续推送
             try { localforage.setItem(BARK_KEY, key); } catch (e) {}
         }
         return ok;
+    }
+    // Bark 开关：默认开启（只要填了密钥）。用户可在「更多 → 其他」里单独关掉。
+    function barkEnabled() {
+        try { return localStorage.getItem(BARK_ENABLED) !== '0'; } catch (e) { return true; }
+    }
+    function setBarkEnabled(on) {
+        try { localStorage.setItem(BARK_ENABLED, on ? '1' : '0'); } catch (e) {}
+    }
+    // Bark 推送级别：passive 静默送达（不响不震动），避免每次都强震
+    function barkLevel() {
+        try { return (localStorage.getItem(BARK_LEVEL) || 'passive').trim() || 'passive'; } catch (e) { return 'passive'; }
+    }
+    function setBarkLevel(level) {
+        try { localStorage.setItem(BARK_LEVEL, String(level || 'passive').trim() || 'passive'); } catch (e) {}
     }
     function barkPush(title, body, opts, keyOverride) {
         var key = String(keyOverride || barkKey() || '').trim();
@@ -207,11 +240,14 @@
         opts = opts || {};
         var base = key.indexOf('http') === 0 ? key.replace(/\/+$/, '') : ('https://api.day.app/' + encodeURIComponent(key));
         var full = base + '/' + encodeURIComponent(title || 'Nano') + '/' + encodeURIComponent(String(body || '').slice(0, 150));
-        var q = ['group=' + encodeURIComponent('Nano'), 'level=active'];
+        // level 默认 passive：静默送达、不响不震动（用户可在控制台 NanoNotify.setBarkLevel('active') 调强）
+        var q = ['group=' + encodeURIComponent('Nano'), 'level=' + encodeURIComponent(opts.level || barkLevel())];
         var target = opts.target || '';
         if (target) {
             try { q.push('url=' + encodeURIComponent(location.origin + location.pathname + '?open=' + encodeURIComponent(target))); } catch (e) {}
         }
+        // 让通知显示 Nano 自己的图标，而不是 Bark 的默认图标
+        try { q.push('icon=' + encodeURIComponent(new URL('icons/icon-192.png', location.href).href)); } catch (e) {}
         var url = full + '?' + q.join('&');
         return fetch(url, { cache: 'no-store' }).then(function (r) {
             return r.json().catch(function () { return {}; });
@@ -231,7 +267,7 @@
         // Bark：应用退到后台/锁屏时，通过苹果推送弹真正的系统通知（国内可用）
         try {
             var hidden = (typeof document !== 'undefined') && (document.hidden || document.visibilityState === 'hidden');
-            if (barkKey() && (hidden || opts.force || opts.bark)) barkPush(title, body, opts);
+            if (barkEnabled() && barkKey() && (hidden || opts.force || opts.bark)) barkPush(title, body, opts);
         } catch (e) {}
         // 已按要求去掉应用内的黑色横幅（appNotify）；前台只保留提示音 + 未读红点
         var payload = {
@@ -300,6 +336,10 @@
         barkKey: barkKey,
         barkKeyAsync: barkKeyAsync,
         setBarkKey: setBarkKey,
+        barkEnabled: barkEnabled,
+        setBarkEnabled: setBarkEnabled,
+        barkLevel: barkLevel,
+        setBarkLevel: setBarkLevel,
         barkPush: barkPush
     };
 })();
