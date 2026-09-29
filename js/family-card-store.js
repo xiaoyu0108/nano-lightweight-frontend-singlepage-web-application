@@ -149,17 +149,25 @@
     function writeCharWallet(chatId, w) {
         try { localStorage.setItem(charKey(chatId), JSON.stringify(w)); } catch (e) {}
     }
-    function charSpend(chatId, desc, amount) {
+    function bumpCharTx(w, type, desc, amount) {
         var amt = Math.round((parseFloat(amount) || 0) * 100) / 100;
-        if (amt <= 0) return Promise.resolve(null);
-        var w = readCharWallet(chatId);
-        w.balance = Math.max(0, (Number(w.balance) || 0) - amt);
+        if (amt <= 0) return false;
+        w.balance = Math.max(0, (Number(w.balance) || 0) + (type === 'income' ? amt : -amt));
         w.transactions.unshift({
             id: 'ctx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-            type: 'expense', amount: amt, desc: desc || '对方消费', time: new Date().toISOString()
+            type: type, amount: amt, desc: desc || (type === 'income' ? '收入' : '支出'), time: new Date().toISOString()
         });
         if (w.transactions.length > 500) w.transactions = w.transactions.slice(0, 500);
-        writeCharWallet(chatId, w);
+        return true;
+    }
+    function charSpend(chatId, desc, amount) {
+        var w = readCharWallet(chatId);
+        if (bumpCharTx(w, 'expense', desc || '对方消费', amount)) writeCharWallet(chatId, w);
+        return Promise.resolve(w);
+    }
+    function charIncome(chatId, desc, amount) {
+        var w = readCharWallet(chatId);
+        if (bumpCharTx(w, 'income', desc || '收入', amount)) writeCharWallet(chatId, w);
         return Promise.resolve(w);
     }
 
@@ -216,6 +224,7 @@
         readCharWallet: readCharWallet,
         writeCharWallet: writeCharWallet,
         charSpend: charSpend,
+        charIncome: charIncome,
         seedCharWallet: seedCharWallet,
         bumpCharWallet: bumpCharWallet
     };

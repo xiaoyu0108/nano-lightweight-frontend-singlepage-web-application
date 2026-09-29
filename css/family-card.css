@@ -109,12 +109,12 @@ html, body {
 }
 .fc-summary-item { text-align: center; min-width: 0; }
 .fc-summary-num {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 700;
     color: #1c1c1e;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    letter-spacing: -0.3px;
 }
 .fc-summary-label {
     font-size: 11px;

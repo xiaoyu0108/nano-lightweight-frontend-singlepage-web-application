@@ -359,13 +359,38 @@ html.keyboard-open .chat-container {
 .bubble-card.familycard.response .card-footer,
 .bubble-card.familycard.rejected .card-footer { border-top-color: rgba(0,0,0,0.08); }
 
-/* 外卖卡片 */
-.bubble-card.takeout { background: #fff; color: #111; }
-.bubble-card.takeout .icon-wrap { background: rgba(255,138,0,0.14); color: #FF8A00; }
-.bubble-card.takeout .card-footer { border-top: 1px solid rgba(0,0,0,0.06); }
-.bubble-card.takeout .card-btn { background: #FF8A00; color: #fff; }
-.bubble-card.takeout .card-btn:active { background: #e07a00; }
-.bubble-card.takeout .card-btn.return-btn { background: #ececf0; color: #555; }
+/* 外卖卡片：上方信息，下方路线图 + 预计时间（与位置卡片同款方形） */
+.bubble-card.takeout { padding: 0; background: #fff; color: #111; width: 208px; }
+.tk-bubble-head { padding: 10px 12px 8px; }
+.tk-bubble-food { font-size: 14px; font-weight: 600; color: #1c1c1e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-bubble-shop { font-size: 11px; color: #8e8e93; margin-top: 2px; }
+.tk-bubble-note { font-size: 11px; color: #a0a0a6; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-bubble-map {
+    position: relative; height: 112px; overflow: hidden;
+    background: linear-gradient(135deg, #eef3f7, #e3ecf3 55%, #f2f5f8);
+}
+.tk-bubble-route {
+    position: absolute; left: 20%; top: 62%; width: 58%;
+    border-top: 3px dashed #FF8A00; transform: rotate(-24deg); border-radius: 2px;
+}
+.loc-map-pin.tk-pin-start { left: 16%; top: 66%; color: #34c759; }
+.loc-map-pin.tk-pin-end { left: 74%; top: 40%; color: #FF8A00; }
+.loc-map-pin.tk-pin-start svg, .loc-map-pin.tk-pin-end svg {
+    width: 26px; height: 26px; fill: currentColor; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.18));
+}
+.tk-bubble-eta {
+    position: absolute; left: 10px; bottom: 8px;
+    background: rgba(255,255,255,0.96); color: #FF8A00;
+    font-size: 11px; font-weight: 700; padding: 4px 10px;
+    border-radius: 999px; box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.tk-bubble-btn {
+    display: block; width: calc(100% - 20px); margin: 10px;
+    border: none; border-radius: 10px; background: #FF8A00; color: #fff;
+    font-family: inherit; font-size: 13px; font-weight: 600; padding: 9px 0; cursor: pointer;
+}
+.tk-bubble-btn:active { background: #e07a00; }
+.tk-bubble-status { padding: 0 12px 10px; font-size: 11px; color: #8e8e93; }
 .bubble-card.takeout.response,
 .bubble-card.takeout.accepted,
 .bubble-card.takeout.rejected { background: #DCDCDC; color: #8a8a8a; }

@@ -67,6 +67,14 @@
         n = Number(n) || 0;
         return '¥' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
+    // 概览数字用紧凑写法，避免大额被截断（万/亿）
+    function moneyCompact(n) {
+        n = Number(n) || 0;
+        var abs = Math.abs(n);
+        if (abs >= 1e8) return '¥' + (n / 1e8).toFixed(2) + '亿';
+        if (abs >= 1e4) return '¥' + (n / 1e4).toFixed(2) + '万';
+        return '¥' + n.toFixed(2);
+    }
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c;
@@ -131,8 +139,8 @@
             return '<div class="' + cls + '">' +
                 '<div class="fc-card-top"><span class="fc-card-type">' + esc(typeLabel) + '</span>' +
                 '<span class="fc-badge">' + badge + '</span></div>' +
-                '<div class="fc-card-limit">' + money(c.limit) + '</div>' +
-                '<div class="fc-card-meta">已用 ' + money(used) + ' · 剩余 ' + money(remain) + '</div>' +
+                '<div class="fc-card-limit">' + moneyCompact(c.limit) + '</div>' +
+                '<div class="fc-card-meta">已用 ' + moneyCompact(used) + ' · 剩余 ' + moneyCompact(remain) + '</div>' +
                 actions +
                 '</div>';
         }).join('');
@@ -165,20 +173,20 @@
         cards.forEach(function (c) {
             if (c.status === 'active') { total += Number(c.limit || 0); used += Number(c.spent || 0); }
         });
-        fcTotal.textContent = money(total);
-        fcUsed.textContent = money(used);
+        fcTotal.textContent = moneyCompact(total);
+        fcUsed.textContent = moneyCompact(used);
         renderCards(cards);
         var inv = $('inviteBtn');
         if (inv) inv.style.display = mine ? '' : 'none';
-        if (!S) { fcBalance.textContent = money(0); renderFlow([]); return; }
+        if (!S) { fcBalance.textContent = moneyCompact(0); renderFlow([]); return; }
         if (mine) {
             S.readWallet().then(function (wd) {
-                fcBalance.textContent = money(wd.balance);
+                fcBalance.textContent = moneyCompact(wd.balance);
                 renderFlow(wd.transactions || []);
             });
         } else {
             var w = S.readCharWallet(chatId);
-            fcBalance.textContent = money(w.balance);
+            fcBalance.textContent = moneyCompact(w.balance);
             renderFlow(w.transactions || []);
         }
     }

@@ -1697,19 +1697,31 @@
             const shop = clean(cardData.shop);
             const price = Number(cardData.price || 0);
             const note = clean(cardData.note);
-            const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18"/><path d="M12 3a8 8 0 0 0-8 8h16a8 8 0 0 0-8-8z"/><path d="M4 15h16l-1 5H5z"/></svg>';
             const eta = Number(cardData.eta || 0);
-            const subParts = [];
-            if (shop) subParts.push(shop);
-            if (price > 0) subParts.push('¥' + price.toFixed(2));
-            const sub = subParts.join(' · ') || '外卖';
-            const etaText = eta > 0 ? ('预计 ' + eta + ' 分钟送达') : '';
-            let footer;
-            if (st === 'accepted') footer = '<span class="card-footer-text">已确认' + (etaText ? ' · ' + etaText : '') + '</span>';
-            else if (st === 'rejected') footer = '<span class="card-footer-text">已取消</span>';
-            else if (dir === 'char') footer = '<span class="card-footer-text">' + (etaText ? etaText : (note ? note : '对方给你点了外卖')) + '</span><span class="card-actions"><button class="card-btn" data-act="takeout-accept">确认外卖</button></span>';
-            else footer = '<span class="card-footer-text">' + (etaText ? etaText : (note ? note : '等待对方确认')) + '</span>';
-            return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + food + '</div><div class="card-sub">' + sub + '</div></div></div><div class="card-footer">' + footer + '</div>';
+            const shopLine = [shop, price > 0 ? ('¥' + price.toFixed(2)) : ''].filter(Boolean).join(' · ');
+            const etaText = eta > 0 ? ('预计 ' + eta + ' 分钟') : '配送中';
+            let action = '';
+            let statusLine = '';
+            if (st === 'accepted') statusLine = '<div class="tk-bubble-status">已确认</div>';
+            else if (st === 'rejected') statusLine = '<div class="tk-bubble-status">已取消</div>';
+            else if (dir === 'char') action = '<button class="tk-bubble-btn" data-act="takeout-accept">确认外卖</button>';
+            else statusLine = '<div class="tk-bubble-status">等待对方确认</div>';
+            const pin = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.4" fill="#fff"/></svg>';
+            return '<div class="tk-bubble-head">' +
+                    '<div class="tk-bubble-food">' + food + '</div>' +
+                    (shopLine ? '<div class="tk-bubble-shop">' + shopLine + '</div>' : '') +
+                    (note ? '<div class="tk-bubble-note">' + note + '</div>' : '') +
+                '</div>' +
+                '<div class="tk-bubble-map">' +
+                    '<div class="loc-map-grid"></div>' +
+                    '<div class="loc-map-road loc-map-road-a"></div>' +
+                    '<div class="loc-map-road loc-map-road-b"></div>' +
+                    '<div class="tk-bubble-route"></div>' +
+                    '<div class="loc-map-pin tk-pin-start">' + pin + '</div>' +
+                    '<div class="loc-map-pin tk-pin-end">' + pin + '</div>' +
+                    '<div class="tk-bubble-eta">' + etaText + '</div>' +
+                '</div>' +
+                action + statusLine;
        } else if (cardData.cardType === 'location') {
             const place = String(cardData.place == null ? '位置' : cardData.place).replace(/[<>&"]/g, '');
             const dist = Number(cardData.distance || 0);
@@ -2745,12 +2757,15 @@
         if (msg.cardData.cardType === 'transfer' && msg.cardData.paidBy !== 'family') {
             const amt = parseMoneyAmount(msg.cardData.amount);
             const who = displayName || chatName || '对方';
+            const S = window.NanoFamilyCardStore;
             if (msg.type === 'right') {
-                // 我发给对方，对方收下 → 我付 → 银行−
+                // 我发给对方，对方收下 → 我付 → 银行−；同时计入对方的银行流水（收入）
                 recordBankFlow(-amt, '转账给' + who);
+                try { if (S) S.charIncome(chatId, '收到 ' + (currentUserName || '用户') + ' 的转账', amt); } catch (e) {}
             } else {
-                // 对方发给我，我收下 → 我收 → 银行+
+                // 对方发给我，我收下 → 我收 → 银行+；同时计入对方的银行流水（支出）
                 recordBankFlow(amt, '收到 ' + who + ' 的转账');
+                try { if (S) S.charSpend(chatId, '转账给 ' + (currentUserName || '用户'), amt); } catch (e) {}
             }
         }
         if (addResponse !== false) addCardResponse(msg, 'receive');

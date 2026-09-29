@@ -43,7 +43,7 @@
     // ===== 定位：虚拟定位 / 真实定位（tab 内容不同）=====
     var locationPopup = $('locationPopup');
     if (locationPopup) {
-        var locLat = null, locLng = null, locMode = 'virtual';
+        var locLat = null, locLng = null, locMode = 'virtual', locRealPlace = '';
         var locTabs = locationPopup.querySelectorAll('.vs-tab[data-loc]');
         function setLocMode(m) {
             locMode = m;
@@ -71,9 +71,27 @@
             navigator.geolocation.getCurrentPosition(function (pos) {
                 locLat = pos.coords.latitude;
                 locLng = pos.coords.longitude;
+                var coord = locLat.toFixed(4) + ', ' + locLng.toFixed(4);
                 if (st) st.textContent = '已定位';
                 var l = $('locMapLabel');
-                if (l) l.textContent = locLat.toFixed(4) + ', ' + locLng.toFixed(4);
+                if (l) l.textContent = coord;
+                // 反查地名，让角色能按地点识别（失败时回退到坐标）
+                locRealPlace = '';
+                try {
+                    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=zh-CN&lat=' + locLat + '&lon=' + locLng, { headers: { 'Accept': 'application/json' } })
+                        .then(function (r) { return r.json(); })
+                        .then(function (j) {
+                            var name = j && j.display_name ? String(j.display_name) : '';
+                            if (!name) return;
+                            var short = name.split(',').slice(0, 3).join('·').replace(/\s+/g, ' ').trim();
+                            if (!short) return;
+                            locRealPlace = short;
+                            if (st) st.textContent = '已定位：' + short;
+                            var l2 = $('locMapLabel');
+                            if (l2) l2.textContent = short;
+                        })
+                        .catch(function () {});
+                } catch (e) {}
             }, function () {
                 if (st) st.textContent = '定位失败，请改用虚拟定位';
             }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
@@ -88,7 +106,7 @@
             var place = '', distance = 0;
             if (locMode === 'real') {
                 if (locLat == null) { window.__chat.showAlert('提示', '请先获取当前位置'); return; }
-                place = locLat.toFixed(4) + ', ' + locLng.toFixed(4);
+                place = locRealPlace || (locLat.toFixed(4) + ', ' + locLng.toFixed(4));
                 distance = Math.max(0, Math.round(parseFloat(($('locationRealDistance') || {}).value) || 0));
             } else {
                 place = (placeEl && placeEl.value || '').trim();
@@ -105,7 +123,7 @@
             var dEl2 = $('locationRealDistance'); if (dEl2) dEl2.value = '';
             var st2 = $('locationStatus'); if (st2) st2.textContent = '未定位';
             var l2 = $('locMapLabel'); if (l2) l2.textContent = '未选择地点';
-            locLat = null; locLng = null;
+            locLat = null; locLng = null; locRealPlace = '';
             setLocMode('virtual');
         });
     }

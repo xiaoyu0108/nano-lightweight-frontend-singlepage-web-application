@@ -30,7 +30,7 @@
 
         html, body {
             width: 100%;
-            height: var(--app-h, 100vh);
+            height: 100vh;
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -40,7 +40,7 @@
 
         .app-container {
             width: 100%;
-            height: var(--app-h, 100vh);
+            height: 100vh;
             margin: 0;
             background: transparent;
             padding: 0 16px 0 16px;
@@ -214,7 +214,7 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: var(--app-h, 100vh);
+            height: 100vh;
             background: #ffffff;
             z-index: 100;
             display: none;
@@ -234,7 +234,7 @@
             width: 100%;
             max-width: 430px;
             margin: 0 auto;
-            height: var(--app-h, 100vh);
+            height: 100vh;
             display: flex;
             flex-direction: column;
         }
@@ -2863,35 +2863,6 @@
             setTimeout(update, 300);
         })();
 
-        // ===== iOS：外壳高度跟随“键盘上方的可视区域” =====
-        // 把 visualViewport.height 写进 --app-h，键盘弹出时整个外壳变矮，
-        // 输入栏自然贴到键盘上方，不再被 iOS 顶偏后切掉一半。
-        (function syncAppHeight() {
-            if (!window.visualViewport) return;
-            var vv = window.visualViewport;
-            var root = document.documentElement;
-            var rafId = 0;
-            function apply() {
-                try { root.style.setProperty('--app-h', Math.round(vv.height) + 'px'); } catch (e) {}
-                try { window.scrollTo(0, 0); } catch (e) {}
-            }
-            function schedule() {
-                if (rafId) return;
-                rafId = requestAnimationFrame(function () { rafId = 0; apply(); });
-            }
-            vv.addEventListener('resize', schedule);
-            vv.addEventListener('scroll', schedule);
-            // 键盘收起（输入框 blur / focusout）后延迟 100ms 再补一次，恢复整屏、底部不留白
-            function restore() { setTimeout(apply, 100); }
-            window.addEventListener('blur', restore, true);
-            document.addEventListener('focusout', restore, true);
-            // 内页（同源 iframe）输入框聚焦/失焦会 postMessage 查询键盘高度，这里顺带刷新一次
-            window.addEventListener('message', function (ev) {
-                var d = ev.data;
-                if (d && d.type === 'nanoKeyboardQuery') setTimeout(apply, 100);
-            });
-            apply();
-        })();
     })();
 
     // ===== 开场动画逻辑（原 开场.html 的脚本，已内联）=====
