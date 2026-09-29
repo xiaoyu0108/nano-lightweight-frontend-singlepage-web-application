@@ -601,16 +601,46 @@ function showToast(text) {
         typingIndicator.classList.remove('active');
     }
 
-    // ===== 读取 API 配置 =====
-    function getApiConfig() {
-        try {
-            const raw = localStorage.getItem('nano_api_config');
-            if (raw) {
-                const config = JSON.parse(raw);
-                if (config.mainUrl && config.mainKey && config.mainModel) return config;
+    // ===== 读取主 API 配置（优先 IndexedDB，和聊天页同一份；再退回 localStorage）=====
+    function readApiConfig() {
+        return new Promise(function (resolve) {
+            function fromLS() {
+                try {
+                    const raw = localStorage.getItem('nano_api_config');
+                    resolve(raw ? JSON.parse(raw) : null);
+                } catch (e) { resolve(null); }
             }
-        } catch (e) {}
-        return null;
+            try {
+                const req = indexedDB.open('nano_api_db', 2);
+                req.onupgradeneeded = function (e) {
+                    try {
+                        const d = e.target.result;
+                        if (!d.objectStoreNames.contains('api_data')) d.createObjectStore('api_data', { keyPath: 'key' });
+                    } catch (err) {}
+                };
+                req.onsuccess = function () {
+                    try {
+                        const db = req.result;
+                        const r = db.transaction('api_data', 'readonly').objectStore('api_data').get('nano_api_config');
+                        r.onsuccess = function () {
+                            const v = r.result ? r.result.value : null;
+                            if (v) resolve(v); else fromLS();
+                        };
+                        r.onerror = fromLS;
+                    } catch (e) { fromLS(); }
+                };
+                req.onerror = fromLS;
+            } catch (e) { fromLS(); }
+        });
+    }
+    // 兼容两种结构：顶层 mainUrl/mainKey/mainModel，或 main:{url,key,model}
+    function normalizeCfg(cfg) {
+        if (!cfg) return null;
+        const url = cfg.mainUrl || (cfg.main && cfg.main.url) || '';
+        const key = cfg.mainKey || (cfg.main && cfg.main.key) || '';
+        const model = cfg.mainModel || (cfg.main && cfg.main.model) || '';
+        if (!url || !key || !model) return null;
+        return { mainUrl: url, mainKey: key, mainModel: model };
     }
 
     // ===== 获取本轮所有用户消息 =====
@@ -644,9 +674,10 @@ function showToast(text) {
     }
 
     function callApi(userMessages, history) {
-        const config = getApiConfig();
+        return readApiConfig().then(function(rawCfg) {
+        const config = normalizeCfg(rawCfg);
         if (!config) {
-            return Promise.resolve('请先在 API 页面配置主 API');
+            return '请先在 API 页面配置主 API';
         }
 
         return loadChatInnerMemory().then(function(chatMemory) {
@@ -716,6 +747,7 @@ function showToast(text) {
             } catch (error) {
                 return '出错了：' + error.message;
             }
+        });
         });
     }
 

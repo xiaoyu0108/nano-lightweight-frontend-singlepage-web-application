@@ -1216,7 +1216,7 @@
         // 这些页面自己会用 --safe-top 给顶栏留白 —— 顶栏背景能一直铺到刘海里去
         const SELF_SAFE_PAGES = ['chat.html', 'chat_inner.html', 'groups.html', 'group-setting.html',
             'mask.html', 'character.html', 'favorite.html', 'emoji.html', 'memory.html', 'worldbook.html',
-            'music.html', 'voice-call.html', 'storage.html', 'backup.html', 'other.html', 'more.html',
+            'music.html', 'voice-call.html', 'video-call.html', 'storage.html', 'backup.html', 'other.html', 'more.html',
             'discover.html', 'api.html', 'moments.html', 'ins.html', 'inner-setting.html', 'beautify.html',
             'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
             'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html'];
@@ -1269,7 +1269,7 @@
             url = withBuild(url);
             voiceCallKeptAlive = false;
             try { urlSourceMap[baseName(url)] = source || ''; } catch (e) {}
-            if (url.indexOf('voice-call.html') === 0) {
+            if (url.indexOf('voice-call.html') === 0 || url.indexOf('video-call.html') === 0) {
                 showVoiceFrame();
                 voiceCallFrame.src = url;
                 overlay.classList.add('no-header');
@@ -1378,7 +1378,8 @@
 
             const chatInnerAlive = frameBase(chatInnerFrame) === 'chat_inner.html';
 
-            if (frameBase(voiceCallFrame) === 'voice-call.html') {
+            const _vcBase = frameBase(voiceCallFrame);
+            if (_vcBase === 'voice-call.html' || _vcBase === 'video-call.html') {
                 voiceCallFrame.style.display = 'none';
                 voiceCallFrame.src = 'about:blank';
             }
@@ -2195,7 +2196,8 @@
                 hideFloatBall();
                 const frame = document.getElementById('voiceCallFrame');
                 // 只要通话帧还活着（没被置回 about:blank），就从悬浮球直接续接原通话，绝不重载/重连
-                if (frame && frame.contentWindow && frameBase(frame) === 'voice-call.html') {
+                const _rb = frameBase(frame);
+                if (frame && frame.contentWindow && (_rb === 'voice-call.html' || _rb === 'video-call.html')) {
                     voiceCallKeptAlive = true;
                     overlayFrame.style.display = 'none';
             hideOtherGenericFrame();
@@ -2903,7 +2905,7 @@
                 'inner-setting.html', 'groups.html', 'group-setting.html', 'music.html', 'ins.html',
                 'moments.html', 'halo.html', 'books.html', 'character.html', 'mask.html', 'favorite.html',
                 'emoji.html', 'worldbook.html', 'memory.html', 'phone.html', 'offline.html',
-                'offline-setting.html', 'couple-spaces.html', 'voice-call.html', 'api.html',
+                'offline-setting.html', 'couple-spaces.html', 'voice-call.html', 'video-call.html', 'api.html',
                 'discover.html', 'more.html'];
             var i = 0;
             function next() {

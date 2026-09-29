@@ -595,6 +595,8 @@ html.keyboard-open .chat-container {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
     30% { transform: translateY(-6px); opacity: 1; }
 }
+/* 任意弹窗/浮层打开时隐藏底部输入栏，避免被底部弹窗遮挡 */
+body.popup-open .bottom-bar { display: none !important; }
 .bottom-bar {
     position: relative; z-index: 40; width: 100%; flex-shrink: 0;
     /* 默认带上 iPhone 底部安全区，避免输入栏被 Home 指示条/底部栏压住 */

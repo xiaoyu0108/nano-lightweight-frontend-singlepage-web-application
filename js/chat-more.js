@@ -41,6 +41,12 @@
             color: '#5856D6'
         },
         {
+            id: 'videocall',
+            label: '视频通话',
+            icon: '<path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
+            color: '#0A84FF'
+        },
+        {
             id: 'memory',
             label: '记忆',
             fa: 'fa-brain',
@@ -294,6 +300,9 @@
                 document.getElementById('imagePopup').classList.add('active');
                 break;
             case 'voicecall':
+            case 'videocall': {
+                const page = action === 'videocall' ? 'video-call.html' : 'voice-call.html';
+                const title = action === 'videocall' ? '视频通话' : '语音电话';
                 if (window.parent !== window) {
                     // 带上当前 chat 的信息，确保人设/头像/记忆同步
                     let qs = '';
@@ -306,12 +315,13 @@
                     } catch (e) {}
                     window.parent.postMessage({
                         type: 'openFullscreen',
-                        url: 'voice-call.html' + (qs ? '?' + qs : ''),
-                        title: '语音电话',
+                        url: page + (qs ? '?' + qs : ''),
+                        title: title,
                         source: 'chat_inner'
                     }, '*');
                 }
                 break;
+            }
             case 'memory':
                 if (window.parent !== window) {
                     let qs = '';
@@ -505,4 +515,47 @@
         DEFAULT_MENU_ITEMS: DEFAULT_MENU_ITEMS
     };
 
+})();
+
+// ============================================================
+// 任意弹窗/浮层打开时，隐藏底部输入栏（避免被底部弹窗遮挡）
+// 只监听这些浮层自身的 class 变化，开销很小。
+// ============================================================
+(function () {
+    var IDS = [
+        'moreOverlay', 'giftPopup', 'imagePopup', 'transferPopup', 'takeoutPopup',
+        'locationPopup', 'editPopup', 'iosAlert', 'callSheetOverlay',
+        'emojiPanelOverlay', 'emojiPanel', 'voiceSheetOverlay', 'nanoVoiceLayer'
+    ];
+    function isOpen(el) {
+        if (!el) return false;
+        var c = el.classList;
+        return c.contains('active') || c.contains('show') || c.contains('open');
+    }
+    var wasOpen = false;
+    function sync() {
+        var open = false;
+        for (var i = 0; i < IDS.length; i++) {
+            if (isOpen(document.getElementById(IDS[i]))) { open = true; break; }
+        }
+        if (open && !wasOpen) {
+            // 弹窗打开时收起键盘，避免键盘和底部弹窗打架
+            try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+        }
+        wasOpen = open;
+        document.body.classList.toggle('popup-open', open);
+    }
+    function boot() {
+        var mo = new MutationObserver(sync);
+        IDS.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) mo.observe(el, { attributes: true, attributeFilter: ['class'] });
+        });
+        sync();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
 })();
