@@ -231,11 +231,46 @@ function setupThoughtExpand(el) {
 .iv-subject { border-bottom: 1px solid rgba(60, 60, 67, 0.08); }
 .iv-thought { font-family: var(--iv-sans); }`;
 
+  // ===== 内置模板 4：自由排版 · 任意移动 / 隐藏文字 / 头像大小位置 =====
+  const FREE_CSS = `/* 自由排版 · 任意移动 / 隐藏文字 / 头像大小位置
+   改下面这些变量就能自由摆放（px / % / vw 都行）：
+     --iv-card-x / --iv-card-y      整张卡片相对居中位置的偏移
+     --iv-avatar-size               头像大小
+     --iv-avatar-x / --iv-avatar-y  头像相对位置偏移
+   隐藏文字：把对应变量设为 none 即可
+     --iv-caption-display   “发送人”小字
+     --iv-name-display      昵称
+     --iv-meta-display      收件人 / 时间信息
+     --iv-subject-display   “此刻 · 印象”主题
+*/
+.nano-voice-modal{
+  --iv-card-x: 0px;
+  --iv-card-y: 0px;
+  --iv-avatar-size: 72px;
+  --iv-avatar-x: 0px;
+  --iv-avatar-y: 0px;
+  --iv-caption-display: block;
+  --iv-name-display: block;
+  --iv-meta-display: grid;
+  --iv-subject-display: block;
+  position: relative;
+  left: var(--iv-card-x);
+  top: var(--iv-card-y);
+  overflow: visible;
+}
+.iv-sender { position: relative; }
+.iv-avatar { transform: translate(var(--iv-avatar-x), var(--iv-avatar-y)); }
+.iv-caption { display: var(--iv-caption-display); }
+.iv-name { display: var(--iv-name-display); }
+.iv-meta { display: var(--iv-meta-display); }
+.iv-subject { display: var(--iv-subject-display); }`;
+
   // ===== 内置模板列表（首次自动写入，且在模板管理里不可删除/改名） =====
   const BUILTIN_TEMPLATES = [
     { id: 'default', name: '默认 · 居中大头像', css: DEFAULT_CSS },
     { id: 'builtin_classic', name: '经典 · 左头像 iOS邮件', css: CLASSIC_CSS },
-    { id: 'builtin_minimal', name: '极简 · 无边框', css: MINIMAL_CSS }
+    { id: 'builtin_minimal', name: '极简 · 无边框', css: MINIMAL_CSS },
+    { id: 'builtin_free', name: '自由排版 · 可移动/隐藏', css: FREE_CSS }
   ];
   function isBuiltinTemplate(id) {
     return BUILTIN_TEMPLATES.some(function (b) { return b.id === id; });
@@ -412,6 +447,7 @@ function setupThoughtExpand(el) {
     let css = '';
     if (c.hideAvatar) css += '.nano-voice-modal .iv-avatar{display:none !important;}\n';
     if (c.hideName) css += '.nano-voice-modal .iv-name{display:none !important;}\n';
+    if (c.hideCaption) css += '.nano-voice-modal .iv-caption{display:none !important;}\n';
     if (c.hideSubject) css += '.nano-voice-modal .iv-subject{display:none !important;}\n';
     if (c.hideMeta) css += '.nano-voice-modal .iv-meta{display:none !important;}\n';
     if (c.hideUnread) css += '.nano-voice-modal .iv-unread{display:none !important;}\n';
@@ -444,6 +480,8 @@ function setupThoughtExpand(el) {
     if (sa) sa.checked = !c.hideAvatar;
     if (sn) sn.checked = !c.hideName;
     if (ar) ar.checked = !!c.avatarRight;
+    const sc = $('ivShowCaption');
+    if (sc) sc.checked = !c.hideCaption;
     const ss = $('ivShowSubject'), sm = $('ivShowMeta');
     if (ss) ss.checked = !c.hideSubject;
     if (sm) sm.checked = !c.hideMeta;
@@ -460,6 +498,8 @@ function setupThoughtExpand(el) {
       c.hideAvatar = sa ? !sa.checked : false;
       c.hideName = sn ? !sn.checked : false;
       c.avatarRight = ar ? !!ar.checked : false;
+      const sc = $('ivShowCaption');
+      c.hideCaption = sc ? !sc.checked : false;
       const ss = $('ivShowSubject'), sm = $('ivShowMeta');
       c.hideSubject = ss ? !ss.checked : false;
       c.hideMeta = sm ? !sm.checked : false;

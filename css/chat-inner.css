@@ -21,6 +21,18 @@ html, body {
     display: flex; flex-direction: column; overflow: hidden; position: relative;
     transition: height 0.18s ease;
 }
+/* 背景图专用底层（.chat-bg）：
+   z-index:0 → 气泡(message-scroll z-index:1) → 顶/底栏(30/40)。
+   背景图只画在这一层，不会跨层级遮住气泡；美化可继续给 .topbar/.bottom-bar 加遮罩。 */
+.chat-bg {
+    position: absolute; inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-color: transparent;
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+}
 /* iOS 键盘弹出：整体收缩到键盘上方，输入栏不被遮住 */
 html.keyboard-open .chat-container {
     height: calc(100% - var(--nano-kb, 0px));
@@ -1608,3 +1620,57 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 .nano-action-btns .nano-run{background:#ff4d94;color:#fff;}
 .nano-action-btns .nano-skip{background:rgba(120,120,128,.14);color:#1c1c1e;}
 .nano-action-btns .nano-copy{background:rgba(0,122,255,.12);color:#007aff;}
+
+
+/* =====================================================================
+   悬浮顶栏 / 底栏（消息区铺满全屏，气泡可滚到栏的下面被看到）
+   ---------------------------------------------------------------------
+   结构：.message-scroll 铺满整个 .chat-container；
+         .topbar / .multi-select-bar / .bottom-bar 悬浮在它上面，默认完全透明。
+   顶/底留白由 JS 实时量出 --chat-top-inset / --chat-bottom-inset，
+   所以初始内容不会被栏盖住，滑动时气泡会从栏的下方穿过（看得见）。
+   美化时想要遮挡：直接给 .topbar / .bottom-bar 加背景即可，例如
+     .topbar { background: linear-gradient(#fff 60%, transparent); }
+     .bottom-bar { background: linear-gradient(transparent, #fff 40%); }
+   想额外加大/减小留白：--chat-top-extra / --chat-bottom-extra
+   ===================================================================== */
+.chat-container {
+    /* JS 未运行时的兜底估值；JS 会用内联样式覆盖 */
+    --chat-topbar-h: calc(var(--chat-topbar-pad, var(--safe-top, 0px)) + 50px);
+    --chat-top-inset: var(--chat-topbar-h);
+    --chat-bottom-inset: calc(52px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)));
+    --chat-top-extra: 8px;
+    --chat-bottom-extra: 14px;
+}
+.message-scroll {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 1; flex: none;
+    padding-top: calc(var(--chat-top-inset) + var(--chat-top-extra));
+    padding-bottom: calc(var(--chat-bottom-inset) + var(--chat-bottom-extra));
+}
+.topbar {
+    position: absolute; top: 0; left: 0; right: 0; width: auto;
+    z-index: 30; background: transparent;
+    pointer-events: none;            /* 透明空白处的手势穿透给下面的消息区 */
+}
+.topbar > * { pointer-events: auto; }
+.multi-select-bar {
+    position: absolute; top: var(--chat-topbar-h); left: 12px; right: 12px;
+    margin: 0; z-index: 31;
+}
+.bottom-bar {
+    position: absolute; left: 0; right: 0; bottom: 0; width: auto;
+    z-index: 40;
+    pointer-events: none;
+}
+.bottom-bar > * { pointer-events: auto; }
+@media (max-width: 480px) {
+    .topbar { left: 0; right: 0; top: 0; }
+    .multi-select-bar { left: 10px; right: 10px; margin: 0; }
+    .bottom-bar { left: 0; right: 0; }
+    .message-scroll {
+        padding-top: calc(var(--chat-top-inset) + var(--chat-top-extra));
+        padding-bottom: calc(var(--chat-bottom-inset) + var(--chat-bottom-extra));
+        padding-left: 10px; padding-right: 10px;
+    }
+}

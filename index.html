@@ -1117,6 +1117,66 @@
             }
         }
 
+        // ===== 右滑返回：统一入口（内页左边缘手势 / 宿主文档边缘手势都会用到）=====
+        // 返回 true 表示这次滑动已经被处理
+        function nanoActiveOverlayFrame() {
+            try {
+                const frames = document.querySelectorAll('#fullscreenOverlay iframe');
+                for (let i = frames.length - 1; i >= 0; i--) {
+                    const f = frames[i];
+                    if (f.offsetParent === null) continue;
+                    const r = f.getBoundingClientRect();
+                    if (r.width > 0 && r.height > 0) return f;
+                }
+            } catch (e) {}
+            return null;
+        }
+        // 让当前浮层内页自己先处理一次返回；处理不了就收起整层
+        function nanoAskOverlayBack() {
+            const f = nanoActiveOverlayFrame();
+            if (!f) return false;
+            let done = false;
+            let timer = null;
+            const cleanup = function () {
+                window.removeEventListener('message', onMsg);
+                if (timer) clearTimeout(timer);
+            };
+            function onMsg(ev) {
+                const d = ev.data;
+                if (!d) return;
+                if (d.type === 'nanoBackHandled') { done = true; cleanup(); }
+                else if (d.type === 'nanoBackUnhandled') { cleanup(); try { closeFullscreen(); } catch (e) {} }
+            }
+            window.addEventListener('message', onMsg);
+            timer = setTimeout(function () { if (!done) { cleanup(); try { closeFullscreen(); } catch (e) {} } }, 320);
+            try { f.contentWindow.postMessage({ type: 'nanoRequestBack' }, '*'); } catch (e) { cleanup(); return false; }
+            return true;
+        }
+        function nanoSwipeBackAction() {
+            try {
+                const ob = document.getElementById('overlayBack');
+                if (ob && overlay.classList.contains('active') && ob.getBoundingClientRect().height > 0) {
+                    ob.click();
+                    return true;
+                }
+                if (overlayActive) {
+                    if (!nanoAskOverlayBack()) { try { closeFullscreen(); } catch (e) {} }
+                    return true;
+                }
+                if (currentPage !== 'chat') {
+                    switchPage('chat');
+                    return true;
+                }
+            } catch (e) {}
+            return false;
+        }
+        // 边缘手势落在父文档（浮层左右 16px 留白）时，swipe-back.js 会派发此事件
+        document.addEventListener('nano:swipe-back-fallback', function (e) {
+            if (nanoSwipeBackAction()) {
+                try { e.preventDefault(); } catch (err) {}
+            }
+        });
+
         function showChatInnerFrame() {
             chatInnerFrame.style.display = 'block';
             // 回到单聊时让内页重读一遍已保存的美化（含头像框），避免实时广播漏掉时样式不生效
@@ -2354,17 +2414,7 @@
             }
 
             if (data.type === 'swipeBack') {
-                try {
-                    const ob = document.getElementById('overlayBack');
-                    if (ob && overlay.classList.contains('active') && ob.getBoundingClientRect().height > 0) {
-                        ob.click();
-                    } else if (overlayActive) {
-                        // 该页没有自己的返回按钮：直接收起全屏层
-                        closeFullscreen();
-                    } else if (currentPage !== 'chat') {
-                        switchPage('chat');
-                    }
-                } catch (e) {}
+                try { nanoSwipeBackAction(); } catch (e) {}
                 return;
             }
 
@@ -2903,11 +2953,16 @@
                 });
             }
             // 键盘占用的高度 = 布局视口高度 − 可视视口高度 − 可视视口顶部偏移。
-            // 必须减去 offsetTop：iOS 聚焦输入框时会把可视区往上滚，漏掉 offsetTop 会让内页
-            // 收缩过多、输入栏跑到键盘上方留出空隙；反之若 offsetTop 变化而没重算，输入栏会被键盘压住。
+            // 关键：iOS 弹出键盘时 window.innerHeight 会一起变小，直接相减会得到 0，
+            // 于是内页不收缩、输入框被键盘压住（安卓 innerHeight 不变所以正常）。
+            // 这里记录「无键盘时的基准高度」kbBaseH 再相减，iOS/安卓都正确。
+            let kbBaseH = 0;
             function kbNow() {
-                return Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+                kbBaseH = Math.max(kbBaseH, window.innerHeight || 0, vv.height || 0);
+                return Math.max(0, Math.round(kbBaseH - vv.height - vv.offsetTop));
             }
+            function resetKbBase() { kbBaseH = 0; setTimeout(update, 350); }
+            window.addEventListener('orientationchange', resetKbBase);
             function update() {
                 const kb = kbNow();
                 if (kb === update._last) return;
@@ -3107,21 +3162,41 @@
                 req.onsuccess = function () { try { req.result.transaction('pending', 'readwrite').objectStore('pending').delete('current'); } catch (e) {} };
             } catch (e) {}
         }
+        // 写入 nano_characters_db，并广播，让聊天列表 / 主页（朋友圈等）都刷新出这个新好友。
+        // 与群聊「加陌生人为好友」(js/groups.js addNpcFriend) 保持同一套路：isNpc:true 才会出现在列表里。
         function addFriend(alt) {
             try {
                 var req = indexedDB.open('nano_characters_db', 1);
                 req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {} };
                 req.onsuccess = function () {
                     try {
-                        var rec = { id: alt.id || ('alt_' + Date.now()), name: alt.name || '小号', avatar: '', gender: '', nationality: '', setting: alt.bio || '' };
-                        var tx = req.result.transaction('characters', 'readwrite');
+                        var db = req.result;
+                        var rec = {
+                            id: alt.id || ('alt_' + Date.now()),
+                            name: alt.name || '小号',
+                            avatar: alt.avatar || '',
+                            gender: alt.gender || '未知',
+                            nationality: alt.nationality || '未知',
+                            setting: alt.bio || '',
+                            isNpc: true
+                        };
+                        var tx = db.transaction('characters', 'readwrite');
                         tx.objectStore('characters').put(rec);
                         tx.oncomplete = function () {
-                            // 刷新聊天列表，让新好友出现
-                            try { var f = document.querySelector('.iframe-container.active iframe'); if (f) { f.src = f.src; } } catch (e) {}
+                            try { db.close(); } catch (e) {}
+                            notifyContactsUpdated();
                         };
+                        tx.onerror = function () { try { db.close(); } catch (e) {} };
                     } catch (e) {}
                 };
+            } catch (e) {}
+        }
+        // 通知所有 iframe（聊天列表 / 朋友圈 / ins 等）重新读取角色库
+        function notifyContactsUpdated() {
+            try {
+                document.querySelectorAll('iframe').forEach(function (f) {
+                    try { f.contentWindow.postMessage({ type: 'contactsDataUpdated' }, '*'); } catch (e) {}
+                });
             } catch (e) {}
         }
         function tellFramesDone() {

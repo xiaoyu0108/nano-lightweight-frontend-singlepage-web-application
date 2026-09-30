@@ -116,21 +116,62 @@
         var close = findClose();
         if (close) { close.click(); return; }
 
-        // 2) 再点本页返回按钮
+        // 2) 页面自定义的内部返回（SPA 子页 / 编辑态）：
+        //    页面可用 window.__nanoInternalBack = function(){ ...; return true; } 接管，
+        //    返回 true 表示已处理，返回 false 则继续走后面的通用逻辑。
+        if (typeof window.__nanoInternalBack === 'function') {
+            try { if (window.__nanoInternalBack() === true) return; } catch (e) {}
+        }
+
+        // 3) 再点本页返回按钮
         var layer = findLayer();
         var back = findBack();
         if (back && (!layer || contains(layer, back))) { back.click(); return; }
 
-        // 有浮层但找不到关闭按钮：什么都不做，避免误触返回
+        // 4) 交给宿主页面处理（index.html 监听此事件：关闭浮层 / 切回聊天页）
+        var handledByHost = false;
+        try {
+            var ev = new CustomEvent('nano:swipe-back-fallback', { cancelable: true });
+            handledByHost = !document.dispatchEvent(ev); // preventDefault 了就代表宿主已处理
+        } catch (e) {}
+        if (handledByHost) return;
+
+        // 有浮层但找不到关闭/返回按钮：什么都不做，避免误触返回
         if (layer) return;
 
-        // 3) 本页没有返回按钮（如首页）：交给主框架的返回栏（index.html 里就是 #overlayBack）
+        // 5) 本页没有返回按钮（如首页）：交给主框架的返回栏（index.html 里就是 #overlayBack）
         try {
             if (window.parent && window.parent !== window) {
                 window.parent.postMessage({ type: 'swipeBack' }, '*');
             }
         } catch (e) {}
     }
+
+    // 宿主(index.html)在「边缘手势落在父文档」时会发来 nanoRequestBack，
+    // 让当前页自己先处理一次返回；处理结果回报给宿主决定是否收起整层。
+    function handleBackRequest() {
+        var handled = false;
+        try {
+            var close = findClose();
+            if (close) { close.click(); handled = true; }
+        } catch (e) {}
+        if (!handled && typeof window.__nanoInternalBack === 'function') {
+            try { if (window.__nanoInternalBack() === true) handled = true; } catch (e) {}
+        }
+        if (!handled) {
+            try { var b = findBack(); if (b) { b.click(); handled = true; } } catch (e) {}
+        }
+        try {
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: handled ? 'nanoBackHandled' : 'nanoBackUnhandled' }, '*');
+            }
+        } catch (e) {}
+    }
+    window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (d && d.type === 'nanoRequestBack') { try { handleBackRequest(); } catch (err) {} }
+    });
+
 
     // ===== 兜住 iOS 系统边缘手势 / 浏览器「返回」=====
     // 不加这层的话：手指停几秒再滑，iOS 会自己执行「返回上一页」（历史后退），

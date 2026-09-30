@@ -214,7 +214,38 @@ const BUILTIN_CSS = {
   minimal: `:root{--page:#f0f1f3;--card:#fff;--header:#f6f7f8;--line:#e6e7ea;--line-strong:#d9dbe0;--ink:#2c2e32;--muted:#96989d;--pink:#e2e3e7;--pink-deep:#c9cbd2;--gray-pink:#eceef0}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 3px 14px rgba(30,35,40,.04)}.topbar,.bottom{background:rgba(246,247,248,.95)}`,
   mono: `:root{--page:#e8e8ea;--card:#fbfbfc;--header:#f0f0f2;--line:#e1e1e3;--line-strong:#d2d2d5;--ink:#2b2b2d;--muted:#98989b;--pink:#dedee0;--pink-deep:#c8c8cb;--gray-pink:#efeff0}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 3px 12px rgba(20,20,25,.05)}.topbar,.bottom{background:rgba(248,248,249,.96)}`,
   seablue: `:root{--page:#eaf3f9;--card:#fff;--header:#f2f8fc;--line:#dce9f1;--line-strong:#c8d9e6;--ink:#26303a;--muted:#86a0b1;--pink:#d8e8f2;--pink-deep:#b9d2e4;--gray-pink:#e4eef5}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 4px 16px rgba(50,90,120,.06)}.topbar,.bottom{background:rgba(244,250,254,.92)}`,
-  mint: `:root{--page:#ecf5f0;--card:#fff;--header:#f2f8f5;--line:#deece5;--line-strong:#cddfd5;--ink:#26342c;--muted:#8aa893;--pink:#d6e8de;--pink-deep:#b8d8c7;--gray-pink:#e5efe9}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 4px 16px rgba(40,90,70,.06)}.topbar,.bottom{background:rgba(242,248,245,.92)}`
+  mint: `:root{--page:#ecf5f0;--card:#fff;--header:#f2f8f5;--line:#deece5;--line-strong:#cddfd5;--ink:#26342c;--muted:#8aa893;--pink:#d6e8de;--pink-deep:#b8d8c7;--gray-pink:#e5efe9}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 4px 16px rgba(40,90,70,.06)}.topbar,.bottom{background:rgba(242,248,245,.92)}`,
+  free: `/* 线下 · 自由排版（任意移动 / 隐藏文字 / 头像大小位置）
+   变量：
+     --msg-x / --msg-y      整条消息相对位置偏移
+     --msg-width            消息宽度（默认 760px）
+     --avatar-size          头像大小
+     --avatar-x / --avatar-y 头像相对位置偏移
+   隐藏文字：给对应元素加 display:none（把下面的注释取消即可）
+*/
+.message{
+  --msg-x: 0px;
+  --msg-y: 0px;
+  --msg-width: 760px;
+  --avatar-size: 46px;
+  --avatar-x: 0px;
+  --avatar-y: 0px;
+  width: min(var(--msg-width), 100%);
+  transform: translate(var(--msg-x), var(--msg-y));
+}
+.identity-row{ position: relative; }
+.message .avatar{
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  flex: 0 0 var(--avatar-size);
+  transform: translate(var(--avatar-x), var(--avatar-y));
+}
+/* 想隐藏就取消注释：
+.diary-title{ display: none; }
+.nickname{ display: none; }
+.time-row{ display: none; }
+.role-label{ display: none; }
+*/`
 };
 
 function escapeHTML(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c)); }
@@ -817,6 +848,7 @@ document.getElementById('cssPreset').onchange = function() {
   if (val === 'mono') { document.getElementById('cssText').value = BUILTIN_CSS.mono; document.getElementById('cssPresetName').value = ''; return; }
   if (val === 'seablue') { document.getElementById('cssText').value = BUILTIN_CSS.seablue; document.getElementById('cssPresetName').value = ''; return; }
   if (val === 'mint') { document.getElementById('cssText').value = BUILTIN_CSS.mint; document.getElementById('cssPresetName').value = ''; return; }
+  if (val === 'free') { document.getElementById('cssText').value = BUILTIN_CSS.free; document.getElementById('cssPresetName').value = ''; return; }
   if (val === 'custom') { document.getElementById('cssText').value = settings.customCSS || ''; document.getElementById('cssPresetName').value = ''; return; }
   if (val.startsWith('user-')) {
     const idx = parseInt(val.replace('user-', ''));

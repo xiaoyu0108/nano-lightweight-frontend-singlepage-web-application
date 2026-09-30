@@ -1212,6 +1212,13 @@ function goBack(){
     openPage(prev,false);
   }else openPage('liveHome',false);
 }
+// 右滑返回：按 Halo 内部历史回退；已在底部导航根页时返回 false，交给主框架关闭整个应用
+window.__nanoInternalBack = function(){
+  try {
+    if (S.history.length > 1) { goBack(); return true; }
+  } catch (e) {}
+  return false;
+};
 function goHomeFromSummary(){
   S.history=['liveHome'];openPage('liveHome',false);
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.page==='liveHome'));

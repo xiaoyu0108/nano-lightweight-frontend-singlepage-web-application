@@ -679,24 +679,24 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 */
 
 /* 配方 I：整条底栏换样式（去胶囊）
-   .nano-chat-inner .bottom-bar { background: #f7f7fa; }
+   顶/底栏默认透明（气泡会从栏下穿过），想加底色/遮罩请用变量（见配方 J）：
+   :root { --chat-bottom-mask: #f7f7fa; }
    .nano-chat-inner .input-shell {
      background: #fff !important; backdrop-filter: none !important;
      border-radius: 14px !important; border: 1px solid rgba(0,0,0,.06) !important; box-shadow: none !important;
    }
 */
 
-/* 配方 J：用 URL 图片改「聊天下方」底图（底栏背景图）
-   .nano-chat-inner .bottom-bar {
-     background: url("https://your.cdn/bottom.png") center / cover no-repeat;
-   }
-   // 群聊同理：
+/* 配方 J：给顶栏/底栏加遮罩（默认透明，气泡从栏下穿过）
+   结构层已把 .topbar/.bottom-bar 固定成悬浮透明，直接写 background 会被覆盖；
+   请用变量加遮罩（px / 渐变 / URL 图片都行）：
+   :root { --chat-topbar-mask: linear-gradient(#fff 60%, rgba(255,255,255,0)); }
+   :root { --chat-bottom-mask: linear-gradient(transparent, #fff 40%); }
+   // 用图片做底栏遮罩：
+   :root { --chat-bottom-mask: url("https://your.cdn/bottom.png") center / cover no-repeat; }
+   // 群聊底栏未启用悬浮结构，仍可直接写 background：
    .nano-groups .bottom-bar {
      background: url("https://your.cdn/bottom.png") center / cover no-repeat;
-   }
-   // 也可以给整条底栏加一层渐变过渡（让内容不要硬切）：
-   .nano-chat-inner .bottom-bar {
-     background-image: linear-gradient(to top, #fff 60%, rgba(255,255,255,0));
    }
 */
 

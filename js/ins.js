@@ -589,6 +589,14 @@ function detailBack() {
   else go('home');
 }
 
+// 右滑返回：交给页面自己按内部层级退回（详情→来源、私信→私信列表、根页→发现页）
+window.__nanoInternalBack = function () {
+  const active = document.querySelector('.page.active');
+  if (!active) return false;
+  goBack();
+  return true;
+};
+
 // ==================== 头像 HTML ====================
 function avatarHTML(name, sizeClass, extraStyle, linkable) {
   const isMe = name === userProfile.name;

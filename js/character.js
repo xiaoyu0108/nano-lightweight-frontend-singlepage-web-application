@@ -790,6 +790,12 @@
         renderAll();
     }
 
+    // 右滑返回：编辑模式下先退出编辑（此时顶栏返回按钮被隐藏）
+    window.__nanoInternalBack = function () {
+        if (isEditMode) { exitEditMode(); return true; }
+        return false;
+    };
+
     // ===== 编辑弹窗 =====
     function openEditModal(id) {
         const item = id ? data.chars.find(c => c.id === id) : null;

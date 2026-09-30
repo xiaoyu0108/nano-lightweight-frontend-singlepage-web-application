@@ -65,6 +65,7 @@
     function applyGlobalCss(css) {
         if (!isGlobalTargetPage()) return;
         applyStyle('nano-beautify-global', css || '');
+        reorderChatLayers();
         bringAvatarToFront();
     }
 
@@ -98,16 +99,51 @@
         // 键盘弹出时底部安全区（Home 条）被键盘盖住，不再需要留白，避免输入栏被顶到键盘外看不到字
         'html.keyboard-open .bottom-bar{padding-bottom:8px !important;}';
 
+    // 悬浮顶/底栏结构（!important 强制）：消息区铺满整屏，顶/底栏悬浮其上且默认透明，
+    // 气泡滑动时会从栏的下方穿过、清晰可见。美化的聊天 CSS 里常把 .message-scroll 写回
+    // flex:1、给 .topbar 加玻璃底，会破坏这个结构，所以这里用高优先级 + !important 兜底。
+    // 想给顶/底栏加遮罩：在聊天 CSS 里设置变量即可（默认透明）：
+    //   :root{ --chat-topbar-mask: linear-gradient(#fff 60%, transparent); }
+    //   :root{ --chat-bottom-mask: linear-gradient(transparent, #fff 40%); }
+    var NANO_CHAT_FLOAT_CSS =
+        'body.nano-chat-inner .message-scroll{' +
+        'position:absolute !important;top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
+        'flex:none !important;z-index:1 !important;background:transparent !important;' +
+        'padding-top:calc(var(--chat-top-inset,60px) + var(--chat-top-extra,8px)) !important;' +
+        'padding-bottom:calc(var(--chat-bottom-inset,72px) + var(--chat-bottom-extra,14px)) !important;}' +
+        'body.nano-chat-inner .topbar{' +
+        'position:absolute !important;top:0 !important;left:0 !important;right:0 !important;width:auto !important;' +
+        'z-index:30 !important;flex-shrink:0 !important;' +
+        'background:var(--chat-topbar-mask,transparent) !important;pointer-events:none !important;}' +
+        'body.nano-chat-inner .topbar > *{pointer-events:auto !important;}' +
+        'body.nano-chat-inner .multi-select-bar{' +
+        'position:absolute !important;top:var(--chat-topbar-h,60px) !important;' +
+        'left:12px !important;right:12px !important;margin:0 !important;z-index:31 !important;}' +
+        'body.nano-chat-inner .bottom-bar{' +
+        'position:absolute !important;left:0 !important;right:0 !important;bottom:0 !important;width:auto !important;' +
+        'z-index:40 !important;flex-shrink:0 !important;' +
+        'background:var(--chat-bottom-mask,transparent) !important;pointer-events:none !important;}' +
+        'body.nano-chat-inner .bottom-bar > *{pointer-events:auto !important;}';
+
+    // 层叠顺序（决定覆盖优先级）：聊天CSS -> 结构修复 -> 全局CSS -> 悬浮结构 -> 头像
+    function reorderChatLayers() {
+        try {
+            var host = document.body || document.head || document.documentElement;
+            ['nano-beautify-chat', 'nano-beautify-chat-fix', 'nano-beautify-global', 'nano-chat-float']
+                .forEach(function (id) {
+                    var el = getEl(id);
+                    if (el && el.parentNode === host) host.appendChild(el);
+                });
+        } catch (e) {}
+    }
+
     function applyChatCss(css) {
         // 聊天 CSS 仅作用于单聊/群聊内页（额外的聊天专用覆盖）
         if (!isChatInterior) return;
         applyStyle('nano-beautify-chat', css || '');
         applyStyle('nano-beautify-chat-fix', CHAT_STRUCT_FIX);
-        // 顺序：聊天 CSS -> 结构修复 -> 全局 CSS（全局最后，便于整体覆盖）
-        var f = getEl('nano-beautify-chat-fix');
-        if (f && f.parentNode) f.parentNode.appendChild(f);
-        var g = getEl('nano-beautify-global');
-        if (g && g.parentNode) g.parentNode.appendChild(g);
+        applyStyle('nano-chat-float', NANO_CHAT_FLOAT_CSS);
+        reorderChatLayers();
         // 头像样式始终放最后，保证头像框不被聊天/全局 CSS 盖掉
         bringAvatarToFront();
     }
@@ -334,10 +370,12 @@
     // ---- 字体 ----
     function fontFormatFor(source) {
         var s = String(source || '').toLowerCase();
-        if (/\.woff2($|\?)/.test(s)) return 'woff2';
-        if (/\.woff($|\?)/.test(s)) return 'woff';
-        if (/\.otf($|\?)/.test(s)) return 'opentype';
-        return 'truetype';
+        if (/\.woff2($|[?#])/.test(s)) return 'woff2';
+        if (/\.woff($|[?#])/.test(s)) return 'woff';
+        if (/\.(otf|tof)($|[?#])/.test(s)) return 'opentype';
+        if (/\.ttf($|[?#])/.test(s)) return 'truetype';
+        // 无扩展名/CDN 链接不写 format()，让浏览器自行嗅探
+        return '';
     }
 
     var _fontBlobUrl = null;
@@ -380,11 +418,11 @@
         if (!src) return '';
         var size = (cfg.size && cfg.size > 0) ? cfg.size : 16;
         var stack = '"' + family + '",-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue","PingFang SC",Arial,sans-serif';
-        // 全站强制字体：除图标(i)与 svg 外所有元素都换字体，覆盖各页面/各功能自带的 font-family
+        var fmt = cfg.format || fontFormatFor(cfg.source || cfg.name);
+        var fmtPart = fmt ? ' format("' + fmt + '")' : '';
         // 全站强制字体：除图标(i / svg / .fa-* 图标元素)外所有元素都换字体。
         // 用 :root * 提高优先级，确保能覆盖各页面类选择器自带的 font-family（含 !important）。
-        return '@font-face{font-family:"' + family + '";src:url("' + src + '") format("' +
-            (cfg.format || fontFormatFor(cfg.source || cfg.name)) + '");font-display:swap;}' +
+        return '@font-face{font-family:"' + family + '";src:url("' + src + '")' + fmtPart + ';font-display:swap;}' +
             'html,body{font-family:' + stack + ' !important;}' +
             '*:not(i):not(svg){font-family:' + stack + ' !important;}' +
             ':root *:not(i):not(svg):not([class*="fa-"]){font-family:' + stack + ' !important;}' +
@@ -533,6 +571,53 @@
         'html body.nano-chat .app-content,html body.nano-chat .container,html body.nano-chat #chatList,html body.nano-chat .chat-list{padding-bottom:96px !important;}' +
         'html body.nano-api .app-content,html body.nano-api .container,html body.nano-more .app-content,html body.nano-more .container,html body.nano-discover .app-content,html body.nano-discover .container{padding-bottom:96px !important;}';
     function applyFlushFix() { applyStyle('nano-flush-fix', BOTTOM_FLUSH_FIX); }
+
+    // ---- 键盘抬升（所有页面通用）----
+    // 外壳 index.html 会把键盘高度 --nano-kb + .keyboard-open 同步到每个 iframe；
+    // 这里再补一层：各页面常见的底部输入栏在键盘弹出时整体上移，避免打字看不到字。
+    var KEYBOARD_CSS =
+        'html.keyboard-open .dm-composer,' +
+        'html.keyboard-open .live-composer,' +
+        'html.keyboard-open .comment-input,' +
+        'html.keyboard-open .chat-input-bar,' +
+        'html.keyboard-open .bottom-area,' +
+        'html.keyboard-open .vc-input-area,' +
+        'html.keyboard-open footer.bottom,' +
+        'html.keyboard-open .ins-emoji-panel{' +
+        'transform:translateY(calc(var(--nano-bottom-shift,0px) - var(--nano-kb,0px))) !important;' +
+        'transition:transform .18s ease;}';
+    function nanoApplyKeyboard(kb) {
+        try {
+            var v = Math.max(0, Math.round(Number(kb) || 0));
+            document.documentElement.style.setProperty('--nano-kb', v + 'px');
+            document.documentElement.classList.toggle('keyboard-open', v > 0.5);
+        } catch (e) {}
+    }
+    try { applyStyle('nano-keyboard-style', KEYBOARD_CSS); } catch (e) {}
+    window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (d && d.type === 'nanoKeyboard') nanoApplyKeyboard(d.kb);
+    });
+    // 独立打开（不在外壳里）时自行检测，iframe 内以父页面同步的值为准
+    if (window.parent === window) {
+        try {
+            if (window.visualViewport) {
+                var _vv = window.visualViewport;
+                var _kbBaseH = 0;
+                var _kbUpd = function () {
+                    try {
+                        // iOS 弹键盘时 innerHeight 会一起变小，用无键盘基准高度相减才准
+                        _kbBaseH = Math.max(_kbBaseH, window.innerHeight || 0, _vv.height || 0);
+                        nanoApplyKeyboard(_kbBaseH - _vv.height - _vv.offsetTop);
+                    } catch (e) {}
+                };
+                _vv.addEventListener('resize', _kbUpd);
+                _vv.addEventListener('scroll', _kbUpd);
+                window.addEventListener('orientationchange', function () { _kbBaseH = 0; setTimeout(_kbUpd, 350); });
+                setTimeout(_kbUpd, 300);
+            }
+        } catch (e) {}
+    }
 
     // ---- 供父框架 / 其它模块调用的入口 ----
     window.__nanoAppearance = {

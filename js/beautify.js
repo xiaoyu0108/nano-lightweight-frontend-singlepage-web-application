@@ -1941,23 +1941,29 @@ document.getElementById("back").onclick = () => {
 };
 
 document.querySelectorAll("[data-clear]").forEach(btn => {
-  btn.onclick = () => {
+  btn.onclick = async () => {
     const type = btn.dataset.clear;
     setCode(type, "");
     persistDraft(type);
+    // 立即同步到所有页面：清空后界面回到初始样式
+    await storePut("settings", { key: "applied_" + type, value: "" }).catch(() => {});
+    applyCSSToParent(type, "");
     refreshPreview(type);
-    toast("已清空");
+    toast("已清空并应用");
   };
 });
 
 document.querySelectorAll("[data-restore]").forEach(btn => {
-  btn.onclick = () => {
+  btn.onclick = async () => {
     const type = btn.dataset.restore;
     const template = type === "global" ? GLOBAL_TEMPLATE : CHAT_TEMPLATE;
     setCode(type, template);
     persistDraft(type);
+    // 立即同步到所有页面：点「还原」立刻恢复初始布局（顶栏/底栏/通知等）
+    await storePut("settings", { key: "applied_" + type, value: template }).catch(() => {});
+    applyCSSToParent(type, template);
     refreshPreview(type);
-    toast("已还原初始模板");
+    toast("已还原初始模板并应用");
   };
 });
 
@@ -2397,11 +2403,114 @@ let localURL = null;
 // ---- 字体配置：序列化后让所有 Nano 页面共享（含文件 base64 / 远程 url） ----
 function fontFormatFor(source) {
   const s = String(source || "").toLowerCase();
-  if (/\.woff2($|\?)/.test(s)) return "woff2";
-  if (/\.woff($|\?)/.test(s)) return "woff";
-  if (/\.otf($|\?)/.test(s)) return "opentype";
-  return "truetype";
+  if (/\.woff2($|[?#])/.test(s)) return "woff2";
+  if (/\.woff($|[?#])/.test(s)) return "woff";
+  if (/\.(otf|tof)($|[?#])/.test(s)) return "opentype";
+  if (/\.ttf($|[?#])/.test(s)) return "truetype";
+  // 无扩展名 / CDN 链接：不写 format()，让浏览器自行嗅探（写错反而会导致加载失败）
+  return "";
 }
+
+// 在 beautify 预览页自身注册一个 @font-face（该页不加载 appearance.js）
+function ensureLocalFontFace(family, src, format) {
+  try {
+    let st = document.getElementById("nano-font-face-preview");
+    if (!st) {
+      st = document.createElement("style");
+      st.id = "nano-font-face-preview";
+      (document.head || document.documentElement).appendChild(st);
+    }
+    const fmt = format ? ' format("' + format + '")' : "";
+    st.textContent = '@font-face{font-family:"' + family + '";src:url("' +
+      String(src).replace(/"/g, '\\"') + '")' + fmt + ';font-display:swap;}';
+  } catch (e) {}
+}
+
+// 读取远程字体：
+//   1) 直接 fetch 成同源 Blob（绕开部分环境 FontFace.load 的跨域限制）
+//   2) 直接交给 FontFace 加载
+//   3) 支持 Google Fonts 的 CSS 链接（自动解析出真正的字体文件）
+//   4) 跨域兜底：走本 App 接口代理（服务端拉取，带宽松 CORS）
+let remoteURL = null;
+
+function nanoFontTimeout(promise, ms, label) {
+  return new Promise(function (resolve, reject) {
+    const t = setTimeout(function () { reject(new Error((label || "加载") + "超时")); }, ms);
+    Promise.resolve(promise).then(function (v) { clearTimeout(t); resolve(v); },
+      function (e) { clearTimeout(t); reject(e); });
+  });
+}
+
+async function loadRemoteFontFace(family, url) {
+  const clean = String(url || "").trim();
+  const cands = [];
+  // Google Fonts CSS -> 解析出字体文件地址
+  if (/fonts\.googleapis\.com\/css/i.test(clean)) {
+    try {
+      const css = await nanoFontTimeout(fetch(clean, { mode: "cors" }).then(r => r.text()), 12000, "读取 Google Fonts");
+      const m = css.match(/url\((https?:[^)'"]+?\.(?:woff2|woff|ttf|otf)[^)'"]*)\)/i);
+      if (m && m[1]) cands.push(m[1]);
+    } catch (e) {}
+  }
+  cands.push(clean);
+  if (/^https?:/i.test(clean)) {
+    const enc = encodeURIComponent(clean);
+    // 跨域兜底：依次尝试本 App 接口代理 + 公共 CORS 代理（服务端拉取，带宽松 CORS）
+    cands.push("https://api.nano315.online/audio/proxy?url=" + enc);
+    cands.push("https://api.allorigins.win/raw?url=" + enc);
+    cands.push("https://corsproxy.io/?url=" + enc);
+  }
+  const unique = cands.filter(Boolean).filter(function (v, i, a) { return a.indexOf(v) === i; });
+  // 并发竞速：谁先成功用谁，避免一个个串行等超时导致「一直连接中」
+  let firstErr = null;
+  return await new Promise(function (resolve, reject) {
+    let pending = unique.length;
+    let done = false;
+    if (!pending) { reject(new Error("无法加载字体")); return; }
+    unique.forEach(function (u) {
+      loadOneFontFace(family, u).then(function (face) {
+        if (done) return;
+        done = true;
+        resolve(face);
+      }).catch(function (e) {
+        if (!firstErr) firstErr = e;
+        if (--pending === 0 && !done) { done = true; reject(firstErr); }
+      });
+    });
+  });
+}
+
+// 单个候选地址：先 fetch→Blob，失败再直接交给 FontFace
+async function loadOneFontFace(family, u) {
+  const ms = /nano315\.online|allorigins|corsproxy/.test(u) ? 8000 : 12000;
+  try {
+    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, ms);
+    let res;
+    try {
+      res = await fetch(u, { mode: "cors", credentials: "omit", signal: ctrl ? ctrl.signal : undefined });
+    } finally { clearTimeout(timer); }
+    if (!res || !res.ok) throw new Error("HTTP " + (res ? res.status : "?"));
+    const buf = await res.arrayBuffer();
+    if (!buf || !buf.byteLength) throw new Error("空数据");
+    const blobUrl = URL.createObjectURL(new Blob([buf], { type: res.headers.get("content-type") || "font/ttf" }));
+    const face = new FontFace(family, 'url("' + blobUrl + '")');
+    try {
+      await nanoFontTimeout(face.load(), 12000, "解析字体");
+    } catch (e) {
+      try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+      throw e;
+    }
+    document.fonts.add(face);
+    remoteURL = blobUrl;
+    return face;
+  } catch (e) { /* 退回直接 URL */ }
+  const face2 = new FontFace(family, 'url("' + String(u).replace(/"/g, '\\"') + '")');
+  await nanoFontTimeout(face2.load(), ms, "解析字体");
+  document.fonts.add(face2);
+  return face2;
+}
+
 
 function buildFontConfig() {
   if (!fontState || !fontState.name) return null;
@@ -2492,20 +2601,29 @@ document.getElementById("fontFile").onchange = async e => {
 document.getElementById("urlApply").onclick = async () => {
   const url = document.getElementById("fontUrl").value.trim();
   if (!url) return toast("请输入字体 URL");
-  try {
-    const face = new FontFace("NanoRemoteFont", 'url("' + url.replace(/"/g, '\\"') + '")');
-    await face.load();
-    document.fonts.add(face);
-    fontState = { name: "NanoRemoteFont", source: url, type: "url", data: null, size: fontState.size || 16 };
+  if (!/^(https?:|data:)/i.test(url)) return toast("请输入 http(s) 开头的字体链接");
+  const niceName = (url.split("/").pop() || "远程字体").split("?")[0] || "远程字体";
+  fontState = { name: niceName, source: url, type: "url", data: null, size: fontState.size || 16 };
+
+  // 立即注册并广播：所有页面都会通过 @font-face 各自尝试加载。
+  // 这样即使退出美化页，字体仍会在后台继续连接、加载完自动生效。
+  ensureLocalFontFace("NanoRemoteFont", url, fontFormatFor(url));
+  applyFontToPage("NanoRemoteFont");
+  try { localStorage.setItem("beautify_font_pending", url); } catch (e) {}
+  await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
+  document.getElementById("filename").textContent = "已应用远程字体（后台加载中）";
+  document.getElementById("fontMeta").textContent = "当前字体：" + url;
+  toast("已应用，字体正在后台加载");
+
+  // 后台校验：成功给个确认；失败也不回滚（已保存的链接会随页面重新尝试）
+  loadRemoteFontFace("NanoRemoteFont", url).then(function () {
+    try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
     applyFontToPage("NanoRemoteFont");
-    await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
-    document.getElementById("filename").textContent = "已连接远程字体";
-    document.getElementById("fontMeta").textContent = "当前字体：" + url;
-    toast("字体已连接");
-  } catch (err) {
-    console.error(err);
-    toast("连接失败，检查 URL 或 CORS");
-  }
+    toast("字体已连接并生效");
+  }).catch(function (err) {
+    console.warn("[font] 远程字体后台加载失败：", err);
+    toast("该链接可能不允许跨域，已保存但可能不显示，建议换可跨域的字体直链");
+  });
 };
 
 // ---- 字体预设 ----
@@ -2569,9 +2687,12 @@ document.getElementById("fontPreset").onchange = async () => {
         document.fonts.add(face);
         applyFontToPage("NanoLocalFont");
       } else if (fontState.type === "url" && fontState.source) {
-        const face = new FontFace("NanoRemoteFont", 'url("' + fontState.source.replace(/"/g, '\\"') + '")');
-        await face.load();
-        document.fonts.add(face);
+        try {
+          await loadRemoteFontFace("NanoRemoteFont", fontState.source);
+        } catch (e) {
+          console.warn("[font] 预设远程字体预加载失败，改为直接应用 @font-face：", e);
+          ensureLocalFontFace("NanoRemoteFont", fontState.source, fontFormatFor(fontState.source));
+        }
         applyFontToPage("NanoRemoteFont");
       }
       await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
@@ -2587,9 +2708,10 @@ document.getElementById("fontPreset").onchange = async () => {
 // ---- 字体应用函数 ----
 function applyFontToPage(family) {
   const size = fontState.size || 16;
-  document.body.style.fontFamily = family + ',-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif';
+  const stack = family + ',-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif';
+  document.body.style.fontFamily = stack;
   document.body.style.fontSize = size + "px";
-  fontPreview.style.fontFamily = "inherit";
+  fontPreview.style.fontFamily = stack;
   fontPreview.style.fontSize = size + "px";
   document.querySelectorAll("button,input,textarea,select").forEach(x => {
     x.style.fontFamily = "inherit";
@@ -2601,9 +2723,10 @@ function applyFontToPage(family) {
 
 function systemFont() {
   const size = fontState.size || 16;
-  document.body.style.fontFamily = '-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif';
+  const stack = '-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif';
+  document.body.style.fontFamily = stack;
   document.body.style.fontSize = size + "px";
-  fontPreview.style.fontFamily = "inherit";
+  fontPreview.style.fontFamily = stack;
   fontPreview.style.fontSize = size + "px";
   document.querySelectorAll("button,input,textarea,select").forEach(x => {
     x.style.fontFamily = "inherit";
@@ -2663,9 +2786,12 @@ document.getElementById("fontApply").onclick = async () => {
       document.fonts.add(face);
       applyFontToPage("NanoLocalFont");
     } else if (fontState.type === "url" && fontState.source) {
-      const face = new FontFace("NanoRemoteFont", 'url("' + fontState.source.replace(/"/g, '\\"') + '")');
-      await face.load();
-      document.fonts.add(face);
+      try {
+        await loadRemoteFontFace("NanoRemoteFont", fontState.source);
+      } catch (e) {
+        console.warn("[font] 远程字体预加载失败，改为直接应用 @font-face：", e);
+        ensureLocalFontFace("NanoRemoteFont", fontState.source, fontFormatFor(fontState.source));
+      }
       applyFontToPage("NanoRemoteFont");
     } else {
       return toast("字体数据无效");
@@ -2756,9 +2882,12 @@ async function restoreFontToBeautifyPage() {
       document.fonts.add(face);
       applyFontToPage("NanoLocalFont");
     } else if (fontState.type === "url" && fontState.source) {
-      const face = new FontFace("NanoRemoteFont", 'url("' + fontState.source.replace(/"/g, '\\"') + '")');
-      await face.load();
-      document.fonts.add(face);
+      try {
+        await loadRemoteFontFace("NanoRemoteFont", fontState.source);
+      } catch (e) {
+        console.warn("[font] 恢复远程字体预加载失败，改为直接应用 @font-face：", e);
+        ensureLocalFontFace("NanoRemoteFont", fontState.source, fontFormatFor(fontState.source));
+      }
       applyFontToPage("NanoRemoteFont");
     }
   } catch (e) {

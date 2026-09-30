@@ -19,6 +19,9 @@
 <body class="nano-chat-inner">
 <div class="chat-container" id="app">
 
+    <!-- 背景图专用底层：位于气泡之下，绝不跨层级遮挡气泡 -->
+    <div class="chat-bg" id="chatBg" aria-hidden="true"></div>
+
     <header class="topbar" id="topbar">
         <button class="back-btn" id="backBtn" data-back><i class="fas fa-chevron-left"></i></button>
         <span class="topbar-title" id="chatTitle">聊天</span>
@@ -487,6 +490,22 @@
       </div>
 
       <div class="iv-custom-scroll">
+        <!-- 预设切换放在 CSS 输入框上方 -->
+        <div class="iv-template-manager">
+          <span class="iv-setting-title">模板 / 预设</span>
+          <div class="iv-template-row-top">
+            <select id="ivTemplateSelect">
+              <option value="default">默认 · iOS邮件</option>
+            </select>
+            <button class="iv-template-btn danger" id="ivDeleteTemplate">删除</button>
+          </div>
+          <div class="iv-template-row-bottom">
+            <input type="text" id="ivTemplateName" placeholder="模板名称" maxlength="20">
+            <button class="iv-template-btn primary" id="ivSaveTemplate">保存</button>
+            <button class="iv-template-btn" id="ivRenameTemplate">修改</button>
+          </div>
+        </div>
+
         <div class="iv-setting">
           <div class="iv-setting-header">
             <span class="iv-setting-title">CSS 覆盖</span>
@@ -520,6 +539,7 @@
           <div class="iv-quick">
             <label class="iv-quick-row"><span class="iv-quick-label">显示头像</span><span class="iv-switch"><input type="checkbox" id="ivShowAvatar" checked><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">显示昵称</span><span class="iv-switch"><input type="checkbox" id="ivShowName" checked><i></i></span></label>
+            <label class="iv-quick-row"><span class="iv-quick-label">显示「发送人」小字</span><span class="iv-switch"><input type="checkbox" id="ivShowCaption" checked><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">头像靠右</span><span class="iv-switch"><input type="checkbox" id="ivAvatarRight"><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">显示「此刻 · 印象」</span><span class="iv-switch"><input type="checkbox" id="ivShowSubject" checked><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">显示收件信息</span><span class="iv-switch"><input type="checkbox" id="ivShowMeta" checked><i></i></span></label>
@@ -536,21 +556,6 @@
               <textarea id="ivBuiltinPrompt" placeholder="例如：必须提及今天的约定"></textarea>
             </div>
             <div class="iv-quick-actions"><button class="iv-template-btn primary" id="ivQuickSave">保存快捷设置</button></div>
-          </div>
-        </div>
-
-        <div class="iv-template-manager">
-          <span class="iv-setting-title">模板管理</span>
-          <div class="iv-template-row-top">
-            <select id="ivTemplateSelect">
-              <option value="default">默认 · iOS邮件</option>
-            </select>
-            <button class="iv-template-btn danger" id="ivDeleteTemplate">删除</button>
-          </div>
-          <div class="iv-template-row-bottom">
-            <input type="text" id="ivTemplateName" placeholder="模板名称" maxlength="20">
-            <button class="iv-template-btn primary" id="ivSaveTemplate">保存</button>
-            <button class="iv-template-btn" id="ivRenameTemplate">修改</button>
           </div>
         </div>
       </div>
@@ -605,21 +610,28 @@
 <script>
 // iOS 键盘：收缩聊天容器，让输入栏位于键盘上方（父页面也会 postMessage 同步）
 (function () {
-  var parentKb = 0, localKb = 0;
+  var parentKb = 0, localKb = 0, kbBaseH = 0;
   function apply() {
     var kb = Math.max(parentKb, localKb);
     document.documentElement.style.setProperty('--nano-kb', kb + 'px');
     document.documentElement.classList.toggle('keyboard-open', kb > 0.5);
   }
+  // iOS 弹键盘时 window.innerHeight 会一起变小，必须用「无键盘基准高度」相减，
+  // 否则算出来是 0，输入栏就被键盘压住（安卓 innerHeight 不变所以原本正常）。
+  function computeLocalKb(vv) {
+    kbBaseH = Math.max(kbBaseH, window.innerHeight || 0, vv.height || 0);
+    return Math.max(0, Math.round(kbBaseH - vv.height - vv.offsetTop));
+  }
   try {
     if (window.visualViewport) {
       var vv = window.visualViewport;
       var upd = function () {
-        localKb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+        localKb = computeLocalKb(vv);
         apply();
       };
       vv.addEventListener('resize', upd);
       vv.addEventListener('scroll', upd);
+      window.addEventListener('orientationchange', function () { kbBaseH = 0; setTimeout(upd, 350); });
     }
   } catch (e) {}
   window.addEventListener('message', function (e) {
@@ -630,7 +642,7 @@
   function isField(t) { return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
   function requery() {
     try { if (window.parent !== window) window.parent.postMessage({ type: 'nanoKeyboardQuery' }, '*'); } catch (err) {}
-    try { if (window.visualViewport) localKb = Math.max(0, Math.round(window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop)); } catch (err) {}
+    try { if (window.visualViewport) localKb = computeLocalKb(window.visualViewport); } catch (err) {}
     apply();
     // iOS：键盘弹起后把输入框滚进可视区，避免被半透明键盘/底部栏压住看不到字
     try {
@@ -648,6 +660,46 @@
     setTimeout(requery, 80);
     setTimeout(requery, 320);
   });
+})();
+</script>
+<script>
+// 悬浮顶栏/底栏：实时量出栏高，写入 --chat-top-inset / --chat-bottom-inset，
+// 让消息区顶部/底部留出对应空白（气泡滑动时可从栏下方穿过）
+(function () {
+  var app = document.getElementById('app');
+  var sc = document.getElementById('messageScroll');
+  var top = document.getElementById('topbar');
+  var ms = document.getElementById('multiSelectBar');
+  var bot = document.querySelector('.bottom-bar');
+  if (!app || !sc) return;
+  var last = { th: -1, ti: -1, bi: -1 };
+  function measure() {
+    var th = top ? Math.round(top.getBoundingClientRect().height) : 0;
+    var ti = th;
+    if (ms && ms.classList.contains('active')) ti += Math.round(ms.getBoundingClientRect().height) + 6;
+    var bi = bot ? Math.round(bot.getBoundingClientRect().height) : 0;
+    if (bi === 0) bi = last.bi > 0 ? last.bi : 0;      // 弹窗打开时底栏被隐藏，沿用旧值避免内容跳动
+    if (th === last.th && ti === last.ti && bi === last.bi) return;
+    var stick = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 40;   // 原本就在最底部
+    var dTop = last.ti >= 0 ? ti - last.ti : 0;
+    app.style.setProperty('--chat-topbar-h', th + 'px');
+    app.style.setProperty('--chat-top-inset', ti + 'px');
+    app.style.setProperty('--chat-bottom-inset', bi + 'px');
+    last = { th: th, ti: ti, bi: bi };
+    if (stick) sc.scrollTop = sc.scrollHeight;
+    else if (dTop && sc.scrollTop > 0) sc.scrollTop += dTop;
+  }
+  measure();
+  try {
+    var ro = new ResizeObserver(measure);
+    [top, ms, bot].forEach(function (el) { if (el) ro.observe(el); });
+  } catch (e) {}
+  try {
+    if (ms) new MutationObserver(measure).observe(ms, { attributes: true, attributeFilter: ['class'] });
+  } catch (e) {}
+  window.addEventListener('resize', measure);
+  window.addEventListener('load', measure);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
 })();
 </script>
 </body>

@@ -751,6 +751,16 @@ function backToDiscover() {
   window.location.href = 'discover.html';
 }
 
+// 右滑返回：先关全屏子页 → 回到选择页 → 根页交给主框架关闭
+window.__nanoInternalBack = function () {
+  try {
+    const fp = document.getElementById('fullpage');
+    if (fp && fp.classList.contains('show')) { closePage(); return true; }
+    if (entered) { switchChar(); return true; }
+  } catch (e) {}
+  return false;
+};
+
 function chooseCharByIndex(i) {
   const c = charList[i];
   if (!c) return;

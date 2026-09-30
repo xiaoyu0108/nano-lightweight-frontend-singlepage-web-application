@@ -659,6 +659,11 @@
         else history.back();
     });
 
+    // 右滑返回 = 挂断（复用挂断按钮的收尾逻辑）
+    window.__nanoInternalBack = function () {
+        try { hangupBtn.click(); return true; } catch (e) { return false; }
+    };
+
     window.addEventListener('message', function (e) {
         var d = e.data;
         if (d && d.type === 'restoreVoiceCall') {

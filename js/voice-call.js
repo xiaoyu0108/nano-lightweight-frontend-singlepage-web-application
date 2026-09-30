@@ -1178,6 +1178,11 @@ init();
         }
     });
 
+    // 右滑返回 = 挂断（走和挂断按钮完全一致的收尾逻辑）
+    window.__nanoInternalBack = function () {
+        try { hangupBtn.click(); return true; } catch (e) { return false; }
+    };
+
     // ===== 免提按钮：切换角色语音播报（配置了 TTS 才有效，未配置则无语音）=====
     if (speakerBtn) {
         speakerBtn.classList.toggle('active', speakerOn);
