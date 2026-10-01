@@ -106,7 +106,7 @@
     // ---------- 样式 ----------
     var CSS = ''
         + ':root{--ab-size:52px;}'
-        + '.ab-ball{position:fixed;z-index:2147483000;width:var(--ab-size);height:var(--ab-size);border-radius:50%;background:#2c2c2e;box-shadow:0 6px 16px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;touch-action:none;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .15s;left:0;top:0;overflow:hidden;}'
+        + '.ab-ball{position:fixed;z-index:2147483002;width:var(--ab-size);height:var(--ab-size);border-radius:50%;background:#2c2c2e;box-shadow:0 6px 16px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;touch-action:none;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .15s;left:0;top:0;overflow:hidden;}'
         + '.ab-ball:active{transform:scale(.94);}'
         + '.ab-ball.ab-hidden{display:none;}'
         + '.ab-ring{width:66%;height:66%;border-radius:50%;background:#8e8e93;box-shadow:inset 0 2px 4px rgba(255,255,255,.25),inset 0 -2px 4px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;}'
@@ -137,7 +137,24 @@
         + '.ab-bt-actions{display:flex;gap:6px;margin-bottom:10px;}'
         + '.ab-bt-btn{flex:1;border:none;border-radius:11px;background:rgba(120,120,128,.12);color:#1c1c1e;font-size:12px;padding:10px 0;font-weight:500;cursor:pointer;font-family:inherit;}'
         + '.ab-bt-btn:active{opacity:.8;}'
-        + '.ab-bt-tip{font-size:10px;color:#8e8e93;text-align:center;margin-bottom:8px;line-height:1.4;}';
+        + '.ab-bt-tip{font-size:10px;color:#8e8e93;text-align:center;margin-bottom:8px;line-height:1.4;}'
+        // ---- 环形菜单（点击悬浮球出现） ----
+        + '.ab-ring-menu{position:fixed;inset:0;z-index:2147483003;display:none;pointer-events:none;}'
+        + '.ab-ring-menu.ab-open{display:block;}'
+        + '.ab-ring-item{position:absolute;pointer-events:auto;border:none;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;box-shadow:0 6px 16px rgba(0,0,0,.24);transition:transform .14s;padding:0;}'
+        + '.ab-ring-item:active{transform:scale(.9);}'
+        + '.ab-ring-item svg{width:46%;height:46%;display:block;}'
+        + '.ab-ring-item.ab-ri-back{background:#007aff;}'
+        + '.ab-ring-item.ab-ri-api{background:#34c759;}'
+        + '.ab-ring-item.ab-ri-beauty{background:#af52de;}'
+        + '.ab-ring-label{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);font-size:9px;font-weight:600;color:#1c1c1e;background:rgba(255,255,255,.9);border-radius:6px;padding:1px 5px;white-space:nowrap;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.12);}'
+        // 环形连接线 + 面板标题 + 贴边半隐
+        + '.ab-ring-line{position:absolute;z-index:-1;background:rgba(120,120,128,.28);pointer-events:none;border-radius:2px;transform-origin:0 50%;}'
+        + '.ab-panel-title{font-size:13px;font-weight:700;color:#1c1c1e;margin:0 2px 10px;letter-spacing:-.2px;}'
+        + '.ab-close{position:absolute;top:9px;right:9px;width:26px;height:26px;border:none;border-radius:50%;background:rgba(120,120,128,.14);color:#3a3a3c;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;}'
+        + '.ab-close:active{background:rgba(120,120,128,.28);}'
+        + '.ab-ball.ab-docked{opacity:.5;}'
+        + '.ab-ball.ab-docked .ab-core{opacity:.85;}';
 
     function injectCSS() {
         var st = document.createElement('style');
@@ -158,14 +175,16 @@
     var ball = document.createElement('div');
     ball.className = 'ab-ball';
     ball.innerHTML = '<img class="ab-photo" alt=""><div class="ab-ring"><div class="ab-core" id="abCore"></div></div>';
+    // API 小窗（API / Image / TTS）
     var panel = document.createElement('div');
-    panel.className = 'ab-panel';
+    panel.className = 'ab-panel ab-panel-api';
     panel.innerHTML = ''
+        + '<button class="ab-close" data-ab-close aria-label="关闭">×</button>'
+        + '<div class="ab-panel-title">API 切换</div>'
         + '<div class="ab-tabs">'
         + '<button class="ab-tab" data-cat="api">API</button>'
         + '<button class="ab-tab" data-cat="image">Image</button>'
         + '<button class="ab-tab" data-cat="tts">TTS</button>'
-        + '<button class="ab-tab" data-cat="beautify">美化</button>'
         + '</div>'
         + '<div class="ab-api-group">'
         + '<select class="ab-select ab-preset"></select>'
@@ -174,7 +193,14 @@
         + '<select class="ab-select ab-model"></select>'
         + '<button class="ab-save">保存配置</button>'
         + '</div>'
-        + '<div class="ab-beauty-group" style="display:none">'
+        + '<div class="ab-status"></div>';
+
+    // 美化小窗（完全独立于 API 小窗）
+    var beautyPanel = document.createElement('div');
+    beautyPanel.className = 'ab-panel ab-panel-beauty';
+    beautyPanel.innerHTML = ''
+        + '<button class="ab-close" data-ab-close aria-label="关闭">×</button>'
+        + '<div class="ab-panel-title">美化</div>'
         + '<div class="ab-bt-cats">'
         + '<button class="ab-bt-cat ab-active" data-bt="global">全局美化</button>'
         + '<button class="ab-bt-cat" data-bt="chat">聊天美化</button>'
@@ -186,19 +212,34 @@
         + '</div>'
         + '<button class="ab-save" data-bt-act="save">应用并保存</button>'
         + '<div class="ab-bt-tip">还原初始会载入内置初始模板</div>'
-        + '</div>'
         + '<div class="ab-status"></div>';
+
+    // 环形菜单：点击悬浮球后围绕它展开的三个动作
+    var ringMenu = document.createElement('div');
+    ringMenu.className = 'ab-ring-menu';
+    ringMenu.innerHTML = ''
+        + '<button class="ab-ring-item ab-ri-back" data-ring="back" title="返回">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'
+        + '<span class="ab-ring-label">返回</span></button>'
+        + '<button class="ab-ring-item ab-ri-api" data-ring="api" title="API">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
+        + '<span class="ab-ring-label">API</span></button>'
+        + '<button class="ab-ring-item ab-ri-beauty" data-ring="beauty" title="美化">'
+        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>'
+        + '<span class="ab-ring-label">美化</span></button>';
 
     function mount() {
         (document.body || document.documentElement).appendChild(ball);
         (document.body || document.documentElement).appendChild(panel);
+        (document.body || document.documentElement).appendChild(beautyPanel);
+        (document.body || document.documentElement).appendChild(ringMenu);
         applySettings(settings);
         placeBall(settings.x, settings.y);
         bind();
     }
 
     var coreEl, photoEl, presetEl, modelEl, statusEl, pullBtn;
-    var apiGroup, beautyGroup, beautyPresetEl;
+    var beautyStatusEl, beautyPresetEl;
     var beautyCat = 'global';
     var activeCat = 'api';
     var working = { url: '', key: '', model: '', preset: '' };
@@ -207,12 +248,19 @@
     function $(sel, root) { return (root || panel).querySelector(sel); }
 
     function getBounds() {
+        var vw = window.innerWidth || 1, vh = window.innerHeight || 1;
         var el = document.querySelector('.app-container') || document.querySelector('.container');
         var r = el ? el.getBoundingClientRect() : null;
         if (r && r.width > 80 && r.height > 120) {
-            return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+            // 和可视窗口取交集：页面比屏幕高时，.app-container 的 bottom 会超出视口，
+            // 直接用会把小窗放到屏幕外。这里保证边界永远不超出当前可视区域。
+            var left = Math.max(0, r.left), top = Math.max(0, r.top);
+            var right = Math.min(vw, r.right), bottom = Math.min(vh, r.bottom);
+            if (right - left > 80 && bottom - top > 120) {
+                return { left: left, top: top, right: right, bottom: bottom };
+            }
         }
-        return { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+        return { left: 0, top: 0, right: vw, bottom: vh };
     }
 
     function applySettings(s) {
@@ -227,40 +275,81 @@
         coreEl = coreEl || ball.querySelector('.ab-core');
         coreEl.textContent = (!s.image && s.icon && s.icon !== 'classic') ? s.icon : '';
         panel.style.visibility = 'hidden';
-        if (s.x == null || s.y == null) {
+        beautyPanel.style.visibility = 'hidden';
+        if (!s.docked && (s.x == null || s.y == null)) {
             var b = getBounds();
             s.x = b.right - (s.size || 52) - 14;
             s.y = b.bottom - (s.size || 52) - 120;
             persistSettings({ x: s.x, y: s.y });
         }
-        placeBall(s.x, s.y);
-        if (panel.classList.contains('ab-open')) placePanel();
+        if (s.docked) placeBall(null, s.y, { dock: s.docked });
+        else placeBall(s.x, s.y);
+        if (panel.classList.contains('ab-open')) placePanel(panel);
+        if (beautyPanel.classList.contains('ab-open')) placePanel(beautyPanel);
     }
 
-    function placeBall(x, y) {
+    function placeBall(x, y, opts) {
         var size = settings.size || 52;
         var b = getBounds();
         var pad = 8;
-        x = Math.max(b.left + pad, Math.min(b.right - size - pad, x));
-        y = Math.max(b.top + pad, Math.min(b.bottom - size - pad, y));
+        if (opts && opts.dock) {
+            // 贴边：一半露在屏幕内、一半在屏幕外
+            x = opts.dock === 'left' ? (b.left - size * 0.5) : (b.right - size * 0.5);
+            y = Math.max(b.top + pad, Math.min(b.bottom - size - pad, (y == null ? settings.y : y)));
+            settings.docked = opts.dock;
+            ball.classList.add('ab-docked');
+        } else {
+            x = Math.max(b.left + pad, Math.min(b.right - size - pad, x));
+            y = Math.max(b.top + pad, Math.min(b.bottom - size - pad, y));
+            settings.docked = null;
+            ball.classList.remove('ab-docked');
+        }
         ball.style.left = x + 'px';
         ball.style.top = y + 'px';
         settings.x = x; settings.y = y;
     }
 
-    function placePanel() {
+    // 小窗跟随悬浮球：放在球旁边（右/左/下/上），优先选不遮挡悬浮球且不出界的位置，
+    // 这样球始终露在小窗旁边、可以继续拖动或再点开菜单。
+    function placePanel(which) {
+        var el = which || panel;
         var size = settings.size || 52;
-        var pw = panel.offsetWidth || 252, ph = panel.offsetHeight || 190;
+        var pw = el.offsetWidth || 252, ph = el.offsetHeight || 190;
         var b = getBounds();
         var bx = parseFloat(ball.style.left) || 0;
         var by = parseFloat(ball.style.top) || 0;
-        var left = bx + size / 2 - pw / 2;
-        left = Math.max(b.left + 8, Math.min(b.right - pw - 8, left));
-        var top = by - ph - 12;
-        if (top < b.top + 8) top = Math.min(b.bottom - ph - 8, by + size + 12);
-        panel.style.left = left + 'px';
-        panel.style.top = top + 'px';
-        panel.style.visibility = 'visible';
+        var gap = 10, pad = 8;
+        var clamp = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };
+        var inBounds = function (r) {
+            return r.l >= b.left + pad && r.t >= b.top + pad && r.l + pw <= b.right - pad && r.t + ph <= b.bottom - pad;
+        };
+        var noOverlap = function (r) {
+            return (r.l >= bx + size + 2 || r.l + pw <= bx - 2 || r.t >= by + size + 2 || r.t + ph <= by - 2);
+        };
+        var cands = [
+            { l: bx + size + gap, t: by + size / 2 - ph / 2 },       // 右
+            { l: bx - pw - gap, t: by + size / 2 - ph / 2 },         // 左
+            { l: bx + size / 2 - pw / 2, t: by + size + gap },       // 下
+            { l: bx + size / 2 - pw / 2, t: by - ph - gap }          // 上
+        ];
+        var chosen = null;
+        for (var i = 0; i < cands.length; i++) {
+            if (inBounds(cands[i]) && noOverlap(cands[i])) { chosen = cands[i]; break; }
+        }
+        if (!chosen) {
+            for (var j = 0; j < cands.length; j++) {
+                var r2 = {
+                    l: clamp(cands[j].l, b.left + pad, b.right - pw - pad),
+                    t: clamp(cands[j].t, b.top + pad, b.bottom - ph - pad)
+                };
+                if (!chosen) chosen = r2;
+                if (noOverlap(r2)) { chosen = r2; break; }
+            }
+        }
+        if (!chosen) chosen = { l: b.left + pad, t: b.top + pad };
+        el.style.left = chosen.l + 'px';
+        el.style.top = chosen.t + 'px';
+        el.style.visibility = 'visible';
     }
 
     // ---------- 交互 ----------
@@ -270,17 +359,16 @@
         modelEl = $('.ab-model');
         statusEl = $('.ab-status');
         pullBtn = $('.ab-pull');
-        apiGroup = panel.querySelector('.ab-api-group');
-        beautyGroup = panel.querySelector('.ab-beauty-group');
-        beautyPresetEl = panel.querySelector('.ab-bt-preset');
+        beautyStatusEl = beautyPanel.querySelector('.ab-status');
+        beautyPresetEl = beautyPanel.querySelector('.ab-bt-preset');
 
         panel.querySelectorAll('.ab-tab').forEach(function (b) {
             b.addEventListener('click', function () { setCat(b.dataset.cat); });
         });
-        panel.querySelectorAll('.ab-bt-cat').forEach(function (b) {
+        beautyPanel.querySelectorAll('.ab-bt-cat').forEach(function (b) {
             b.addEventListener('click', function () { setBeautyCat(b.dataset.bt); });
         });
-        panel.querySelectorAll('[data-bt-act]').forEach(function (b) {
+        beautyPanel.querySelectorAll('[data-bt-act]').forEach(function (b) {
             b.addEventListener('click', function () {
                 var a = b.dataset.btAct;
                 if (a === 'clear') doBeautyClear();
@@ -309,28 +397,79 @@
         });
         ball.addEventListener('pointermove', function (e) {
             if (!dragging) return;
-            if (Math.abs(e.clientX - startX) > 4 || Math.abs(e.clientY - startY) > 4) moved = true;
-            if (moved) placeBall(e.clientX - offX, e.clientY - offY);
+            if (!moved && (Math.abs(e.clientX - startX) > 4 || Math.abs(e.clientY - startY) > 4)) {
+                moved = true;
+                if (settings.docked) { settings.docked = null; ball.classList.remove('ab-docked'); }
+            }
+            if (moved) {
+                placeBall(e.clientX - offX, e.clientY - offY);
+                // 拖动时环形菜单 / 小窗跟着一起动
+                if (ringOpen) placeRing();
+                if (panel.classList.contains('ab-open')) placePanel(panel);
+                if (beautyPanel.classList.contains('ab-open')) placePanel(beautyPanel);
+            }
         });
         ball.addEventListener('pointerup', function (e) {
             if (!dragging) return;
             dragging = false;
             try { ball.releasePointerCapture(e.pointerId); } catch (err) {}
-            if (moved) { persistSettings({ x: settings.x, y: settings.y }); }
-            else { togglePanel(); }
+            if (moved) {
+                var size = settings.size || 52, b = getBounds();
+                var cx = settings.x + size / 2;
+                // 拖到左右边缘 → 半隐贴边
+                if (cx < b.left + size * 0.75) dockBall('left');
+                else if (cx > b.right - size * 0.75) dockBall('right');
+                persistSettings({ x: settings.x, y: settings.y, docked: settings.docked || null });
+                if (settings.docked) {
+                    // 贴边后收起菜单/小窗，点击半个球时再出来
+                    closeRing(); closePanel(panel); closePanel(beautyPanel);
+                } else {
+                    if (ringOpen) placeRing();
+                    if (panel.classList.contains('ab-open')) placePanel(panel);
+                    if (beautyPanel.classList.contains('ab-open')) placePanel(beautyPanel);
+                }
+            } else if (settings.docked) {
+                // 点贴边的半个球 → 先出来，再展开环形菜单
+                undockBall();
+                openRing();
+            } else {
+                toggleRing();
+            }
         });
         ball.addEventListener('pointercancel', function () { dragging = false; });
 
-        // 点击面板外收起
+        // 环形菜单按钮
+        ringMenu.querySelectorAll('[data-ring]').forEach(function (b) {
+            b.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var act = b.dataset.ring;
+                if (act === 'back') { closeRing(); doBack(); }
+                else if (act === 'api') { openApiPanel(); }
+                else if (act === 'beauty') { openBeautyPanel(); }
+            });
+        });
+
+        // 小窗右上角关闭按钮（即使球被挡住也能关）
+        [panel, beautyPanel].forEach(function (p) {
+            p.querySelectorAll('[data-ab-close]').forEach(function (b) {
+                b.addEventListener('click', function (e) { e.stopPropagation(); closePanel(p); });
+            });
+        });
+
+        // 点击空白处收起面板 / 环形菜单
         document.addEventListener('pointerdown', function (e) {
-            if (!panel.classList.contains('ab-open')) return;
-            if (panel.contains(e.target) || ball.contains(e.target)) return;
-            closePanel();
+            if (ringMenu.contains(e.target) || ball.contains(e.target)) return;
+            if (panel.classList.contains('ab-open') && !panel.contains(e.target)) closePanel(panel);
+            if (beautyPanel.classList.contains('ab-open') && !beautyPanel.contains(e.target)) closePanel(beautyPanel);
+            closeRing();
         }, true);
 
         window.addEventListener('resize', function () {
-            placeBall(settings.x, settings.y);
-            if (panel.classList.contains('ab-open')) placePanel();
+            if (settings.docked) placeBall(null, settings.y, { dock: settings.docked });
+            else placeBall(settings.x, settings.y);
+            if (panel.classList.contains('ab-open')) placePanel(panel);
+            if (beautyPanel.classList.contains('ab-open')) placePanel(beautyPanel);
+            if (ringOpen) placeRing();
         });
 
         // 设置同步（同源 storage 事件 + 父级消息）
@@ -338,37 +477,124 @@
             if (e.key !== LS_KEY) return;
             settings = loadSettings();
             applySettings(settings);
-            if (settings.enabled === false) closePanel();
+            if (settings.enabled === false) { closePanel(panel); closePanel(beautyPanel); closeRing(); }
         });
         window.addEventListener('message', function (e) {
             var d = e.data;
             if (d && d.type === 'apiBallSettings') {
                 settings = persistSettings(d.settings || {});
                 applySettings(settings);
-                if (settings.enabled === false) closePanel();
+                if (settings.enabled === false) { closePanel(panel); closePanel(beautyPanel); closeRing(); }
             }
         });
     }
 
     var panelOpen = false;
-    function togglePanel() {
-        if (panelOpen) closePanel();
-        else openPanel();
+    function closePanel(el) {
+        var which = el || panel;
+        which.classList.remove('ab-open');
+        if (which === panel) panelOpen = false;
     }
-    function openPanel() {
+    function openApiPanel() {
+        closeRing();
+        closePanel(beautyPanel);
         panelOpen = true;
         panel.classList.add('ab-open');
-        if (activeCat === 'beautify') {
-            loadBeautyPresets();
-            placePanel();
-            return;
-        }
-        loadAll().then(placePanel);
-        placePanel();
+        loadAll().then(function () { placePanel(panel); });
+        placePanel(panel);
     }
-    function closePanel() {
-        panelOpen = false;
-        panel.classList.remove('ab-open');
+    function openBeautyPanel() {
+        closeRing();
+        closePanel(panel);
+        beautyPanel.classList.add('ab-open');
+        loadBeautyPresets();
+        placePanel(beautyPanel);
+    }
+
+    // ---------- 环形菜单（围绕悬浮球均匀分布三个功能） ----------
+    var ringOpen = false;
+    function toggleRing() { if (ringOpen) closeRing(); else openRing(); }
+    function ringItemSize() {
+        var size = settings.size || 52;
+        return Math.max(40, Math.round(size * 0.82));
+    }
+    function ringRadius() {
+        var size = settings.size || 52;
+        return size + ringItemSize() * 0.62;
+    }
+    function openRing() {
+        closePanel(panel); closePanel(beautyPanel);
+        fitBallForRing();
+        ringOpen = true;
+        ringMenu.classList.add('ab-open');
+        placeRing();
+    }
+    function closeRing() {
+        ringOpen = false;
+        ringMenu.classList.remove('ab-open');
+    }
+    // 球太靠边时先把球心收进可视区，保证整个环形菜单都看得到
+    function fitBallForRing() {
+        var size = settings.size || 52, item = ringItemSize(), R = ringRadius();
+        var b = getBounds(), pad = 6;
+        var cx = settings.x + size / 2, cy = settings.y + size / 2;
+        var maxX = R * Math.cos(30 * Math.PI / 180) + item / 2;
+        var minX = b.left + pad + maxX;
+        var maxCx = b.right - pad - maxX;
+        var minY = b.top + pad + R + item / 2;
+        var maxCy = b.bottom - pad - (R * Math.sin(30 * Math.PI / 180) + item / 2);
+        if (maxCx < minX) { cx = (b.left + b.right) / 2; } else { cx = Math.max(minX, Math.min(maxCx, cx)); }
+        if (maxCy < minY) { cy = (b.top + b.bottom) / 2; } else { cy = Math.max(minY, Math.min(maxCy, cy)); }
+        placeBall(cx - size / 2, cy - size / 2);
+    }
+    function placeRing() {
+        var size = settings.size || 52;
+        var item = ringItemSize();
+        var radius = ringRadius();
+        var b = getBounds();
+        var pad = 6;
+        var cx = (parseFloat(ball.style.left) || 0) + size / 2;
+        var cy = (parseFloat(ball.style.top) || 0) + size / 2;
+        // 均匀分布：-90°（上）/ 30°（右下）/ 150°（左下），各自相隔 120°
+        var defs = [{ a: -90, k: 'back' }, { a: 150, k: 'beauty' }, { a: 30, k: 'api' }];
+        defs.forEach(function (d) {
+            var btn = ringMenu.querySelector('[data-ring="' + d.k + '"]');
+            if (!btn) return;
+            btn.style.width = item + 'px';
+            btn.style.height = item + 'px';
+            var rad = d.a * Math.PI / 180;
+            var px = cx + radius * Math.cos(rad) - item / 2;
+            var py = cy + radius * Math.sin(rad) - item / 2;
+            px = Math.max(b.left + pad, Math.min(b.right - item - pad, px));
+            py = Math.max(b.top + pad, Math.min(b.bottom - item - pad, py));
+            btn.style.left = px + 'px';
+            btn.style.top = py + 'px';
+        });
+    }
+    function dockBall(side) { placeBall(null, settings.y, { dock: side }); }
+    function undockBall() {
+        var size = settings.size || 52, b = getBounds(), pad = 8;
+        var x = (settings.docked === 'left') ? (b.left + pad) : (b.right - size - pad);
+        placeBall(x, settings.y);
+    }
+    // 返回：优先走宿主统一的返回逻辑（关浮层 / 回聊天页），否则点本页返回按钮
+    function doBack() {
+        // 外壳 index.html 提供了统一返回逻辑
+        if (typeof window.__nanoGoBack === 'function') {
+            try { if (window.__nanoGoBack()) return; } catch (e) {}
+            return; // 已在首页、无可返回：直接不动，避免退出 App
+        }
+        // 独立打开的页面：点它自己的可见返回按钮
+        var b = null, list = document.querySelectorAll('[data-back]');
+        for (var i = list.length - 1; i >= 0; i--) {
+            var r = list[i].getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) { b = list[i]; break; }
+        }
+        if (b) { try { b.click(); return; } catch (e) {} }
+        try {
+            if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'swipeBack' }, '*');
+            else history.back();
+        } catch (e) {}
     }
 
     // ---------- 数据 ----------
@@ -387,14 +613,6 @@
         panel.querySelectorAll('.ab-tab').forEach(function (b) {
             b.classList.toggle('ab-active', b.dataset.cat === cat);
         });
-        var isBeauty = (cat === 'beautify');
-        if (apiGroup) apiGroup.style.display = isBeauty ? 'none' : '';
-        if (beautyGroup) beautyGroup.style.display = isBeauty ? 'block' : 'none';
-        if (isBeauty) {
-            if (statusEl) statusEl.textContent = '';
-            loadBeautyPresets();
-            return;
-        }
         loadAll();
     }
 
@@ -559,11 +777,13 @@
         });
     }
 
-    function flash(msg) {
-        statusEl.textContent = msg;
+    function flash(msg, el) {
+        var target = el || statusEl;
+        if (!target) return;
+        target.textContent = msg;
         clearTimeout(flash._t);
         flash._t = setTimeout(function () {
-            if (statusEl.textContent === msg) statusEl.textContent = '';
+            if (target.textContent === msg) target.textContent = '';
         }, 2600);
     }
 
@@ -683,7 +903,7 @@
 
     function setBeautyCat(cat) {
         beautyCat = cat;
-        panel.querySelectorAll('.ab-bt-cat').forEach(function (b) {
+        beautyPanel.querySelectorAll('.ab-bt-cat').forEach(function (b) {
             b.classList.toggle('ab-active', b.dataset.bt === cat);
         });
         loadBeautyPresets();
@@ -694,11 +914,11 @@
         if (!id) return;
         bdbAllPresets().then(function (items) {
             var found = (items || []).find(function (x) { return x.id === id && x.category === beautyCat; });
-            if (!found) { flash('预设不存在，请重新选择'); return; }
+            if (!found) { flash('预设不存在，请重新选择', beautyStatusEl); return; }
             var css = found.code || '';
             applyBeautify(beautyCat, css);
             bdbSet('settings', { key: 'applied_' + beautyCat, value: css }).then(function () {
-                flash('已切换：' + (found.name || ''));
+                flash('已切换：' + (found.name || ''), beautyStatusEl);
             });
         });
     }
@@ -719,17 +939,17 @@
             } catch (e) {}
         }
         bdbSet('settings', { key: 'applied_' + beautyCat, value: '' }).then(function () {
-            flash('已清空' + (beautyCat === 'global' ? '全局' : '聊天') + '美化');
+            flash('已清空' + (beautyCat === 'global' ? '全局' : '聊天') + '美化', beautyStatusEl);
         });
     }
 
     function doBeautyRestore() {
         ensureBeautyScripts().then(function () {
             var tpl = initialTemplate(beautyCat);
-            if (!tpl) { flash('初始模板加载失败'); return; }
+            if (!tpl) { flash('初始模板加载失败', beautyStatusEl); return; }
             applyBeautify(beautyCat, tpl);
             bdbSet('settings', { key: 'applied_' + beautyCat, value: tpl }).then(function () {
-                flash('已还原初始');
+                flash('已还原初始', beautyStatusEl);
             });
         });
     }
@@ -749,7 +969,7 @@
             applyBeautify(beautyCat, css2);
             p = bdbSet('settings', { key: 'applied_' + beautyCat, value: css2 });
         }
-        p.then(function () { flash('已保存'); });
+        p.then(function () { flash('已保存', beautyStatusEl); });
     }
 
     window.ApiBall = {
@@ -758,10 +978,11 @@
         apply: function (patch) {
             settings = persistSettings(patch || {});
             applySettings(settings);
-            if (settings.enabled === false) closePanel();
+            if (settings.enabled === false) { closePanel(panel); closePanel(beautyPanel); closeRing(); }
         },
-        open: openPanel,
-        close: closePanel
+        open: openApiPanel,
+        close: function () { closePanel(panel); closePanel(beautyPanel); },
+        openRing: openRing
     };
 
     if (document.readyState === 'loading') {

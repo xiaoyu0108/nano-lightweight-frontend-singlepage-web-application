@@ -957,6 +957,43 @@ function idbPutRecord(dbName, storeName, key, value) {
     })).catch(() => false);
 }
 
+// localforage 默认库：库名 localforage、存储 keyvaluepairs（无 keyPath）。
+// 新设备上该库可能还不存在，需要按 localforage 的结构补建，否则聊天记录写不进去。
+function idbPutLocalforage(rows) {
+    if (!rows || !rows.length) return Promise.resolve();
+    return new Promise((resolve) => {
+        const write = (db) => {
+            try {
+                const tx = db.transaction('keyvaluepairs', 'readwrite');
+                const store = tx.objectStore('keyvaluepairs');
+                rows.forEach((r) => { try { store.put(r.value, r.key); } catch (e) {} });
+                tx.oncomplete = () => { try { db.close(); } catch (e) {} resolve(); };
+                tx.onerror = () => { try { db.close(); } catch (e) {} resolve(); };
+                tx.onabort = () => { try { db.close(); } catch (e) {} resolve(); };
+            } catch (e) { try { db.close(); } catch (e2) {} resolve(); }
+        };
+        const req = indexedDB.open('localforage');
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('keyvaluepairs')) db.createObjectStore('keyvaluepairs');
+        };
+        req.onsuccess = () => {
+            let db = req.result;
+            if (db.objectStoreNames.contains('keyvaluepairs')) { write(db); return; }
+            const v = (db.version || 1) + 1;
+            db.close();
+            const req2 = indexedDB.open('localforage', v);
+            req2.onupgradeneeded = (e) => {
+                const d = e.target.result;
+                if (!d.objectStoreNames.contains('keyvaluepairs')) d.createObjectStore('keyvaluepairs');
+            };
+            req2.onsuccess = () => write(req2.result);
+            req2.onerror = () => resolve();
+        };
+        req.onerror = () => resolve();
+    });
+}
+
 async function listCharactersForBackup() {
     const rows = await idbReadAll('nano_characters_db', 'characters');
     return rows.map((r) => r.value).filter((v) => v && v.id);
@@ -995,6 +1032,11 @@ async function collectCharBackup(charId) {
 
     const vcRows = await idbReadAll('voice_call_' + charId, 'messages');
     if (vcRows.length) indexedDBData['voice_call_' + charId] = { messages: vcRows };
+
+    // localforage 默认库：这里存着完整聊天记录（chat_messages_<id>）等，之前漏了这一块导致导入后没有历史
+    const lfRows = (await idbReadAll('localforage', 'keyvaluepairs')).filter((r) =>
+        r && r.key && String(r.key).indexOf(charId) !== -1);
+    if (lfRows.length) indexedDBData['localforage'] = { keyvaluepairs: lfRows };
 
     let mask = null, maskAvatar = null;
     const bindUser = character && character.bindUser;
@@ -1109,6 +1151,11 @@ async function importCharBackup(data) {
     Object.keys(ls).forEach((k) => { try { localStorage.setItem(k, ls[k]); } catch (e) {} });
     const idb = data.indexedDB || {};
     for (const dbName in idb) {
+        if (dbName === 'localforage') {
+            // 特殊处理：补建 localforage 结构后写入完整聊天记录
+            try { await idbPutLocalforage((idb[dbName] && idb[dbName].keyvaluepairs) || []); } catch (e) {}
+            continue;
+        }
         for (const storeName in idb[dbName]) {
             const rows = idb[dbName][storeName] || [];
             for (const row of rows) {

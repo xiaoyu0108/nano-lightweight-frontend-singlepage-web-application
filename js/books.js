@@ -11,6 +11,7 @@
 let books=[], currentBook=null, currentChapter=0;
 let currentPage=0, totalPages=1, chapterPages=[];
 let markedText='';
+let markedForNextReply='';   // 标记段落只在下一轮 API 里引用一次，之后照常聊天
 let currentBubble=null;
 let folded=false;
 let pagerMode='page';
@@ -118,7 +119,7 @@ async function loadRuntimeData(){
   // ---- 2. 角色 ----
   const allChars = await nanoGetAll('nano_characters_db','characters');
   const maskId = runtime.mask ? runtime.mask.id : null;
-  runtime.characters = allChars.filter(c => c.bindUser===maskId || c.isNpc===true);
+  runtime.characters = allChars.filter(c => (c.bindUser===maskId || c.isNpc===true) && !c.nanoAssistant);
 
   // ---- 3. 世界书 ----
   try{
@@ -698,9 +699,11 @@ function closeDrawer(){
 /* ==================== 标记分享 ==================== */
 function showMarkToolbar(range){
   const tb=document.getElementById('markToolbar');
-  const rect=range.getBoundingClientRect();
-  tb.style.left=(rect.left+rect.width/2)+'px';
-  tb.style.top=(rect.top-10)+'px';
+  // 固定钉在屏幕底部：iOS 长按选词时系统自带菜单出现在选区上方，
+  // 之前把工具栏放在选区上方会被系统菜单盖住，「分享给 Char」点不到。
+  tb.style.left='50%';
+  tb.style.top='auto';
+  tb.style.bottom='calc(22px + env(safe-area-inset-bottom, 0px))';
   tb.classList.add('show');
 }
 function hideMarkToolbar(){ document.getElementById('markToolbar').classList.remove('show'); }
@@ -1166,8 +1169,8 @@ function buildSystemPrompt(){
   if(currentBook){
     sys+=`\n【正在一起看的书】\n《${currentBook.title}》第 ${currentChapter+1} 章`;
   }
-  if(markedText){
-    sys+=`\n\n【用户标记的段落】\n「${markedText}」`;
+  if(markedForNextReply){
+    sys+=`\n\n【用户标记的段落（只在最初一轮作为引子，之后不必再提）】\n「${markedForNextReply}」`;
   }
   const wbText=buildWorldbookText();
   if(wbText) sys+=`\n\n【世界书设定】\n${wbText}`;
@@ -1184,7 +1187,7 @@ function buildSystemPrompt(){
     '6. 说话方式必须贴合人设与世界书：称呼、口癖、用词、身份语气都要对得上；不确定的事不要编。\n'+
     '7. 可以自然聊到书中情节、人物、你的联想，以及你和用户的共同经历（可从长期记忆中取材）。\n'+
     '8. 每次回复 1-3 句、口语化，不写旁白、括号动作、心理描写，不复述用户的话。'+
-    '\n\n回复要求：围绕标记段落或当前章节自然对话，保持角色口吻和活人感。';
+    '\n\n回复要求：有标记段落时，第一轮围绕它自然聊一句；一旦聊开，就像平常一样顺着话题聊，不要反复回到那段话、也不要一直引用它。没有标记段落时，围绕当前章节或你们正在聊的话题自然对话，保持角色口吻和活人感，不写旁白和括号动作。';
   return sys;
 }
 
@@ -1228,6 +1231,7 @@ async function callMainAPI(){
   const sys = buildSystemPrompt();
   const history = buildHistoryMessages();
   const messages = [{role:'system',content:sys}, ...history];
+  markedForNextReply='';   // 标记段落只让角色读一次，后续消息正常聊天
 
   const res = await fetch(url,{
     method:'POST',
@@ -1307,6 +1311,9 @@ async function sendOrReply(){
   if(v){
     // 引用优先用双击引用；没有则用刚标记的原文段落（保证 char 知道在讨论哪段）
     const q = quotedText || markedText || '';
+    // 标记段落只随第一条消息走一次，并把上下文留给紧接着的那一轮回复，
+    // 之后清空，后面就是正常聊天，不再一直引用。
+    if(markedText){ markedForNextReply = markedText; markedText=''; }
     addTimeDivider();
     addMsg('me','我',null,null,v,q);
     pushAux('user', v, q);

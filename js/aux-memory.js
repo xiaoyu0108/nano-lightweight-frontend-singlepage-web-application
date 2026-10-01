@@ -245,6 +245,9 @@
         }).join('\n');
         return callLlm(url, key, model, buildPrompt(charName, userName, sourceLabel), chatText).then(function (summary) {
           var items = parseSummary(summary, charName, charId);
+          // 一起看 / 一起听：一次只留一张总结卡片就够了（线下等其它场景不受限）
+          var onlyAux = res.pending.every(function (m) { return m.source === 'books' || m.source === 'music'; });
+          if (onlyAux && items.length > 1) items = items.slice(0, 1);
           if (!items.length) return null;
           return appendMemories(charId, items).then(function () {
             return putV('auxstate_' + charId, { summarizedCount: res.done + res.pending.length });

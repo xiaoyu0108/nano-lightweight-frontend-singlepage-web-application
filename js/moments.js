@@ -500,7 +500,7 @@
     // NPC：优先用角色库 isNpc 的真实 NPC，其次用按面具生成的「关系人物花名册」
     function dbNpcs() {
         return (dbCharsCache || []).filter(function(c) {
-            return c && c.name && c.isNpc && !isGenericNpcName(c.name);
+            return c && c.name && c.isNpc && !c.nanoAssistant && !isGenericNpcName(c.name);
         }).map(function(c) {
             return {
                 id: c.id || ('npc_' + c.name),

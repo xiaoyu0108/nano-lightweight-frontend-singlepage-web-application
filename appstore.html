@@ -27,6 +27,9 @@
   --shadow-float:0 16px 44px rgba(30,35,60,.12);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* 隐藏右侧滚动条（保留滚动） */
+html,body,main{scrollbar-width:none;-ms-overflow-style:none}
+html::-webkit-scrollbar,body::-webkit-scrollbar,main::-webkit-scrollbar{display:none;width:0;height:0}
 html,body{
   margin:0;padding:0;min-height:100%;
   background:linear-gradient(180deg,#fbfcfd 0%,#f5f6f8 55%,#f1f2f5 100%);
@@ -37,7 +40,7 @@ html,body{
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 
 main{
-  padding:calc(22px + env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));
+  padding:calc(22px + max(var(--safe-top, 0px), env(safe-area-inset-top))) max(18px,env(safe-area-inset-right)) calc(96px + max(var(--nano-safe-bottom, 0px), env(safe-area-inset-bottom))) max(18px,env(safe-area-inset-left));
   max-width:480px;margin:0 auto;
 }
 
@@ -249,7 +252,7 @@ h1{margin:0;font-size:clamp(26px,8vw,34px);line-height:1.1;letter-spacing:-.04em
 
 .nav{
   position:fixed;left:0;right:0;bottom:0;z-index:20;
-  padding:8px max(18px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));
+  padding:8px max(18px,env(safe-area-inset-right)) calc(8px + max(var(--nano-safe-bottom, 0px), env(safe-area-inset-bottom))) max(18px,env(safe-area-inset-left));
   background:rgba(255,255,255,.86);
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
   border-top:1px solid var(--line);
@@ -322,7 +325,7 @@ h1{margin:0;font-size:clamp(26px,8vw,34px);line-height:1.1;letter-spacing:-.04em
   <!-- ============ 商店 ============ -->
   <div id="pageStore">
     <p class="eyebrow">MY APPSTORE</p>
-    <h1>AppStore</h1>
+    <h1 id="appstoreTitle">AppStore</h1>
     <p class="sub">导入一个 HTML 文件，就是一个应用</p>
 
     <section class="section">
@@ -605,6 +608,23 @@ h1{margin:0;font-size:clamp(26px,8vw,34px);line-height:1.1;letter-spacing:-.04em
 <input type="file" id="fileInput" accept=".html,text/html" hidden>
 <input type="file" id="backupInput" accept="application/json,.json" hidden>
 
+<script>
+// 顶栏已去掉：点左上角「AppStore」几个字返回上一层
+(function(){
+  var t = document.getElementById('appstoreTitle');
+  if (!t) return;
+  t.style.cursor = 'pointer';
+  t.addEventListener('click', function(){
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'nanoCloseOverlay' }, '*');
+      } else {
+        history.back();
+      }
+    } catch (e) {}
+  });
+})();
+</script>
 <script src="js/appstore.js"></script>
 </body>
 </html>

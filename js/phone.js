@@ -2455,8 +2455,8 @@ async function getChars(){
   try{ chars = await loadCharsFromDB(); }catch(e){ chars = []; }
   chars = (chars || []).filter(c => c && (c.name || c.id));
   const uid = getCurrentUserId();
-  let list = chars.filter(c => c.bindUser === uid || c.isNpc);
-  if(!list.length) list = chars.slice();
+  let list = chars.filter(c => (c.bindUser === uid || c.isNpc) && !c.nanoAssistant);
+  if(!list.length) list = chars.filter(c => !c.nanoAssistant).slice();
 
   const lastId = getLastChatId();
   if(lastId){

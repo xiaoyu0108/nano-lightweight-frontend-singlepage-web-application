@@ -411,18 +411,50 @@
         return '';
     }
 
+    // 收集可用的字体源：直接地址 + 允许跨域的代理兜底。
+    // iOS Safari 对跨域 Web 字体严格执行 CORS，直接挂 .ttf/.otf 链接常被静默丢弃回退到系统字体；
+    // 在 @font-face 的 src 列表里追加带 CORS 头的代理地址，浏览器会按顺序自动回退。
+    function fontSrcCandidates(cfg) {
+        var out = [];
+        function add(u, f) {
+            u = String(u == null ? '' : u).trim();
+            if (!u) return;
+            u = u.replace(/"/g, '\\"');
+            for (var i = 0; i < out.length; i++) { if (out[i].url === u) return; }
+            out.push({ url: u, format: f || '' });
+        }
+        if (!cfg) return out;
+        if (cfg.type === 'file') {
+            var fs = resolveFontSrc(cfg);
+            if (fs) add(fs, cfg.format || fontFormatFor(cfg.source || cfg.name));
+            return out;
+        }
+        if (cfg.type === 'url' && cfg.source) {
+            if (cfg.__resolved) add(cfg.__resolved, fontFormatFor(cfg.__resolved));
+            add(cfg.source, cfg.format || fontFormatFor(cfg.source));
+            if (/^https?:/i.test(cfg.source)) {
+                var enc = encodeURIComponent(cfg.source);
+                add('https://api.nano315.online/audio/proxy?url=' + enc, '');
+                add('https://api.allorigins.win/raw?url=' + enc, '');
+                add('https://corsproxy.io/?url=' + enc, '');
+            }
+        }
+        return out;
+    }
+
     function buildFontCss(cfg) {
         if (!cfg) return '';
+        var cands = fontSrcCandidates(cfg);
+        if (!cands.length) return '';
         var family = 'NanoBeautifyFont';
-        var src = resolveFontSrc(cfg);
-        if (!src) return '';
         var size = (cfg.size && cfg.size > 0) ? cfg.size : 16;
         var stack = '"' + family + '",-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue","PingFang SC",Arial,sans-serif';
-        var fmt = cfg.format || fontFormatFor(cfg.source || cfg.name);
-        var fmtPart = fmt ? ' format("' + fmt + '")' : '';
+        var srcPart = cands.map(function (c) {
+            return 'url("' + c.url + '")' + (c.format ? ' format("' + c.format + '")' : '');
+        }).join(',');
         // 全站强制字体：除图标(i / svg / .fa-* 图标元素)外所有元素都换字体。
         // 用 :root * 提高优先级，确保能覆盖各页面类选择器自带的 font-family（含 !important）。
-        return '@font-face{font-family:"' + family + '";src:url("' + src + '")' + fmtPart + ';font-display:swap;}' +
+        return '@font-face{font-family:"' + family + '";src:' + srcPart + ';font-display:swap;}' +
             'html,body{font-family:' + stack + ' !important;}' +
             '*:not(i):not(svg){font-family:' + stack + ' !important;}' +
             ':root *:not(i):not(svg):not([class*="fa-"]){font-family:' + stack + ' !important;}' +
@@ -430,8 +462,35 @@
             'html{font-size:' + size + 'px;}';
     }
 
+    // Google Fonts 的 css2 链接本身不是字体文件，先解析出真正的 woff2 地址再注入
+    var _gfontResolving = {};
+    function resolveGoogleFontFile(url) {
+        try {
+            return fetch(url, { mode: 'cors', credentials: 'omit' })
+                .then(function (r) { return r.text(); })
+                .then(function (css) {
+                    var m = String(css).match(/url\((https?:[^)'"]+?\.(?:woff2|woff|ttf|otf)[^)'"]*)\)/i);
+                    return (m && m[1]) || '';
+                })
+                .catch(function () { return ''; });
+        } catch (e) { return Promise.resolve(''); }
+    }
+
     function applyFontCfg(cfg) {
-        applyStyle('nano-beautify-font', buildFontCss(cfg || null));
+        if (!cfg) { applyStyle('nano-beautify-font', ''); return; }
+        applyStyle('nano-beautify-font', buildFontCss(cfg));
+        // 粘贴的是 Google Fonts CSS 链接时，解析成真实字体文件后重新注入
+        if (cfg.type === 'url' && cfg.source &&
+            /fonts\.googleapis\.com\/css/i.test(cfg.source) && !cfg.__resolved && !_gfontResolving[cfg.source]) {
+            _gfontResolving[cfg.source] = true;
+            resolveGoogleFontFile(cfg.source).then(function (fileUrl) {
+                if (!fileUrl) return;
+                var next = {};
+                for (var k in cfg) { if (Object.prototype.hasOwnProperty.call(cfg, k)) next[k] = cfg[k]; }
+                next.__resolved = fileUrl;
+                applyStyle('nano-beautify-font', buildFontCss(next));
+            });
+        }
     }
 
     // 同步读取（URL 字体存 localStorage；文件字体不走 localStorage，避免超配额）
@@ -528,13 +587,13 @@
 
     // ---- 全局底栏位置偏移（“其他”页的底栏位置滑杆，作用于所有页面的底栏） ----
     var TOP_SHIFT_SEL = '.top-bar,.navbar,.nav-bar,.memory-topbar,.topbar,.page-topbar,.overlay-header,.status';
-    var BOTTOM_SHIFT_SEL = '.bottom-actions,.bottom-bar,footer.bottom,.bottom,' +
-        '.dm-composer,.mm-viewer-bar,.comment-input,.chat-input-bar,.ins-emoji-panel';
+    // 底栏位置滑杆只作用于「聊天/群聊/线下」这几种以 chat-inner、线下为锚点的底栏；
+    // 其它 App（ins / moments / halo 等的输入栏）不再跟着一起上下移动。
+    var BOTTOM_SHIFT_SEL = '.bottom-bar,footer.bottom,.bottom';
     // index 外壳自己的底栏（.bottom-actions）保持贴底不动：上调后它下面会露出
     // .app 的透明区域，出现一条与主题不符的空隙。其它页面（含线下的 .bottom、
     // chat_inner/groups 的 .bottom-bar）照常跟随「底栏位置」上调。
-    var BOTTOM_SHIFT_SEL_NO_ACTIONS = '.bottom-bar,footer.bottom,.bottom,' +
-        '.dm-composer,.mm-viewer-bar,.comment-input,.chat-input-bar,.ins-emoji-panel';
+    var BOTTOM_SHIFT_SEL_NO_ACTIONS = '.bottom-bar,footer.bottom,.bottom';
     function applyShift(kind, px) {
         var key = kind === 'top' ? 'nanoTopShift' : 'nanoBottomShift';
         var v = parseInt(px, 10);
@@ -556,17 +615,22 @@
     function applyBottomShift(px) { applyShift('bottom', px); }
 
     // ---- 强制所有底栏贴底（不吃缓存：始终注入，覆盖旧的页面 CSS / 旧预设） ----
+    var BOTTOM_BAR_PAD = 'calc(6px + max(12px,var(--nano-safe-bottom,env(safe-area-inset-bottom,0px))))';
     var BOTTOM_FLUSH_FIX =
         'html .bottom-actions,html .nano-index .bottom-actions{bottom:20px !important;padding-bottom:0 !important;}' +
         // 只兜底底部安全区留白，不要强制 background/border/shadow —— 否则用户无法给顶栏/底栏设白底
-        // 非 index 页面的底部输入栏统一再抬高约 14px（index 自身的 .bottom-actions 不动）
-        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar{padding-bottom:calc(14px + max(12px,var(--nano-safe-bottom,env(safe-area-inset-bottom,0px)))) !important;}' +
-        'html.keyboard-open .bottom-bar,html.keyboard-open .nano-chat-inner .bottom-bar,html.keyboard-open .nano-groups .bottom-bar{padding-bottom:calc(14px + 8px) !important;}' +
-        'html footer.bottom{padding-bottom:14px !important;}' +
-        'html .bottom{padding-bottom:14px !important;}' +
-        'html .dm-composer{padding-bottom:18px !important;}' +
-        'html .mm-viewer-bar{padding-bottom:18px !important;}' +
-        'html .comment-input,html .chat-input-bar{padding-bottom:18px !important;}' +
+        // 所有 App 的底栏统一成同一高度基准（以 chat-inner / 线下为锚点），
+        // 比原来 chat-inner 的 48px 略低一点，其它 App 相应上移或不变。
+        'html .bottom-bar,html .nano-chat-inner .bottom-bar,html .nano-groups .bottom-bar,' +
+        'html footer.bottom,html .bottom,' +
+        'html .dm-composer,html .mm-viewer-bar,html .comment-input,html .chat-input-bar{' +
+        'padding-bottom:' + BOTTOM_BAR_PAD + ' !important;}' +
+        // 键盘弹出时去掉底部安全区留白，让输入栏直接贴着键盘上沿，不在中间留一条空白
+        'html.keyboard-open .bottom-bar,html.keyboard-open .nano-chat-inner .bottom-bar,' +
+        'html.keyboard-open .nano-groups .bottom-bar,html.keyboard-open footer.bottom,html.keyboard-open .bottom,' +
+        'html.keyboard-open .dm-composer,html.keyboard-open .mm-viewer-bar,' +
+        'html.keyboard-open .comment-input,html.keyboard-open .chat-input-bar{' +
+        'padding-bottom:6px !important;}' +
         // 底栏改为悬浮在页面之上：留白放进各页面自身，避免外壳出现与主题不符的白边
         'html body.nano-chat .app-content,html body.nano-chat .container,html body.nano-chat #chatList,html body.nano-chat .chat-list{padding-bottom:96px !important;}' +
         'html body.nano-api .app-content,html body.nano-api .container,html body.nano-more .app-content,html body.nano-more .container,html body.nano-discover .app-content,html body.nano-discover .container{padding-bottom:96px !important;}';
@@ -575,6 +639,7 @@
     // ---- 键盘抬升（所有页面通用）----
     // 外壳 index.html 会把键盘高度 --nano-kb + .keyboard-open 同步到每个 iframe；
     // 这里再补一层：各页面常见的底部输入栏在键盘弹出时整体上移，避免打字看不到字。
+    // 底栏位置滑杆现在只作用于聊天/线下，其它 App 的输入栏不再叠加 --nano-bottom-shift
     var KEYBOARD_CSS =
         'html.keyboard-open .dm-composer,' +
         'html.keyboard-open .live-composer,' +
@@ -582,8 +647,10 @@
         'html.keyboard-open .chat-input-bar,' +
         'html.keyboard-open .bottom-area,' +
         'html.keyboard-open .vc-input-area,' +
-        'html.keyboard-open footer.bottom,' +
         'html.keyboard-open .ins-emoji-panel{' +
+        'transform:translateY(calc(-1 * var(--nano-kb,0px))) !important;' +
+        'transition:transform .18s ease;}' +
+        'html.keyboard-open footer.bottom{' +
         'transform:translateY(calc(var(--nano-bottom-shift,0px) - var(--nano-kb,0px))) !important;' +
         'transition:transform .18s ease;}';
     function nanoApplyKeyboard(kb) {

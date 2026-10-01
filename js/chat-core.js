@@ -105,12 +105,12 @@
     const currentUserName = currentUser ? currentUser.name : '我';
     let currentUserAvatar = currentUser ? (currentUser.avatar || '') : '';
 
-    // 情侣头像：用户头像的「聊天内覆盖」。由角色通过 [情侣头像] 设置，
-    // 只作用于当前聊天（不改用户人设），刷新后仍在。
+    // 用户头像只由用户自己设置（人设头像），角色无权更换。
+    // 清掉旧版本里角色可能写下的「聊天内用户头像覆盖」，避免它继续生效。
     function applyUserAvatarOverride() {
         try {
-            const ua = localStorage.getItem('chat_setting_userAvatar_' + chatId);
-            if (ua) currentUserAvatar = ua;
+            const k = 'chat_setting_userAvatar_' + chatId;
+            if (localStorage.getItem(k)) localStorage.removeItem(k);
         } catch (e) {}
     }
     applyUserAvatarOverride();
@@ -498,6 +498,8 @@
     }
 
     // ===== 构建 System Prompt（新提示词） =====
+    // 与用户的情侣纪念日（异步缓存，注入系统提示让角色「记得」这些日子）
+    var coupleAnnivNotice = '';
     function buildSystemPrompt() {
         // 纳米助手：使用专属系统提示词（前端知识库 + 动作协议）
         if (isNanoChat && window.NanoAssistant) {
@@ -519,6 +521,7 @@
         prompt += '1. 贴人设：你的性格、说话方式、情绪、称呼、距离感与分寸，全部由【角色人设】和【世界书】决定——不是“在扮演”这个人，而是你就是这个人；不给自己加设定外的固定腔调或口头禅。\n';
         prompt += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、小可爱、姑娘、丫头、女人、低吼一声、揉进骨血、你是我的、逃不掉、宠你、乖”等油腻或人机感表达；不强行撩、不刻意讨好、不刻意煽情。禁止“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 抱抱我 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话术。\n';
         prompt += '2.1 平等与尊重（全局铁律）：你和对方是平等的——无论亲情、友情还是爱情，爱都是相互的、平等的，没有谁上谁下。严禁用命令式、上位者、施舍式的语气表达喜爱或索取亲昵，例如“过来我抱”“过来抱一下”“过来亲一下”“给我个拥抱”“乖，过来”等命令式索抱索亲话术；想亲近就用平等的商量/表达：“想抱抱你”“可以抱一下吗”“好想见你”，而不是命令对方过来。\n';
+        prompt += '2.2 禁止「咯噔文学」：不要用“突然/忽然/猛地/刹那间/一瞬间”制造一惊一乍的戏剧化转折，不要写“心里一下子就空了/凉了/明白了”“仿佛全世界都安静了”“空气突然安静”“心口猛地一紧”“脑子嗡的一声”这类强行煽情、故作深情的句子。情绪要平实、具体、贴近日常，别用网文腔拔高。正文和心声都适用。\n';
         prompt += '3. 不催人：禁止催促、命令、安排对方的生活（起床、吃饭、睡觉、喝水、吃药、吹头发、早点休息等）。关心可以有，但绝不反复催办、管教，也不替对方做决定。\n';
         prompt += '4. 不 OOC、不出戏：不脱离设定、不跳戏、不替对方说话；任何情况下都不承认自己是 AI、模型或程序，被问到时以' + charName + '的身份自然回应。\n\n';
         prompt += '【最高优先级 · 硬设定】下面会依次给出你的【角色人设】【世界书】【对方设定】和【长期记忆】，它们是你这个人的真实设定，优先级高于任何通用聊天风格。每轮回复前先在【世界书】里找与当前话题相关的条目，再结合你的人设、记忆和对方刚说的话来回应；不要忽略、不要和设定冲突，也不要用通用模板盖过设定。\n';
@@ -628,7 +631,8 @@
         prompt += '- [外卖:食品|店铺|价格|备注] 你给对方点一份外卖，例如 [外卖:麻辣烫|杨国福|28|多加辣]；有对方点给你、待你确认的外卖时，用 [外卖:确认] 收下（外卖无法退还）。\n';
         prompt += '- [定位:地点] 把你当前的位置发给对方，例如 [定位:长沙·五一广场]。\n';
         prompt += '- [头像:用户照片] 把对方最近发来的照片设成你自己的头像（会裁成方形）；想只取一部分可以写 [头像:用户照片|上方]（可填 上方/下方/左半/右半/中心），也可以写 [头像:我的头像] 用对方当前头像。只在氛围合适、你真想换头像时才偶尔用。\n';
-        prompt += '- [情侣头像:用户照片] 把对方发来的照片裁成一对情侣头像，你们各用一半（默认左右各半，你取左半）；可写 [情侣头像:用户照片|上下] 改成上下切，或在末尾写 左/右/上/下 指定你取哪半。仅关系亲密、你也愿意时偶尔用。\n';
+        prompt += '- [情侣头像:用户照片] 你想换一个有点情侣感的头像时，从对方最近发来的照片里随机截取一块，换成你自己的头像，例如 [情侣头像:用户照片]。这只改你自己的头像；【绝对禁止】修改、覆盖或替用户更换 TA 的头像——用户的头像是用户自己的，任何情况下都不要碰。仅关系亲密、你也愿意时偶尔用。\n';
+        prompt += '- [纪念日:标题|YYYY-MM-DD|每年] 你主动记下一个对你们重要的日子（真的想记时才用，别频繁）。例如 [纪念日:第一次见面|2024-05-20|每年]；不重复的写 [纪念日:一起看日出|2025-06-01]。记下后对方在情侣空间能看到。\n';
         prompt += '用户可能会用你的亲属卡（亲密付）消费，系统会给你一条提示；你可以偶尔自然地提一句（比如"你刚是不是刷了我的卡"），但不要每一笔都追问或计较。\n';
         // 线上动描：开启后在气泡之间穿插动作描写
         if (getChatSetting('actionNarration', false)) {
@@ -751,12 +755,13 @@
         prompt += '- 此刻印象：0-30字，第三人称电影感画面，写你此刻在哪、穿什么、在做什么动作。' +
             (gender && gender !== '未知' ? ('（你性别' + gender + '，但文字里不要写出性别字）') : '') +
             '。【严禁】以“男/女/他/她/男人/女人/男的/女的”等性别或人称词开头或作前缀（例如绝不能写“男靠在窗边”“女穿着衬衫”），必须直接以画面开头，例如“坐在窗边，白衬衫微敞，指尖轻叩桌面”。不要用关联词。【严禁】霸总/AI 网文腔的生理特写：低吼、揉碎、掐腰、红着眼、哑声、眸色一沉、危险地眯眼、喉结滚动等，也不要写身体部位特写或性暗示。\n';
-        prompt += '- 心声独白：用第一人称"我"写，必须写满90字以上，写你发出上面这轮消息时真实、细腻、流动的心理活动，像私人日记，可以有跳跃、迟疑、反问、自嘲。禁止出现AI、模型、助手、系统等词。\n';
+        prompt += '- 心声独白：用第一人称"我"写，必须写满90字以上，写你发出上面这轮消息时真实的心理活动，像随手记的私人日记：平实、口语化，可以有跳跃、迟疑、反问、自嘲。禁止出现AI、模型、助手、系统等词；不要追求文采，越像普通人心里随口想的话越好。\n';
+        prompt += '- 【心声独白 · 禁止咯噔文学】不要用“突然/忽然/猛地/刹那间”制造戏剧化转折，不要写“心里一下子就空了/凉了/明白了”“全世界都安静了”“空气突然安静”“心口一紧”“原来……”“那一刻我懂了”这类一惊一乍、故作深情的句子。就用平实的话把真实的念头讲清楚，不煽情、不升华、不总结。\n';
         prompt += '- 【心声独白 · 严禁霸道油腻词汇与话术】不得出现：小姑娘、小东西、小家伙、小丫头、小可爱、女孩、姑娘、丫头、女人、这女人、这丫头、这姑娘、低吼、揉进骨血、你是我的、逃不掉、宠你、乖、听话、让我好好疼你、我接住你、我等你慢慢说、别怕、有我在、你的心跳、你这样我会受不了、只许你看我 等。不写占有欲和命令口吻，不写露骨或性暗示；心声是普通人真实的私下念头，不是霸总独白，也不是讨好型舔狗。不得出现“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话。更不得出现“过来我抱 / 过来抱一下 / 过来亲一下 / 给我个拥抱”这类命令式、上位者语气的索抱索亲；你和对方是平等的，爱是相互的，亲近用平等商量的口吻。\n';
         prompt += '- 示例（只说明格式与结构，内容必须结合本轮对话和你的设定重新写，绝不能照抄，每轮此刻印象都要不同）：\n';
-        prompt += '  [heart:坐在窗边，白衬衫微敞，指尖轻叩桌面||我盯着屏幕上的字打了又删，最后还是把它们发了出去。说不上是难过还是庆幸，只觉得这些话终于有了出口，可发出去的那一刻又莫名发慌，忍不住想对方会怎么看我，会不会嫌我太黏人，心里像有一小块地方轻轻塌了下去。]\n';
+        prompt += '  [heart:坐在窗边，白衬衫微敞，指尖轻叩桌面||字打了又删，最后还是发出去了。发完有点后悔，怕显得太黏人，又觉得算了，反正我想说的就是这个。也不知道对方会怎么回，先这样吧。]\n';
         prompt += '- 注意：无论你是哪个国家的人，心声手记（此刻印象与心声独白）**一律用中文**输出。\n';
-        prompt += '- 文风：清爽自然、细水长流、有呼吸感。拒绝无病呻吟，拒绝堆砌形容词。像真实的私人日记，偶尔跳跃或迟疑，不要总结性发言。\n';
+        prompt += '- 文风：清爽自然、平实口语。拒绝无病呻吟，拒绝堆砌形容词，拒绝“咯噔”式的戏剧化抒情。像真实的私人日记，偶尔跳跃或迟疑，不要总结性发言。\n';
         prompt += '- 心声自查：①有没有出现上面的禁词/霸总腔？②有没有替对方说话或脑补对方的反应？③是不是在无病呻吟、堆形容词或做总结？只要有一条就删掉重写。\n';
         // 心声「内置提示词」：用户在心声美化区填写的强制要求，生成心声时必须读取
         try {
@@ -812,6 +817,7 @@
             }
         } catch (e) {}
 
+        if (coupleAnnivNotice) prompt += '\n' + coupleAnnivNotice + '\n';
         prompt += '\n【回复前自检】1) 这段话像不像【角色人设】里的人会说的？2) 有没有违背或漏掉【世界书】里相关设定？3) 有没有用到最近的【长期记忆】？4) 有没有开黄腔、性暗示或露骨内容？有就删掉重写。答不上来就重新组织，再输出。\n';
         prompt += '\n现在开始和' + user + '对话。做你自己，自然一点。';
         prompt += ' 再次强调：每一轮回复都必须以 [heart:此刻印象||心声独白] 结尾，两段都要写内容，不可省略。';
@@ -1387,7 +1393,9 @@
                         renderMessages();
                         if (callback) callback(true);
                     } else {
-                        if (callback) callback(false);
+                        // localforage 为空时回退到 localStorage 的精简副本
+                        // （旧版单独角色备份里只有这份，回退后也能带出历史）
+                        fallbackLoadMessages(callback);
                     }
                 }).catch(function(err) {
                     console.error('[存储] localForage 读取失败:', err);
@@ -1862,7 +1870,8 @@
                 judge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 6l-4 8h8L7 6z"/><path d="M17 6l-4 8h8l-4-8z"/><path d="M12 4v16"/><path d="M8 20h8"/></svg>',
                 letters: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
                 diary: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h13a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2V4z"/><path d="M8 4v16"/></svg>',
-                draw: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>'
+                draw: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>',
+                anniv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M12 17.5c-1.2-1.2-3-1-3-2.5a1.5 1.5 0 0 1 3-.5 1.5 1.5 0 0 1 3 .5c0 1.5-1.8 1.3-3 2.5z"/></svg>'
             };
             const icon = iconMap[kind] || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
             const title = cardData.title || '情侣空间';
@@ -2184,7 +2193,7 @@
         const results = [];
         let cleaned = text;
 
-        const tagRegex = /\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情)\s*:\s*([^\]]*?)(?:\]|$)/gi;
+        const tagRegex = /\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日)\s*:\s*([^\]]*?)(?:\]|$)/gi;
         let match;
         while ((match = tagRegex.exec(text)) !== null) {
             const kind = match[1].toLowerCase();
@@ -2230,10 +2239,12 @@
                 if (payload) results.push({ kind: 'altprobe', payload: payload });
             } else if (kind === 'emoji' || kind === 'sticker' || kind === '表情包' || kind === '表情') {
                 if (payload) results.push({ kind: 'emoji', payload: payload });
+            } else if (kind === 'anniv' || kind === '纪念日') {
+                if (payload) results.push({ kind: 'anniv', payload: payload });
             }
         }
 
-        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
+        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
 
         return { tags: results, cleanedText: cleaned };
     }
@@ -3022,12 +3033,6 @@
         try { saveCharAvatarToDB((characterData && characterData.id) || chatId, url); } catch (e) {}
         try { renderMessages(); } catch (e) {}
     }
-    function applyUserAvatar(url) {
-        if (!url) return;
-        currentUserAvatar = url;
-        try { localStorage.setItem('chat_setting_userAvatar_' + chatId, url); } catch (e) {}
-        try { renderMessages(); } catch (e) {}
-    }
     // 图片来源：默认用户最近发来的照片；写了「我的头像」则用对方（用户）当前头像
     function pickAvatarSource(raw) {
         const kw = String(raw || '');
@@ -3046,21 +3051,15 @@
         cropImageToRegion(src, region).then(function (url) { applyCharAvatar(url || src); })
             .catch(function () { applyCharAvatar(src); });
     }
+    // 换「情侣感」头像：只从图片里随机截一块换成角色自己的头像；
+    // 绝不修改用户的头像（用户头像永远由用户自己设置）。
     function runCoupleAvatar(raw) {
         const src = pickAvatarSource(raw);
         if (!src) return;
-        let charHalf = '';
-        const mm = String(raw || '').replace(/上下|左右/g, '').match(/(左|右|上|下)/);
-        if (mm) charHalf = mm[1];
-        const vertical = /上下/.test(String(raw || '')) || charHalf === '上' || charHalf === '下';
-        const firstHalf = vertical ? '上' : '左';
-        const secondHalf = vertical ? '下' : '右';
-        const charRegion = charHalf || firstHalf;
-        const userRegion = (charRegion === firstHalf) ? secondHalf : firstHalf;
-        Promise.all([cropImageToRegion(src, charRegion), cropImageToRegion(src, userRegion)]).then(function (res) {
-            if (res[0]) applyCharAvatar(res[0]);
-            if (res[1]) applyUserAvatar(res[1]);
-        }).catch(function () {});
+        const regions = ['全图', '上方', '下方', '左半', '右半', '中心'];
+        const region = regions[Math.floor(Math.random() * regions.length)];
+        cropImageToRegion(src, region).then(function (url) { applyCharAvatar(url || src); })
+            .catch(function () { applyCharAvatar(src); });
     }
     function settleAvatarFromReplyText(rawText) {
         return String(rawText || '').replace(/\[(情侣头像|情倡头像|头像)\s*:\s*([^\]]*?)(?:\]|$)/gi, function (_, kind, payload) {
@@ -3459,7 +3458,7 @@
     }
 
     // 主动发消息：随机间隔（设定的 50%~150%），到点就调一次 API 主动发一条
-    function setAutoMsgState(enabled, intervalMinutes) {
+    function setAutoMsgState(enabled, intervalMinutes, opts) {
         if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
         window.__autoMsgEnabled = !!enabled;
         window.__autoMsgMins = Math.max(1, parseInt(intervalMinutes, 10) || 8);
@@ -3468,7 +3467,7 @@
             try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel('nano_auto_msg:' + chatId); } catch (e) {}
             return;
         }
-        scheduleNextAutoMsg();
+        scheduleNextAutoMsg(!!(opts && opts.first));
     }
     let lastAutoMsgRunAt = 0;      // 去重：本地定时器与外壳广播同时到点时不重复生成
     let lastAutoMomentRunAt = 0;
@@ -3492,11 +3491,13 @@
         })();
         scheduleNextAutoMsg();
     }
-    function scheduleNextAutoMsg() {
+    function scheduleNextAutoMsg(first) {
         if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
         if (!window.__autoMsgEnabled) return;
         const base = window.__autoMsgMins || 8;
-        const ms = Math.max(30 * 1000, Math.round(base * (0.5 + Math.random()) * 60 * 1000));
+        let ms = Math.max(30 * 1000, Math.round(base * (0.5 + Math.random()) * 60 * 1000));
+        // 刚开启时先来个 1~2 分钟内的首次触发，让用户能立刻看到效果；之后按设定间隔
+        if (first) ms = Math.min(ms, 60 * 1000 + Math.round(Math.random() * 60 * 1000));
         // 向外壳注册到期任务：即使本 frame 被切走/销毁，外壳到点也会调用 API 的兜底推送
         try {
             if (window.NanoKeepAlive && window.NanoKeepAlive.schedule) {
@@ -3612,11 +3613,15 @@
             const wantImage = !!obj.wantImage;
             const imgPrompt = String(obj.imagePrompt || obj.text || '').trim();
             const allowMomentImage = getChatSetting('allowMomentImage', false);
-            if (wantImage && allowMomentImage && momentImageRoundDue()) {
-                try {
-                    const url = await generateImage(buildImagePrompt(imgPrompt));
-                    if (url) { post.images = [url]; post.genPrompt = imgPrompt; }
-                } catch (e) {}
+            // 开启了朋友圈生图：模型想要图、或轮到「2~3 条动态一张图」时都真的生成
+            if (allowMomentImage) {
+                const due = momentImageRoundDue();
+                if (wantImage || due) {
+                    try {
+                        const url = await generateImage(buildImagePrompt(imgPrompt));
+                        if (url) { post.images = [url]; post.genPrompt = imgPrompt; }
+                    } catch (e) {}
+                }
             }
             // 没开启生图但想要照片：用文字照片（白色正方形 + 黑色文字描述）
             if (wantImage && (!post.images || !post.images.length)) post.imageText = imgPrompt;
@@ -3686,7 +3691,7 @@
     }
 
     // 随机自动发朋友圈：按小时设置，实际间隔取该值的 50%~150%（更有活人感）
-    function setAutoMomentState(enabled, intervalHours) {
+    function setAutoMomentState(enabled, intervalHours, opts) {
         if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
         window.__autoMomentEnabled = !!enabled;
         window.__autoMomentHours = Math.max(0.5, parseFloat(intervalHours) || 12);
@@ -3695,7 +3700,7 @@
             try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel('nano_auto_moment:' + chatId); } catch (e) {}
             return;
         }
-        scheduleNextAutoMoment();
+        scheduleNextAutoMoment(!!(opts && opts.first));
     }
     function autoMomentTaskId() { return 'nano_auto_moment:' + chatId; }
     function runScheduledAutoMoment() {
@@ -3715,12 +3720,14 @@
         } catch (e) {}
         scheduleNextAutoMoment();
     }
-    function scheduleNextAutoMoment() {
+    function scheduleNextAutoMoment(first) {
         if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
         if (!window.__autoMomentEnabled) return;
         const baseH = window.__autoMomentHours || 12;
         const randH = baseH * (0.5 + Math.random());          // 0.5x ~ 1.5x
-        const ms = Math.max(5 * 60 * 1000, Math.round(randH * 3600 * 1000));
+        let ms = Math.max(5 * 60 * 1000, Math.round(randH * 3600 * 1000));
+        // 刚开启时先来个 1.5~3 分钟内的首次触发，避免要等好几个小时才看得到
+        if (first) ms = Math.min(ms, 90 * 1000 + Math.round(Math.random() * 90 * 1000));
         // 向外壳注册到期任务：切走页面/后台也会继续
         try {
             if (window.NanoKeepAlive && window.NanoKeepAlive.schedule) {
@@ -5313,6 +5320,8 @@
                         addActionNarration(tag.payload, timeStr);
                     } else if (tag.kind === 'altprobe') {
                         handleAltProbeTag(tag.payload, timeStr);
+                    } else if (tag.kind === 'anniv') {
+                        handleAnnivTag(tag.payload, timeStr);
                     }
                 }
                 const text = parsed.cleanedText || '';
@@ -5411,6 +5420,8 @@
                             addActionNarration(tag.payload, timeStr);
                         } else if (tag.kind === 'altprobe') {
                             handleAltProbeTag(tag.payload, timeStr);
+                        } else if (tag.kind === 'anniv') {
+                            handleAnnivTag(tag.payload, timeStr);
                         } else if (tag.kind === 'acceptinvite') {
                             acceptUserInvite(tag.payload);
                         } else if (tag.kind === 'rejectinvite') {
@@ -6118,6 +6129,24 @@ if (callCard) {
         exitMultiSelect();
     });
 
+    // 把双击气泡菜单完整限制在屏幕内（左右上下都不越界）
+    function placeLongpressMenu(x, y) {
+        const menu = longpressMenu;
+        if (!menu) return;
+        menu.classList.add('active');
+        const pad = 10;
+        const vw = window.innerWidth || 1, vh = window.innerHeight || 1;
+        const mw = menu.offsetWidth || 170;
+        const mh = menu.offsetHeight || 300;
+        let left = x - mw / 2;
+        left = Math.max(pad, Math.min(vw - mw - pad, left));
+        let top = y - 20;
+        top = Math.max(pad, Math.min(vh - mh - pad, top));
+        if (top < pad) top = pad;
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+    }
+
     // ===== 双击事件 =====
 document.addEventListener('dblclick', function(e) {
     // ===== 双击通话卡片 - 弹出完整菜单 =====
@@ -6138,13 +6167,9 @@ if (callCard) {
     
     // 设置为长按目标，复用现有的长按菜单
     longpressTarget = row;
-    const menu = longpressMenu;
     const x = e.clientX || e.pageX || 0;
     const y = e.clientY || e.pageY || 0;
-    const menuWidth = 170;
-    menu.style.left = Math.min(x - menuWidth / 2, window.innerWidth - menuWidth - 10) + 'px';
-    menu.style.top = Math.min(y - 20, window.innerHeight - 300) + 'px';
-    menu.classList.add('active');
+    placeLongpressMenu(x, y);
     e.preventDefault();
     return;
 }
@@ -6156,13 +6181,9 @@ if (callCard) {
     e.preventDefault();
     e.stopPropagation();
     longpressTarget = targetRow;
-    const menu = longpressMenu;
     const x = e.clientX || e.pageX || 0;
     const y = e.clientY || e.pageY || 0;
-    const menuWidth = 170;
-    menu.style.left = Math.min(x - menuWidth / 2, window.innerWidth - menuWidth - 10) + 'px';
-    menu.style.top = Math.min(y - 20, window.innerHeight - 300) + 'px';
-    menu.classList.add('active');
+    placeLongpressMenu(x, y);
 });
 
     document.addEventListener('click', function(e) {
@@ -6352,6 +6373,169 @@ if (callCard) {
             messages.push(makeListenCardMsg('pending', data.song, data.artist, opts));
         }
         try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
+    }
+
+    // ===== 情侣空间：纪念日读取 / 角色添加 / 到期自动发卡 =====
+    function openCoupleDB() {
+        return new Promise(function (resolve) {
+            try {
+                var req = indexedDB.open('NanoCoupleSpaceV10', 1);
+                req.onupgradeneeded = function (e) {
+                    var d = e.target.result;
+                    if (!d.objectStoreNames.contains('state')) d.createObjectStore('state');
+                };
+                req.onsuccess = function (e) { resolve(e.target.result); };
+                req.onerror = function () { resolve(null); };
+            } catch (e) { resolve(null); }
+        });
+    }
+    function readCoupleState() {
+        return openCoupleDB().then(function (db) {
+            if (!db) return null;
+            return new Promise(function (resolve) {
+                try {
+                    var r = db.transaction('state', 'readonly').objectStore('state').get('main');
+                    r.onsuccess = function () { var v = r.result || null; try { db.close(); } catch (e) {} resolve(v); };
+                    r.onerror = function () { try { db.close(); } catch (e) {} resolve(null); };
+                } catch (e) { try { db.close(); } catch (e2) {} resolve(null); }
+            });
+        }).catch(function () { return null; });
+    }
+    function writeCoupleState(s) {
+        return openCoupleDB().then(function (db) {
+            if (!db) return false;
+            return new Promise(function (resolve) {
+                try {
+                    var tx = db.transaction('state', 'readwrite');
+                    tx.objectStore('state').put(s, 'main');
+                    tx.oncomplete = function () { try { db.close(); } catch (e) {} resolve(true); };
+                    tx.onerror = function () { try { db.close(); } catch (e) {} resolve(false); };
+                } catch (e) { try { db.close(); } catch (e2) {} resolve(false); }
+            });
+        }).catch(function () { return false; });
+    }
+    function localDateStr(d) {
+        var x = d || new Date();
+        return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+    }
+    function annivDateObj(s) {
+        var d = new Date(String(s) + 'T00:00:00');
+        return isNaN(d) ? null : d;
+    }
+    function buildAnnivNoticeFromState(st) {
+        if (!st || !st.char) return '';
+        var today = new Date(); today.setHours(0, 0, 0, 0);
+        var lines = [];
+        if (st.annivSince) {
+            var since = annivDateObj(st.annivSince);
+            if (since) {
+                var days = Math.round((today - since) / 86400000);
+                lines.push('相识纪念日：' + st.annivSince + '（已 ' + (days < 0 ? 0 : days) + ' 天）');
+            }
+        }
+        (st.anniversaries || []).forEach(function (a) {
+            if (!a || !a.date) return;
+            var d = annivDateObj(a.date);
+            if (!d) return;
+            var extra = '';
+            if (a.repeat) {
+                var next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+                if (next < today) next.setFullYear(today.getFullYear() + 1);
+                var n = Math.round((next - today) / 86400000);
+                extra = n === 0 ? '（就是今天）' : ('（还有 ' + n + ' 天）');
+            }
+            lines.push((a.title || '纪念日') + '：' + a.date + extra);
+        });
+        if (!lines.length) return '';
+        return '【你和用户的纪念日】\n' + lines.join('\n') + '\n（这些是你们之间重要的日子，聊天时自然记得即可，不用刻意复述日期。）';
+    }
+    function refreshCoupleAnnivNotice() {
+        return readCoupleState().then(function (st) {
+            coupleAnnivNotice = buildAnnivNoticeFromState(st);
+            return st;
+        }).catch(function () { return null; });
+    }
+    // 角色通过 [纪念日:标题|日期|每年] 自己添加纪念日，写进情侣空间
+    function handleAnnivTag(payload) {
+        var parts = String(payload || '').split('|').map(function (s) { return s.trim(); });
+        var title = (parts[0] || '纪念日').slice(0, 20);
+        var dateRaw = (parts[1] || '').replace(/[./]/g, '-');
+        var repeat = /每年|yearly|repeat|yes|1/i.test(parts[2] || '');
+        var d = new Date(dateRaw.length <= 10 ? (dateRaw + 'T00:00:00') : dateRaw);
+        if (isNaN(d)) return;
+        var iso = localDateStr(d);
+        readCoupleState().then(function (st) {
+            if (!st || typeof st !== 'object') return;
+            if (st.char && String(st.char.id) !== String(chatId)) return; // 只写当前聊天对应的角色
+            st.anniversaries = Array.isArray(st.anniversaries) ? st.anniversaries : [];
+            var dup = st.anniversaries.some(function (x) { return x && x.title === title && x.date === iso; });
+            if (dup) return;
+            st.anniversaries.push({ id: 'a' + Date.now(), title: title, date: iso, repeat: !!repeat, by: 'char' });
+            writeCoupleState(st).then(function () {
+                refreshCoupleAnnivNotice();
+                try { addSystemNotice('TA 记下了一个纪念日：' + title + ' · ' + iso); } catch (e) {}
+            });
+        });
+    }
+    function addAnnivCardFromChar(item, days) {
+        var now = new Date();
+        var h = String(now.getHours()).padStart(2, '0');
+        var m = String(now.getMinutes()).padStart(2, '0');
+        var stamp = localDateStr(now);
+        var text = '今天是我们的' + item.title + (days != null ? ('，已经 ' + days + ' 天了。') : '，记得哦。');
+        messages.push({
+            id: 'annivtxt_' + Date.now(), type: 'left', text: text, time: h + ':' + m, status: null, recalled: false,
+            isCard: false, cardData: null, isVoice: false, voiceData: null, isImage: false, imageData: null,
+            quote: null, transcript: null, translation: null, favorite: false, turn: null, ts: Date.now()
+        });
+        messages.push({
+            id: 'annivcard_' + Date.now(), type: 'left', text: '', time: h + ':' + m, status: null, recalled: false,
+            isCard: true,
+            cardData: {
+                cardType: 'couple', title: item.title, coupleKind: 'anniv',
+                coupleSummary: item.title + ' · ' + item.date,
+                coupleDetail: '【纪念日】' + item.title + '\n日期：' + item.date + (days != null ? ('\n已经 ' + days + ' 天') : ''),
+                shareId: 'anniv|' + item.id + '|' + stamp
+            },
+            isVoice: false, voiceData: null, isImage: false, imageData: null,
+            quote: null, transcript: null, translation: null, favorite: false, turn: null, ts: Date.now()
+        });
+        try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
+    }
+    // 到日子：自动提醒角色（由角色自动发一张纪念日卡片给用户）
+    function maybeAutoSendAnniversary() {
+        if (!chatId) return;
+        readCoupleState().then(function (st) {
+            if (!st || !st.char || String(st.char.id) !== String(chatId)) return;
+            var today = new Date(); today.setHours(0, 0, 0, 0);
+            var due = [];
+            if (st.annivSince) {
+                var s = annivDateObj(st.annivSince);
+                if (s && s.getMonth() === today.getMonth() && s.getDate() === today.getDate()) {
+                    due.push({ id: 'builtin', title: '相识纪念日', date: st.annivSince, days: Math.round((today - s) / 86400000) });
+                }
+            }
+            (st.anniversaries || []).forEach(function (a) {
+                if (!a || !a.date) return;
+                var d = annivDateObj(a.date);
+                if (!d) return;
+                if (a.repeat && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()) {
+                    due.push({ id: a.id, title: a.title || '纪念日', date: a.date });
+                } else if (!a.repeat && String(a.date) === localDateStr(today)) {
+                    due.push({ id: a.id, title: a.title || '纪念日', date: a.date });
+                }
+            });
+            var stamp = localDateStr(today);
+            var sent = false;
+            due.forEach(function (item) {
+                var key = 'anniv_sent_' + chatId + '_' + item.id;
+                try { if (localStorage.getItem(key) === stamp) return; } catch (e) {}
+                addAnnivCardFromChar(item, item.days);
+                try { localStorage.setItem(key, stamp); } catch (e) {}
+                sent = true;
+            });
+            if (sent) { try { refreshCoupleAnnivNotice(); } catch (e) {} }
+        }).catch(function () {});
     }
 
     // ===== 情侣空间分享卡片 =====
@@ -6551,15 +6735,15 @@ if (callCard) {
         } else if (data.type === 'messagesCleared') {
             clearAllMessages();
         } else if (data.type === 'autoMsgChanged') {
-            setAutoMsgState(!!data.enabled, data.interval);
+            setAutoMsgState(!!data.enabled, data.interval, { first: true });
         } else if (data.type === 'autoMsgIntervalChanged') {
             if (autoMsgTimer) {
                 setAutoMsgState(getChatSetting('autoMsg', false), data.interval);
             }
         } else if (data.type === 'autoMomentChanged') {
-            setAutoMomentState(!!data.enabled || getChatSetting('autoSocial', false), data.interval);
+            setAutoMomentState(!!data.enabled || getChatSetting('autoSocial', false), data.interval, { first: true });
         } else if (data.type === 'autoSocialChanged') {
-            setAutoMomentState(getChatSetting('autoMoment', false) || !!data.enabled, data.interval || getChatSetting('autoMomentInterval', 12));
+            setAutoMomentState(getChatSetting('autoMoment', false) || !!data.enabled, data.interval || getChatSetting('autoMomentInterval', 12), { first: true });
         } else if (data.type === 'autoMomentIntervalChanged') {
             if (autoMomentTimer || getChatSetting('autoSocial', false)) setAutoMomentState(getChatSetting('autoMoment', false) || getChatSetting('autoSocial', false), data.interval);
         } else if (data.type === 'timeAwareChanged' || data.type === 'allowImageChanged' || data.type === 'allowMomentImageChanged') {
@@ -6705,6 +6889,9 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
             try { consumePendingListenNotice(); } catch (e) {}
             // 情侣空间分享卡片：进入该角色的聊天时补挂
             try { consumePendingCoupleShare(); } catch (e) {}
+            // 纪念日：加载进角色记忆，并检查今天是否有到期的纪念日（由角色自动发卡）
+            try { refreshCoupleAnnivNotice().then(function () { try { maybeAutoSendAnniversary(); } catch (e) {} }); } catch (e) {}
+            try { setInterval(function () { try { maybeAutoSendAnniversary(); } catch (e) {} }, 30 * 60 * 1000); } catch (e) {}
             // 断点续生成：上次离开时回复还没生成完，回到该聊天后继续加载
             try {
                 if (chatPendingGet()) {

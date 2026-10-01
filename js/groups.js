@@ -2515,9 +2515,16 @@
     var longpressTarget = null;
     function showLongpress(row, x, y){
         longpressTarget = row;
-        longpressMenu.style.left = Math.min(x, window.innerWidth - 190) + 'px';
-        longpressMenu.style.top = Math.min(y, window.innerHeight - 340) + 'px';
         longpressMenu.classList.add('active');
+        // 先展开再量尺寸，然后把菜单完整限制在屏幕内
+        var pad = 10;
+        var vw = window.innerWidth || 1, vh = window.innerHeight || 1;
+        var mw = longpressMenu.offsetWidth || 190;
+        var mh = longpressMenu.offsetHeight || 340;
+        var left = Math.max(pad, Math.min(vw - mw - pad, x - mw / 2));
+        var top = Math.max(pad, Math.min(vh - mh - pad, y - 20));
+        longpressMenu.style.left = left + 'px';
+        longpressMenu.style.top = top + 'px';
     }
     messageContainer.addEventListener('dblclick', function(e){
         var row = e.target.closest('.message-row');

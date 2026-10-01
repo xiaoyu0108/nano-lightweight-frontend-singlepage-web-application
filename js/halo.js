@@ -3072,7 +3072,7 @@ const HaloData = (() => {
   /* 过滤：只保留 bindUser === 当前人设id 或 isNpc === true 的角色 */
   function filterCharacters(chars, maskId) {
     return (chars || []).filter((c) =>
-      c && (c.bindUser === maskId || c.isNpc === true)
+      c && !c.nanoAssistant && (c.bindUser === maskId || c.isNpc === true)
     );
   }
 

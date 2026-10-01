@@ -1099,6 +1099,7 @@
 
             currentPage = page;
 
+            pumpSafeTop();
             setTimeout(syncShellBg, 60);
             setTimeout(syncShellBg, 500);
 
@@ -1170,6 +1171,10 @@
             } catch (e) {}
             return false;
         }
+        // 悬浮球环形菜单的「返回」直接复用这套逻辑（关浮层 / 回聊天页）
+        window.__nanoGoBack = function () {
+            try { return nanoSwipeBackAction(); } catch (e) { return false; }
+        };
         // 边缘手势落在父文档（浮层左右 16px 留白）时，swipe-back.js 会派发此事件
         document.addEventListener('nano:swipe-back-fallback', function (e) {
             if (nanoSwipeBackAction()) {
@@ -1309,7 +1314,7 @@
             'music.html', 'voice-call.html', 'video-call.html', 'storage.html', 'backup.html', 'other.html', 'more.html',
             'discover.html', 'api.html', 'moments.html', 'ins.html', 'inner-setting.html', 'beautify.html',
             'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
-            'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html'];
+            'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html', 'appstore.html'];
         // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
         function applySafeFallback(f) {
             try {
@@ -1333,6 +1338,15 @@
                     applySafeFallback(f);
                 });
             } catch (e) {}
+        }
+        // 内页 iframe 的 load 事件要等所有子资源（大脚本/CDN）加载完才触发，
+        // 期间 --safe-top 一直缺失，顶栏会先顶到灵动岛里再跳下来。
+        // 这里在内页刚建立 document 时就尽早注入安全区像素值，避免那段“缓冲跳动”。
+        function pumpSafeTop() {
+            try { applySafeTopToFrames(); } catch (e) {}
+            [30, 80, 160, 320, 700, 1400].forEach(function (t) {
+                setTimeout(function () { try { applySafeTopToFrames(); } catch (e) {} }, t);
+            });
         }
         getSafeTopFrames().forEach(function(f) {
             if (f) f.addEventListener('load', applySafeTopToFrames);
@@ -1419,7 +1433,7 @@
                 if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
                     overlayFrame.src = url;
                 }
-                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html'];
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
                 if (noOuterHeader) {
@@ -1448,6 +1462,7 @@
             } else if (!url.includes('chat_inner.html')) {
                 overlayBack.classList.remove('hidden');
             }
+            pumpSafeTop();
         }
 
         function closeFullscreen() {

@@ -849,3 +849,64 @@ html, body {
 .sheet {
   overflow-y: auto;
 }
+
+/* ---------- 纪念日 ---------- */
+.anniv-card{
+  display:flex;align-items:center;gap:14px;
+  background:linear-gradient(145deg,#fff,#fdf7f8);
+  border-radius:22px;padding:16px;
+  box-shadow:var(--shadow),inset 0 0 0 1px #f4eee7;
+  cursor:pointer;transition:.15s;
+}
+.anniv-card:active{transform:scale(.985)}
+.anniv-days{
+  flex:0 0 auto;width:62px;height:62px;border-radius:20px;
+  background:var(--couple-pink-soft);color:var(--rose-d);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-weight:700;line-height:1;
+}
+.anniv-days b{font-size:22px}
+.anniv-days small{font-size:9px;margin-top:3px;font-weight:600}
+.anniv-info{flex:1;min-width:0}
+.anniv-info b{display:block;font-size:15px}
+.anniv-info span{display:block;font-size:11.5px;color:var(--sub);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anniv-arrow{flex:0 0 auto;color:#c7bfc7;font-size:20px}
+
+.anniv-hero{
+  text-align:center;background:linear-gradient(145deg,#fff,#fdf7f8);
+  border-radius:24px;padding:26px 18px;
+  box-shadow:var(--shadow),inset 0 0 0 1px #f4eee7;
+}
+.anniv-hero .eyebrow{font-size:9px;letter-spacing:1.8px;color:#b3aca3;text-transform:uppercase;font-weight:600}
+.anniv-big{font-family:Georgia,serif;font-size:52px;color:var(--rose-d);line-height:1;margin-top:10px}
+.anniv-big small{font-size:15px;margin-left:4px}
+.anniv-hero p{color:var(--sub);font-size:12px;margin:10px 0 0}
+
+.anniv-item{
+  display:flex;align-items:center;gap:12px;background:var(--card);
+  border-radius:18px;padding:13px 14px;margin-bottom:10px;
+  box-shadow:0 6px 20px #2b1f1a08,inset 0 0 0 1px var(--line);
+}
+.anniv-item .ai-date{
+  flex:0 0 auto;width:46px;height:46px;border-radius:14px;background:var(--couple-pink-soft);
+  color:var(--rose-d);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;
+}
+.anniv-item .ai-date b{font-size:16px}
+.anniv-item .ai-date small{font-size:8.5px;font-weight:600;margin-top:2px}
+.anniv-item .ai-main{flex:1;min-width:0}
+.anniv-item .ai-main b{display:block;font-size:14.5px}
+.anniv-item .ai-main span{display:block;font-size:11px;color:var(--sub);margin-top:2px}
+.anniv-item .ai-actions{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.anniv-item .ai-share{background:var(--couple-pink-soft);color:var(--rose-d);border-radius:12px;padding:7px 10px;font-size:11px}
+.anniv-item .ai-del{background:#f4f0ea;color:#b06a7a;border-radius:12px;padding:7px 10px;font-size:11px}
+
+.anniv-form{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.anniv-form input[type=text],.anniv-form input[type=date]{
+  width:100%;border:0;border-radius:14px;padding:12px 14px;background:var(--card);
+  box-shadow:inset 0 0 0 1px var(--line);font-size:14px;color:var(--ink);outline:none;
+  font-family:inherit;
+}
+.anniv-form .row{display:flex;gap:10px}
+.anniv-form .row .btn{flex:1}
+.anniv-check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--sub)}
+.anniv-check input{width:16px;height:16px;accent-color:var(--rose-d)}

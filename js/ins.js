@@ -1123,7 +1123,7 @@ function userPersonaBlock() {
 }
 
 function dbNpcs() {
-  return (currentUserChars || []).filter(c => c && c.name && c.isNpc && !isGenericNpcName(c.name)).map(c => ({
+  return (currentUserChars || []).filter(c => c && c.name && c.isNpc && !c.nanoAssistant && !isGenericNpcName(c.name)).map(c => ({
     id: c.id || ('npc_' + normName(c.name)), name: c.name, avatar: c.avatar || '', type: 'npc',
     isNpc: true, setting: c.setting || '', gender: c.gender || ''
   }));
@@ -3174,7 +3174,7 @@ async function loadInsData() {
 
   const allChars = await getCharacters();
   if (mask) {
-    currentUserChars = allChars.filter(c => c.bindUser === mask.id || c.isNpc);
+    currentUserChars = allChars.filter(c => c.bindUser === mask.id || (c.isNpc && !c.nanoAssistant));
   } else {
     currentUserChars = allChars;
   }

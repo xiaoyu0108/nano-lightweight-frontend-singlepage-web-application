@@ -201,46 +201,10 @@
         installHistoryGuard();
     }
 
-    document.addEventListener('touchstart', function (e) {
-        tracking = false;
-        if (!e.touches || e.touches.length !== 1) return;
-        var t = e.touches[0];
-        if (t.clientX >= EDGE_PX) return;   // 必须从边缘开始
-        if (isEditing()) return;
-        startX = lastX = t.clientX;
-        startY = lastY = t.clientY;
-        tracking = true;
-    }, { passive: true });
-
-    document.addEventListener('touchmove', function (e) {
-        if (!tracking) return;
-        if (!e.touches || e.touches.length !== 1) { tracking = false; return; }
-        var t = e.touches[0];
-        var dx = t.clientX - startX;
-        var dy = t.clientY - startY;
-
-        // 不是右滑 / 偏竖直：放弃（不阻止默认行为，保证页面还能正常滚动）
-        if (dx <= 0 || Math.abs(dy) > dx) { tracking = false; return; }
-
-        lastX = t.clientX;
-        lastY = t.clientY;
-
-        if (dx > 10 && e.cancelable) e.preventDefault();
-    }, { passive: false });
-
-    function finish(e) {
-        var wasTracking = tracking;
-        tracking = false;
-        if (!wasTracking) return;
-        if (isEditing()) return;
-
-        var dx = lastX - startX;
-        var dy = lastY - startY;
-        if (dx > MIN_X_PX && dx > Math.abs(dy) * X_RATIO) trigger();
-    }
-
-    document.addEventListener('touchend', finish, { passive: true });
-    document.addEventListener('touchcancel', function () { tracking = false; }, { passive: true });
+    // ===== 边缘右滑手势已停用 =====
+    // 之前「起点 <30px + 横向位移」的手势在多数页面不稳定（有输入框、滚动容器、
+    // 收藏层时容易误判），已改为由「API 悬浮球 → 环形菜单 → 返回」统一提供返回。
+    // 这里保留 trigger / handleBackRequest / 系统返回守卫，供浮层与 iOS 系统返回复用。
 
     // 便于调试/其它脚本主动触发
     window.__nanoSwipeBack = { trigger: trigger };

@@ -40,7 +40,7 @@ html.keyboard-open .chat-container {
 .topbar {
     position: relative; z-index: 30; width: 100%; flex-shrink: 0;
     /* 可用 --chat-topbar-pad 在美化里调整顶部间距（默认贴着灵动岛安全区，不留空隙） */
-    padding: var(--chat-topbar-pad, var(--safe-top, 0px)) 12px 6px;
+    padding: var(--chat-topbar-pad, max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 12px 6px;
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
 .back-btn {
@@ -1151,7 +1151,7 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 }
 
 @media (max-width: 480px) {
-    .topbar { left: auto; right: auto; top: auto; padding: var(--chat-topbar-pad, var(--safe-top, 0px)) 10px 6px; gap: 8px; }
+    .topbar { left: auto; right: auto; top: auto; padding: var(--chat-topbar-pad, max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 10px 6px; gap: 8px; }
     .back-btn, .topbar-avatar { width: 38px; height: 38px; }
     .back-btn i { font-size: 16px; }
     .topbar-title { font-size: 15px; padding: 5px 16px; max-width: 110px; }
@@ -1636,7 +1636,7 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
    ===================================================================== */
 .chat-container {
     /* JS 未运行时的兜底估值；JS 会用内联样式覆盖 */
-    --chat-topbar-h: calc(var(--chat-topbar-pad, var(--safe-top, 0px)) + 50px);
+    --chat-topbar-h: calc(var(--chat-topbar-pad, max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) + 50px);
     --chat-top-inset: var(--chat-topbar-h);
     --chat-bottom-inset: calc(52px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)));
     --chat-top-extra: 8px;

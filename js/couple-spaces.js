@@ -498,6 +498,8 @@ function buildCharSystem(extra, recentText) {
   const wb = getWorldbookText(recentText);
   if (wb) p += '\n【世界书 · 世界观与关系设定】\n' + wb + '\n（涉及世界观、关系、称呼、尺度时，以世界书为准。）\n';
   if (u.setting) p += '\n【对方（' + (u.name || '用户') + '）的设定】\n' + u.setting + '\n';
+  const annivCtx = buildAnnivContext();
+  if (annivCtx) p += '\n【你们的纪念日】\n' + annivCtx + '\n（这些日子对方很在意，可以自然地在聊天里提起。）\n';
   p += '\n【通用要求】只输出角色本人要说的话或内容本身；不要解释、不要旁白、不要输出 Markdown 代码块或思考过程。保持人物设定中的语气。';
   if (extra) p += '\n\n' + extra;
   return p;
@@ -541,8 +543,104 @@ const defaultState = () => ({
   letters: { current: { user: '', char: '', userLocked: false, charLocked: false, unlocked: false }, history: [] },
   diaries: { current: { user: '', char: '', userLocked: false, charLocked: false, unlocked: false }, history: [] },
   stats: { exchange: 0, complete: 0 },
-  events: []
+  events: [],
+  anniversaries: [],
+  annivSince: '',
+  annivCharId: ''
 });
+
+/* ---------- 纪念日 ---------- */
+function toDateStr(d) {
+  const dt = (d instanceof Date) ? d : new Date(d);
+  const x = isNaN(dt) ? new Date() : dt;
+  return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+}
+// 尝试从角色数据里找出「添加 char 的时间」
+function charSinceDate(c) {
+  if (!c) return null;
+  const raw = c.createdAt || c.created || c.addedAt || c.time || c.ts;
+  if (raw) { const d = new Date(raw); if (!isNaN(d)) return d; }
+  // 新建角色的 id 形如 c + 时间戳
+  const m = String(c.id || '').match(/^c(\d{10,})/);
+  if (m) { const d2 = new Date(Number(m[1])); if (!isNaN(d2) && d2.getFullYear() > 2000) return d2; }
+  return null;
+}
+// 内置的「相识纪念日」：从添加 char 那天算起，换 char 会重算
+function ensureAnnivBase() {
+  if (!state || !state.char) return;
+  const cid = String(state.char.id || state.char.name || '');
+  if (state.annivSince && state.annivCharId === cid) return;
+  const d = charSinceDate(state.char) || new Date();
+  state.annivCharId = cid;
+  state.annivSince = toDateStr(d);
+}
+function daysBetween(fromStr) {
+  const f = new Date(String(fromStr) + 'T00:00:00');
+  if (isNaN(f)) return 0;
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const diff = Math.round((t - f) / 86400000);
+  return diff < 0 ? 0 : diff;
+}
+function daysToNext(dateStr) {
+  const d = new Date(String(dateStr) + 'T00:00:00');
+  if (isNaN(d)) return 0;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  let next = new Date(now.getFullYear(), d.getMonth(), d.getDate());
+  if (next < now) next = new Date(now.getFullYear() + 1, d.getMonth(), d.getDate());
+  return Math.round((next - now) / 86400000);
+}
+function nextUpcomingAnniv(list) {
+  let best = null;
+  (list || []).forEach((a) => {
+    if (!a || !a.repeat) return;
+    const days = daysToNext(a.date);
+    if (!best || days < best.days) best = { title: a.title || '纪念日', days: days };
+  });
+  return best;
+}
+function buildAnnivContext() {
+  if (!state || !state.char) return '';
+  ensureAnnivBase();
+  const lines = [];
+  if (state.annivSince) lines.push('相识纪念日：' + state.annivSince + '（已 ' + daysBetween(state.annivSince) + ' 天）');
+  (state.anniversaries || []).forEach((a) => {
+    if (!a) return;
+    let extra = '';
+    if (a.repeat) { const n = daysToNext(a.date); extra = n === 0 ? '（就是今天）' : ('（还有 ' + n + ' 天）'); }
+    lines.push((a.title || '纪念日') + '：' + a.date + extra);
+  });
+  return lines.join('\n');
+}
+function shareAnnivToChar(id) {
+  if (!state || !state.char) return;
+  ensureAnnivBase();
+  const name = state.char.name || 'Char';
+  const isBuiltin = (id === 'builtin');
+  const a = isBuiltin ? null : (state.anniversaries || []).find((x) => x.id === id);
+  if (!isBuiltin && !a) return;
+  const title = isBuiltin ? '相识纪念日' : (a.title || '纪念日');
+  const date = isBuiltin ? state.annivSince : a.date;
+  const days = (isBuiltin || !a.repeat) ? daysBetween(date) : daysToNext(date);
+  let summary;
+  if (isBuiltin) summary = '你和 ' + name + ' 已经认识 ' + days + ' 天';
+  else if (a.repeat) summary = date + ' · ' + (days === 0 ? '就是今天' : ('还有 ' + days + ' 天'));
+  else summary = date + ' · 已 ' + days + ' 天';
+  const detail = '【纪念日】' + title + '\n日期：' + date +
+    (isBuiltin ? ('\n你们已经认识 ' + days + ' 天') : (a.repeat ? '\n每年重复' : ''));
+  shareCardToChat('anniv', title, summary, detail);
+}
+function annivCardHTML() {
+  ensureAnnivBase();
+  const total = daysBetween(state.annivSince);
+  const next = nextUpcomingAnniv(state.anniversaries);
+  let sub = state.annivSince + ' 相识';
+  if (next) sub = next.title + ' · ' + (next.days === 0 ? '就是今天' : (next.days + ' 天后'));
+  return `<div class="anniv-card" onclick="openPage('anniv')">
+    <div class="anniv-days"><b>${total}</b><small>天</small></div>
+    <div class="anniv-info"><b>相识纪念日</b><span>${esc(sub)}</span></div>
+    <div class="anniv-arrow">›</div>
+  </div>`;
+}
 
 /* ---------- IndexedDB ---------- */
 function idb() {
@@ -771,6 +869,7 @@ function chooseCharByIndex(i) {
 async function enterSpace() {
   if (!selectedChar) { toast('请选择一个 Char'); return; }
   state.char = selectedChar;
+  ensureAnnivBase();
   entered = true;
   try { await loadUserProfile(); } catch (e) {}
   try { await loadWorldbooks(); } catch (e) {}
@@ -809,6 +908,10 @@ function renderHome() {
       <img class="avatar" src="${esc(u.avatar || fallbackAvatar(u.name || '我'))}">
       <span class="mename">你 · <b>${esc(u.name || '我')}</b></span>
     </div>
+    <section class="section">
+      <div class="head"><b>纪念日</b><span>ANNIVERSARY</span></div>
+      ${annivCardHTML()}
+    </section>
     <section class="section">
       <div class="head"><b>现在可以一起做</b><span>ACTIVE</span></div>
       <div class="feature">
@@ -854,6 +957,89 @@ function tile(n, t, p, page, b) {
   </div>`;
 }
 
+/* ---------- 纪念日页面 ---------- */
+function annivItemHTML(a) {
+  const d = new Date(String(a.date) + 'T00:00:00');
+  const day = isNaN(d) ? '--' : d.getDate();
+  const mon = isNaN(d) ? '--' : (d.getMonth() + 1);
+  let label;
+  if (a.repeat) {
+    const n = daysToNext(a.date);
+    label = n === 0 ? '就是今天' : (n + ' 天后');
+  } else {
+    label = '已 ' + daysBetween(a.date) + ' 天';
+  }
+  return `<div class="anniv-item">
+    <div class="ai-date"><b>${day}</b><small>${mon}月</small></div>
+    <div class="ai-main"><b>${esc(a.title || '纪念日')}</b><span>${esc(a.date)}${a.repeat ? ' · 每年' : ''} · ${label}</span></div>
+    <div class="ai-actions">
+      <button class="ai-share" onclick="shareAnnivToChar('${esc(a.id)}')">分享</button>
+      <button class="ai-del" onclick="delAnniversary('${esc(a.id)}')">删除</button>
+    </div>
+  </div>`;
+}
+function anniv() {
+  ensureAnnivBase();
+  const name = state.char ? esc(state.char.name || 'Char') : 'Char';
+  const base = state.annivSince;
+  const total = daysBetween(base);
+  const list = (state.anniversaries || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const bd = new Date(String(base) + 'T00:00:00');
+  const bDay = isNaN(bd) ? '--' : bd.getDate();
+  const bMon = isNaN(bd) ? '--' : (bd.getMonth() + 1);
+  const builtin = `<div class="anniv-item">
+    <div class="ai-date"><b>${bDay}</b><small>${bMon}月</small></div>
+    <div class="ai-main"><b>相识纪念日</b><span>${esc(base)} · 已 ${total} 天</span></div>
+    <div class="ai-actions">
+      <button class="ai-share" onclick="shareAnnivToChar('builtin')">分享</button>
+    </div>
+  </div>`;
+  return `<div class="anniv-hero">
+      <div class="eyebrow">SINCE ${esc(base)}</div>
+      <div class="anniv-big">${total}<small>天</small></div>
+      <p>你和 ${name} 已经认识 ${total} 天</p>
+    </div>
+    <div class="head" style="margin-top:22px"><b>我们的纪念日</b><span>DATES</span></div>
+    ${builtin}
+    ${list.length ? list.map(annivItemHTML).join('') : '<div class="hint" style="text-align:center;color:#a69b96;padding:14px 0 4px">还可以把别的重要日子记下来。</div>'}
+    <div class="row"><button class="btn dark" onclick="toggleAnnivForm()">添加纪念日</button></div>
+    <div class="anniv-form" id="annivForm" style="display:none">
+      <input type="text" id="annivTitle" placeholder="名称，例如 第一次见面" maxlength="20">
+      <input type="date" id="annivDate">
+      <label class="anniv-check"><input type="checkbox" id="annivRepeat" checked> 每年重复提醒</label>
+      <div class="row">
+        <button class="btn soft" onclick="toggleAnnivForm()">取消</button>
+        <button class="btn dark" onclick="addAnniversary()">保存</button>
+      </div>
+    </div>`;
+}
+function toggleAnnivForm() {
+  const f = document.getElementById('annivForm');
+  if (!f) return;
+  const show = f.style.display === 'none' || !f.style.display;
+  f.style.display = show ? 'flex' : 'none';
+  if (show) {
+    const dt = document.getElementById('annivDate');
+    if (dt && !dt.value) dt.value = toDateStr(new Date());
+  }
+}
+function addAnniversary() {
+  const tEl = document.getElementById('annivTitle');
+  const dEl = document.getElementById('annivDate');
+  const rEl = document.getElementById('annivRepeat');
+  const title = String(tEl ? tEl.value : '').trim();
+  const date = String(dEl ? dEl.value : '').trim();
+  if (!title) { toast('请输入纪念日名称'); return; }
+  if (!date) { toast('请选择日期'); return; }
+  state.anniversaries = state.anniversaries || [];
+  state.anniversaries.push({ id: 'a' + Date.now(), title: title, date: date, repeat: !!(rEl && rEl.checked) });
+  save().then(() => { openPage('anniv'); toast('已添加'); });
+}
+function delAnniversary(id) {
+  state.anniversaries = (state.anniversaries || []).filter((a) => a.id !== id);
+  save().then(() => { openPage('anniv'); });
+}
+
 /* ---------- 页面路由（统一走 fullpage） ---------- */
 function stateKey(type) {
   return type === 'diary' ? 'diaries' : type === 'letters' ? 'letters' : null;
@@ -865,6 +1051,7 @@ function openPage(type) {
     : type === 'personality' ? personality()
     : type === 'draw' ? draw()
     : type === 'judge' ? judge()
+    : type === 'anniv' ? anniv()
     : settings();
 
   const titleMap = {
@@ -872,6 +1059,7 @@ function openPage(type) {
     personality: '情侣人格',
     draw: '你画我猜',
     judge: '审判庭',
+    anniv: '纪念日',
     settings: 'Space 设置'
   };
   const title = titleMap[type] || 'Couple Space';
@@ -2045,6 +2233,7 @@ function resumePendingApi() {
   const allChars = await DB.getCharacters();
   charList = allChars.filter((c) => {
     if (!c) return false;
+    if (c.nanoAssistant === true) return false;   // 纳米是助手，不是可互动角色
     if (c.isNpc === true) return true;
     if (currentMask && c.bindUser === currentMask.id) return true;
     return false;
@@ -2058,7 +2247,8 @@ function resumePendingApi() {
     setting: c.setting,
     bindUser: c.bindUser,
     isNpc: c.isNpc,
-    worldbookBindings: c.worldbookBindings
+    worldbookBindings: c.worldbookBindings,
+    createdAt: c.createdAt || c.created || c.addedAt || c.time || c.ts || ''
   }));
 
   state = await dbGet();
@@ -2080,6 +2270,10 @@ function resumePendingApi() {
     }
     await dbPut(state);
   }
+
+  if (!Array.isArray(state.anniversaries)) state.anniversaries = [];
+  ensureAnnivBase();
+  await dbPut(state);
 
   selectedChar = state.char;
   renderRoot();
