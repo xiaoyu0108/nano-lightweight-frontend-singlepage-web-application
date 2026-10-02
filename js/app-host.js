@@ -63,6 +63,17 @@
       });
     }).catch(function () { return false; });
   }
+  function idbGetAll(store) {
+    return openStoreDB().then(function (db) {
+      return new Promise(function (resolve) {
+        try {
+          var r = db.transaction(store, 'readonly').objectStore(store).getAll();
+          r.onsuccess = function () { resolve(r.result || []); db.close(); };
+          r.onerror = function () { resolve([]); db.close(); };
+        } catch (e) { resolve([]); }
+      });
+    }).catch(function () { return []; });
+  }
   function idbDelete(store, key) {
     return openStoreDB().then(function (db) {
       return new Promise(function (resolve) {
@@ -388,6 +399,60 @@
         try { parent.postMessage({ type: 'nanoToast', text: args[0] }, '*'); } catch (e) {}
         task = Promise.resolve(true);
         break;
+
+      // 本应用自己的清单（名称 / 图标 / 颜色 / 描述）
+      case 'getManifest':
+        task = idbGet(APP_STORE, appId).then(function (rec) {
+          return rec ? { id: rec.id, name: rec.name, icon: rec.icon, color: rec.color, desc: rec.desc, version: rec.version } : null;
+        });
+        break;
+      // 应用在运行中设计自己的图标 / 改名（写回 AppStore 已安装区）
+      case 'setManifest':
+        task = idbGet(APP_STORE, appId).then(function (rec) {
+          if (!rec) throw new Error('应用记录不存在');
+          var p = args[0] || {};
+          if (p.name != null) rec.name = String(p.name).slice(0, 40);
+          if (p.icon != null) rec.icon = String(p.icon).slice(0, 200000);
+          if (p.color != null) rec.color = String(p.color).slice(0, 32);
+          if (p.desc != null) rec.desc = String(p.desc).slice(0, 160);
+          if (p.version != null) rec.version = String(p.version).slice(0, 24);
+          return idbPut(APP_STORE, rec).then(function () {
+            try { parent.postMessage({ type: 'nanoAppManifestChanged', appId: appId, name: rec.name, icon: rec.icon, color: rec.color, desc: rec.desc }, '*'); } catch (e) {}
+            return { id: rec.id, name: rec.name, icon: rec.icon, color: rec.color, desc: rec.desc, version: rec.version };
+          });
+        });
+        break;
+      // 已安装应用列表（可以互相打开 / 展示在应用里）
+      case 'apps':
+        task = idbGetAll(APP_STORE).then(function (list) {
+          return (list || []).map(function (a) {
+            return { id: a.id, name: a.name, icon: a.icon, color: a.color, desc: a.desc, version: a.version };
+          });
+        });
+        break;
+      // 打开另一个已安装的应用
+      case 'openApp':
+        try {
+          parent.postMessage({ type: 'openFullscreen', url: 'app-host.html?id=' + encodeURIComponent(args[0]), title: args[1] || '应用', showBack: false, source: 'appstore' }, '*');
+        } catch (e) {}
+        task = Promise.resolve(true);
+        break;
+      // 关闭当前应用：默认回到 AppStore
+      case 'close':
+        try { parent.postMessage({ type: 'nanoCloseOverlay' }, '*'); } catch (e) {}
+        task = Promise.resolve(true);
+        break;
+      // 系统 / 应用内通知
+      case 'notify':
+        try { parent.postMessage({ type: 'appNotify', title: args[0] || '应用', body: args[1] || '', app: appId }, '*'); } catch (e) {}
+        task = Promise.resolve(true);
+        break;
+      case 'user':
+      case 'avatar':
+        task = Promise.resolve(currentUser());
+        break;
+
+      // 手势返回交给内层应用决定；不处理则默认回 AppStore
       default:
         respond(win, id, false, null, '未知方法 ' + method);
         return;
@@ -401,7 +466,25 @@
 
   window.addEventListener('message', function (event) {
     var data = event.data;
-    if (!data || !data.__nanoApp) return;
+    if (!data || typeof data !== 'object') return;
+
+    // 外壳的手势/返回请求：先问内层应用要不要自己处理
+    if (data.type === 'nanoRequestBack') {
+      var handled = false;
+      var onInner = function (e) {
+        var d = e.data;
+        if (d && d.__nanoBackHandled) { handled = true; window.removeEventListener('message', onInner); }
+      };
+      window.addEventListener('message', onInner);
+      try { if (appFrame && appFrame.contentWindow) appFrame.contentWindow.postMessage({ __nanoBack: true }, '*'); } catch (e) {}
+      setTimeout(function () {
+        window.removeEventListener('message', onInner);
+        try { parent.postMessage({ type: handled ? 'nanoBackHandled' : 'nanoBackUnhandled' }, '*'); } catch (e) {}
+      }, 220);
+      return;
+    }
+
+    if (!data.__nanoApp) return;
     if (appFrame && event.source !== appFrame.contentWindow) return;
     handleRequest(event.source, data);
   });
@@ -409,7 +492,7 @@
   /* ---------------- 启动 ---------------- */
   function injectBridge(html, id) {
     var tag = '<script>window.__NANO_APP_ID__=' + JSON.stringify(String(id)) + ';<\/script>' +
-              '<script src="js/nano-app-bridge.js"><\/script>';
+              '<script src="js/nano-app-bridge.js?v=20261002a"><\/script>';
     if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, function (m) { return m + tag; });
     if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + tag + '</head>'; });
     return tag + html;

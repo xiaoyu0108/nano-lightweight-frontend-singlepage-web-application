@@ -1240,6 +1240,10 @@
             prompt += '\n【当前时间】' + now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 星期' + weekdays[now.getDay()] + ' ' +
                 String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + '。\n';
         }
+        try {
+            var __gbp = (localStorage.getItem('nano_builtin_prompt') || '').trim();
+            if (__gbp) prompt += '\n\n【全局内置提示词 · 必须遵守】\n' + __gbp + '\n';
+        } catch (e) {}
         prompt += '\n现在开始群聊，做你自己，自然一点。';
         return prompt;
     }

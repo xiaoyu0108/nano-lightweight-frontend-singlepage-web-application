@@ -1467,6 +1467,15 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* 系统提示：完整显示且不换行 */
+.message-row.sys-notice .message-content { max-width: 98% !important; }
+.message-row.sys-notice .recall-notice {
+    display: inline-block;
+    max-width: none !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
 .message-row.recalled .recall-notice.expand {
     white-space: normal;
     overflow: visible;

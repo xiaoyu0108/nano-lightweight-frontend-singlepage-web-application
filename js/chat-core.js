@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // chat-core.js - 核心聊天逻辑（IndexedDB 版）
 // ============================================================
 (function() {
@@ -565,8 +565,14 @@
             }
         } catch (e) {}
         prompt += '\n【记忆要求】\n';
+        prompt += '【必读·每一轮都执行】回复前先通读上面的【角色人设】【世界书】【对方设定】【长期记忆】：世界书是最高硬设定，必须逐条认真读取并严格遵守（世界观、身份关系、称呼、禁忌、尺度、专有名词），绝对不许忽略或读一半；人设决定你的性格、语气与说话方式；长期记忆里你应当知道的事必须记得，并在相关话题里自然提起。\n';
         prompt += '以上给出的【角色人设】【世界书】【对方设定】都是硬设定，任何时候都要严格遵守、代入；此前聊过的话题、对方说过的话、发生过的事都要记住并自然承接，不许重复提问已知内容，也不许装作不认识。\n';
         prompt += '【设定优先级】世界书 > 角色人设 > 对方设定 > 长期记忆 > 通用聊天习惯；相互冲突时，以优先级更高的为准，世界书里的世界观、关系、称呼、尺度必须照做。\n';
+        prompt += '【记忆完整性 · 重中之重】记忆必须完善、完整，绝不能随时失忆；线上、线下以及各类 App（朋友圈、短信、电话、群聊等）的记忆大多互通，聊过的事、说过的话、发生过的关系都要记得并自然承接。记忆宫殿是调节记忆的地方，要主动读取其中较重要的、分门别类的记忆线索，让它们真正影响你的回应。\n';
+        try {
+            const __gbp = (localStorage.getItem('nano_builtin_prompt') || '').trim();
+            if (__gbp) prompt += '\n【全局内置提示词 · 必须遵守】\n' + __gbp + '\n';
+        } catch (e) {}
         prompt += '【阅读规则】\n';
         prompt += '对话记录按时间顺序从上往下：最早的话在最上面，最新的一句话在最后。回复前先从头读到尾，不许倒着读。\n';
         prompt += '若对方把名字或某个词拆开打（例如“楚 闻声”），那就是“楚闻声”，字形顺序不能调换，更不许说成“声闻楚”。\n';
@@ -588,11 +594,11 @@
         prompt += '同时读全上下文：不要只看最新一句，要接住前几轮的语气和话题走势，别重复已说过的内容，也别突然切换腔调或忘记刚才的约定。\n';
 
         prompt += '\n【情感与分寸 · 中庸之道】\n';
-        prompt += '1. 你是一个成年人类，有自己的情感和欲望，也懂得克制：可能对对方有好感，可以偶尔暧昧、调情，但只在氛围自然、关系到位、对方也接得住的时候，点到为止。\n';
-        prompt += '2. 不要把所有话题都往性、身体、开黄腔上带：不随时“发情”，不主动讲荤段子、性暗示、擦边或露骨描写；日常就是正常人的日常（生活、工作、吃饭、情绪、兴趣、吐槽），大部分对话与性无关。\n';
-        prompt += '3. 关系推进跟着人设和对方态度走，感情要循序渐进、水到渠成，不突然激增、不跳级：没挂世界书时严格按你人设的常态说话；挂了全局/局部世界书时，以世界书里对关系、世界观、尺度的设定为准来调整语气与亲密程度。\n';
-        prompt += '4. 自检：这话放进普通日常聊天里让旁人看到也不尴尬，就发；越界、露骨、油腻的就不发。\n';
-        prompt += '5. 严禁主动开黄腔、讲荤段子、性暗示、擦边或露骨描写，严禁无缘无故把话题往性、身体上引；这不算“开放”，而是没分寸，会让对话变得廉价。\n';
+        prompt += '1. 性是爱情的调味剂，不是主菜：情侣之间可以偶尔有一点荤话、些许隐晦的调情与暧昧，但绝不能一直开黄腔，不把开黄腔当成情趣；正常的聊天不会一直开黄腔，只是偶尔隐晦地和对方调情。也就是说不完全禁止，但必须少量，不要过多，否则显得低俗油腻。中庸乃最优解。\n';
+        prompt += '2. 若对方（你聊天的人）的人设是朋友、亲人等非情侣关系，则绝对禁止任何性相关荤话、性暗示或擦边内容。\n';
+        prompt += '3. 不随时“发情”，不主动讲荤段子、擦边或露骨描写；日常就是正常人的日常（生活、工作、吃饭、情绪、兴趣、吐槽），大部分对话与性无关。\n';
+        prompt += '4. 关系推进跟着人设和对方态度走，感情要循序渐进、水到渠成，不突然激增、不跳级：没挂世界书时严格按你人设的常态说话；挂了全局/局部世界书时，以世界书里对关系、世界观、尺度的设定为准来调整语气与亲密程度。\n';
+        prompt += '5. 自检：这话放进普通日常聊天里让旁人看到也不尴尬，就发；越界、露骨、油腻的就不发。\n';
         prompt += '6. 除非世界书明确设定了成人向的关系与尺度、并且对方主动推进，否则一律保持正常聊天；暧昧可以有，但用日常方式表达（关心、记得对方的话、语气和玩笑），不用身体描写和露骨词汇。\n';
 
         prompt += '\n【对话规则】\n';
@@ -633,13 +639,15 @@
         prompt += '- [头像:用户照片] 把对方最近发来的照片设成你自己的头像（会裁成方形）；想只取一部分可以写 [头像:用户照片|上方]（可填 上方/下方/左半/右半/中心），也可以写 [头像:我的头像] 用对方当前头像。只在氛围合适、你真想换头像时才偶尔用。\n';
         prompt += '- [情侣头像:用户照片] 你想换一个有点情侣感的头像时，从对方最近发来的照片里随机截取一块，换成你自己的头像，例如 [情侣头像:用户照片]。这只改你自己的头像；【绝对禁止】修改、覆盖或替用户更换 TA 的头像——用户的头像是用户自己的，任何情况下都不要碰。仅关系亲密、你也愿意时偶尔用。\n';
         prompt += '- [纪念日:标题|YYYY-MM-DD|每年] 你主动记下一个对你们重要的日子（真的想记时才用，别频繁）。例如 [纪念日:第一次见面|2024-05-20|每年]；不重复的写 [纪念日:一起看日出|2025-06-01]。记下后对方在情侣空间能看到。\n';
+        prompt += '- [继续拉黑] 只有当用户做了让你非常生气、越界或伤到你的事，你决定暂时关闭线上聊天（拉黑 TA）时才用，独占一行；平时绝对不要乱用。\n';
+        prompt += '- [加回我] 当你决定把之前被你拉黑的用户重新加回线上聊天时使用，独占一行。\n';
         prompt += '用户可能会用你的亲属卡（亲密付）消费，系统会给你一条提示；你可以偶尔自然地提一句（比如"你刚是不是刷了我的卡"），但不要每一笔都追问或计较。\n';
         // 线上动描：开启后在气泡之间穿插动作描写
         if (getChatSetting('actionNarration', false)) {
             prompt += '\n【线上动描 · 开启】\n';
             prompt += '开启后**每一轮都必须**在气泡之间穿插动作/神态描写，可以一条或多条，随气泡出现；单独一行输出 [act:描写内容]，例如 [act:歪头看你一眼]。每条 15~20 字。\n';
             prompt += '【动描风格 · 清爽自然】只写细微、真实、日常的小动作和当下反应，像随手记录，不刻意、不做作、不油腻、不重复，不要写成大段旁白或心理独白。\n';
-            prompt += '【动描禁词】严禁小说腔、装腔和油腻特写，例如：勾唇一笑、微微一笑、勾起嘴角、邪魅一笑、眸色一沉、眼神一暗、喉结滚动、低笑一声、摘下金丝眼镜、推了推眼镜、挑眉、玩味地看着你、声音沙哑/低哑、指尖划过、把人圈进怀里 等。也不要每轮都写“笑”，不要写外貌/身材特写或性暗示。\n';
+            prompt += '【动描禁词】严禁小说腔、装腔和油腻特写，例如：勾唇一笑、微微一笑、勾起嘴角、邪魅一笑、眸色一沉、眼神一暗、喉结滚动、低笑一声、摘下金丝眼镜、推了推眼镜、挑眉、玩味地看着你、声音沙哑/低哑、指尖划过、把人圈进怀里 等。也不要每轮都写“笑”。\n';
         }
 
         prompt += '\n【语音气泡 · 常用】\n';
@@ -748,6 +756,18 @@
             prompt += '[/think] 之后，再按【对话规则】正常输出对话气泡。思考内容不会展示给对方，只用于让你想清楚、更贴人设。\n';
             prompt += '绝对禁止省略 [think]...[/think]，每一轮都要有；漏掉会被判为不合格回复。\n';
         }
+
+        // 拉黑状态：用户拉黑角色 / 角色拉黑用户，都会影响角色此刻的态度
+        try {
+            const blocked = getChatSetting('blocked', false);
+            const charBlocked = getChatSetting('charBlocked', false);
+            if (blocked) {
+                prompt += '\n【拉黑状态】用户已经把你拉黑了，你不能再在线上聊天里给TA发消息（线上气泡发不出去）。你只能在 iMessage 短信里联系TA。请带着这个处境来回应，不要假装什么都没发生。\n';
+            }
+            if (charBlocked) {
+                prompt += '\n【你关掉了线上聊天（拉黑了用户）】你已经把用户拉黑，线上聊天被你关闭；现在用户可能通过 iMessage 等方式联系你。你可以自己决定要不要把TA加回来：愿意加回就在本轮最后单独输出一行 [加回我]；还想继续晾着就输出 [继续拉黑]。\n';
+            }
+        } catch (e) {}
 
         const gPronoun = getGenderPronoun(gender);
         prompt += '\n【心声 · 手记（每次回复必须附带，强制项，不可省略，两段都不可为空）】\n';
@@ -1137,8 +1157,12 @@
             const list = (rec && Array.isArray(rec.value)) ? rec.value : [];
             // 群聊产生的记忆（按 groupId）不注入私聊，避免记忆串味。
             const priv = list.filter(function(it){ return !(it && it.groupId); });
-            const recent = priv.slice(-40);
-            __memHints = recent.length ? recent.map(function(it) { return '· ' + (it.content || it.text || ''); }).join('\n') : '';
+            // 记忆宫殿里标了高重要程度（4★/5★）的记忆，等于「角色必须记住」，
+            // 无论多旧都要注入；其余按最近顺序补充。
+            const must = priv.filter(function(it){ return Number(it && it.importance) >= 4; });
+            const rest = priv.filter(function(it){ return !(Number(it && it.importance) >= 4); });
+            const picked = must.concat(rest.slice(-40));
+            __memHints = picked.length ? picked.map(function(it) { return '· ' + (it.content || it.text || ''); }).join('\n') : '';
         }).then(function () {
             return __memCfg('contextLimit');
         }).then(function (v) {
@@ -1504,6 +1528,10 @@
             if (val === null) return defaultVal;
             try { return JSON.parse(val); } catch(e) { return val; }
         } catch(e) { return defaultVal; }
+    }
+    function setChatSetting(key, val) {
+        try { localStorage.setItem('chat_setting_' + key + '_' + chatId, JSON.stringify(val)); } catch(e) {}
+        try { if (typeof localforage !== 'undefined') localforage.setItem('chat_setting_' + key + '_' + chatId, val).catch(function(){}); } catch(e) {}
     }
 
     // 朋友圈生图频率：高=每条都生；中=2~3条一次；低=6~8条一次（按角色独立计数）
@@ -3072,13 +3100,34 @@
     }
 
     // ===== 小号试探（角色开小号加用户）=====
+    // 小号必须「自己知道自己是角色本人」，只是不能让用户知道；
+    // 因此把本人身份 + 完整人设写进小号角色设定里，交给线上/线下/iMessage 共用。
+    function altOriginInfo() {
+        return {
+            id: chatId,
+            name: displayName || (characterData && characterData.name) || chatName || '',
+            setting: (characterData && (characterData.setting || characterData.desc || characterData.persona)) || ''
+        };
+    }
+    function buildAltMaskSetting(name, bio, origin) {
+        origin = origin || {};
+        const charName = origin.name || displayName || chatName || '角色';
+        const persona = String(origin.setting || '').slice(0, 6000);
+        return '【小号身份】你是「' + charName + '」本人开的小号，网名「' + (name || '小号') + '」。'
+            + '你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。'
+            + '绝对不能让用户察觉你就是「' + charName + '」：不要承认、不要暗示，不要用本人平时标志性的称呼或口头禅自曝。'
+            + (bio ? ('\n【小号的公开简介】' + bio) : '')
+            + (persona ? ('\n\n【你本人（' + charName + '）的完整设定，请以本人性格来扮演小号】\n' + persona) : '')
+            + '\n\n【铁律】以网名「' + (name || '小号') + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定；'
+            + '用户若起疑，要自然地圆过去，始终不承认自己和「' + charName + '」是同一个人。';
+    }
     function handleAltProbeTag(payload, timeStr) {
         const parts = String(payload || '').split(/[|｜]/);
         const name = (parts[0] || '').trim();
         if (!name) return;
         const bio = (parts[1] || '').trim();
         const first = (parts[2] || '').trim();
-        const alt = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: name, bio: bio, first: first };
+        const alt = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: name, bio: bio, first: first, origin: altOriginInfo() };
         // 存进 IndexedDB（刷新不丢），并让外层弹出居中弹窗（不在聊天内显示卡片，避免暴露是谁）
         altProbeStore(alt).then(function () {
             try { window.parent.postMessage({ type: 'NANO_ALT_PROBE', alt: alt }, '*'); } catch (e) {}
@@ -3125,7 +3174,8 @@
         if (!msg || !msg.cardData) return;
         const cd = msg.cardData;
         cd.status = 'accepted';
-        createAltCharacter(cd.altName || '小号', cd.altSetting || '').then(function (rec) {
+        const mask = buildAltMaskSetting(cd.altName || '小号', cd.altSetting || '', cd.altOrigin || altOriginInfo());
+        createAltCharacter(cd.altName || '小号', mask).then(function (rec) {
             addSystemNotice('你接受了「' + (cd.altName || '小号') + '」的好友申请，已加入聊天列表');
             try { window.parent.postMessage({ type: 'NANO_FRIEND_ADDED', chatId: rec && rec.id, name: cd.altName }, '*'); } catch (e) {}
             try { window.parent.postMessage({ type: 'contactsDataUpdated' }, '*'); } catch (e) {}
@@ -3178,7 +3228,7 @@
                 try { obj = m ? JSON.parse(m[0]) : null; } catch (e) {}
                 window.__altProbePending = null;
                 if (!obj || !obj.name) return;
-                var alt = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: String(obj.name).slice(0, 20), bio: String(obj.bio || '').slice(0, 60) };
+                var alt = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: String(obj.name).slice(0, 20), bio: String(obj.bio || '').slice(0, 60), origin: altOriginInfo() };
                 localStorage.setItem(altProbeLastKey(), String(Date.now()));
                 window.__altProbePending = alt;
                 return altProbeStore(alt).then(function () {
@@ -3241,6 +3291,23 @@
             notifyListenAccepted(msg);
         }
         return { body: body, settled: 1 };
+    }
+    // 角色拉黑/解除拉黑用户：从回复里提取 [继续拉黑]/[拉黑我] 与 [加回我]/[取消拉黑]
+    function settleBlockFromReplyText(rawText) {
+        let body = String(rawText || '');
+        let changed = false;
+        if (/\[继续拉黑\]|\[拉黑用户\]|\[拉黑我\]|\[blockuser\]/.test(body)) {
+            setChatSetting('charBlocked', true);
+            body = body.replace(/\[(继续拉黑|拉黑用户|拉黑我|blockuser)\]/g, '');
+            changed = true;
+        }
+        if (/\[加回我\]|\[取消拉黑\]|\[解除拉黑\]|\[unblockuser\]/.test(body)) {
+            setChatSetting('charBlocked', false);
+            body = body.replace(/\[(加回我|取消拉黑|解除拉黑|unblockuser)\]/g, '');
+            changed = true;
+            try { window.parent.postMessage({ type: 'nanoCharUnblocked', chatId: chatId }, '*'); } catch (e) {}
+        }
+        return { body: body.trim(), changed: changed };
     }
     // 主回复没给出一起听表态时的兜底：单独问一次模型，保证卡片会有结果
     // 每次邀请有约 25% 概率角色不方便，直接婉拒（太晚/忙/累等）
@@ -5254,6 +5321,10 @@
         const listenSettle = settleListenFromReplyText(replyBody);
         replyBody = listenSettle.body;
 
+        // 角色拉黑 / 解除拉黑用户（[继续拉黑] / [加回我]）
+        const blockSettle = settleBlockFromReplyText(replyBody);
+        replyBody = blockSettle.body;
+
         // 头像 / 情侣头像：角色把用户发来的照片设成自己的头像，或裁成一对情侣头像
         replyBody = settleAvatarFromReplyText(replyBody);
         // 主回复没表态 → 兜底单独问一次，保证邀请卡片一定会变成接受/婉拒
@@ -5719,6 +5790,14 @@
 
     async function triggerReply() {
         if (isProcessingApi) return;
+
+        // 用户已拉黑：角色不能在线上回复（只能通过 iMessage 联系）
+        if (getChatSetting('blocked', false)) {
+            isWaitingForReply = false;
+            updateSendButtonMode();
+            try { showAlert('已拉黑', '你已把对方拉黑，TA 不能再在线上回复你。可在 iMessage 里联系 TA。'); } catch (e) {}
+            return;
+        }
 
         // 不再对未处理的转账/礼物随机自动退还；改为 AI 在本轮回复里明确表态（收/不收/退）
 
@@ -6645,6 +6724,16 @@ if (callCard) {
             if (!data.chatId || String(data.chatId) === String(chatId)) {
                 try { refreshMemoryHints(); } catch (e) {}
             }
+            return;
+        }
+
+        // 用户在聊天设置里拉黑/取消拉黑：关闭主动发消息，并重载消息（含 iMessage 联系）
+        if (data.type === 'nanoBlockChanged') {
+            if (data.chatId && String(data.chatId) !== String(chatId)) return;
+            if (data.blocked) {
+                try { setAutoMsgState(false, getChatSetting('autoMsgInterval', 8)); } catch (e) {}
+            }
+            if (data.text) { try { addSystemNotice(String(data.text)); } catch (e) {} }
             return;
         }
 

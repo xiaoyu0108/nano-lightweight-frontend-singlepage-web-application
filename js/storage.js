@@ -84,6 +84,11 @@ const APP_CATEGORIES = [
         ]
     },
     {
+        id: 'imessage', label: 'iMessage', color: '#34c759',
+        ls: ['nano_imessage_', 'chat_setting_imessageRead_'],
+        idb: [{ db: 'nano_imessage_db' }]
+    },
+    {
         id: 'call', label: '通话', color: '#5ac8fa',
         ls: ['voice_call_seconds_'],
         idb: [{ db: 'voice_call_records_db' }, { dbPrefix: 'voice_call_', store: 'messages' }]
@@ -153,6 +158,7 @@ const IMAGE_IDB_CONTAINERS = [
     { db: 'nano_groups_db', store: 'kv', key: ['group_msgs_'], owner: 'group' },
     { db: 'NanoMomentsDB', store: 'moments', owner: 'moments' },
     { db: 'nano_ins_db', store: 'state', owner: 'ins' },
+    { db: 'nano_imessage_db', store: 'chats', owner: 'imessage' },
     { db: 'MeetSettingsDB', store: 'messages', owner: 'offline' },
     { dbPrefix: 'voice_call_', store: 'messages', owner: 'call' }
 ];

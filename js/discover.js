@@ -207,6 +207,8 @@
     halo:    { url: 'halo.html', title: 'Halo' },
     books:   { url: 'books.html', title: 'Books' },
     music:   { url: 'music.html', title: 'Music' },
+    memorypalace: { url: 'memory palace.html', title: 'Memory Palace', showBack: true },
+    imessage: { url: 'imessage.html', title: 'iMessage', showBack: true },
     appstore: { url: 'appstore.html', title: 'App Store', showBack: true }
   };
 

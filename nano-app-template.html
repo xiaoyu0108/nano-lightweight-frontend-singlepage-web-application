@@ -10,10 +10,15 @@
   ------------------------------------------------------------
   1. 把本文件另存为 .html，改上面的 id / name / icon 后，在「App Store」里导入即可。
   2. 应用运行时能通过 window.Nano 调用 Nano 的能力：
-     Nano.characters() / Nano.currentUser() / Nano.persona(id)
-     Nano.worldbook(id) / Nano.memory(id) / Nano.apiConfig()
-     Nano.chat({ charIds, messages, system, useCharPersona, useUserPersona, useWorldbook, useMemory })
+     Nano.currentUser() / Nano.user() / Nano.avatar()   // 用户资料（含头像）
+     Nano.characters() / Nano.persona(id) / Nano.worldbook(id) / Nano.memory(id)
+     Nano.apiConfig() / Nano.chat({ charIds, messages, useCharPersona, useUserPersona, useWorldbook, useMemory })
      Nano.store.get/set/remove(key)
+     Nano.apps() / Nano.openApp(id)                      // 已安装应用列表 / 打开其他应用
+     Nano.manifest() / Nano.setManifest({name,icon,color,desc}) / Nano.setIcon(...)  // 设计自己的图标
+     Nano.notify(title, body) / Nano.toast(text) / Nano.openUrl(url, title)
+     Nano.close()                                        // 关闭并回到 AppStore
+     Nano.onBack(fn)                                     // 自定义手势/返回逻辑；不注册则默认回 AppStore
   3. 首次进入会让你配置：图标、名称、单人/多人、邀请方式、是否读取人设/世界书/记忆。
   4. 想改默认值，直接改下面的 DEFAULT_CONFIG。
   ============================================================
@@ -39,6 +44,11 @@
   .tt .s{font-size:11.5px;color:#8e8e93}
   .gbtn{width:34px;height:34px;border-radius:50%;border:0;background:rgba(120,120,128,.1);color:#3c3c43;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
   .gbtn svg{width:19px;height:19px}
+  /* 去掉应用顶栏：应用完全由用户 DIY（标题/返回自己设计）；设置改为悬浮按钮 */
+  .top{display:none !important}
+  #btnGear{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:12px;z-index:20;
+    background:rgba(120,120,128,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  #btnInvite{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:56px;z-index:20}
   .list{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:10px}
   .row{display:flex;gap:8px;align-items:flex-end;max-width:100%}
   .row.me{flex-direction:row-reverse}
@@ -94,6 +104,11 @@
 </style>
 </head>
 <body>
+<!-- 默认返回：回 AppStore。你也可以用 Nano.onBack(fn) 改成自己的返回逻辑 -->
+<button class="gbtn" id="btnBack" title="返回" style="position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:21;background:rgba(120,120,128,.18);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+</button>
+<input type="file" id="sIconFile" accept="image/*" style="display:none">
 <div class="app" id="app" style="--theme:#5B8DEF">
   <div class="top">
     <div class="ico" id="hIco">A</div>
@@ -119,7 +134,7 @@
 
 <div class="setup" id="setup" style="--theme:#5B8DEF"></div>
 
-<script src="js/nano-app-bridge.js"></script>
+<script src="js/nano-app-bridge.js?v=20261002a"></script>
 <script>
 (function () {
   'use strict';
@@ -313,9 +328,10 @@
       '<div class="card"><div class="ct">图标与名称</div>' +
         '<div class="iconrow"><div class="prev" id="sPrev"></div>' +
         '<div style="flex:1"><div class="fld"><label>名称</label><input type="text" id="sName" maxlength="16" value="' + esc(c.name) + '"></div></div></div>' +
-        '<div class="fld" style="margin-top:10px"><label>图标字母 / 文字</label><input type="text" id="sLetter" maxlength="2" value="' + esc(c.icon.letter) + '"></div>' +
+        '<div class="fld" style="margin-top:10px"><label>图标字母 / Emoji</label><input type="text" id="sLetter" maxlength="4" value="' + esc(c.icon.letter) + '"></div>' +
         '<div class="fld"><label>图标颜色</label><input type="color" id="sColor" value="' + esc(c.icon.color) + '"></div>' +
-        '<div class="fld"><label>或使用图片地址（可选）</label><input type="url" id="sImage" placeholder="https://…" value="' + esc(c.icon.image) + '"></div>' +
+        '<div class="fld"><label>或使用图片（地址 / 上传 / 我的头像）</label><input type="url" id="sImage" placeholder="https://…" value="' + esc(c.icon.image) + '"></div>' +
+        '<div style="display:flex;gap:8px;margin-top:2px"><button class="btn ghost" id="sUseAvatar" type="button" style="flex:1">用我的头像</button><button class="btn ghost" id="sUploadIcon" type="button" style="flex:1">上传图片</button></div>' +
       '</div>' +
       '<div class="card"><div class="ct">聊天方式</div>' +
         '<div class="seg"><button data-mode="single" class="' + (c.mode === 'single' ? 'on' : '') + '">单人</button>' +
@@ -356,6 +372,23 @@
     paintPrev();
     ['sLetter','sColor','sImage'].forEach(function (id) { var el = $(id); if (el) el.oninput = paintPrev; });
 
+    var useAvatar = $('sUseAvatar');
+    if (useAvatar) useAvatar.onclick = function () {
+      var av = (state._user && state._user.avatar) || '';
+      if (!av) { alert('还没有设置头像'); return; }
+      $('sImage').value = av; paintPrev();
+    };
+    var upIcon = $('sUploadIcon');
+    if (upIcon) upIcon.onclick = function () { $('sIconFile').click(); };
+    var iconFile = $('sIconFile');
+    if (iconFile) iconFile.onchange = function () {
+      var f = this.files && this.files[0]; this.value = '';
+      if (!f) return;
+      var r = new FileReader();
+      r.onload = function (ev) { $('sImage').value = String(ev.target.result || ''); paintPrev(); };
+      r.readAsDataURL(f);
+    };
+
     box.querySelectorAll('[data-mode]').forEach(function (b) { b.onclick = function () { cfg().mode = b.getAttribute('data-mode'); openSetup(firstRun); }; });
     box.querySelectorAll('[data-invite]').forEach(function (b) { b.onclick = function () { cfg().invite = b.getAttribute('data-invite'); openSetup(firstRun); }; });
     box.querySelectorAll('[data-tog]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-tog'); cfg()[k] = !cfg()[k]; openSetup(firstRun); }; });
@@ -365,6 +398,14 @@
       cfg().icon = { letter: $('sLetter').value.trim() || 'A', color: $('sColor').value || '#5B8DEF', image: $('sImage').value.trim() };
       cfg().welcome = $('sWelcome').value;
       await save();
+      // 把设计好的图标 / 名称写回 AppStore 的已安装区
+      try {
+        await Nano.setManifest({
+          name: cfg().name,
+          icon: (cfg().icon.image || cfg().icon.letter || 'A'),
+          color: cfg().icon.color
+        });
+      } catch (e) {}
       box.style.display = 'none';
       applyTheme(); render();
       if (firstRun || !state.history.length) ensureOpening();
@@ -379,6 +420,15 @@
     notJoined.forEach(function (id) { pushMsg({ role: 'invite', charId: id, name: (byId(id) || {}).name }); });
   };
   $('btnGear').onclick = function () { openSetup(false); };
+
+  /* ---------------- 返回：默认回 AppStore，可自定义 ---------------- */
+  var btnBack = $('btnBack');
+  if (btnBack) btnBack.onclick = function () { if (Nano.close) Nano.close(); else history.back(); };
+  if (Nano.onBack) Nano.onBack(function () {
+    var s = $('setup');
+    if (s && s.style.display !== 'none') { s.style.display = 'none'; applyTheme(); render(); return true; }
+    return false; // 交回系统 → 默认回到 AppStore
+  });
 
   /* ---------------- 输入框 ---------------- */
   var input = $('input');
@@ -398,6 +448,7 @@
         state.config = Object.assign({}, DEFAULT_CONFIG, r[0].config, { icon: Object.assign({}, DEFAULT_CONFIG.icon, (r[0].config || {}).icon || {}) });
         state.history = r[0].history || [];
         state.joined = r[0].joined || [];
+        $('setup').style.display = 'none';
         applyTheme(); render();
         if (!state.config.charIds.length) openSetup(false);
       } else {

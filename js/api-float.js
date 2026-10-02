@@ -202,9 +202,11 @@
         + '<button class="ab-close" data-ab-close aria-label="关闭">×</button>'
         + '<div class="ab-panel-title">美化</div>'
         + '<div class="ab-bt-cats">'
-        + '<button class="ab-bt-cat ab-active" data-bt="global">全局美化</button>'
-        + '<button class="ab-bt-cat" data-bt="chat">聊天美化</button>'
+        + '<button class="ab-bt-cat ab-active" data-bt="global">全局</button>'
+        + '<button class="ab-bt-cat" data-bt="chat">聊天</button>'
+        + '<button class="ab-bt-cat" data-bt="font">字体</button>'
         + '</div>'
+        + '<div class="ab-bt-main">'
         + '<select class="ab-select ab-bt-preset"></select>'
         + '<div class="ab-bt-actions">'
         + '<button class="ab-bt-btn" data-bt-act="clear">清空</button>'
@@ -212,6 +214,14 @@
         + '</div>'
         + '<button class="ab-save" data-bt-act="save">应用并保存</button>'
         + '<div class="ab-bt-tip">还原初始会载入内置初始模板</div>'
+        + '</div>'
+        + '<div class="ab-bt-font-wrap" style="display:none">'
+        + '<select class="ab-select ab-bt-font"></select>'
+        + '<div class="ab-bt-actions">'
+        + '<button class="ab-bt-btn" data-bt-act="font-restore">还原系统字体</button>'
+        + '</div>'
+        + '<div class="ab-bt-tip">切换字体后所有页面立即生效；还原即回到系统默认</div>'
+        + '</div>'
         + '<div class="ab-status"></div>';
 
     // 环形菜单：点击悬浮球后围绕它展开的三个动作
@@ -239,7 +249,7 @@
     }
 
     var coreEl, photoEl, presetEl, modelEl, statusEl, pullBtn;
-    var beautyStatusEl, beautyPresetEl;
+    var beautyStatusEl, beautyPresetEl, beautyFontEl;
     var beautyCat = 'global';
     var activeCat = 'api';
     var working = { url: '', key: '', model: '', preset: '' };
@@ -361,6 +371,7 @@
         pullBtn = $('.ab-pull');
         beautyStatusEl = beautyPanel.querySelector('.ab-status');
         beautyPresetEl = beautyPanel.querySelector('.ab-bt-preset');
+        beautyFontEl = beautyPanel.querySelector('.ab-bt-font');
 
         panel.querySelectorAll('.ab-tab').forEach(function (b) {
             b.addEventListener('click', function () { setCat(b.dataset.cat); });
@@ -374,9 +385,11 @@
                 if (a === 'clear') doBeautyClear();
                 else if (a === 'restore') doBeautyRestore();
                 else if (a === 'save') doBeautySave();
+                else if (a === 'font-restore') doFontRestore();
             });
         });
         if (beautyPresetEl) beautyPresetEl.addEventListener('change', function () { onBeautyPreset(this.value); });
+        if (beautyFontEl) beautyFontEl.addEventListener('change', function () { onFontPreset(this.value); });
         panel.querySelectorAll('.ab-tab').forEach(function (b) {
             b.classList.toggle('ab-active', b.dataset.cat === activeCat);
         });
@@ -906,7 +919,12 @@
         beautyPanel.querySelectorAll('.ab-bt-cat').forEach(function (b) {
             b.classList.toggle('ab-active', b.dataset.bt === cat);
         });
-        loadBeautyPresets();
+        var main = beautyPanel.querySelector('.ab-bt-main');
+        var fw = beautyPanel.querySelector('.ab-bt-font-wrap');
+        var isFont = (cat === 'font');
+        if (main) main.style.display = isFont ? 'none' : '';
+        if (fw) fw.style.display = isFont ? '' : 'none';
+        if (isFont) loadFontPresets(); else loadBeautyPresets();
     }
 
     function onBeautyPreset(value) {
@@ -921,6 +939,77 @@
                 flash('已切换：' + (found.name || ''), beautyStatusEl);
             });
         });
+    }
+
+    // ===== 字体 tab：切换字体预设 / 还原系统字体 =====
+    function loadFontPresets() {
+        if (!beautyFontEl) return;
+        bdbAllPresets().then(function (items) {
+            var list = (items || []).filter(function (x) { return x && x.category === 'font' && x.font; });
+            beautyFontEl.innerHTML = '';
+            if (!list.length) {
+                var o0 = document.createElement('option');
+                o0.value = ''; o0.textContent = '暂无字体预设（去美化页保存）';
+                beautyFontEl.appendChild(o0);
+                return;
+            }
+            var ph = document.createElement('option');
+            ph.value = ''; ph.textContent = '切换字体…';
+            beautyFontEl.appendChild(ph);
+            list.forEach(function (x) {
+                var o = document.createElement('option');
+                o.value = x.id; o.textContent = x.name || ('字体 ' + x.id);
+                beautyFontEl.appendChild(o);
+            });
+        });
+    }
+    function broadcastFont(cfg) {
+        try { if (window.__nanoAppearance) window.__nanoAppearance.applyMessage({ type: 'beautify:font', cfg: cfg }); } catch (e) {}
+        var frames = document.querySelectorAll('iframe');
+        for (var i = 0; i < frames.length; i++) {
+            try { frames[i].contentWindow.postMessage({ type: 'beautify:font', cfg: cfg }, '*'); } catch (e) {}
+        }
+    }
+    function onFontPreset(value) {
+        var id = Number(value);
+        if (!id) return;
+        bdbAllPresets().then(function (items) {
+            var found = (items || []).find(function (x) { return x.id === id && x.category === 'font'; });
+            if (!found || !found.font) { flash('字体预设不存在', beautyStatusEl); return; }
+            var fs = found.font;
+            var cfg = {
+                family: 'NanoBeautifyFont',
+                name: fs.name || found.name || '',
+                source: fs.source || '',
+                type: fs.type || '',
+                size: fs.size || 16
+            };
+            if (fs.type === 'url' && fs.source) {
+                try { localStorage.setItem('beautify_font', JSON.stringify(cfg)); } catch (e) {}
+                broadcastFont(cfg);
+            } else if (fs.type === 'file' && fs.data) {
+                // 文件字体体积大，写入设置后让各页自行从 IndexedDB 重新读取
+                var frames = document.querySelectorAll('iframe');
+                for (var i = 0; i < frames.length; i++) {
+                    try { frames[i].contentWindow.postMessage({ type: 'beautify:refresh' }, '*'); } catch (e) {}
+                }
+                try { if (window.__nanoAppearance) window.__nanoAppearance.applySaved(); } catch (e) {}
+            }
+            bdbSet('settings', { key: 'appliedFont', value: fs }).then(function () {
+                flash('已切换字体：' + (found.name || ''), beautyStatusEl);
+            });
+        });
+    }
+    function doFontRestore() {
+        try {
+            localStorage.removeItem('beautify_font');
+            localStorage.removeItem('beautify_font_pending');
+            localStorage.removeItem('nano_beautify_font');
+        } catch (e) {}
+        bdbSet('settings', { key: 'appliedFont', value: null });
+        if (beautyFontEl) beautyFontEl.value = '';
+        broadcastFont(null);
+        flash('已还原系统字体', beautyStatusEl);
     }
 
     function doBeautyClear() {

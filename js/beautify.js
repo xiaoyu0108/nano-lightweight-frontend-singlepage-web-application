@@ -2602,28 +2602,19 @@ document.getElementById("urlApply").onclick = async () => {
   const url = document.getElementById("fontUrl").value.trim();
   if (!url) return toast("请输入字体 URL");
   if (!/^(https?:|data:)/i.test(url)) return toast("请输入 http(s) 开头的字体链接");
-  const niceName = (url.split("/").pop() || "远程字体").split("?")[0] || "远程字体";
+  const niceName = ((/fonts\.googleapis\.com/i.test(url) ? googleFontFamily(url) : "") || (url.split("/").pop() || "远程字体")).split("?")[0] || "远程字体";
   fontState = { name: niceName, source: url, type: "url", data: null, size: fontState.size || 16 };
 
-  // 立即注册并广播：所有页面都会通过 @font-face 各自尝试加载。
-  // 这样即使退出美化页，字体仍会在后台继续连接、加载完自动生效。
-  ensureLocalFontFace("NanoRemoteFont", url, fontFormatFor(url));
-  applyFontToPage("NanoRemoteFont");
+  // 立即注册并广播：所有页面都会通过 @font-face / <link> 各自加载。
+  // 不再依赖 JS fetch，可绕开「能加载的直链被 fetch 跨域拦截」的问题。
   try { localStorage.setItem("beautify_font_pending", url); } catch (e) {}
+  await applyRemoteFont(url);
   await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
-  document.getElementById("filename").textContent = "已应用远程字体（后台加载中）";
+  try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
+  document.getElementById("filename").textContent = "已应用远程字体";
   document.getElementById("fontMeta").textContent = "当前字体：" + url;
-  toast("已应用，字体正在后台加载");
-
-  // 后台校验：成功给个确认；失败也不回滚（已保存的链接会随页面重新尝试）
-  loadRemoteFontFace("NanoRemoteFont", url).then(function () {
-    try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
-    applyFontToPage("NanoRemoteFont");
-    toast("字体已连接并生效");
-  }).catch(function (err) {
-    console.warn("[font] 远程字体后台加载失败：", err);
-    toast("该链接可能不允许跨域，已保存但可能不显示，建议换可跨域的字体直链");
-  });
+  renderFontQuickBar();
+  toast("已应用；若未生效，请换支持外链的字体直链（如 jsDelivr）");
 };
 
 // ---- 字体预设 ----
@@ -2653,57 +2644,144 @@ async function refreshFontPresets() {
   if (want && filtered.some(x => x.id === want)) sel.value = want;
 }
 
-// 加载字体预设 - 修复：正确设置fontState并应用
-document.getElementById("fontPreset").onchange = async () => {
-  const sel = document.getElementById("fontPreset");
-  const id = Number(sel.value);
-  if (!id) return;
-  const items = await storeAll("presets");
-  const found = items.find(x => x.id === id && x.category === "font");
-  if (found && found.font) {
-    currentPreset.font = id;
-    // 完整复制字体状态
-    fontState = {
-      name: found.font.name || "",
-      source: found.font.source || "",
-      type: found.font.type || "",
-      data: found.font.data || null,
-      size: found.font.size || 16
-    };
-    document.getElementById("fontName").value = found.name || "";
-    document.getElementById("filename").textContent = fontState.source || "已加载";
-    document.getElementById("fontMeta").textContent = "预设：" + (fontState.name || found.name);
-    document.getElementById("fontUrl").value = fontState.type === "url" ? fontState.source : "";
-    fontSizeSlider.value = fontState.size;
-    updateFontSize(fontState.size);
-    
-    // 自动应用字体
-    try {
-      if (fontState.type === "file" && fontState.data) {
-        if (localURL) URL.revokeObjectURL(localURL);
-        localURL = URL.createObjectURL(new Blob([fontState.data]));
-        const face = new FontFace("NanoLocalFont", 'url("' + localURL + '")');
-        await face.load();
-        document.fonts.add(face);
-        applyFontToPage("NanoLocalFont");
-      } else if (fontState.type === "url" && fontState.source) {
-        try {
-          await loadRemoteFontFace("NanoRemoteFont", fontState.source);
-        } catch (e) {
-          console.warn("[font] 预设远程字体预加载失败，改为直接应用 @font-face：", e);
-          ensureLocalFontFace("NanoRemoteFont", fontState.source, fontFormatFor(fontState.source));
-        }
-        applyFontToPage("NanoRemoteFont");
-      }
-      await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
-      persistDraft("font");
-      toast("字体预设已加载并应用");
-    } catch (e) {
-      console.error(e);
-      toast("字体加载失败，请检查文件或URL");
+// 提取 Google Fonts CSS 链接里的 family 名（无需 fetch，直接交给浏览器加载）
+function googleFontFamily(url) {
+  try {
+    const m = String(url).match(/[?&]family=([^&:]+)/i);
+    if (!m) return "";
+    let f = decodeURIComponent(m[1]).replace(/\+/g, " ").trim();
+    f = f.split(":")[0].trim();
+    return f;
+  } catch (e) { return ""; }
+}
+function injectGoogleFontLink(url) {
+  try {
+    let link = document.getElementById("nano-google-font");
+    if (!link) {
+      link = document.createElement("link");
+      link.id = "nano-google-font";
+      link.rel = "stylesheet";
+      (document.head || document.documentElement).appendChild(link);
+    }
+    link.href = url;
+  } catch (e) {}
+}
+
+// 应用远程字体：优先「浏览器自身加载」路径，不再依赖 JS fetch（避免把可用的直链误判为跨域失败）
+async function applyRemoteFont(url) {
+  const u = String(url || "").trim();
+  if (!u) return;
+  if (/fonts\.googleapis\.com\/css/i.test(u)) {
+    const fam = googleFontFamily(u);
+    if (fam) {
+      injectGoogleFontLink(u);
+      applyFontToPage(fam);
+      return;
     }
   }
+  // 直链字体：先注入 @font-face 让浏览器自己加载（不受 JS fetch 的 CORS 影响）
+  ensureLocalFontFace("NanoRemoteFont", u, fontFormatFor(u));
+  applyFontToPage("NanoRemoteFont");
+  // 后台再尽力用 FontFace 注册一次，提升成功率（失败也不影响已注入的 @font-face）
+  try {
+    await loadRemoteFontFace("NanoRemoteFont", u);
+    applyFontToPage("NanoRemoteFont");
+  } catch (e) {
+    console.warn("[font] FontFace 预加载失败，继续使用 @font-face：", e);
+  }
+}
+
+function escapeHtmlFont(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// 应用指定字体预设
+async function applyFontPresetById(id) {
+  id = Number(id);
+  if (!id) return false;
+  const items = await storeAll("presets");
+  const found = items.find(x => x.id === id && x.category === "font");
+  if (!found || !found.font) return false;
+  currentPreset.font = id;
+  fontState = {
+    name: found.font.name || "",
+    source: found.font.source || "",
+    type: found.font.type || "",
+    data: found.font.data || null,
+    size: found.font.size || 16
+  };
+  document.getElementById("fontName").value = found.name || "";
+  document.getElementById("filename").textContent = fontState.source || "已加载";
+  document.getElementById("fontMeta").textContent = "预设：" + (fontState.name || found.name);
+  document.getElementById("fontUrl").value = fontState.type === "url" ? fontState.source : "";
+  fontSizeSlider.value = fontState.size;
+  updateFontSize(fontState.size);
+  try {
+    if (fontState.type === "file" && fontState.data) {
+      if (localURL) URL.revokeObjectURL(localURL);
+      localURL = URL.createObjectURL(new Blob([fontState.data]));
+      const face = new FontFace("NanoLocalFont", 'url("' + localURL + '")');
+      await face.load();
+      document.fonts.add(face);
+      applyFontToPage("NanoLocalFont");
+    } else if (fontState.type === "url" && fontState.source) {
+      await applyRemoteFont(fontState.source);
+    }
+    await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
+    persistDraft("font");
+    await refreshFontPresets();
+    renderFontQuickBar();
+    toast("字体预设已加载并应用");
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast("字体加载失败，请检查文件或URL");
+    return false;
+  }
+}
+
+// 加载字体预设
+document.getElementById("fontPreset").onchange = async () => {
+  const sel = document.getElementById("fontPreset");
+  await applyFontPresetById(Number(sel.value));
 };
+
+// 「快速切换 / 还原」胶囊
+async function renderFontQuickBar() {
+  const bar = document.getElementById("fontPresetBar");
+  if (!bar) return;
+  const items = (await storeAll("presets")).filter(x => x.category === "font");
+  const usingFont = !!fontState.name;
+  let h = `<button type="button" class="font-preset-chip system${usingFont ? '' : ' on'}" data-pid="0">系统默认</button>`;
+  h += items.map(x => `<button type="button" class="font-preset-chip${(usingFont && currentPreset.font === x.id) ? ' on' : ''}" data-pid="${x.id}">${escapeHtmlFont(x.name)}</button>`).join('');
+  if (!items.length) h += '<span style="font-size:11px;color:#8e8e93;padding:6px 2px">保存字体后会出现在这里</span>';
+  bar.innerHTML = h;
+}
+document.getElementById("fontPresetBar").addEventListener("click", e => {
+  const chip = e.target.closest("[data-pid]");
+  if (!chip) return;
+  const pid = Number(chip.getAttribute("data-pid"));
+  if (!pid) { restoreSystemFont("已还原系统字体"); return; }
+  applyFontPresetById(pid);
+});
+
+// 还原系统字体：清空已应用字体并通知所有页面
+function restoreSystemFont(msg) {
+  fontState = { name: "", source: "", type: "", data: null, size: fontState.size || 16 };
+  const u = document.getElementById("fontUrl"); if (u) u.value = "";
+  const fn = document.getElementById("fontName"); if (fn) fn.value = "";
+  systemFont();
+  try { localStorage.removeItem("beautify_font"); } catch (e) {}
+  try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
+  storeDel("settings", "appliedFont").catch(() => {});
+  currentPreset.font = 0;
+  persistDraft("font");
+  refreshFontPresets();
+  renderFontQuickBar();
+  const fileEl = document.getElementById("filename"); if (fileEl) fileEl.textContent = "未选择";
+  const metaEl = document.getElementById("fontMeta"); if (metaEl) metaEl.textContent = "系统默认";
+  toast(msg || "已还原系统字体");
+}
 
 // ---- 字体应用函数 ----
 function applyFontToPage(family) {
@@ -2738,41 +2816,15 @@ function systemFont() {
 
 // ---- 清除/还原/应用 ----
 document.getElementById("fontClearFile").onclick = () => {
-  fontState = { name: "", source: "", type: "", data: null, size: fontState.size || 16 };
-  systemFont();
-  storeDel("settings", "appliedFont").catch(() => {});
-  currentPreset.font = 0;
-  persistDraft("font");
-  refreshFontPresets();
-  document.getElementById("filename").textContent = "未选择";
-  document.getElementById("fontMeta").textContent = "系统默认";
-  toast("已清除字体");
+  restoreSystemFont("已清除字体");
 };
 
 document.getElementById("fontClear").onclick = () => {
-  fontState = { name: "", source: "", type: "", data: null, size: fontState.size || 16 };
-  document.getElementById("fontUrl").value = "";
-  systemFont();
-  storeDel("settings", "appliedFont").catch(() => {});
-  currentPreset.font = 0;
-  persistDraft("font");
-  refreshFontPresets();
-  document.getElementById("filename").textContent = "未选择";
-  document.getElementById("fontMeta").textContent = "系统默认";
-  toast("字体设置已清空");
+  restoreSystemFont("字体设置已清空");
 };
 
 document.getElementById("fontRestore").onclick = () => {
-  fontState = { name: "", source: "", type: "", data: null, size: fontState.size || 16 };
-  document.getElementById("fontUrl").value = "";
-  systemFont();
-  storeDel("settings", "appliedFont").catch(() => {});
-  currentPreset.font = 0;
-  persistDraft("font");
-  refreshFontPresets();
-  document.getElementById("filename").textContent = "未选择";
-  document.getElementById("fontMeta").textContent = "系统默认";
-  toast("已还原系统字体");
+  restoreSystemFont("已还原系统字体");
 };
 
 document.getElementById("fontApply").onclick = async () => {
@@ -2786,17 +2838,12 @@ document.getElementById("fontApply").onclick = async () => {
       document.fonts.add(face);
       applyFontToPage("NanoLocalFont");
     } else if (fontState.type === "url" && fontState.source) {
-      try {
-        await loadRemoteFontFace("NanoRemoteFont", fontState.source);
-      } catch (e) {
-        console.warn("[font] 远程字体预加载失败，改为直接应用 @font-face：", e);
-        ensureLocalFontFace("NanoRemoteFont", fontState.source, fontFormatFor(fontState.source));
-      }
-      applyFontToPage("NanoRemoteFont");
+      await applyRemoteFont(fontState.source);
     } else {
       return toast("字体数据无效");
     }
     await storePut("settings", { key: "appliedFont", value: fontState });
+    renderFontQuickBar();
     toast("字体已应用 ✓");
   } catch (e) {
     console.error(e);
@@ -2813,6 +2860,7 @@ document.getElementById("fontSave").onclick = async () => {
   const id = await storePut("presets", { category: "font", name, font: fontState, createdAt: Date.now() });
   currentPreset.font = id;
   await refreshFontPresets();
+  await renderFontQuickBar();
   document.getElementById("fontPreset").value = id;
   persistDraft("font");
   toast("字体预设已保存");
@@ -2835,6 +2883,7 @@ document.getElementById("fontEdit").onclick = async () => {
   currentPreset.font = id;
   document.getElementById("fontName").value = name;
   await refreshFontPresets();
+  await renderFontQuickBar();
   sel.value = id;
   persistDraft("font");
   toast("字体预设已修改");
@@ -2847,6 +2896,7 @@ document.getElementById("fontDelete").onclick = async () => {
   await storeDel("presets", id);
   if (currentPreset.font === id) currentPreset.font = 0;
   await refreshFontPresets();
+  await renderFontQuickBar();
   persistDraft("font");
   toast("字体预设已删除");
 };
@@ -2945,6 +2995,7 @@ async function restoreFontToBeautifyPage() {
     await refreshPresets("global");
     await refreshPresets("chat");
     await refreshFontPresets();
+    await renderFontQuickBar();
     await loadFontSize();
     
     const af = await storeGet("settings", "appliedFont");

@@ -1314,7 +1314,8 @@
             'music.html', 'voice-call.html', 'video-call.html', 'storage.html', 'backup.html', 'other.html', 'more.html',
             'discover.html', 'api.html', 'moments.html', 'ins.html', 'inner-setting.html', 'beautify.html',
             'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
-            'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html', 'appstore.html'];
+            'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html', 'appstore.html',
+            'imessage.html', 'memory palace.html', 'app-host.html'];
         // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
         function applySafeFallback(f) {
             try {
@@ -1358,7 +1359,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-09-29-01';
+        var BUILD = 'nano-2026-10-02-01';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -1433,7 +1434,7 @@
                 if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
                     overlayFrame.src = url;
                 }
-                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html'];
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html', 'imessage.html', 'memory palace.html', 'app-host.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
                 if (noOuterHeader) {
@@ -1624,6 +1625,25 @@
                 isChatInnerActive = false;
                 restoreBottomBar();
                 restoreTopBar();
+                return;
+            }
+
+            // 从 DIY 应用返回：默认回到 AppStore（应用内部也可自己设计返回逻辑）
+            if (wasOverlaySource === 'appstore') {
+                currentOverlaySource = 'discover';
+                pickOverlayFrame('appstore.html');
+                showOverlayFrame();
+                overlayFrame.src = withBuild('appstore.html');
+                overlay.classList.add('active');
+                overlay.classList.add('no-header');
+                overlayActive = true;
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
+                isChatInnerActive = false;
+                topBar.classList.add('hidden');
+                bottomBar.classList.add('hidden');
+                appContent.style.paddingTop = '0';
+                appContent.style.paddingBottom = '0';
                 return;
             }
 
@@ -2464,12 +2484,26 @@
                 }
             }
 
-            const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'autoSocialChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared', 'nanoTransMode'];
+            const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'autoSocialChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared', 'nanoTransMode', 'nanoBlockChanged', 'nanoCharUnblocked'];
             if (innerSettingTypes.indexOf(data.type) !== -1) {
                 const c = document.getElementById('chatInnerFrame');
                 if (c && frameBase(c) === 'chat_inner.html') {
                     try { c.contentWindow.postMessage(data, '*'); } catch(e) {}
                 }
+            }
+
+            // iMessage 是独立 App：拉黑后写入的新消息 / 拉黑状态变化要同步给正在打开的 iMessage
+            if (data.type === 'nanoIMessageUpdated' || data.type === 'nanoBlockChanged') {
+                document.querySelectorAll('iframe').forEach(function(f) {
+                    try { if (f && f.contentWindow) f.contentWindow.postMessage(data, '*'); } catch (e) {}
+                });
+            }
+
+            // DIY 应用改了名字 / 图标：同步给正在打开的 AppStore
+            if (data.type === 'nanoAppManifestChanged') {
+                document.querySelectorAll('iframe').forEach(function(f) {
+                    try { if (f && f.contentWindow) f.contentWindow.postMessage(data, '*'); } catch (e) {}
+                });
             }
 
             if (data.type === 'momentsDataUpdated') {
@@ -3179,6 +3213,22 @@
         }
         // 写入 nano_characters_db，并广播，让聊天列表 / 主页（朋友圈等）都刷新出这个新好友。
         // 与群聊「加陌生人为好友」(js/groups.js addNpcFriend) 保持同一套路：isNpc:true 才会出现在列表里。
+        // 小号是角色本人披的马甲：它自己知道自己是本人，只是不能让用户知道。
+        // 把「小号身份 + 本人完整人设 + 铁律」写进角色设定，线上/线下/iMessage 共用同一套提示词。
+        function buildAltMaskSetting(alt) {
+            var origin = alt.origin || {};
+            var charName = origin.name || '角色';
+            var persona = String(origin.setting || '').slice(0, 6000);
+            var name = alt.name || '小号';
+            var bio = alt.bio || '';
+            return '【小号身份】你是「' + charName + '」本人开的小号，网名「' + name + '」。'
+                + '你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。'
+                + '绝对不能让用户察觉你就是「' + charName + '」：不要承认、不要暗示，不要用本人平时标志性的称呼或口头禅自曝。'
+                + (bio ? ('\n【小号的公开简介】' + bio) : '')
+                + (persona ? ('\n\n【你本人（' + charName + '）的完整设定，请以本人性格来扮演小号】\n' + persona) : '')
+                + '\n\n【铁律】以网名「' + name + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定；'
+                + '用户若起疑，要自然地圆过去，始终不承认自己和「' + charName + '」是同一个人。';
+        }
         function addFriend(alt) {
             try {
                 var req = indexedDB.open('nano_characters_db', 1);
@@ -3192,8 +3242,10 @@
                             avatar: alt.avatar || '',
                             gender: alt.gender || '未知',
                             nationality: alt.nationality || '未知',
-                            setting: alt.bio || '',
-                            isNpc: true
+                            setting: buildAltMaskSetting(alt),
+                            isNpc: true,
+                            isAltProbe: true,
+                            altOriginId: (alt.origin && alt.origin.id) || ''
                         };
                         var tx = db.transaction('characters', 'readwrite');
                         tx.objectStore('characters').put(rec);

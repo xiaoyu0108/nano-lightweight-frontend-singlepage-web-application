@@ -825,6 +825,283 @@
         }
     }
 
+    // ===== 拉黑 / 取消拉黑（用户拉黑角色；角色也能拉黑用户）=====
+    var blockItem = document.getElementById('blockItem');
+    var unblockItem = document.getElementById('unblockItem');
+    var blockStatus = document.getElementById('blockStatus');
+    var unblockStatus = document.getElementById('unblockStatus');
+    var charBlockItem = document.getElementById('charBlockItem');
+    var lastCharRec = null;
+    function postToParent(type, extra) {
+        var m = { type: type, chatId: chatId };
+        if (extra) { for (var k in extra) { m[k] = extra[k]; } }
+        try { if (window.parent !== window) window.parent.postMessage(m, '*'); } catch (e) {}
+    }
+    function applyBlockState() {
+        var blocked = !!getSetting('blocked', false);
+        var charBlocked = !!getSetting('charBlocked', false);
+        if (blockStatus) blockStatus.textContent = blocked ? '已拉黑' : '未拉黑';
+        if (unblockStatus) unblockStatus.textContent = blocked ? '点此恢复' : '';
+        if (unblockItem) unblockItem.style.opacity = blocked ? '1' : '.45';
+        if (charBlockItem) charBlockItem.style.display = charBlocked ? 'flex' : 'none';
+    }
+    function doBlock() {
+        if (getSetting('blocked', false)) return;
+        setSetting('blocked', true);
+        if (autoMsgToggle && autoMsgToggle.checked) { autoMsgToggle.checked = false; toggleAutoMsg(); }
+        applyBlockState();
+        postToParent('nanoBlockChanged', { blocked: true, text: '你已拉黑 TA' });
+        showCenterToast('已拉黑 TA');
+        contactCharViaIMessage();
+    }
+    function doUnblock() {
+        setSetting('blocked', false);
+        try { localStorage.removeItem('chat_setting_blockedContacted_' + chatId); } catch (e) {}
+        applyBlockState();
+        postToParent('nanoBlockChanged', { blocked: false, text: '已加回好友' });
+        appendIMessageSystem('已加回好友');
+        showCenterToast('已加回好友');
+    }
+    // 打开/读取 iMessage 独立消息库
+    function openIMDB() {
+        return new Promise(function (resolve) {
+            try {
+                var req = indexedDB.open('nano_imessage_db');
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('chats')) d.createObjectStore('chats', { keyPath: 'id' }); if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta', { keyPath: 'key' }); } catch (err) {} };
+                req.onsuccess = function () { resolve(req.result); };
+                req.onerror = function () { resolve(null); };
+                req.onblocked = function () { resolve(null); };
+            } catch (e) { resolve(null); }
+        });
+    }
+    // 同步一份到 localStorage，和 iMessage 应用的兜底镜像保持一致（切页不丢消息）
+    function mirrorIMChat(c) {
+        try {
+            localStorage.setItem('nano_imessage_chat_' + c.id, JSON.stringify(c));
+            var idx = [];
+            try { idx = JSON.parse(localStorage.getItem('nano_imessage_chat_index') || '[]') || []; } catch (e) {}
+            if (idx.indexOf(c.id) === -1) { idx.push(c.id); localStorage.setItem('nano_imessage_chat_index', JSON.stringify(idx)); }
+        } catch (e) {}
+    }
+    // 把角色通过 iMessage 发来的消息写进 iMessage 卡片的聊天记录
+    function appendIMessage(rec, msgs) {
+        if (!msgs || !msgs.length) return Promise.resolve();
+        return openIMDB().then(function (db) {
+            if (!db) return;
+            return new Promise(function (resolve) {
+                try {
+                    var tx = db.transaction('chats', 'readwrite');
+                    var store = tx.objectStore('chats');
+                    var g = store.get('c:' + chatId);
+                    g.onsuccess = function () {
+                        var c = g.result;
+                        if (!c) {
+                            c = {
+                                id: 'c:' + chatId, kind: 'char', charId: chatId,
+                                name: (rec && rec.name) || chatName || '角色',
+                                avatar: (rec && rec.avatar) || chatAvatar || '',
+                                setting: (rec && (rec.setting || rec.desc || rec.persona)) || '',
+                                history: [], preview: '', lastTime: '', sortTime: 0, unread: 0
+                            };
+                        }
+                        c.history = (c.history || []).concat(msgs);
+                        var last = c.history[c.history.length - 1];
+                        if (last) { c.preview = last.text || ''; c.lastTime = last.time || ''; c.sortTime = last.ts || Date.now(); }
+                        c.unread = (c.unread || 0) + msgs.length;
+                        store.put(c);
+                        mirrorIMChat(c);
+                    };
+                    tx.oncomplete = function () { try { db.close(); } catch (e) {} resolve(); };
+                    tx.onerror = function () { try { db.close(); } catch (e) {} resolve(); };
+                } catch (e) { try { db.close(); } catch (e2) {} resolve(); }
+            });
+        });
+    }
+    function readApiConfig() {
+        return new Promise(function(resolve){
+            try {
+                var req = indexedDB.open('nano_api_db');
+                req.onupgradeneeded = function(e){ try{ var d=e.target.result; if(!d.objectStoreNames.contains('api_data')) d.createObjectStore('api_data', { keyPath: 'key' }); }catch(err){} };
+                req.onsuccess = function(){
+                    try {
+                        var db=req.result;
+                        var g=db.transaction('api_data','readonly').objectStore('api_data').get('nano_api_config');
+                        g.onsuccess=function(){ var rec=g.result; var v=(rec&&rec.value!==undefined)?rec.value:rec; try{db.close();}catch(e){} resolve(v||null); };
+                        g.onerror=function(){ try{db.close();}catch(e){} resolve(null); };
+                    } catch(e){ resolve(null); }
+                };
+                req.onerror=function(){ resolve(null); };
+            } catch(e){ resolve(null); }
+        }).then(function(cfg){
+            if(cfg) return cfg;
+            try { return JSON.parse(localStorage.getItem('nano_api_config')||'null'); } catch(e){ return null; }
+        });
+    }
+    function readCharRec() {
+        return new Promise(function(resolve){
+            try {
+                var req = indexedDB.open('nano_characters_db',1);
+                req.onupgradeneeded=function(e){ try{ var d=e.target.result; if(!d.objectStoreNames.contains('characters')) d.createObjectStore('characters',{keyPath:'id'}); }catch(err){} };
+                req.onsuccess=function(){
+                    try{
+                        var db=req.result;
+                        var g=db.transaction('characters','readonly').objectStore('characters').get(chatId);
+                        g.onsuccess=function(){ var v=g.result||null; try{db.close();}catch(e){} resolve(v); };
+                        g.onerror=function(){ try{db.close();}catch(e){} resolve(null); };
+                    }catch(e){ resolve(null); }
+                };
+                req.onerror=function(){ resolve(null); };
+            }catch(e){ resolve(null); }
+        });
+    }
+    function readUserName(){
+        try{
+            var keys=['nano_mask_data','nano_home_data','peach_home_data'];
+            for(var i=0;i<keys.length;i++){
+                var raw=localStorage.getItem(keys[i]);
+                if(raw){ var d=JSON.parse(raw); if(d&&d.masks){ var m=(d.masks||[]).filter(function(x){return x.id===d.currentMaskId;})[0]; if(m&&m.name) return m.name; } }
+            }
+        }catch(e){}
+        return '用户';
+    }
+    // 通过外壳代理请求（和线上一致，优于 iframe 内直接 fetch）
+    function imPendingAdd(token){
+        try{ var l=JSON.parse(localStorage.getItem('nano_imessage_pending')||'[]'); l.push({token:token,kind:'blocking',ts:Date.now()}); localStorage.setItem('nano_imessage_pending',JSON.stringify(l)); }catch(e){}
+    }
+    function imPendingRemove(token){
+        try{ var l=JSON.parse(localStorage.getItem('nano_imessage_pending')||'[]').filter(function(p){return p.token!==token;}); localStorage.setItem('nano_imessage_pending',JSON.stringify(l)); }catch(e){}
+    }
+    function timeNow(){ var d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+    function showCenterToast(text){
+        try{
+            var el=document.getElementById('_blockToast');
+            if(!el){
+                el=document.createElement('div'); el.id='_blockToast';
+                el.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;background:rgba(0,0,0,.78);color:#fff;font-size:14px;line-height:1;padding:12px 18px;border-radius:12px;pointer-events:none;opacity:0;transition:opacity .18s;';
+                document.body.appendChild(el);
+            }
+            el.textContent=text; el.style.opacity='1';
+            clearTimeout(el._t); el._t=setTimeout(function(){ el.style.opacity='0'; },1400);
+        }catch(e){}
+    }
+    // 在 iMessage 卡片里插入一条居中系统提示
+    function appendIMessageSystem(text){
+        return openIMDB().then(function(db){
+            if(!db) return;
+            return new Promise(function(resolve){
+                try{
+                    var tx=db.transaction('chats','readwrite'); var store=tx.objectStore('chats');
+                    var g=store.get('c:'+chatId);
+                    g.onsuccess=function(){
+                        var c=g.result;
+                        if(!c){ c={id:'c:'+chatId,kind:'char',charId:chatId,name:chatName||'角色',avatar:chatAvatar||'',setting:'',history:[],preview:'',lastTime:'',sortTime:0,unread:0}; }
+                        c.history=c.history||[];
+                        c.history.push({id:'sys_'+Date.now(),type:'system',text:text,time:timeNow(),ts:Date.now()});
+                        c.sortTime=Date.now();
+                        store.put(c);
+                        mirrorIMChat(c);
+                    };
+                    tx.oncomplete=function(){try{db.close();}catch(e){}resolve();};
+                    tx.onerror=function(){try{db.close();}catch(e){}resolve();};
+                }catch(e){try{db.close();}catch(e2){}resolve();}
+            });
+        });
+    }
+    function proxyFetch(payload, tokenOverride){
+        return new Promise(function(resolve){
+            var token=tokenOverride||('blk'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
+            var resultKey='chat_api_result_'+token;
+            var done=false;
+            function finish(d){ if(done)return; done=true; try{localStorage.removeItem(resultKey);}catch(e){} window.removeEventListener('storage',onStorage); window.removeEventListener('message',onMsg); resolve(d); }
+            function onStorage(e){ if(e&&e.key===resultKey&&e.newValue){ var o=null; try{o=JSON.parse(e.newValue);}catch(err){} finish(o); } }
+            function onMsg(e){ var d=e.data; if(d&&d.type==='chatApiDone'&&d.token===token){ var v=null; try{v=localStorage.getItem(resultKey);}catch(err){} finish(v?JSON.parse(v):null); } }
+            window.addEventListener('storage',onStorage); window.addEventListener('message',onMsg);
+            if(window.parent!==window){
+                try{ window.parent.postMessage({type:'chatApiFetch',token:token,resultKey:resultKey,url:payload.url,method:'POST',headers:payload.headers,body:payload.body},'*'); }
+                catch(e){ finish(null); return; }
+            } else {
+                fetch(payload.url,{method:'POST',headers:payload.headers,body:payload.body}).then(function(r){return r.json();}).then(finish).catch(function(){finish(null);});
+                return;
+            }
+            var n=0; var iv=setInterval(function(){ n++; var v=null; try{v=localStorage.getItem(resultKey);}catch(e){} if(v){ clearInterval(iv); var o=null; try{o=JSON.parse(v);}catch(err){} finish(o); } else if(n>120){ clearInterval(iv); finish(null); } },250);
+        });
+    }
+    function pickContent(d){
+        var o=d;
+        if(o&&typeof o.text==='string'){ try{o=JSON.parse(o.text);}catch(e){o=null;} }
+        return (o&&o.choices&&o.choices[0]&&o.choices[0].message&&o.choices[0].message.content)||'';
+    }
+    var blockContacting=false;
+    // 拉黑后自动调用一次 API，让角色以 iMessage 短信联系用户（写进 iMessage 独立卡片）
+    function contactCharViaIMessage(){
+        var last=0;
+        try{ last=parseInt(localStorage.getItem('chat_setting_blockedContacted_'+chatId)||'0',10)||0; }catch(e){}
+        if(blockContacting || Date.now()-last < 60000) return;
+        blockContacting=true;
+        Promise.all([readApiConfig(), readCharRec()]).then(function(arr){
+            var cfg=arr[0], rec=arr[1];
+            lastCharRec=rec||lastCharRec;
+            if(!cfg||!cfg.mainUrl||!cfg.mainKey||!cfg.mainModel){ blockContacting=false; console.warn('[block] 未配置主 API，无法通过 iMessage 联系'); return; }
+            var base=String(cfg.mainUrl).trim();
+            if(base.slice(-3)!=='/v1') base=base+(base.slice(-1)==='/'?'v1':'/v1');
+            var cName=(rec&&rec.name)||chatName||'角色';
+            var setting=(rec&&(rec.setting||rec.desc||rec.persona))||'';
+            var user=readUserName();
+            var nat=(rec&&rec.nationality)||'';
+            var isForeign=nat&&!/中国|中國|china|chinese|华|華|汉|漢|未知|unknown/i.test(nat);
+            var sys='你是「'+cName+'」。用户「'+user+'」刚刚在线上聊天里把你拉黑了，你现在无法再在线上给TA发消息，只能通过 iMessage 短信联系TA。'
+                +'请以角色本人的性格，给TA发 2 到 4 条很短的 iMessage 消息（每条不超过22字，每条独立一行）。'
+                +'内容必须围绕“你被TA拉黑了 / 被冷落了”这件事展开：可以是委屈、质问、解释、挽留或故作镇定，让TA明确感觉到你在意这件事。'
+                +'可以提到被拉黑 / 被冷落，但不要说“系统”“AI”“API”等词。'
+                +(isForeign?'\n你是外国人：每条消息用「母语||中文翻译」格式，先母语再中文翻译，两边都写完整。':'')
+                +(setting?('\n【你本人的人设】\n'+String(setting).slice(0,4000)):'');
+            var payload={
+                url:base+'/chat/completions',
+                headers:{'Authorization':'Bearer '+String(cfg.mainKey).trim(),'Content-Type':'application/json'},
+                body:JSON.stringify({model:cfg.mainModel,messages:[{role:'system',content:sys},{role:'user',content:'（给TA发条短信）'}],max_tokens:260,temperature:Number(cfg.mainTemp)||0.85})
+            };
+            var blkToken='blk'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+            imPendingAdd(blkToken);
+            var handled=false;
+            function handleContactResult(d){
+                if(handled) return; handled=true;
+                blockContacting=false;
+                imPendingRemove(blkToken);
+                var t=pickContent(d);
+                var lines=String(t).replace(/\[[^\]]*\]/g,'').split(/\n+/).map(function(s){return s.trim().replace(/^[-*•\d.、\s]+/,'');}).filter(Boolean).slice(0,4);
+                if(!lines.length){ console.warn('[block] 角色未生成 iMessage 内容'); return; }
+                var now=new Date();
+                var time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+                var msgs=lines.map(function(line,i){
+                    var tx=String(line||'').trim(), tr='';
+                    var di=tx.indexOf('||');
+                    if(di!==-1){ tr=tx.slice(di+2).trim(); tx=tx.slice(0,di).trim(); }
+                    var m={id:'im_'+Date.now()+'_'+i, type:'left', text:tx, time:time, ts:Date.now()+i, via:'imessage'};
+                    if(tr) m.trans=tr;
+                    return m;
+                });
+                appendIMessage(rec, msgs).then(function(){
+                    try{ localStorage.setItem('chat_setting_blockedContacted_'+chatId, String(Date.now())); }catch(e){}
+                    notifyIMessageRefresh();
+                    try{ if(window.parent!==window) window.parent.postMessage({type:'appNotify',title:(rec&&rec.name)||chatName||'角色',body:(msgs[0]&&msgs[0].text)||'',app:'imessage'},'*'); }catch(e){}
+                });
+            }
+            proxyFetch(payload, blkToken).then(function(d){
+                if(d){ handleContactResult(d); return; }
+                // 代理失败时直接用 fetch 兜底
+                fetch(payload.url,{method:'POST',headers:payload.headers,body:payload.body})
+                    .then(function(r){return r.json();}).then(handleContactResult)
+                    .catch(function(){ handleContactResult(null); });
+            });
+        }).catch(function(){ blockContacting=false; });
+    }
+    function notifyIMessageRefresh(){
+        try{ if(window.parent!==window) window.parent.postMessage({type:'nanoIMessageUpdated',chatId:chatId},'*'); }catch(e){}
+    }
+    if(blockItem) blockItem.addEventListener('click', doBlock);
+    if(unblockItem) unblockItem.addEventListener('click', doUnblock);
+    applyBlockState();
+
     // ===== 事件绑定 =====
     document.getElementById('remarkItem').addEventListener('click', openRemarkModal);
     remarkCancel.addEventListener('click', function() { remarkModal.classList.remove('active'); });

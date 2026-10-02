@@ -69,6 +69,18 @@
   var $confirmCancel = document.getElementById('confirmCancel');
   var $confirmOk     = document.getElementById('confirmOk');
 
+  // 图标设计
+  var $iconModal  = document.getElementById('iconModal');
+  var $iconPrev   = document.getElementById('iconPrev');
+  var $iconLetter = document.getElementById('iconLetter');
+  var $iconColor  = document.getElementById('iconColor');
+  var $iconAvatar = document.getElementById('iconAvatar');
+  var $iconUpload = document.getElementById('iconUpload');
+  var $iconClear  = document.getElementById('iconClear');
+  var $iconCancel = document.getElementById('iconCancel');
+  var $iconOk     = document.getElementById('iconOk');
+  var $iconFile   = document.getElementById('iconFile');
+
   var $exportModal    = document.getElementById('exportModal');
   var $exportList     = document.getElementById('exportList');
   var $exportAll      = document.getElementById('exportAll');
@@ -303,7 +315,7 @@
         img.src = app.icon; img.alt = '';
         icon.appendChild(img);
       } else {
-        icon.textContent = (app.icon && String(app.icon).length <= 2)
+        icon.textContent = (app.icon && String(app.icon).length <= 4)
           ? app.icon
           : (app.name || '?').charAt(0).toUpperCase();
         if (/^#[0-9a-f]{3,8}$/i.test(app.color || '')) { icon.style.background = app.color; icon.style.color = '#fff'; }
@@ -330,6 +342,14 @@
       openBtn.textContent = '打开';
       openBtn.addEventListener('click', function (e) { e.stopPropagation(); openApp(app.id); });
       actions.appendChild(openBtn);
+
+      var iconBtn = document.createElement('button');
+      iconBtn.className = 'app-del';
+      iconBtn.style.color = 'var(--accent)';
+      iconBtn.setAttribute('aria-label', '设计图标');
+      iconBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+      iconBtn.addEventListener('click', function (e) { e.stopPropagation(); openIconEditor(app); });
+      actions.appendChild(iconBtn);
 
       var delBtn = document.createElement('button');
       delBtn.className = 'app-del';
@@ -359,11 +379,88 @@
     var url = 'app-host.html?id=' + encodeURIComponent(id);
     if (window.parent && window.parent !== window) {
       try {
-        window.parent.postMessage({ type: 'openFullscreen', url: url, title: '应用' }, '*');
+        // 应用自带导航：不显示外壳顶栏/返回；从应用返回时回到 AppStore
+        window.parent.postMessage({ type: 'openFullscreen', url: url, title: '应用', showBack: false, source: 'appstore' }, '*');
         return;
       } catch (e) {}
     }
     location.href = url;
+  }
+
+  // ===== 图标设计 =====
+  function readMyAvatar() {
+    try {
+      var keys = ['nano_mask_data', 'nano_home_data', 'peach_home_data'];
+      for (var i = 0; i < keys.length; i++) {
+        var raw = localStorage.getItem(keys[i]);
+        if (!raw) continue;
+        var d = JSON.parse(raw);
+        if (d && Array.isArray(d.masks)) {
+          var m = d.masks.filter(function (x) { return x.id === d.currentMaskId; })[0] || d.masks[0];
+          if (m && m.avatar) return m.avatar;
+        }
+      }
+    } catch (e) {}
+    return '';
+  }
+  var iconEditApp = null;
+  var iconEditImage = '';
+  function paintIconPrev() {
+    if (!$iconPrev) return;
+    if (iconEditImage) {
+      $iconPrev.textContent = '';
+      $iconPrev.style.background = '#e5e5ea';
+      $iconPrev.innerHTML = '<img src="' + iconEditImage.replace(/"/g, '&quot;') + '" style="width:100%;height:100%;object-fit:cover">';
+    } else {
+      $iconPrev.innerHTML = '';
+      $iconPrev.textContent = ($iconLetter.value || 'A');
+      $iconPrev.style.background = $iconColor.value || '#4a6cf7';
+    }
+  }
+  function openIconEditor(app) {
+    iconEditApp = app;
+    var icon = String(app.icon || '');
+    var isImg = /^(data:image\/|https?:\/\/|blob:)/i.test(icon);
+    iconEditImage = isImg ? icon : '';
+    $iconLetter.value = isImg ? '' : (icon || (app.name || 'A').charAt(0));
+    $iconColor.value = /^#[0-9a-f]{3,8}$/i.test(app.color || '') ? app.color : '#4a6cf7';
+    paintIconPrev();
+    $iconModal.classList.add('on');
+  }
+  function closeIconEditor() { $iconModal.classList.remove('on'); iconEditApp = null; iconEditImage = ''; }
+
+  if ($iconModal) {
+    $iconModal.addEventListener('click', function (e) { if (e.target === $iconModal) closeIconEditor(); });
+    $iconCancel.addEventListener('click', closeIconEditor);
+    $iconLetter.addEventListener('input', paintIconPrev);
+    $iconColor.addEventListener('input', paintIconPrev);
+    $iconAvatar.addEventListener('click', function () {
+      var av = readMyAvatar();
+      if (!av) { toast('还没有设置头像'); return; }
+      iconEditImage = av; paintIconPrev();
+    });
+    $iconUpload.addEventListener('click', function () { $iconFile.click(); });
+    $iconClear.addEventListener('click', function () { iconEditImage = ''; paintIconPrev(); });
+    $iconFile.addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0];
+      $iconFile.value = '';
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function (ev) { iconEditImage = String(ev.target.result || ''); paintIconPrev(); };
+      reader.readAsDataURL(f);
+    });
+    $iconOk.addEventListener('click', function () {
+      if (!iconEditApp) return;
+      var app = iconEditApp;
+      var letter = ($iconLetter.value || '').trim();
+      app.icon = iconEditImage || letter || (app.name || 'A').charAt(0);
+      app.color = $iconColor.value || '';
+      dbPut(app).then(function () {
+        closeIconEditor();
+        toast('图标已更新');
+        refresh();
+      }).catch(function () { toast('保存失败'); });
+    });
   }
 
     // ===== 通用：选择列表 =====
@@ -629,7 +726,7 @@
           img.src = item.icon; img.alt = '';
           ic.appendChild(img);
         } else {
-          ic.textContent = (item.icon && String(item.icon).length <= 2)
+          ic.textContent = (item.icon && String(item.icon).length <= 4)
             ? item.icon
             : (item.name || '?').charAt(0).toUpperCase();
         }
@@ -871,6 +968,16 @@
     keyword = this.value.trim();
     renderList();
   });
+
+  // ===== 从 DIY 应用返回后刷新（图标/名称可能被应用自己改过） =====
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (d && d.type === 'nanoAppManifestChanged') refresh();
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') refresh();
+  });
+  window.addEventListener('pageshow', function () { refresh(); });
 
   // ===== 启动 =====
   refresh();

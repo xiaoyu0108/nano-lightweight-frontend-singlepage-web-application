@@ -716,6 +716,12 @@
         }
     });
 
+    // 跨标签页/跨 iframe 字体同步：美化页写入 beautify_font 后，其他页面立即跟随
+    window.addEventListener('storage', function(e) {
+        if (!e || e.key !== 'beautify_font') return;
+        try { applyFontCfg(readFontCfgSync()); } catch (err) {}
+    });
+
     // 页面重新可见 / 从后台恢复时，重读一次已保存美化，确保头像框等样式不丢
     window.addEventListener('pageshow', function() { try { applySaved(); } catch (e) {} });
     document.addEventListener('visibilitychange', function() {
