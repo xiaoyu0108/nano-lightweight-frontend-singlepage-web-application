@@ -1311,6 +1311,18 @@
     function cleanGroupReplyText(raw){
         if (typeof raw !== 'string') return '';
         var s = raw;
+        // ```json ... ``` 之类：抽正文；若整段是 {"bubbles":[...]} 就转成逐条文本
+        s = s.replace(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/g, function (m, inner) {
+            var t = String(inner || '').trim();
+            try {
+                var o = JSON.parse(t);
+                var arr = o && (o.bubbles || o.messages || o.lines || o.reply || o.text);
+                if (Array.isArray(arr)) return arr.map(function (x) { return typeof x === 'string' ? x : ((x && (x.text || x.content)) || ''); }).filter(Boolean).join('\n');
+                if (typeof arr === 'string') return arr;
+            } catch (e) {}
+            return t;
+        });
+        s = s.replace(/```/g, ' ');
         s = s.replace(/\[heart\s*:\s*[\s\S]*?\]/gi, '');
         // 思维链：成对 + 未闭合（跑到结尾）都要去掉，避免 [think] 漏进群聊
         s = s.replace(/\[\s*think\s*\][\s\S]*?\[\s*\/\s*think\s*\]/gi, '');

@@ -172,6 +172,8 @@
     var voiceFreq = document.getElementById('voiceFreq');
     var actionNarrationToggle = document.getElementById('actionNarrationToggle');
     var actionNarrationStatus = document.getElementById('actionNarrationStatus');
+    var cotToggle = document.getElementById('cotToggle');
+    var cotToggleStatus = document.getElementById('cotToggleStatus');
     var altProbeToggle = document.getElementById('altProbeToggle');
     var altProbeStatus = document.getElementById('altProbeStatus');
     var autoSocialToggle = document.getElementById('autoSocialToggle');
@@ -257,6 +259,13 @@
         if (actionNarrationToggle) {
             actionNarrationToggle.checked = actionNarration;
             actionNarrationStatus.textContent = actionNarration ? '开启' : '关闭';
+        }
+        // 思维链开关：兼容旧设置（以前只要填了预设就等于开启）
+        var cotSaved = getSetting('cotEnabled', null);
+        var cotEnabled = (cotSaved === null || cotSaved === undefined) ? !!getSetting('cotPrompt', '') : !!cotSaved;
+        if (cotToggle) {
+            cotToggle.checked = cotEnabled;
+            if (cotToggleStatus) cotToggleStatus.textContent = cotEnabled ? '开启' : '关闭';
         }
         var altProbe = getSetting('altProbe', false);
         if (altProbeToggle) {
@@ -1220,6 +1229,11 @@
     if (actionNarrationToggle) actionNarrationToggle.addEventListener('change', function() {
         setSetting('actionNarration', this.checked);
         actionNarrationStatus.textContent = this.checked ? '开启' : '关闭';
+    });
+    if (cotToggle) cotToggle.addEventListener('change', function() {
+        setSetting('cotEnabled', this.checked);
+        if (cotToggleStatus) cotToggleStatus.textContent = this.checked ? '开启' : '关闭';
+        try { if (window.parent) window.parent.postMessage({ type: 'cotChanged', chatId: chatId, cotEnabled: this.checked }, '*'); } catch (e) {}
     });
     if (altProbeToggle) altProbeToggle.addEventListener('change', function() {
         setSetting('altProbe', this.checked);

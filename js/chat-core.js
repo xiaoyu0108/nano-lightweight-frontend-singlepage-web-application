@@ -753,17 +753,21 @@
         prompt += '5.6 想实时看对方真实屏幕的画面时（对方问“你在看什么”“给你看看我的屏幕”，或你想陪 TA 一起看），输出 [看屏幕]（独占一行）。系统会请求对方共享屏幕，由对方决定；同意后你能看到 TA 屏幕的画面并实时点评。不要频繁用。\n';
         prompt += '6. 平衡：一轮回复里特殊格式一般 1-2 个、最多 3 个，优先让它们服务剧情而不是单纯堆砌；语音气泡和表情包不算在内，按上面的频率照常发。\n';
 
-        // 思维链预设（COT）：先思考，再回复；思考放在 [think]...[/think]
+        // 思维链（COT）：由「思维链」开关控制；开着才思考，思考必须在说话之前
         const cotPrompt = getChatSetting('cotPrompt', '');
-        if (cotPrompt) {
-            prompt += '\n【思维链预设 · 强制执行（每一轮都必须做）】\n';
-            prompt += '你本轮回复的**第一个字符必须是 [think]**，接着按下面的预设展开推理，最后用 [/think] 收尾，必须独占在正文之前（可多行）。\n';
-            prompt += '格式固定为 [think]...[/think]，不要用 <think>、【思考】、（）或其它写法，也不要只在心里想而不写出来。\n';
-            prompt += '严格按下面的思维链预设进行推理：\n';
-            prompt += cotPrompt + '\n';
-            prompt += '[/think] 之后，再按【对话规则】正常输出对话气泡。思考内容不会展示给对方，只用于让你想清楚、更贴人设。\n';
-            prompt += '绝对禁止省略 [think]...[/think]，每一轮都要有；漏掉会被判为不合格回复。\n';
-            prompt += '注意：整段回复里 [think] 只能出现一次、[/think] 也只能出现一次；正文气泡里绝对不要再出现 [think]、[/think] 或 think 字样。\n';
+        const cotSaved = getChatSetting('cotEnabled', null);
+        const cotOn = (cotSaved === null || cotSaved === undefined) ? !!cotPrompt : !!cotSaved;
+        if (cotOn) {
+            prompt += '\n【思维链 · 已开启（每一轮都必须做）】\n';
+            prompt += '你本轮回复的**第一个字符必须是 [think]**，先完成思考，再用 [/think] 收尾，思考必须独占在正文之前。\n';
+            prompt += '格式固定为 [think]...[/think]，只允许出现这一组；不要用 <think>、【思考】、（）或其它写法。\n';
+            if (cotPrompt) {
+                prompt += '严格按下面的思维链预设进行推理：\n' + cotPrompt + '\n';
+            } else {
+                prompt += '思考内容：先判断对方情绪和意图 → 回忆相关设定 → 想清楚你此刻的态度、以及要说的重点。\n';
+            }
+            prompt += '[/think] 之后再按【对话规则】正常输出对话气泡；思考内容不会展示给对方。\n';
+            prompt += '顺序只能是「先 [think]…[/think]，后正文」：绝对禁止把 [think] 或思考内容放到正文后面 / 结尾，也绝对禁止重复输出 [think]。\n';
         }
 
         // 拉黑状态：用户拉黑角色 / 角色拉黑用户，都会影响角色此刻的态度
@@ -4722,6 +4726,18 @@
     function cleanReplyText(raw) {
         if (typeof raw !== 'string') return raw;
         let s = raw;
+        // ```json ... ``` 之类的代码块：抽出里面的正文；若整段是 {"bubbles":[...]} 就转成逐条文本
+        s = s.replace(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/g, function (m, inner) {
+            const t = String(inner || '').trim();
+            try {
+                const o = JSON.parse(t);
+                const arr = o && (o.bubbles || o.messages || o.lines || o.reply || o.text);
+                if (Array.isArray(arr)) return arr.map(function (x) { return typeof x === 'string' ? x : ((x && (x.text || x.content)) || ''); }).filter(Boolean).join('\n');
+                if (typeof arr === 'string') return arr;
+            } catch (e) {}
+            return t;
+        });
+        s = s.replace(/```/g, '');
         // 思维链标签归一化：模型可能写成 <think>、［think］、【思考】等，统一成 [think] 再解析
         s = s.replace(/<\s*think\s*>/gi, '[think]').replace(/<\s*\/\s*think\s*>/gi, '[/think]');
         s = s.replace(/［\s*think\s*］/gi, '[think]').replace(/［\s*\/\s*think\s*］/gi, '[/think]');
@@ -5356,7 +5372,11 @@
             if (!roundThink && t) roundThink = t;
             return ' ';
         });
-        pendingTurnThink = roundThink || '';
+        // 思维链开关关闭时：仍然把思考内容从正文里删掉，但不展示思维区块
+        const cotPromptP = getChatSetting('cotPrompt', '');
+        const cotSavedP = getChatSetting('cotEnabled', null);
+        const cotOnP = (cotSavedP === null || cotSavedP === undefined) ? !!cotPromptP : !!cotSavedP;
+        pendingTurnThink = cotOnP ? (roundThink || '') : '';
 
         // 二次清理：防止未闭合 / 多余的思维链标记漏进正文气泡
         replyBody = replyBody

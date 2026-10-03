@@ -7,7 +7,7 @@
 // ============================================================
 (function () {
     'use strict';
-    var VERSION = '20261003m';
+    var VERSION = '20261003n';
     try { console.log('[ScreenShare] build ' + VERSION + ' loaded'); } catch (e) {}
 
     var INTERVAL = 30000; // 每 30 秒看一帧，省调用/token
@@ -177,11 +177,12 @@
         var d = document.createElement('div'); d.className = 'ss-bub';
         d.innerHTML = '<span>' + escHtml(p.main) + '</span>' + (p.sub ? ('<span class="zh">' + escHtml(p.sub) + '</span>') : '');
         SS.log.appendChild(d); SS.log.scrollTop = SS.log.scrollHeight;
-        // 同时弹一条系统通知，切到别的真实 App、看不到小窗时也能看到 TA 的点评
+        // 同时弹一条系统通知，并把它写进标签页标题：切到别的窗口/标签、看不到小窗时也能看到 TA 的点评
         try {
             if (window.NanoNotify && SS.info) {
-                window.NanoNotify.notify(SS.info.name || 'TA', p.main || String(text || ''), { icon: SS.info.avatar || '', channel: 'chat' });
+                window.NanoNotify.notify(SS.info.name || 'TA', p.main || String(text || ''), { icon: SS.info.avatar || '', channel: 'chat', force: true });
             }
+            document.title = '💬 ' + (p.main || String(text || '')).slice(0, 24) + ' · Nano';
         } catch (e) {}
     }
 
@@ -248,9 +249,20 @@
         }
         var data = await resp.json();
         var content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-        var parsed = firstJson(content) || {};
+        // 去掉 ```json 代码块围栏，避免把 JSON 原文当成消息
+        var body = String(content || '').replace(/```[a-zA-Z0-9_-]*/g, ' ').replace(/```/g, ' ').trim();
+        var parsed = firstJson(body) || {};
         var bubbles = Array.isArray(parsed.bubbles) ? parsed.bubbles : (parsed.bubbles ? [parsed.bubbles] : []);
-        if (!bubbles.length && content) bubbles = [String(content).replace(/[{}"\[\]]/g, ' ').trim().slice(0, 120)];
+        if (!bubbles.length) {
+            // 容错：JSON 不合法时，直接抠出引号里的内容当气泡
+            var re = /"((?:[^"\\]|\\.)*)"/g, mm, quoted = [];
+            while ((mm = re.exec(body)) !== null) {
+                var v = String(mm[1] || '').trim();
+                if (v && !/^(bubbles|next|text|type|image_url|url|role|content)$/i.test(v) && !/^data:/.test(v)) quoted.push(v);
+            }
+            if (quoted.length) bubbles = quoted;
+        }
+        if (!bubbles.length && body) bubbles = [body.replace(/[{}"\[\]]/g, ' ').replace(/\b(json|bubbles)\b/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)];
         bubbles.filter(Boolean).slice(0, 2).forEach(addBubble);
         if (bubbles.length) {
             try { var s = shell(); if (s && s.postToChat) s.postToChat({ type: 'NANO_CHAR_SAY', chatId: String(SS.info.id), text: String(bubbles[0]) }); } catch (e) {}
@@ -313,17 +325,19 @@
             '<div style="margin-top:10px;font-size:10px;color:#c0aab3">屏幕模块 ' + VERSION + '</div></div>';
         document.body.appendChild(el);
         var close = function () { try { el.remove(); } catch (e) {} };
+        var askNotify = function () { try { if (window.NanoNotify && NanoNotify.ensurePermission) NanoNotify.ensurePermission(); } catch (e) {} };
         var c = el.querySelector('.ss-cancel'); if (c) c.onclick = close;
-        var ok = el.querySelector('.ss-ok'); if (ok) ok.onclick = function () { close(); doStart(info); };
-        var cam = el.querySelector('.ss-cam'); if (cam) cam.onclick = function () { close(); startCamera(info); };
-        var shot = el.querySelector('.ss-shot'); if (shot) shot.onclick = function () { close(); pickScreenshot(info); };
-        var tryBtn = el.querySelector('.ss-try'); if (tryBtn) tryBtn.onclick = function () { close(); doStart(info); };
+        var ok = el.querySelector('.ss-ok'); if (ok) ok.onclick = function () { askNotify(); close(); doStart(info); };
+        var cam = el.querySelector('.ss-cam'); if (cam) cam.onclick = function () { askNotify(); close(); startCamera(info); };
+        var shot = el.querySelector('.ss-shot'); if (shot) shot.onclick = function () { askNotify(); close(); pickScreenshot(info); };
+        var tryBtn = el.querySelector('.ss-try'); if (tryBtn) tryBtn.onclick = function () { askNotify(); close(); doStart(info); };
     }
 
     async function runStream(info, stream, mode) {
         SS.active = true; SS.info = info; SS.stream = stream; SS.lastAt = Date.now();
         SS.mode = mode || 'screen';
         SS.comments = []; SS.cardPosted = false;
+        try { if (window.NanoNotify && NanoNotify.ensurePermission) NanoNotify.ensurePermission(); } catch (e) {}
         buildPanel(info, SS.mode);
         try { SS.video.srcObject = stream; } catch (e) {}
         setStatus('正在读取人设与 API…');
@@ -423,6 +437,7 @@
     async function doScreenshotComment(info, dataURL) {
         if (!dataURL) return;
         SS.active = true; SS.info = info; SS.comments = []; SS.cardPosted = false; SS.mode = 'photo'; SS.stream = null;
+        try { if (window.NanoNotify && NanoNotify.ensurePermission) NanoNotify.ensurePermission(); } catch (e) {}
         buildPanel(info, 'photo');
         setStatus('正在读取人设与 API…');
         SS.ctx = (await requestContext(info)) || {};
@@ -441,6 +456,7 @@
         setTimeout(function () {
             try { if (SS.panel) SS.panel.remove(); } catch (e) {}
             SS.panel = null; SS.log = null; SS.statusEl = null; SS.video = null;
+            try { document.title = 'Nano'; } catch (e) {}
         }, 1500);
     }
     function stop() {
@@ -453,6 +469,7 @@
         try { if (SS.video) SS.video.srcObject = null; } catch (e) {}
         try { if (SS.panel) SS.panel.remove(); } catch (e) {}
         SS.panel = null; SS.log = null; SS.statusEl = null; SS.video = null; SS.stream = null;
+        try { document.title = 'Nano'; } catch (e) {}
     }
 
     window.ScreenShare = { version: VERSION, start: start, stop: stop, isActive: function () { return SS.active; } };

@@ -763,6 +763,18 @@ function splitBubbles(text) {
 // 去掉模型输出的思维链（[think]...[/think]、<think>、【思考】等），包括未闭合、跑到结尾的
 function stripThinkTags(text) {
   let s = String(text || '');
+  // ```json ... ``` 之类：抽正文；若整段是 {"bubbles":[...]} 就转成逐条文本
+  s = s.replace(/```[a-zA-Z0-9_-]*\s*([\s\S]*?)```/g, function (m, inner) {
+    const t = String(inner || '').trim();
+    try {
+      const o = JSON.parse(t);
+      const arr = o && (o.bubbles || o.messages || o.lines || o.reply || o.text);
+      if (Array.isArray(arr)) return arr.map(function (x) { return typeof x === 'string' ? x : ((x && (x.text || x.content)) || ''); }).filter(Boolean).join('\n');
+      if (typeof arr === 'string') return arr;
+    } catch (e) {}
+    return t;
+  });
+  s = s.replace(/```/g, ' ');
   s = s.replace(/\[\s*think\s*\][\s\S]*?\[\s*\/\s*think\s*\]/gi, ' ');
   s = s.replace(/<\s*think\s*>[\s\S]*?<\s*\/\s*think\s*>/gi, ' ');
   s = s.replace(/【\s*(?:think|思考|思维链)\s*】[\s\S]*?【\s*\/\s*(?:think|思考|思维链)\s*】/gi, ' ');
