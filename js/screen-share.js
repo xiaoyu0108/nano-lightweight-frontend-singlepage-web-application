@@ -7,7 +7,8 @@
 // ============================================================
 (function () {
     'use strict';
-    try { console.log('[ScreenShare] build 20261003k loaded'); } catch (e) {}
+    var VERSION = '20261003m';
+    try { console.log('[ScreenShare] build ' + VERSION + ' loaded'); } catch (e) {}
 
     var INTERVAL = 30000; // 每 30 秒看一帧，省调用/token
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -28,23 +29,24 @@
         return null;
     }
 
-    var SS = { active: false, info: null, cfg: null, ctx: {}, stream: null, panel: null, log: null, statusEl: null, video: null, lastAt: 0, busy: false, timer: null, comments: [], cardPosted: false };
+    var SS = { active: false, info: null, cfg: null, ctx: {}, stream: null, panel: null, log: null, statusEl: null, video: null, lastAt: 0, busy: false, timer: null, comments: [], cardPosted: false, mode: 'screen' };
     // 面板放在外壳（index.html）里，切到别的页面也会一直显示；点评同时收集成一张卡片
     function postCard() {
         if (SS.cardPosted || !SS.info || !SS.comments.length) return;
         SS.cardPosted = true;
         try {
             var s = shell(); if (!s || !s.postToChat) return;
-            var detail = '（' + (SS.info.name || 'TA') + ' 看了你的屏幕）\n' + SS.comments.map(function (b) {
+            var what = SS.mode === 'camera' ? '你的镜头' : (SS.mode === 'photo' ? '你发来的截图' : '你的屏幕');
+            var detail = '（' + (SS.info.name || 'TA') + ' 看了' + what + '）\n' + SS.comments.map(function (b) {
                 var p = splitBy(b); return '　' + p.main + (p.sub ? ('（' + p.sub + '）') : '');
             }).join('\n');
             s.postToChat({
                 type: 'NANO_TAKEOVER_CARD',
                 chatId: String(SS.info.id),
-                title: (SS.info.name || 'TA') + ' 看了你的屏幕',
+                title: (SS.info.name || 'TA') + ' 看了' + what,
                 summary: '共 ' + SS.comments.length + ' 条点评',
                 detail: detail,
-                log: [{ name: '屏幕', bubbles: SS.comments.slice() }],
+                log: [{ name: (SS.mode === 'camera' ? '镜头' : (SS.mode === 'photo' ? '截图' : '屏幕')), bubbles: SS.comments.slice() }],
                 startedAt: Date.now()
             });
         } catch (e) {}
@@ -144,16 +146,18 @@
         ].join('');
         document.head.appendChild(st);
     }
-    function buildPanel(info) {
+    function buildPanel(info, mode) {
         injectCss();
+        var isPhoto = mode === 'photo';
+        var looking = mode === 'camera' ? ' 在看你的镜头' : (isPhoto ? ' 看了你的截图' : ' 在看你的屏幕');
         var el = document.createElement('div'); el.className = 'ss-panel';
         el.innerHTML =
             '<div class="ss-head">' +
                 '<div class="ss-ava"' + (info.avatar ? (' style="background-image:url(\'' + escHtml(info.avatar) + '\')"') : '') + '>' + (info.avatar ? '' : escHtml(String(info.name || '?').slice(0, 1))) + '</div>' +
-                '<div><div class="ss-name">' + escHtml(info.name || 'TA') + ' 在看你的屏幕</div><div class="ss-status">连接中…</div></div>' +
+                '<div><div class="ss-name">' + escHtml(info.name || 'TA') + looking + '</div><div class="ss-status">连接中…</div></div>' +
                 '<button class="ss-stop">停止</button>' +
             '</div>' +
-            '<video class="ss-video" autoplay muted playsinline></video>' +
+            (isPhoto ? '' : '<video class="ss-video" autoplay muted playsinline></video>') +
             '<div class="ss-log"></div>';
         document.body.appendChild(el);
         SS.panel = el; SS.log = el.querySelector('.ss-log'); SS.statusEl = el.querySelector('.ss-status');
@@ -190,6 +194,70 @@
         return c.toDataURL('image/jpeg', 0.6);
     }
 
+    function resizeImage(dataURL, maxW) {
+        return new Promise(function (resolve) {
+            try {
+                var img = new Image();
+                img.onload = function () {
+                    try {
+                        var w = Math.min(maxW || 720, img.width || maxW || 720);
+                        var h = Math.round((img.height || 1) * (w / (img.width || w)));
+                        var c = document.createElement('canvas'); c.width = w; c.height = h;
+                        c.getContext('2d').drawImage(img, 0, 0, w, h);
+                        resolve(c.toDataURL('image/jpeg', 0.6));
+                    } catch (e) { resolve(dataURL); }
+                };
+                img.onerror = function () { resolve(dataURL); };
+                img.src = dataURL;
+            } catch (e) { resolve(dataURL); }
+        });
+    }
+
+    // 把一张图片交给能识图的模型点评；mode: screen | camera | photo
+    async function requestComment(dataURL, mode) {
+        if (!dataURL) return;
+        var cfg = SS.cfg || {};
+        if (!cfg.mainUrl || !cfg.mainKey || !cfg.mainModel) { addLine('主 API 未配置，无法点评。', true); setStatus('主 API 未配置'); return; }
+        var what = mode === 'camera' ? '摄像头画面' : (mode === 'photo' ? '用户发来的一张截图' : '用户此刻真实屏幕的截图');
+        var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        var timer = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 45000) : null;
+        var resp;
+        try {
+            resp = await fetch(apiEndpoint(cfg.mainUrl), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.mainKey },
+                body: JSON.stringify({
+                    model: cfg.mainModel,
+                    messages: [
+                        { role: 'system', content: systemText() },
+                        { role: 'user', content: [
+                            { type: 'text', text: '这是' + what + '。用你的人设点评这个画面（1-2 条短气泡）。只输出 JSON：{"bubbles":["..."]}' },
+                            { type: 'image_url', image_url: { url: dataURL } }
+                        ] }
+                    ],
+                    max_tokens: 220,
+                    temperature: (typeof cfg.mainTemp === 'number' ? cfg.mainTemp : 0.85)
+                }),
+                signal: ctrl ? ctrl.signal : undefined
+            });
+        } finally { if (timer) clearTimeout(timer); }
+        if (!resp.ok) {
+            var m = 'HTTP ' + resp.status;
+            try { var d = await resp.json(); m = (d.error && d.error.message) || d.message || m; } catch (e) {}
+            addLine('这一步失败：' + m, true); setStatus('出错（模型需支持识图）'); return;
+        }
+        var data = await resp.json();
+        var content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        var parsed = firstJson(content) || {};
+        var bubbles = Array.isArray(parsed.bubbles) ? parsed.bubbles : (parsed.bubbles ? [parsed.bubbles] : []);
+        if (!bubbles.length && content) bubbles = [String(content).replace(/[{}"\[\]]/g, ' ').trim().slice(0, 120)];
+        bubbles.filter(Boolean).slice(0, 2).forEach(addBubble);
+        if (bubbles.length) {
+            try { var s = shell(); if (s && s.postToChat) s.postToChat({ type: 'NANO_CHAR_SAY', chatId: String(SS.info.id), text: String(bubbles[0]) }); } catch (e) {}
+            setStatus('刚刚点评了一句');
+        } else setStatus('在看…');
+    }
+
     async function captureAndComment() {
         if (!SS.active || SS.busy) return;
         SS.busy = true;
@@ -197,44 +265,7 @@
             var dataURL = grab();
             if (!dataURL) { SS.busy = false; return; }
             setStatus('正在看…');
-            var cfg = SS.cfg || {};
-            var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-            var timer = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 45000) : null;
-            var resp;
-            try {
-                resp = await fetch(apiEndpoint(cfg.mainUrl), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.mainKey },
-                    body: JSON.stringify({
-                        model: cfg.mainModel,
-                        messages: [
-                            { role: 'system', content: systemText() },
-                            { role: 'user', content: [
-                                { type: 'text', text: '这是用户此刻真实屏幕的一张截图。用你的人设点评这个画面（1-2 条短气泡）。只输出 JSON：{"bubbles":["..."]}' },
-                                { type: 'image_url', image_url: { url: dataURL } }
-                            ] }
-                        ],
-                        max_tokens: 220,
-                        temperature: (typeof cfg.mainTemp === 'number' ? cfg.mainTemp : 0.85)
-                    }),
-                    signal: ctrl ? ctrl.signal : undefined
-                });
-            } finally { if (timer) clearTimeout(timer); }
-            if (!resp.ok) {
-                var m = 'HTTP ' + resp.status;
-                try { var d = await resp.json(); m = (d.error && d.error.message) || d.message || m; } catch (e) {}
-                addLine('这一步失败：' + m, true); SS.busy = false; setStatus('出错（模型需支持识图）'); return;
-            }
-            var data = await resp.json();
-            var content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-            var parsed = firstJson(content) || {};
-            var bubbles = Array.isArray(parsed.bubbles) ? parsed.bubbles : (parsed.bubbles ? [parsed.bubbles] : []);
-            if (!bubbles.length && content) bubbles = [String(content).replace(/[{}"\[\]]/g, ' ').trim().slice(0, 120)];
-            bubbles.filter(Boolean).slice(0, 2).forEach(addBubble);
-            if (bubbles.length) {
-                try { var s = shell(); if (s && s.postToChat) s.postToChat({ type: 'NANO_CHAR_SAY', chatId: String(SS.info.id), text: String(bubbles[0]) }); } catch (e) {}
-                setStatus('刚刚点评了一句');
-            } else setStatus('在看…');
+            await requestComment(dataURL, SS.mode || 'screen');
         } catch (e) {
             addLine('出错：' + ((e && e.message) || e), true); setStatus('出错');
         }
@@ -249,20 +280,71 @@
     }
 
     /* ---------------- 启动 / 停止 ---------------- */
+    function canScreenShare() {
+        try { return !!(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function'); } catch (e) { return false; }
+    }
+    function canCamera() {
+        try { return !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function'); } catch (e) { return false; }
+    }
+
     function start(info) {
         if (SS.active) return;
         info = info || {}; info.id = String(info.id || info.charId || ''); info.name = String(info.name || info.charName || 'TA');
         if (!info.id) return;
-        // 不做系统限制：支持就让你用，不行会在点击「开始共享」后提示
-        // getDisplayMedia 需要「用户手势」，这里用一个确认按钮把点击交给浏览器
         injectCss();
+        var screenOk = canScreenShare(), camOk = canCamera();
+        var title, desc, actions;
+        if (screenOk) {
+            title = '让「' + escHtml(info.name) + '」看你真实的屏幕？';
+            desc = '会请求屏幕共享权限（建议选「整个屏幕」，这样你切换窗口 TA 也能看到），TA 定时截帧并用你配置的「能识图的模型」点评。可随时停止。';
+            actions = '<button class="ss-cancel">取消</button><button class="ss-ok">开始共享</button>';
+        } else if (camOk) {
+            title = '让「' + escHtml(info.name) + '」看你这边？';
+            desc = '这个浏览器没有提供网页录屏接口，改用摄像头也能让 TA 实时看到你这边的画面（可以把镜头对着另一个屏幕）。可随时停止。';
+            actions = '<button class="ss-cancel">取消</button><button class="ss-shot">发一张截图</button><button class="ss-cam">用摄像头</button><button class="ss-try">仍尝试屏幕共享</button>';
+        } else {
+            title = '让「' + escHtml(info.name) + '」看？';
+            desc = '当前环境不支持实时共享（http:// 不安全环境，或浏览器不提供网页录屏/摄像头接口，所以不会有授权弹窗）。可以发一张截图给 TA 看；要看屏幕请改用 https:// 打开或电脑 Chrome/Edge。';
+            actions = '<button class="ss-cancel">取消</button><button class="ss-shot">发一张截图</button><button class="ss-try">仍尝试屏幕共享</button>';
+        }
         var el = document.createElement('div'); el.className = 'ss-confirm';
-        el.innerHTML = '<div class="ss-dialog"><h3>让「' + escHtml(info.name) + '」看你真实的屏幕？</h3>' +
-            '<p>会请求你的屏幕共享权限（建议选「整个屏幕」，这样你切换窗口 TA 也能看到），TA 会定时截帧并用你配置的「能识图的模型」点评。可随时停止。</p>' +
-            '<div class="ss-actions"><button class="ss-cancel">取消</button><button class="ss-ok">开始共享</button></div></div>';
+        el.innerHTML = '<div class="ss-dialog"><h3>' + title + '</h3><p>' + desc + '</p>' +
+            '<div class="ss-actions" style="flex-wrap:wrap">' + actions + '</div>' +
+            '<div style="margin-top:10px;font-size:10px;color:#c0aab3">屏幕模块 ' + VERSION + '</div></div>';
         document.body.appendChild(el);
-        el.querySelector('.ss-cancel').onclick = function () { try { el.remove(); } catch (e) {} };
-        el.querySelector('.ss-ok').onclick = function () { try { el.remove(); } catch (e) {} doStart(info); };
+        var close = function () { try { el.remove(); } catch (e) {} };
+        var c = el.querySelector('.ss-cancel'); if (c) c.onclick = close;
+        var ok = el.querySelector('.ss-ok'); if (ok) ok.onclick = function () { close(); doStart(info); };
+        var cam = el.querySelector('.ss-cam'); if (cam) cam.onclick = function () { close(); startCamera(info); };
+        var shot = el.querySelector('.ss-shot'); if (shot) shot.onclick = function () { close(); pickScreenshot(info); };
+        var tryBtn = el.querySelector('.ss-try'); if (tryBtn) tryBtn.onclick = function () { close(); doStart(info); };
+    }
+
+    async function runStream(info, stream, mode) {
+        SS.active = true; SS.info = info; SS.stream = stream; SS.lastAt = Date.now();
+        SS.mode = mode || 'screen';
+        SS.comments = []; SS.cardPosted = false;
+        buildPanel(info, SS.mode);
+        try { SS.video.srcObject = stream; } catch (e) {}
+        setStatus('正在读取人设与 API…');
+        SS.ctx = (await requestContext(info)) || {};
+        if (SS.ctx.api && SS.ctx.api.url && SS.ctx.api.key && SS.ctx.api.model) {
+            SS.cfg = { mainUrl: SS.ctx.api.url, mainKey: SS.ctx.api.key, mainModel: SS.ctx.api.model, mainTemp: SS.ctx.api.temp };
+        }
+        if (!SS.cfg) SS.cfg = await getApiConfig();
+        if (!SS.cfg || !SS.cfg.mainUrl || !SS.cfg.mainKey || !SS.cfg.mainModel) { setStatus('主 API 未配置'); addLine('主 API 未配置，无法点评。', true); }
+        setStatus(SS.mode === 'camera' ? '正在看你的镜头…' : '盯着你的屏幕…');
+        addLine(SS.mode === 'camera' ? '（TA 开始看你的镜头了）' : '（TA 开始看你的屏幕了）');
+        try {
+            stream.getVideoTracks()[0].addEventListener('ended', function () {
+                setStatus('已结束（点评已收进聊天卡片）');
+                if (SS.timer) { clearInterval(SS.timer); SS.timer = null; }
+                postCard();
+            });
+        } catch (e) {}
+        SS.lastAt = 0;
+        setTimeout(captureAndComment, 2500);
+        SS.timer = setInterval(tick, 3000);
     }
 
     async function doStart(info) {
@@ -286,9 +368,14 @@
             }
         }
         if (!stream) {
-            var msg = lastErr
-                ? ('无法开始屏幕共享：' + (lastErr.name ? (lastErr.name + '：') : '') + (lastErr.message || lastErr))
-                : '当前环境没有可用的屏幕共享接口。请点击「开始共享」并在浏览器弹窗里允许录屏。';
+            var msg;
+            if (!window.isSecureContext) {
+                msg = '当前是 http:// 打开的不安全环境，浏览器不会提供录屏接口，所以也不会弹授权。\n请改用 https:// 打开，或点「发一张截图」。';
+            } else if (!gdm) {
+                msg = '这个浏览器的网页端没有屏幕共享接口（安卓 Chrome/Edge、iOS 的网页端通常都不支持网页录屏）。\n可改用摄像头 / 发一张截图，或用电脑 Chrome/Edge。';
+            } else {
+                msg = '无法开始屏幕共享：' + (lastErr ? ((lastErr.name ? lastErr.name + '：' : '') + (lastErr.message || lastErr)) : '未知原因');
+            }
             try { alert(msg); } catch (err) {}
             return;
         }
@@ -296,29 +383,65 @@
             var vt = stream.getVideoTracks()[0];
             if (vt && vt.applyConstraints) vt.applyConstraints({ frameRate: 2 }).catch(function () {});
         } catch (e) {}
-        SS.active = true; SS.info = info; SS.stream = stream; SS.lastAt = Date.now();
-        SS.comments = []; SS.cardPosted = false;
-        buildPanel(info);
-        try { SS.video.srcObject = stream; } catch (e) {}
+        runStream(info, stream, 'screen');
+    }
+
+    async function startCamera(info) {
+        var stream = null;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+        } catch (e) {
+            try { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
+            catch (e2) {
+                var msg = (!window.isSecureContext)
+                    ? '摄像头也需要 https:// 环境。请改用 https 打开，或点「发一张截图」。'
+                    : ('无法打开摄像头：' + ((e2 && e2.message) || e2));
+                try { alert(msg); } catch (err) {}
+                return;
+            }
+        }
+        runStream(info, stream, 'camera');
+    }
+
+    function pickScreenshot(info) {
+        var input = document.createElement('input');
+        input.type = 'file'; input.accept = 'image/*';
+        input.style.display = 'none';
+        document.body.appendChild(input);
+        input.onchange = function () {
+            var f = input.files && input.files[0];
+            try { input.remove(); } catch (e) {}
+            if (!f) return;
+            var reader = new FileReader();
+            reader.onload = function () { doScreenshotComment(info, String(reader.result || '')); };
+            reader.onerror = function () { try { alert('读取图片失败'); } catch (e) {} };
+            reader.readAsDataURL(f);
+        };
+        input.click();
+    }
+
+    async function doScreenshotComment(info, dataURL) {
+        if (!dataURL) return;
+        SS.active = true; SS.info = info; SS.comments = []; SS.cardPosted = false; SS.mode = 'photo'; SS.stream = null;
+        buildPanel(info, 'photo');
         setStatus('正在读取人设与 API…');
         SS.ctx = (await requestContext(info)) || {};
         if (SS.ctx.api && SS.ctx.api.url && SS.ctx.api.key && SS.ctx.api.model) {
             SS.cfg = { mainUrl: SS.ctx.api.url, mainKey: SS.ctx.api.key, mainModel: SS.ctx.api.model, mainTemp: SS.ctx.api.temp };
         }
         if (!SS.cfg) SS.cfg = await getApiConfig();
-        if (!SS.cfg || !SS.cfg.mainUrl || !SS.cfg.mainKey || !SS.cfg.mainModel) { setStatus('主 API 未配置'); addLine('主 API 未配置，无法点评。', true); }
-        setStatus('盯着你的屏幕…');
-        addLine('（TA 开始看你的屏幕了）');
+        setStatus('正在看图…');
         try {
-            stream.getVideoTracks()[0].addEventListener('ended', function () {
-                setStatus('共享已结束（点评已收进聊天卡片）');
-                if (SS.timer) { clearInterval(SS.timer); SS.timer = null; }
-                postCard();
-            });
-        } catch (e) {}
-        SS.lastAt = 0;
-        setTimeout(captureAndComment, 2500);
-        SS.timer = setInterval(tick, 3000);
+            var small = await resizeImage(dataURL, 720);
+            await requestComment(small, 'photo');
+        } catch (e) { addLine('出错：' + ((e && e.message) || e), true); setStatus('出错'); }
+        SS.active = false;
+        postCard();
+        setStatus('点评完成（已收进聊天卡片）');
+        setTimeout(function () {
+            try { if (SS.panel) SS.panel.remove(); } catch (e) {}
+            SS.panel = null; SS.log = null; SS.statusEl = null; SS.video = null;
+        }, 1500);
     }
     function stop() {
         if (!SS.active) return;
@@ -332,7 +455,7 @@
         SS.panel = null; SS.log = null; SS.statusEl = null; SS.video = null; SS.stream = null;
     }
 
-    window.ScreenShare = { version: '20261003k', start: start, stop: stop, isActive: function () { return SS.active; } };
+    window.ScreenShare = { version: VERSION, start: start, stop: stop, isActive: function () { return SS.active; } };
 
     window.addEventListener('message', function (e) {
         var d = e && e.data;

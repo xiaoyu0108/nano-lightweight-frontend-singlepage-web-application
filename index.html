@@ -3,6 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <script>
+    // 版本升级时强制清一次缓存并重载：避免手机/PWA 一直跑旧 JS（屏幕共享/思维链等问题）
+    (function () {
+        try {
+            var KEY = 'nano_build';
+            var CUR = 'nano-2026-10-03-03';
+            var prev = null, ok = false;
+            try { prev = localStorage.getItem(KEY); } catch (e) {}
+            if (prev === CUR) return;
+            try { localStorage.setItem(KEY, CUR); ok = true; } catch (e) {}
+            var jobs = [];
+            try {
+                if (window.caches && caches.keys) jobs.push(caches.keys().then(function (ks) {
+                    return Promise.all(ks.map(function (k) { return caches.delete(k).catch(function () {}); }));
+                }));
+            } catch (e) {}
+            try {
+                if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+                    return Promise.all(rs.map(function (r) { return r.unregister().catch(function () {}); }));
+                }));
+            } catch (e) {}
+            var fired = false;
+            var go = function () { if (fired) return; fired = true; if (ok) { try { location.reload(); } catch (e) {} } };
+            Promise.all(jobs).catch(function () {}).then(go);
+            setTimeout(go, 1200);
+        } catch (e) {}
+    })();
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1401,7 +1429,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-03-01';
+        var BUILD = 'nano-2026-10-03-03';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -3257,7 +3285,7 @@
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js"></script>
 <script src="js/char-takeover.js?v=20261003n"></script>
-<script src="js/screen-share.js?v=20261003k"></script>
+<script src="js/screen-share.js?v=20261003m"></script>
 </div>
     <!-- 小号试探：居中弹窗（不暴露是谁）-->
     <div class="alt-probe-overlay" id="altProbeOverlay">
