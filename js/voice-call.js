@@ -434,8 +434,10 @@ function hideInputArea() {
         callStatus.textContent = '接通中...';
         document.body.classList.add('connecting');
         startRing();
-        // 底部的免提/挂断/录音三个按钮，接通之后才显示
-        if (hangupWrapper) hangupWrapper.style.display = 'none';
+        // 接通中：底部保留「挂断」按钮（随时可取消），免提/录音接通后再显示
+        if (hangupWrapper) hangupWrapper.style.display = '';
+        var _spk0 = document.getElementById('speakerBtn'); if (_spk0) _spk0.style.display = 'none';
+        var _rec0 = document.getElementById('recordBtn'); if (_rec0) _rec0.style.display = 'none';
         hangupBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="white"><path d="M20 15.5c-1.2 0-2.4-.2-3.6-.6-.3-.1-.7 0-1 .2l-2.2 2.2c-2.8-1.4-5.1-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.2-.6-2.4-.6-3.6 0-.6-.4-1-1-1H4c-.6 0-1 .4-1 1 0 9.4 7.6 17 17 17 .6 0 1-.4 1-1v-3.5c0-.6-.4-1-1-1z"/></svg>';
 
         // 接通时长 = 角色「决定接不接」的 API 反应时间（保留最短动画）
@@ -468,6 +470,8 @@ function hideInputArea() {
             document.body.classList.remove('connecting');
             callStatus.textContent = '00:00';
             if (hangupWrapper) hangupWrapper.style.display = '';
+            var _spk1 = document.getElementById('speakerBtn'); if (_spk1) _spk1.style.display = '';
+            var _rec1 = document.getElementById('recordBtn'); if (_rec1) _rec1.style.display = '';
             hangupBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="white"><path d="M20 15.5c-1.2 0-2.4-.2-3.6-.6-.3-.1-.7 0-1 .2l-2.2 2.2c-2.8-1.4-5.1-3.8-6.6-6.6l2.2-2.2c.3-.3.4-.7.2-1-.4-1.2-.6-2.4-.6-3.6 0-.6-.4-1-1-1H4c-.6 0-1 .4-1 1 0 9.4 7.6 17 17 17 .6 0 1-.4 1-1v-3.5c0-.6-.4-1-1-1z"/></svg>';
             startTimer();
             showToast('通话已接通');

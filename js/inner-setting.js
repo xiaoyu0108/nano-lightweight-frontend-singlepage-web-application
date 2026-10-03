@@ -174,6 +174,12 @@
     var actionNarrationStatus = document.getElementById('actionNarrationStatus');
     var cotToggle = document.getElementById('cotToggle');
     var cotToggleStatus = document.getElementById('cotToggleStatus');
+    var cotItemEl = document.getElementById('cotItem');
+    function applyCotItemState(on) {
+        if (!cotItemEl) return;
+        cotItemEl.style.opacity = on ? '' : '0.45';
+        cotItemEl.style.pointerEvents = on ? '' : 'none';
+    }
     var altProbeToggle = document.getElementById('altProbeToggle');
     var altProbeStatus = document.getElementById('altProbeStatus');
     var autoSocialToggle = document.getElementById('autoSocialToggle');
@@ -267,6 +273,7 @@
             cotToggle.checked = cotEnabled;
             if (cotToggleStatus) cotToggleStatus.textContent = cotEnabled ? '开启' : '关闭';
         }
+        applyCotItemState(cotEnabled);
         var altProbe = getSetting('altProbe', false);
         if (altProbeToggle) {
             altProbeToggle.checked = altProbe;
@@ -1233,6 +1240,7 @@
     if (cotToggle) cotToggle.addEventListener('change', function() {
         setSetting('cotEnabled', this.checked);
         if (cotToggleStatus) cotToggleStatus.textContent = this.checked ? '开启' : '关闭';
+        applyCotItemState(this.checked);
         try { if (window.parent) window.parent.postMessage({ type: 'cotChanged', chatId: chatId, cotEnabled: this.checked }, '*'); } catch (e) {}
     });
     if (altProbeToggle) altProbeToggle.addEventListener('change', function() {

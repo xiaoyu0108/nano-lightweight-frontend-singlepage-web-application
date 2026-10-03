@@ -84,16 +84,11 @@
             icon: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/><path d="M9 8.5c1.2-1 4.8-1 6 0"/>',
             color: '#FF4D94'
         },
-        {
-            id: 'screenshare',
-            label: '看屏幕',
-            icon: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
-            color: '#FFB020'
-        },
     ];
 
-    // 旧版本曾加入过「接收/结束一起听」，这里移除，避免老用户菜单里残留
-    const REMOVED_MENU_IDS = ['listen-accept', 'listen-end'];
+    // 旧版本曾加入过「接收/结束一起听」「看屏幕」，这里移除，避免老用户菜单里残留
+    // （看屏幕入口只保留在「查手机 → 设置」里）
+    const REMOVED_MENU_IDS = ['listen-accept', 'listen-end', 'screenshare'];
 
     // ===== IndexedDB 操作 =====
     const DB_NAME = 'nano_chat_menu_db';

@@ -689,7 +689,10 @@
         var inputArea = document.querySelector('.vc-input-area');
         var controls = document.querySelector('.hangup-wrapper');
         if (inputArea) inputArea.style.display = 'none';
-        if (controls) controls.style.display = 'none';
+        // 接通中：底部保留「挂断」按钮（随时可取消），免提/录音接通后再显示
+        if (controls) controls.style.display = '';
+        var _spkV = $('speakerBtn'); if (_spkV) _spkV.style.display = 'none';
+        var _recV = $('recordBtn'); if (_recV) _recV.style.display = 'none';
         if (connectingEl) connectingEl.style.display = 'flex';
         startRing();
         // 接通时长 = 角色「决定接不接」的 API 反应时间（保留最短动画）
@@ -715,6 +718,8 @@
             if (connectingEl) connectingEl.style.display = 'none';
             if (inputArea) inputArea.style.display = '';
             if (controls) controls.style.display = '';
+            var _spkV2 = $('speakerBtn'); if (_spkV2) _spkV2.style.display = '';
+            var _recV2 = $('recordBtn'); if (_recV2) _recV2.style.display = '';
             callStatus.textContent = '00:00';
             startTimer();
         });

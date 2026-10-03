@@ -55,8 +55,32 @@
     }
     function isConfigured(cfg) {
         cfg = cfg || {};
+        if ((cfg.ttsType || '') === 'browser') return ('speechSynthesis' in window);
         return !!(cleanUrl(cfg.ttsUrl) && cfg.ttsKey && (cfg.ttsModel || cfg.ttsVoice));
     }
+    // ===== 本地语音（浏览器自带，免费、离线，无需 Key）=====
+    function speakNative(text, cfg) {
+        return new Promise(function (resolve) {
+            try {
+                if (!('speechSynthesis' in window)) { resolve(false); return; }
+                stopNative();
+                var u = new SpeechSynthesisUtterance(String(text || ''));
+                var want = String((cfg && cfg.ttsVoice) || '').trim();
+                if (want) {
+                    var vs = window.speechSynthesis.getVoices() || [];
+                    var v = vs.filter(function (x) { return x.name === want || x.voiceURI === want; })[0]
+                        || vs.filter(function (x) { return x.lang && x.lang.toLowerCase().indexOf(want.toLowerCase()) === 0; })[0];
+                    if (v) u.voice = v;
+                }
+                u.lang = (u.voice && u.voice.lang) || 'zh-CN';
+                u.rate = 1; u.pitch = 1;
+                u.onend = function () { resolve(true); };
+                u.onerror = function () { resolve(false); };
+                window.speechSynthesis.speak(u);
+            } catch (e) { resolve(false); }
+        });
+    }
+    function stopNative() { try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (e) {} }
     function hexToBytes(hex) {
         var h = String(hex || '').replace(/[^0-9a-fA-F]/g, '');
         if (!h || h.length % 2) return null;
@@ -169,6 +193,7 @@
     }
 
     function stop() {
+        stopNative();
         if (currentAudio) {
             try { currentAudio.pause(); } catch (e) {}
             currentAudio = null;
@@ -185,7 +210,8 @@
         if (!t) return false;
         var cfg = await getConfig();
         if (opts.config) cfg = Object.assign({}, cfg, opts.config);
-        if (!isConfigured(cfg)) { console.warn('[TTS] 未配置：需要 地址 + Key +（音色/模型 或 声音 ID）'); return false; }
+        if (!isConfigured(cfg)) { console.warn('[TTS] 未配置：需要 地址 + Key +（音色/模型 或 声音 ID），或选择「本地语音」'); return false; }
+        if ((cfg.ttsType || '') === 'browser') return await speakNative(t, cfg);
         var blob = await synth(t, cfg);
         return await playBlob(blob);
     }
@@ -196,6 +222,7 @@
         var t = String(text == null ? '' : text).trim() || '这是一段语音测试。';
         var cfg = await getConfig();
         if (opts.config) cfg = Object.assign({}, cfg, opts.config);
+        if ((cfg.ttsType || '') === 'browser') return await speakNative(t, cfg);
         if (!isConfigured(cfg)) throw new Error('配置不完整：需要 地址 + Key +（音色/模型 或 声音 ID）');
         var blob = await synth(t, cfg);
         return await playBlob(blob);

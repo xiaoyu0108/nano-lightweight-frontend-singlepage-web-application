@@ -7,10 +7,10 @@
 // ============================================================
 (function () {
     'use strict';
-    var VERSION = '20261003n';
+    var VERSION = '20261003o';
     try { console.log('[ScreenShare] build ' + VERSION + ' loaded'); } catch (e) {}
 
-    var INTERVAL = 30000; // 每 30 秒看一帧，省调用/token
+    var INTERVAL = 10000; // 每 10 秒看一帧
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function enc(s) { return encodeURIComponent(String(s == null ? '' : s)); }
     function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
@@ -232,11 +232,11 @@
                     messages: [
                         { role: 'system', content: systemText() },
                         { role: 'user', content: [
-                            { type: 'text', text: '这是' + what + '。用你的人设点评这个画面（1-2 条短气泡）。只输出 JSON：{"bubbles":["..."]}' },
+                            { type: 'text', text: '这是' + what + '。用你的人设自然地点评这个画面，写 2~3 条完整的话（每条 15~40 字、是一句通顺完整的话，不要碎片、不要乱码、不要只蹦几个字），像真人随口说。只输出 JSON：{"bubbles":["...","..."]}' },
                             { type: 'image_url', image_url: { url: dataURL } }
                         ] }
                     ],
-                    max_tokens: 220,
+                    max_tokens: 800,
                     temperature: (typeof cfg.mainTemp === 'number' ? cfg.mainTemp : 0.85)
                 }),
                 signal: ctrl ? ctrl.signal : undefined
@@ -252,21 +252,24 @@
         // 去掉 ```json 代码块围栏，避免把 JSON 原文当成消息
         var body = String(content || '').replace(/```[a-zA-Z0-9_-]*/g, ' ').replace(/```/g, ' ').trim();
         var parsed = firstJson(body) || {};
-        var bubbles = Array.isArray(parsed.bubbles) ? parsed.bubbles : (parsed.bubbles ? [parsed.bubbles] : []);
+        var bubbles = Array.isArray(parsed.bubbles) ? parsed.bubbles : (typeof parsed.bubbles === 'string' ? [parsed.bubbles] : []);
+        bubbles = bubbles.map(function (b) { return typeof b === 'string' ? b.trim() : String((b && (b.text || b.content)) || '').trim(); }).filter(Boolean);
         if (!bubbles.length) {
-            // 容错：JSON 不合法时，直接抠出引号里的内容当气泡
-            var re = /"((?:[^"\\]|\\.)*)"/g, mm, quoted = [];
-            while ((mm = re.exec(body)) !== null) {
-                var v = String(mm[1] || '').trim();
-                if (v && !/^(bubbles|next|text|type|image_url|url|role|content)$/i.test(v) && !/^data:/.test(v)) quoted.push(v);
-            }
-            if (quoted.length) bubbles = quoted;
+            // JSON 不合法时不要乱抠引号（会得到碎片/乱码），只把 JSON 外壳去掉，保留可读的一整段
+            var cleaned = body
+                .replace(/[{}\[\]"]/g, ' ')
+                .replace(/\b(bubbles|next|type|image_url|url|role|content|text|json)\b\s*:?/gi, ' ')
+                .replace(/\s+/g, ' ').trim();
+            if (cleaned) bubbles = [cleaned.slice(0, 400)];
         }
-        if (!bubbles.length && body) bubbles = [body.replace(/[{}"\[\]]/g, ' ').replace(/\b(json|bubbles)\b/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)];
-        bubbles.filter(Boolean).slice(0, 2).forEach(addBubble);
+        bubbles = bubbles.slice(0, 3);
+        bubbles.forEach(addBubble);
         if (bubbles.length) {
-            try { var s = shell(); if (s && s.postToChat) s.postToChat({ type: 'NANO_CHAR_SAY', chatId: String(SS.info.id), text: String(bubbles[0]) }); } catch (e) {}
-            setStatus('刚刚点评了一句');
+            try {
+                var s = shell();
+                if (s && s.postToChat) bubbles.forEach(function (b) { s.postToChat({ type: 'NANO_CHAR_SAY', chatId: String(SS.info.id), text: String(b) }); });
+            } catch (e) {}
+            setStatus('刚刚点评了 ' + bubbles.length + ' 句');
         } else setStatus('在看…');
     }
 
