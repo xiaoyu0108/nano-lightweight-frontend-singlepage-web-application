@@ -760,6 +760,20 @@ function splitBubbles(text) {
   }
   return out;
 }
+// 去掉模型输出的思维链（[think]...[/think]、<think>、【思考】等），包括未闭合、跑到结尾的
+function stripThinkTags(text) {
+  let s = String(text || '');
+  s = s.replace(/\[\s*think\s*\][\s\S]*?\[\s*\/\s*think\s*\]/gi, ' ');
+  s = s.replace(/<\s*think\s*>[\s\S]*?<\s*\/\s*think\s*>/gi, ' ');
+  s = s.replace(/【\s*(?:think|思考|思维链)\s*】[\s\S]*?【\s*\/\s*(?:think|思考|思维链)\s*】/gi, ' ');
+  s = s.replace(/\[\s*(?:思考|思维链)\s*\][\s\S]*?\[\s*\/\s*(?:思考|思维链)\s*\]/gi, ' ');
+  s = s.replace(/\[\s*think\s*\][\s\S]*$/i, ' ');
+  s = s.replace(/<\s*think\s*>[\s\S]*$/i, ' ');
+  s = s.replace(/\[\s*\/?\s*(?:think|思考|思维链)\s*\]/gi, ' ');
+  s = s.replace(/【\s*\/?\s*(?:think|思考|思维链)\s*】/gi, ' ');
+  s = s.replace(/<\s*\/?\s*think\s*>/gi, ' ');
+  return s.replace(/\n{3,}/g, '\n\n').trim();
+}
 function bubblesToMessages(bubbles, kind) {
   const msgs = [];
   (bubbles || []).forEach(b => {
@@ -876,7 +890,8 @@ async function genCharReply(c) {
   if (!history.slice(1).some(m => m.role === 'user')) history.push({ role: 'user', content: '（主动给 TA 发条 iMessage 短信）' });
   const raw = await callApi(history, { maxTokens: 900 }, { kind: 'reply', chatId: c.id });
   if (!raw) return null;
-  const body = String(raw).replace(/\[(加回我|取消拉黑|解除拉黑|unblockuser|继续拉黑|拉黑用户|拉黑我|blockuser)\]/g, '');
+  let body = String(raw).replace(/\[(加回我|取消拉黑|解除拉黑|unblockuser|继续拉黑|拉黑用户|拉黑我|blockuser)\]/g, '');
+  body = stripThinkTags(body);
   // 只要不是中文（外国角色、或没填国籍但说了外语），都补上中文翻译
   if (foreign || looksNonChinese(body)) {
     const lines = await ensureTranslatedLines(ch, String(body).split(/\n+/).map(s => s.trim()).filter(Boolean).slice(0, 6));
@@ -988,7 +1003,7 @@ async function genAliasReply(c) {
   const history = [{ role: 'system', content: sys }].concat(historyForApi(16, c.history));
   const raw = await callApi(history, { maxTokens: 400, temperature: 0.9 }, { kind: 'reply', chatId: c.id });
   if (!raw) return null;
-  const body = String(raw);
+  const body = stripThinkTags(raw);
   if (foreign || looksNonChinese(body)) {
     const lines = await ensureTranslatedLines(ch, body.split(/\n+/).map(s => s.trim()).filter(Boolean).slice(0, 6));
     return { raw: body, bubbles: lines };
@@ -1011,7 +1026,7 @@ async function genStrangerReply(c) {
     const history = [{ role: 'system', content: sys }].concat(historyForApi(16, c.history));
     const raw = await callApi(history, { maxTokens: 360, temperature: 0.95 }, { kind: 'reply', chatId: c.id });
     if (!raw) return null;
-    return { raw: String(raw), bubbles: splitBubbles(raw) };
+    return { raw: String(raw), bubbles: splitBubbles(stripThinkTags(raw)) };
   }
   const setting = c.setting || '';
   const u = readCurrentUser() || {};
@@ -1025,7 +1040,7 @@ async function genStrangerReply(c) {
   const history = [{ role: 'system', content: sys }].concat(historyForApi(16, c.history));
   const raw = await callApi(history, { maxTokens: 320, temperature: 0.95 }, { kind: 'reply', chatId: c.id });
   if (!raw) return null;
-  return { raw: String(raw), bubbles: splitBubbles(raw) };
+  return { raw: String(raw), bubbles: splitBubbles(stripThinkTags(raw)) };
 }
 
 /* ---------------- 重 roll：删掉本轮对方的所有回复 ---------------- */

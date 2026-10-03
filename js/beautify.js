@@ -2689,25 +2689,36 @@ document.getElementById("fontFile").onchange = async e => {
 
 // ---- URL字体 ----
 document.getElementById("urlApply").onclick = async () => {
+  const btn = document.getElementById("urlApply");
   const url = document.getElementById("fontUrl").value.trim();
   if (!url) return fontAlert("字体连接失败", "请输入字体链接（字体文件直链，或 Google Fonts / 字体 CSS 链接）");
+  const oldLabel = btn ? btn.textContent : "连接";
+  if (btn) { btn.disabled = true; btn.textContent = "连接中…"; }
+  try { var metaEl0 = document.getElementById("fontMeta"); if (metaEl0) metaEl0.textContent = "正在连接字体，请稍候…"; } catch (e) {}
   try {
-    const prepared = await prepareRemoteFont(url);
-    const niceName = (prepared.cssFamily || googleFontFamily(url) || (url.split("/").pop() || "远程字体")).split("?")[0] || "远程字体";
-    fontState = { name: niceName, source: url, type: "url", data: null, size: fontState.size || 16, cssFamily: prepared.cssFamily || "", cssText: prepared.cssText || "" };
-    try { localStorage.setItem("beautify_font_pending", url); } catch (e) {}
-    await applyRemoteFont(url, fontState.cssFamily, fontState.cssText);
-    await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
-    try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
-    document.getElementById("filename").textContent = "已应用远程字体";
-    document.getElementById("fontMeta").textContent = "当前字体：" + (fontState.name || url);
-    renderFontQuickBar();
+    // 整体限时，避免手机上“点了没反应、一直转”
+    await nanoFontTimeout((async () => {
+      const prepared = await prepareRemoteFont(url);
+      const niceName = (prepared.cssFamily || googleFontFamily(url) || (url.split("/").pop() || "远程字体")).split("?")[0] || "远程字体";
+      fontState = { name: niceName, source: url, type: "url", data: null, size: fontState.size || 16, cssFamily: prepared.cssFamily || "", cssText: prepared.cssText || "" };
+      try { localStorage.setItem("beautify_font_pending", url); } catch (e) {}
+      await applyRemoteFont(url, fontState.cssFamily, fontState.cssText);
+      await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
+      try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
+      document.getElementById("filename").textContent = "已应用远程字体";
+      document.getElementById("fontMeta").textContent = "当前字体：" + (fontState.name || url);
+      renderFontQuickBar();
+    })(), 45000, "连接字体");
     toast("字体连接成功，已应用");
   } catch (err) {
     console.error("[font] 远程字体连接失败:", err);
     try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
-    fontAlert("字体连接失败", (err && err.message ? err.message : String(err)) +
+    let hint = "";
+    if (window.isSecureContext === false) hint = "\n\n提示：当前不是 HTTPS 安全环境，部分手机浏览器会拦截外部字体或接口，请改用 https:// 打开。";
+    fontAlert("字体连接失败", (err && err.message ? err.message : String(err)) + hint +
       "\n\n支持的链接：\n· 字体文件直链：.ttf / .otf / .woff / .woff2\n· Google Fonts 的 CSS 链接\n· 其它 @font-face 字体 CSS 链接\n· 也可直接粘贴 @font-face CSS");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = oldLabel; }
   }
 };
 

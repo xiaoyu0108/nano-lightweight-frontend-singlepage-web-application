@@ -1,8 +1,8 @@
 // ============================================================
 // screen-share.js — 「让 TA 看你真实的屏幕」（掌心窗）
 // 用 getDisplayMedia 采集屏幕 → 定时截帧 → 交给能识图的模型
-// → TA 以人设实时短评。桌面 Chrome/Edge、安卓 Chrome 可用；
-// iOS Safari 不支持屏幕采集。
+// → TA 以人设实时短评。
+// 不设任何平台 / 环境限制：能拿到屏幕流就工作，拿不到就由浏览器/系统自行决定并回报错误。
 // 入口：查手机 → 设置 → 让 TA 看我的真实屏幕（测试）
 // ============================================================
 (function () {
@@ -265,15 +265,36 @@
     }
 
     async function doStart(info) {
-        var stream;
+        var stream = null, lastErr = null;
+        // 不做任何平台 / 环境限制：直接向浏览器申请屏幕共享，多种参数与接口依次尝试
+        var md = navigator.mediaDevices || {};
+        var gdm = null;
         try {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) throw new Error('unsupported');
-            stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 2 }, audio: false });
-        } catch (e) {
-            var msg = (e && e.name === 'NotAllowedError') ? '你取消了共享，或没有授权。' : '这个浏览器暂时不支持屏幕共享（iOS Safari 通常不支持；可换电脑 Chrome/Edge 或安卓 Chrome 试试）。';
+            if (md && typeof md.getDisplayMedia === 'function') gdm = function (c) { return md.getDisplayMedia(c); };
+            else if (typeof navigator.getDisplayMedia === 'function') gdm = function (c) { return navigator.getDisplayMedia(c); };
+            else if (typeof navigator.webkitGetDisplayMedia === 'function') gdm = function (c) { return navigator.webkitGetDisplayMedia(c); };
+        } catch (e) { gdm = null; }
+        var opts = [
+            { video: true, audio: false },
+            { video: true },
+            { video: { frameRate: 2 }, audio: false }
+        ];
+        if (gdm) {
+            for (var i = 0; i < opts.length && !stream; i++) {
+                try { stream = await gdm(opts[i]); } catch (e) { lastErr = e; }
+            }
+        }
+        if (!stream) {
+            var msg = lastErr
+                ? ('无法开始屏幕共享：' + (lastErr.name ? (lastErr.name + '：') : '') + (lastErr.message || lastErr))
+                : '当前环境没有可用的屏幕共享接口。请点击「开始共享」并在浏览器弹窗里允许录屏。';
             try { alert(msg); } catch (err) {}
             return;
         }
+        try {
+            var vt = stream.getVideoTracks()[0];
+            if (vt && vt.applyConstraints) vt.applyConstraints({ frameRate: 2 }).catch(function () {});
+        } catch (e) {}
         SS.active = true; SS.info = info; SS.stream = stream; SS.lastAt = Date.now();
         SS.comments = []; SS.cardPosted = false;
         buildPanel(info);
@@ -310,7 +331,7 @@
         SS.panel = null; SS.log = null; SS.statusEl = null; SS.video = null; SS.stream = null;
     }
 
-    window.ScreenShare = { version: '20261003g', start: start, stop: stop, isActive: function () { return SS.active; } };
+    window.ScreenShare = { version: '20261003j', start: start, stop: stop, isActive: function () { return SS.active; } };
 
     window.addEventListener('message', function (e) {
         var d = e && e.data;

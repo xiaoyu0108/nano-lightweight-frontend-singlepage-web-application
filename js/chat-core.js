@@ -5338,39 +5338,32 @@
             replyBody = reply.replace(heartMatch[0], '').trim();
         }
 
-        // 思维链：提取 [think]...[/think]（兼容 <think>、【思考】、全角括号等写法），
-        // 挂到本轮第一条角色气泡上方的可折叠区
+        // 思维链：**全局**提取并移除所有 [think]...[/think]（兼容 <think>、【思考】、全角括号等写法），
+        // 第一段非空内容挂到本轮第一条角色气泡上方的可折叠区
         let roundThink = '';
-        const thinkPatterns = [
-            /\[\s*think\s*\]([\s\S]*?)\[\s*\/\s*think\s*\]/i,
-            /<\s*think\s*>([\s\S]*?)<\s*\/\s*think\s*>/i,
-            /【\s*(?:think|思考|思维链)\s*】([\s\S]*?)【\s*\/\s*(?:think|思考|思维链)\s*】/i,
-            /\[\s*(?:思考|思维链)\s*\]([\s\S]*?)\[\s*\/\s*(?:思考|思维链)\s*\]/i
-        ];
-        for (let ti = 0; ti < thinkPatterns.length; ti++) {
-            const tm = replyBody.match(thinkPatterns[ti]);
-            if (tm && tm[1].trim()) {
-                roundThink = tm[1].trim();
-                replyBody = replyBody.replace(tm[0], '').trim();
-                break;
-            }
-        }
-        // 兜底：只有开头 [think] 没有闭合，取到末尾，避免整段思考漏进正文
-        if (!roundThink) {
-            const openOnly = replyBody.match(/\[\s*think\s*\]([\s\S]*)$/i);
-            if (openOnly && openOnly[1].trim()) {
-                roundThink = openOnly[1].replace(/\[\s*\/\s*think\s*\]/i, '').trim();
-                replyBody = replyBody.replace(openOnly[0], '').trim();
-            }
-        }
+        const grabThink = function (m, inner) {
+            if (!roundThink && inner && String(inner).trim()) roundThink = String(inner).trim();
+            return ' ';
+        };
+        replyBody = replyBody.replace(/\[\s*think\s*\]([\s\S]*?)\[\s*\/\s*think\s*\]/gi, grabThink);
+        replyBody = replyBody.replace(/<\s*think\s*>([\s\S]*?)<\s*\/\s*think\s*>/gi, grabThink);
+        replyBody = replyBody.replace(/【\s*(?:think|思考|思维链)\s*】([\s\S]*?)【\s*\/\s*(?:think|思考|思维链)\s*】/gi, grabThink);
+        replyBody = replyBody.replace(/\[\s*(?:思考|思维链)\s*\]([\s\S]*?)\[\s*\/\s*(?:思考|思维链)\s*\]/gi, grabThink);
+        // 未闭合的思维链：从 [think] 一直吞到结尾（不管它在开头还是结尾），避免思考内容漏进正文
+        replyBody = replyBody.replace(/\[\s*think\s*\]([\s\S]*)$/i, function (m, inner) {
+            const t = String(inner || '').replace(/\[\s*\/\s*think\s*\]/i, '').trim();
+            if (!roundThink && t) roundThink = t;
+            return ' ';
+        });
         pendingTurnThink = roundThink || '';
 
         // 二次清理：防止未闭合 / 多余的思维链标记漏进正文气泡
         replyBody = replyBody
-            .replace(/\[\s*\/?\s*(?:think|思考|思维链)\s*\]/gi, '')
-            .replace(/【\s*\/?\s*(?:think|思考|思维链)\s*】/gi, '')
-            .replace(/<\s*\/?\s*think\s*>/gi, '')
+            .replace(/\[\s*\/?\s*(?:think|思考|思维链)\s*\]/gi, ' ')
+            .replace(/【\s*\/?\s*(?:think|思考|思维链)\s*】/gi, ' ')
+            .replace(/<\s*\/?\s*think\s*>/gi, ' ')
             .replace(/^[ \t]*[\/]?[ \t]*think[ \t]*$/gim, '')
+            .replace(/\n{3,}/g, '\n\n')
             .trim();
 
         // AI 对「用户发来的转账/礼物」表态（[收]/[不收]/[退]）：
