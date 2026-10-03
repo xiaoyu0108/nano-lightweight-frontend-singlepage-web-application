@@ -241,13 +241,16 @@
         var base = key.indexOf('http') === 0 ? key.replace(/\/+$/, '') : ('https://api.day.app/' + encodeURIComponent(key));
         var full = base + '/' + encodeURIComponent(title || 'Nano') + '/' + encodeURIComponent(String(body || '').slice(0, 150));
         // level 默认 passive：静默送达、不响不震动（用户可在控制台 NanoNotify.setBarkLevel('active') 调强）
-        var q = ['group=' + encodeURIComponent('Nano'), 'level=' + encodeURIComponent(opts.level || barkLevel())];
+        var q = ['group=' + encodeURIComponent(opts.group || 'Nano'), 'level=' + encodeURIComponent(opts.level || barkLevel())];
         var target = opts.target || '';
         if (target) {
             try { q.push('url=' + encodeURIComponent(location.origin + location.pathname + '?open=' + encodeURIComponent(target))); } catch (e) {}
         }
-        // 让通知显示 Nano 自己的图标，而不是 Bark 的默认图标
-        try { q.push('icon=' + encodeURIComponent(new URL('icons/icon-192.png', location.href).href)); } catch (e) {}
+        // 有头像就用头像当图标；Bark 需要可访问的 http 图片，data: 头像则退回 Nano 图标
+        try {
+            var bi = (opts.icon && /^https?:/i.test(opts.icon)) ? opts.icon : nanoIconUrl();
+            if (bi) q.push('icon=' + encodeURIComponent(bi));
+        } catch (e) {}
         var url = full + '?' + q.join('&');
         return fetch(url, { cache: 'no-store' }).then(function (r) {
             return r.json().catch(function () { return {}; });
@@ -260,14 +263,25 @@
         });
     }
 
+    function nanoIconUrl() {
+        try { return new URL('icons/icon-192.png', location.href).href; } catch (e) { return ''; }
+    }
+
     function notify(title, body, opts) {
         opts = opts || {};
         if (!enabled() && !opts.force) return;
         playSound(soundFor(opts));
+        // 头像作为大图标（icon），Nano 图标作为右下角角标（badge）
+        var defIcon = nanoIconUrl();
+        var icon = opts.icon || defIcon;
+        var badge = opts.badge || defIcon;
         // Bark：应用退到后台/锁屏时，通过苹果推送弹真正的系统通知（国内可用）
         try {
             var hidden = (typeof document !== 'undefined') && (document.hidden || document.visibilityState === 'hidden');
-            if (barkEnabled() && barkKey() && (hidden || opts.force || opts.bark)) barkPush(title, body, opts);
+            if (barkEnabled() && barkKey() && (hidden || opts.force || opts.bark)) {
+                var bopts = Object.assign({}, opts, { icon: icon, group: opts.group || title || 'Nano' });
+                barkPush(title, body, bopts);
+            }
         } catch (e) {}
         // 已按要求去掉应用内的黑色横幅（appNotify）；前台只保留提示音 + 未读红点
         var payload = {
@@ -276,6 +290,8 @@
             silent: true,
             data: { target: opts.target || '' }
         };
+        if (icon) payload.icon = icon;
+        if (badge) payload.badge = badge;
         function legacy() {
             try {
                 var n = new Notification(title || 'Nano', payload);

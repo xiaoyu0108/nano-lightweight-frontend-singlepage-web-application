@@ -228,6 +228,44 @@ function escHtml(s){
   restoreLayout();
 })();
 
+/* =========================
+   5.5 主屏：第二屏（扩展 App）分页
+========================= */
+(function initHomePaging(){
+  const pages = document.getElementById("homePages");
+  const dots = document.getElementById("homeDots");
+  if(!pages || !dots) return;
+  const spans = [...dots.children];
+  function current(){
+    const w = pages.clientWidth || 1;
+    return Math.max(0, Math.min(spans.length - 1, Math.round(pages.scrollLeft / w)));
+  }
+  function sync(){
+    const i = current();
+    spans.forEach((s, k) => s.classList.toggle("active", k === i));
+  }
+  pages.addEventListener("scroll", () => requestAnimationFrame(sync), { passive:true });
+  spans.forEach((s, k) => {
+    s.addEventListener("click", () => pages.scrollTo({ left: k * pages.clientWidth, behavior:"smooth" }));
+  });
+  /* 左右滑动切换分页（图标自身吞掉了横向滚动，这里补一个手势） */
+  let tx = 0, ty = 0, tt = 0;
+  pages.addEventListener("touchstart", e => {
+    const t = e.touches[0]; if(!t) return;
+    tx = t.clientX; ty = t.clientY; tt = Date.now();
+  }, { passive:true });
+  pages.addEventListener("touchend", e => {
+    if(document.querySelector(".dragging")) return;
+    const t = e.changedTouches[0]; if(!t) return;
+    const dx = t.clientX - tx, dy = t.clientY - ty;
+    if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4 && Date.now() - tt < 600){
+      const i = current();
+      const next = Math.max(0, Math.min(spans.length - 1, i + (dx < 0 ? 1 : -1)));
+      pages.scrollTo({ left: next * pages.clientWidth, behavior:"smooth" });
+    }
+  }, { passive:true });
+})();
+
 /* =========================================================
    6. 存储层
    ========================================================= */
@@ -367,10 +405,10 @@ function extractJSON(text){
   try{ return JSON.parse(t); }catch(e){ return null; }
 }
 
-const SYS_JSON = "你是虚构角色的手机数据生成器，所有内容均为小说角色的文学创作，不涉及真实人物。允许描写角色隐秘、克制、暧昧的心思与生活细节，但必须收敛、适量、点到为止：最多 1 条偏重的内容，不写露骨性描写、不写血腥暴力、不写自残、不涉及未成年、不写违法犯罪细节。所有内容必须严格贴合给定的人设、世界书与记忆库，不得脱离角色自由发挥。只输出用户要求的 JSON，不要输出任何解释、markdown 代码块或多余文字。";
+const SYS_JSON = "你是虚构角色的手机数据生成器，所有内容均为小说角色的文学创作，不涉及真实人物。允许描写角色隐秘、克制、暧昧的心思与生活细节，但必须收敛、适量、点到为止：最多 1 条偏重的内容，不写露骨性描写、不写血腥暴力、不写自残、不涉及未成年、不写违法犯罪细节。遇到设定中暧昧、私密或灰度的内容，自然写出即可，不要反复声明、说教或刻意回避。所有内容必须严格贴合给定的人设、世界书与记忆库，不得脱离角色自由发挥。只输出用户要求的 JSON，不要输出任何解释、markdown 代码块或多余文字。";
 
 /* 通用的「贴合人设」硬性约束 */
-const PERSONA_RULE = "硬性要求：所有内容必须贴合上面的角色设定、世界书设定与记忆库，符合角色的身份、性格、说话方式、社交圈、作息与近期经历；不得出现与角色无关的通用模板内容；不同角色的内容必须明显不同。内容还必须与「用户」有关联：每个 App 至少有 1-2 条自然涉及用户（用用户的名字、与用户共同经历的事、用户说过的话，或直接从记忆库取材），让人能看出两人生活交织，但不要每条都硬提用户，保持自然。";
+const PERSONA_RULE = "硬性要求：所有内容必须贴合上面的角色设定、世界书设定与记忆库，符合角色的身份、性格、说话方式、社交圈、作息与近期经历；不得出现与角色无关的通用模板内容；不同角色的内容必须明显不同。内容还必须与「用户」有关联：每个 App 至少有 1-2 条自然涉及用户（用用户的名字、与用户共同经历的事、用户说过的话，或直接从记忆库取材），让人能看出两人生活交织，但不要每条都硬提用户，保持自然。\n【反雷同】每次生成都要换新的场景、时间、物件、话术与结构，不要反复套用同一批句式或套路；避免千篇一律的「温柔守护」「默默注视」等空泛描写。\n【反油腻】禁止使用「小姑娘」「小丫头」「丫头」「小家伙」「宝贝儿」「乖乖」「咱家」「你知道吗」「我懂你」等油腻、幼化或模板化称呼与句式，除非角色人设与用户称呼明确如此。用词要自然、克制、有具体质感。";
 
 /* =========================================================
    7.5 人设 / 世界书 读取
@@ -2276,12 +2314,15 @@ const SETTINGS_APPS = [
   {id:"game",name:"游戏"},{id:"mail",name:"邮箱"},{id:"settings",name:"设置"},
   {id:"video",name:"视频"},{id:"diary",name:"日记"},{id:"private",name:"私密"},
   {id:"health",name:"健康"},{id:"chat",name:"聊天"},
+  {id:"doubao",name:"豆包"},{id:"taobao",name:"淘宝"},{id:"mapcal",name:"地图日程"},
   {id:"album",name:"相册"},{id:"memo",name:"备忘录"},{id:"browser",name:"浏览器"}
 ];
 
 async function openSettings(){
   const c = currentChar || {};
   const av = c.avatar || "";
+  const proactiveOn = (localStorage.getItem("nano_takeover_proactive") !== "0");
+  const pagesN = localStorage.getItem("nano_takeover_pages") || "5";
   appHost.innerHTML = `<div class="st-wrap">
     <header class="st-top">
       <div class="st-top-left" data-back>
@@ -2306,6 +2347,56 @@ async function openSettings(){
           <div>
             <div class="st-btn-title">修改壁纸</div>
             <div class="st-btn-sub">从相册选择图片作为主屏背景</div>
+          </div>
+          <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div class="st-row">
+        <button class="st-btn" data-act="takeover">
+          <div>
+            <div class="st-btn-title">让 TA 接管我的手机</div>
+            <div class="st-btn-sub">测试：TA 会翻看你的 App 并给你发消息</div>
+          </div>
+          <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div class="st-row">
+        <button class="st-btn" data-act="proactive-toggle">
+          <div>
+            <div class="st-btn-title">允许 TA 主动查看我的手机</div>
+            <div class="st-btn-sub">TA 会时不时自己提出想看看你的手机</div>
+          </div>
+          <span style="font-size:13px;color:#8a8a8f;margin-left:8px">${proactiveOn ? "开" : "关"}</span>
+        </button>
+      </div>
+
+      <div class="st-row">
+        <button class="st-btn" data-act="proactive-now">
+          <div>
+            <div class="st-btn-title">现在让 TA 主动申请</div>
+            <div class="st-btn-sub">测试：让 TA 自己发起一次查看</div>
+          </div>
+          <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div class="st-row">
+        <button class="st-btn" data-act="pages">
+          <div>
+            <div class="st-btn-title">每次查看的页数</div>
+            <div class="st-btn-sub">越少越省调用次数</div>
+          </div>
+          <span style="font-size:13px;color:#8a8a8f;margin-left:8px">${pagesN} 页</span>
+        </button>
+      </div>
+
+      <div class="st-row">
+        <button class="st-btn" data-act="screenshare">
+          <div>
+            <div class="st-btn-title">让 TA 看我的真实屏幕</div>
+            <div class="st-btn-sub">共享屏幕让 TA 实时点评（需能识图的模型；iOS 不支持）</div>
           </div>
           <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
         </button>
@@ -2362,6 +2453,51 @@ async function openSettings(){
       await applyWallpaper(currentChar.id);
       openSettings();
     });
+  };
+
+  appHost.querySelector('[data-act="takeover"]').onclick = () => {
+    const info = { id: currentChar.id, name: currentChar.name, avatar: currentChar.avatar || "" };
+    try{
+      const t = window.parent;
+      if(t && t !== window && t.CharTakeover && t.CharTakeover.start){ t.CharTakeover.start(info); return; }
+      if(window.CharTakeover && window.CharTakeover.start){ window.CharTakeover.start(info); return; }
+      if(t && t !== window) t.postMessage({ type:"startTakeover", charId: info.id, charName: info.name, avatar: info.avatar }, "*");
+    }catch(e){}
+  };
+
+  appHost.querySelector('[data-act="proactive-toggle"]').onclick = () => {
+    const on = localStorage.getItem("nano_takeover_proactive") !== "0";
+    try{ localStorage.setItem("nano_takeover_proactive", on ? "0" : "1"); }catch(e){}
+    openSettings();
+  };
+
+  appHost.querySelector('[data-act="proactive-now"]').onclick = () => {
+    try{
+      if(window.parent && window.parent !== window){
+        window.parent.postMessage({ type:"takeoverProactive" }, "*");
+      }else if(window.CharTakeover && window.CharTakeover.proactiveNow){
+        window.CharTakeover.proactiveNow();
+      }
+    }catch(e){}
+  };
+
+  appHost.querySelector('[data-act="pages"]').onclick = () => {
+    const order = ["3", "5", "7", "10"];
+    const cur = localStorage.getItem("nano_takeover_pages") || "5";
+    const i = Math.max(0, order.indexOf(cur));
+    const next = order[(i + 1) % order.length];
+    try{ localStorage.setItem("nano_takeover_pages", next); }catch(e){}
+    openSettings();
+  };
+
+  appHost.querySelector('[data-act="screenshare"]').onclick = () => {
+    const info = { id: currentChar.id, name: currentChar.name, avatar: currentChar.avatar || "" };
+    try{
+      const t = window.parent;
+      if(t && t !== window && t.ScreenShare && t.ScreenShare.start){ t.ScreenShare.start(info); return; }
+      if(window.ScreenShare && window.ScreenShare.start){ window.ScreenShare.start(info); return; }
+      if(t && t !== window) t.postMessage({ type:"startScreenShare", charId: info.id, charName: info.name, avatar: info.avatar }, "*");
+    }catch(e){}
   };
   appHost.querySelector('[data-act="reset-wallpaper"]').onclick = async () => {
     await dataSet(`wallpaper_${currentChar.id}`, "");
@@ -2629,12 +2765,18 @@ const MULTI_SPEC = {
   browser:`"browser":[{"keyword":"搜索词","url":"https://example.com/a","site":"网站名","title":"网页标题","time":"今天 22:06","visits":3,"intro":"页面摘要","quote":"引用句","points":["要点一","要点二","要点三"]}]`,
   game:`"game":[{"name":"中文游戏名","id":"4827 1936","winRate":68,"matches":327,"wins":222,"losses":105,"rank":"大师","rating":2847,"rankMark":"III","recent":[{"result":"W","mode":"排位赛","time":"今天 · 21:42","kda":"18 / 6 / 11"}],"habit":"隐藏游戏习惯","weekly":[35,55,43,75,100,67,46]}]`,
   private:`"private":[{"type":"PRIVATE / 01","time":"23:41","title":"标题","preview":"模糊区一句话","detail":"隐藏细节","tags":["记忆","未公开"],"level":"轻"}]`,
-  chat:`"chat":[{"name":"NPC名字","lastMsg":"最后一条","time":"昨天 22:13","unread":0,"messages":[{"side":"left","text":"消息"}]}]`
+  chat:`"chat":[{"name":"NPC名字","lastMsg":"最后一条","time":"昨天 22:13","unread":0,"messages":[{"side":"left","text":"消息"}]}]`,
+  doubao:`"doubao":[{"role":"char","content":"角色问豆包的问题"},{"role":"ai","content":"豆包的回答"}]`,
+  taobao:`"taobao":{"cart":[{"name":"商品名","shop":"店铺","spec":"规格","price":"129"}],"orders":[{"shop":"店铺","name":"商品名","spec":"规格","price":"129","status":"交易成功","time":"8月27日"}],"food":[{"restaurant":"店名","dish":"菜品","price":"26.8","status":"已送达","time":"今天 12:18"}]}`,
+  mapcal:`"mapcal":{"places":[{"name":"地点名","address":"地址或区域","time":"今天 14:20","note":"搜索或导航备注"}],"events":[{"date":"10月4日","day":"星期六","time":"15:30","title":"安排标题","info":"地点或说明","tag":"工作"}]}`
 };
 const MULTI_COUNT = {
   video:"video 3 条", diary:"diary 3 篇", album:"album 5 条", mail:"mail 4 封",
-  memo:"memo 3 组（每组 2-3 条）", browser:"browser 4 条", game:"game 2 个",
-  private:"private 4 条（轻×2、中×1、重×1）", chat:"chat 3 个会话（每个 5-8 条消息）"
+  memo:"memo 约 4 条（分 2-3 组，每组 1-2 条）", browser:"browser 4 条", game:"game 2 个",
+  private:"private 4 条（轻×2、中×1、重×1）", chat:"chat 3 个会话（每个 5-8 条消息）",
+  doubao:"doubao 8-10 条消息（char 与 ai 交替，构成一次完整对话）",
+  taobao:"taobao：cart 2-3 件、orders 2-3 单、food 2-3 单",
+  mapcal:"mapcal：places 3 个、events 4 条"
 };
 
 function buildMultiPrompt(ids, char, ctx){
@@ -2645,6 +2787,8 @@ ${ctx}
 
 ${PERSONA_RULE}
 
+【本次随机编号】${Date.now().toString(36)}-${Math.floor(Math.random()*1e6)}
+请根据这个编号换一个与以往不同的切入角度、场景与措辞来写，避免和之前生成的内容雷同。
 请一次性生成以下 App 的数据（只生成这些：${ids.join("、")}）：
 {
   ${need}
@@ -2657,12 +2801,15 @@ ${PERSONA_RULE}
 - video.desc：40-80 字，写清视频讲了什么 + 角色的反应。
 - diary.content：120-200 字，有具体场景、动作、心情变化，像真人日记。
 - mail.body：每封 3-4 段，每段 30-60 字，有称呼、正文、落款的感觉。
-- memo.items[].content：40-90 字，写清具体待办/记录细节。
+- memo：总数约 4 条，分 2-3 组；每条 content 90-150 字，写清具体经过、心情或待办细节，不要写得太短。
 - browser.intro：50-100 字；quote：15-40 字；points 3 条各 15-30 字。
 - private.preview：20-40 字；detail：50-100 字，有前因后果。
 - game.habit：40-80 字，写清玩法习惯与心态。
 - chat：每个会话 6-10 条消息，有来有回，单条 5-25 字。
 - album.text：10-30 字，有画面感。
+- doubao：8-10 条，char 提问与 ai 回答交替；问题贴合角色当下生活与困惑，ai 回答口语化、可带分点，单条 20-60 字。
+- taobao：商品名、店铺、规格、价格要像真实电商；外卖写清店名、菜品、时间与配送状态；cart/orders/food 都要有数据。
+- mapcal.places：写角色搜索或导航过的、有真实感的地点；events：写接下来的日程，含时间、地点、类型标签。
 每个 App 的数据格式必须严格符合示例字段名，只输出一个 JSON 对象，不要解释、不要代码块。
 输出必须紧凑：字段之间不要换行、不要缩进，正文尽量简短。`;
 }
@@ -2704,7 +2851,9 @@ async function genMulti(api, char, ids){
     model: api.model,
     messages: [{role:"system", content:SYS_JSON},{role:"user", content:user}],
     temperature: api.temp,
-    max_tokens: Math.max(4096, Number(api.maxTokens) || 8192)
+    max_tokens: Math.max(16384, Number(api.maxTokens) || 32768),
+    presence_penalty: 0.4,
+    frequency_penalty: 0.5
   };
   const headers = {"Content-Type":"application/json"};
   if(api.key) headers.Authorization = "Bearer " + api.key;
@@ -2757,10 +2906,12 @@ async function genMulti(api, char, ids){
     }
     if(data === undefined || data === null){ log.push({t:"err", s:`${id}: 缺失`}); continue; }
     let valid = true, reason = "";
-    if(["video","diary","album","mail","memo","browser","game","private","chat"].includes(id)){
+    if(["video","diary","album","mail","memo","browser","game","private","chat","doubao"].includes(id)){
       if(!Array.isArray(data) || !data.length){ valid = false; reason = "不是非空数组"; }
     }
     if(id === "health" && (!data || typeof data !== "object" || !data.steps)){ valid = false; reason = "缺少 steps"; }
+    if(id === "taobao" && (!data || typeof data !== "object" || !(Array.isArray(data.cart) || Array.isArray(data.orders) || Array.isArray(data.food)))){ valid = false; reason = "缺少 cart/orders/food"; }
+    if(id === "mapcal" && (!data || typeof data !== "object" || !(Array.isArray(data.places) || Array.isArray(data.events)))){ valid = false; reason = "缺少 places/events"; }
     if(!valid){ log.push({t:"err", s:`${id}: 校验失败（${reason}）`}); continue; }
     ok[id] = {type:id, data};
     log.push({t:"ok", s:`${id}: OK（${Array.isArray(data)?data.length+" 条":"对象"}）`});
@@ -2805,21 +2956,15 @@ async function startGeneration(ids){
   refreshSheet.classList.add("hidden");
   hideGenFail();
 
-  /* 分批请求：单次请求 App 太多会 504（网关超时），这里每批最多 CHUNK 个，
-     用户仍只需点一次「刷新」，整体算「一次生成」。 */
+  /* 生成策略：勾选多个 App 时，先尝试「一次请求全部」，成功就只调用一次 API（省钱）。
+     若因请求过大导致网关超时 / HTTP 错误，再自动拆成每批 CHUNK 个重试，避免整次白费。 */
   const CHUNK = 5;
-  const chunks = [];
-  for(let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
 
   const okAll = {};
   const fatalMsgs = [];
 
-  for(let ci = 0; ci < chunks.length; ci++){
-    const batch = chunks[ci];
-    showGenToast(chunks.length > 1
-      ? `正在生成第 ${ci + 1}/${chunks.length} 批（${batch.length} 个 App）…`
-      : `正在生成 ${batch.length} 个 App…（可返回切换其它 App）`);
-
+  const runBatch = async (batch, label) => {
+    showGenToast(label);
     let r = {ok:{}, log:[], fatal:null};
     try{
       r = await genMulti(api, currentChar, batch);
@@ -2828,9 +2973,9 @@ async function startGeneration(ids){
       r.fatal = (e && e.message) || String(e);
     }
 
-    genState.log.push({t:"sec", s:`第 ${ci + 1} 批：${batch.join("、")}`});
+    genState.log.push({t:"sec", s:label});
     (r.log || []).forEach(l => genState.log.push(l));
-    if(r.fatal) fatalMsgs.push(`第 ${ci + 1} 批：${r.fatal}`);
+    if(r.fatal) fatalMsgs.push(`${label}：${r.fatal}`);
 
     /* 每批生成完就立刻落盘，避免整次刷新白费 */
     for(const id of Object.keys(r.ok)){
@@ -2839,6 +2984,21 @@ async function startGeneration(ids){
     }
     /* 每批完成后即时刷新界面，让用户看到进度 */
     await reRenderCurrentApp();
+    return r;
+  };
+
+  if(ids.length > CHUNK){
+    genState.log.push({t:"sec", s:`一次生成全部（${ids.length} 个 App，单次请求）`});
+    const first = await runBatch(ids, `正在一次生成全部 ${ids.length} 个 App…（可返回切换其它 App）`);
+    if(first.fatal){
+      genState.log.push({t:"warn", s:`一次生成失败，自动拆分为每批 ${CHUNK} 个重试…`});
+      for(let i = 0; i < ids.length; i += CHUNK){
+        const batch = ids.slice(i, i + CHUNK);
+        await runBatch(batch, `正在生成第 ${Math.floor(i / CHUNK) + 1} 批（${batch.length} 个 App）…`);
+      }
+    }
+  }else{
+    await runBatch(ids, `正在生成 ${ids.length} 个 App…（可返回切换其它 App）`);
   }
 
   genState.running = false;
@@ -2891,6 +3051,33 @@ function showLogSheet(log, failed){
 document.getElementById("checkLogClose").onclick = () =>
   document.getElementById("checkLogSheet").classList.add("hidden");
 
+/* ---------- 新 App 宿主：加载原版页面（UI 不变，仅注入数据） ---------- */
+async function openHostedApp(appId, file, renderName){
+  appHost.innerHTML = `<iframe class="app-frame" data-frame src="${file}" title=""></iframe>`;
+  const frame = appHost.querySelector("[data-frame]");
+  if(!frame) return;
+  frame.addEventListener("load", async () => {
+    if(!appHost.contains(frame)) return;
+    let data = null;
+    try{ const saved = await dataGet(`app_${currentChar.id}_${appId}`); data = saved ? saved.data : null; }catch(e){}
+    if(!appHost.contains(frame)) return;
+    try{
+      const w = frame.contentWindow;
+      w.__phoneRefresh = () => startGeneration([appId]);
+      if(typeof w[renderName] === "function") w[renderName](data);
+    }catch(e){}
+  });
+}
+function openDoubao(){ return openHostedApp("doubao", "doubao.html", "renderDoubaoConversation"); }
+function openTaobao(){ return openHostedApp("taobao", "taobao.html", "renderCharShopping"); }
+function openMapcal(){ return openHostedApp("mapcal", "mapcal.html", "renderCharMapCalendar"); }
+
+/* 子页面点返回时关闭当前 App */
+window.addEventListener("message", e => {
+  const d = e && e.data;
+  if(d && d.type === "phoneAppClose") closeApp();
+});
+
 /* App 路由 */
 async function renderAppById(appId){
   if(appId === "video")        await openVideoList();
@@ -2903,6 +3090,9 @@ async function renderAppById(appId){
   else if(appId === "game")    await openGame();
   else if(appId === "private") await openPrivate();
   else if(appId === "chat")    await openChat();
+  else if(appId === "doubao")  await openDoubao();
+  else if(appId === "taobao")  await openTaobao();
+  else if(appId === "mapcal")  await openMapcal();
   else if(appId === "settings") await openSettings();
 }
 
@@ -2921,7 +3111,7 @@ document.querySelectorAll('#phoneHome .app[data-app], #phoneHome .dock-slot[data
   el.addEventListener("click", e => {
     if(el.dataset.justDragged === "1"){ el.dataset.justDragged = "0"; return; }
     const id = el.dataset.app;
-    if(["video","diary","album","mail","memo","health","browser","game","private","chat","settings"].includes(id)){
+    if(["video","diary","album","mail","memo","health","browser","game","private","chat","doubao","taobao","mapcal","settings"].includes(id)){
       e.preventDefault();
       e.stopPropagation();
       openApp(id);

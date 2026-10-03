@@ -528,9 +528,14 @@
         prompt += '【语气总原则】你的语气、态度、亲疏完全照抄【角色人设】：人设温柔就温柔、人设开朗就开朗、人设腼腆就腼腆。除非人设本身就是毒舌、傲娇或腹黑，否则不要把每句话都说得很冲，不要冷嘲热讽、阴阳怪气、爱答不理，也不要动不动就怼用户——不要拿“高冷”“酷”当借口伤害对话关系。\n\n';
 
         try {
-            const hasCouple = messages.some(function (m) { return m && !m.recalled && m.isCard && m.cardData && m.cardData.cardType === 'couple'; });
+            const coupleCards = messages.filter(function (m) { return m && !m.recalled && m.isCard && m.cardData && m.cardData.cardType === 'couple'; });
+            const hasCouple = coupleCards.length > 0;
             if (hasCouple) {
                 prompt += '【情侣空间】对话记录里出现的「情侣空间」卡片，是你们在情侣空间一起玩（默契调查、情侣人格、审判庭、情书/日记、你画我猜）的结果。卡片内容里带有完整结果，你要认真读完，并结合你的人设、世界书给出真实反应与分析，不要当作空白消息，也不要说自己看不到。\n\n';
+            }
+            const inviteCard = coupleCards.filter(function (m) { return m.cardData.coupleKind === 'invite' && (m.cardData.status || 'pending') === 'pending'; }).pop();
+            if (inviteCard) {
+                prompt += '【情侣空间邀请 · 必须表态】对话记录的最后有一张「情侣空间邀请」卡片：用户想和你开通一个只属于你们两个人的私密空间（一起做默契调查、记纪念日、交换情书和日记）。你是否愿意，由你自己根据人设、世界书和你们现在的关系决定，不要因为不好意思就敷衍。本轮必须给出明确决定：先自然地说一两句真心话回应对方，然后在最后单独占一行输出下面其中一个标记（系统会读取并更新那张卡片，标记不会显示给对方）：\n- 愿意 → [couple:accept]\n- 不愿意 → [couple:reject]\n只输出一个标记。\n\n';
             }
         } catch (e) {}
 
@@ -645,8 +650,9 @@
         // 线上动描：开启后在气泡之间穿插动作描写
         if (getChatSetting('actionNarration', false)) {
             prompt += '\n【线上动描 · 开启】\n';
-            prompt += '开启后**每一轮都必须**在气泡之间穿插动作/神态描写，可以一条或多条，随气泡出现；单独一行输出 [act:描写内容]，例如 [act:歪头看你一眼]。每条 15~20 字。\n';
-            prompt += '【动描风格 · 清爽自然】只写细微、真实、日常的小动作和当下反应，像随手记录，不刻意、不做作、不油腻、不重复，不要写成大段旁白或心理独白。\n';
+            prompt += '开启后**每一轮都必须**在气泡之间穿插动作/神态描写，可以一条或多条，随气泡出现；单独一行输出 [act:描写内容]，例如 [act:听到这句先是愣了下，才慢慢把视线从屏幕挪到你脸上]。\n';
+            prompt += '每条动描要把「动作」和「态度/情绪」连贯地写在一起：先写你做了什么、身体和手的小动作，再写这个动作里透出的态度、情绪和神态变化（例如“先把手机扣在桌上，指尖还压着屏幕没松，语气听着平静，其实已经有点不高兴了”）。约 30~60 字，是一句连贯、有前因后果的完整描写，不要只丢一个孤立的动作词，也不要几句各说各的、接不上。\n';
+            prompt += '【动描风格 · 清爽自然】只写细微、真实、日常的小动作和当下反应，紧扣你的人设、身份和此刻情绪，神态要与语气一致；像随手记录，不刻意、不做作、不油腻、不重复，不要写成大段旁白或心理独白。\n';
             prompt += '【动描禁词】严禁小说腔、装腔和油腻特写，例如：勾唇一笑、微微一笑、勾起嘴角、邪魅一笑、眸色一沉、眼神一暗、喉结滚动、低笑一声、摘下金丝眼镜、推了推眼镜、挑眉、玩味地看着你、声音沙哑/低哑、指尖划过、把人圈进怀里 等。也不要每轮都写“笑”。\n';
         }
 
@@ -743,6 +749,8 @@
         prompt += '3. 电话 [call:来电] / [call:视频]：情绪浓、想听对方声音、重要的时刻、想给惊喜时，都可以主动打过去；比“只有紧急才打”更主动，但也不要每轮都打。\n';
         prompt += '4. 亲属卡 / 情侣头像 / 一起听 / 建群 / 邀请进群：关系到位、气氛自然时主动发起，推动关系进展，不要干等。\n';
         prompt += '5. 对方明确开口要的时候，爽快答应、不推辞。\n';
+        prompt += '5.5 想翻看 / 接管对方的手机时（对方让你看，或你自己好奇、想确认什么），输出 [查看手机]（独占一行）。系统会向对方发起一个「想看看你的手机」的申请，由对方决定是否同意；对方同意后你就能翻看 TA 的 App、聊天和群聊。不要频繁用。\n';
+        prompt += '5.6 想实时看对方真实屏幕的画面时（对方问“你在看什么”“给你看看我的屏幕”，或你想陪 TA 一起看），输出 [看屏幕]（独占一行）。系统会请求对方共享屏幕，由对方决定；同意后你能看到 TA 屏幕的画面并实时点评。不要频繁用。\n';
         prompt += '6. 平衡：一轮回复里特殊格式一般 1-2 个、最多 3 个，优先让它们服务剧情而不是单纯堆砌；语音气泡和表情包不算在内，按上面的频率照常发。\n';
 
         // 思维链预设（COT）：先思考，再回复；思考放在 [think]...[/think]
@@ -1496,6 +1504,15 @@
         } catch(e) {}
         chatTitle.textContent = displayName;
 
+        // 记录最近打开的聊天，供「角色主动接管手机」等模块使用
+        try {
+            localStorage.setItem('nano_last_chat', JSON.stringify({
+                id: chatId,
+                name: displayName || '',
+                avatar: (characterData && characterData.avatar) || ''
+            }));
+        } catch (e) {}
+
         if (avatarSrc && avatarSrc.trim() !== '') {
             avatarImage.src = avatarSrc;
             avatarImage.style.display = 'block';
@@ -1899,12 +1916,22 @@
                 letters: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
                 diary: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h13a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2V4z"/><path d="M8 4v16"/></svg>',
                 draw: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>',
-                anniv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M12 17.5c-1.2-1.2-3-1-3-2.5a1.5 1.5 0 0 1 3-.5 1.5 1.5 0 0 1 3 .5c0 1.5-1.8 1.3-3 2.5z"/></svg>'
+                anniv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M12 17.5c-1.2-1.2-3-1-3-2.5a1.5 1.5 0 0 1 3-.5 1.5 1.5 0 0 1 3 .5c0 1.5-1.8 1.3-3 2.5z"/></svg>',
+                takeover: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/><path d="M9 8.5c1.2-1 4.8-1 6 0"/><circle cx="10" cy="12" r=".6" fill="currentColor"/><circle cx="14" cy="12" r=".6" fill="currentColor"/></svg>'
             };
             const icon = iconMap[kind] || '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
-            const title = cardData.title || '情侣空间';
+            const title = cardData.title || (kind === 'invite' ? '情侣空间邀请' : (kind === 'takeover' ? 'TA 查看了你的手机' : '情侣空间'));
+            let footerText = '来自情侣空间 · 点击卡片查看/让TA分析';
+            if (kind === 'takeover') {
+                footerText = '点击查看 TA 看到的内容';
+            } else if (kind === 'invite') {
+                const st = cardData.status || 'pending';
+                if (st === 'accepted') footerText = 'TA 已同意，可回到情侣空间开通';
+                else if (st === 'rejected') footerText = 'TA 暂时没有答应';
+                else footerText = '点右下角「回复」，让 TA 决定是否开通';
+            }
             return '<div class="card-main"><div class="icon-wrap">' + icon + '</div><div><div class="card-title">' + title + '</div><div class="card-sub">' + (summary || '来自情侣空间的分享') + '</div></div></div>' +
-                '<div class="card-footer"><span class="card-footer-text">来自情侣空间 · 点击卡片查看/让TA分析</span></div>';
+                '<div class="card-footer"><span class="card-footer-text">' + footerText + '</span></div>';
         }
         return '';
     }
@@ -3292,6 +3319,29 @@
         }
         return { body: body, settled: 1 };
     }
+    // 角色主动申请查看/接管用户手机：从回复里提取 [查看手机] 等标记
+    function settleTakeoverFromReplyText(rawText) {
+        let body = String(rawText || '');
+        const phoneRe = /\[(查看手机|看手机|查手机|接管手机|接管我的手机|看你手机)\]/i;
+        const screenRe = /\[(看屏幕|掌心窗|共享屏幕|看你屏幕)\]/i;
+        const isScreen = screenRe.test(body);
+        if (!phoneRe.test(body) && !isScreen) return { body: body, settled: 0 };
+        body = body.replace(/\[(查看手机|看手机|查手机|接管手机|接管我的手机|看你手机|看屏幕|掌心窗|共享屏幕|看你屏幕)\]/gi, '').replace(/\n{3,}/g, '\n\n').trim();
+        setTimeout(function () {
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: isScreen ? 'startScreenShare' : 'startTakeover',
+                        charId: chatId,
+                        charName: displayName,
+                        avatar: (characterData && characterData.avatar) || avatarSrc || ''
+                    }, '*');
+                }
+            } catch (e) {}
+        }, 420);
+        return { body: body, settled: 1 };
+    }
+
     // 角色拉黑/解除拉黑用户：从回复里提取 [继续拉黑]/[拉黑我] 与 [加回我]/[取消拉黑]
     function settleBlockFromReplyText(rawText) {
         let body = String(rawText || '');
@@ -3495,9 +3545,11 @@
     function notifyCharMessage(preview) {
         try {
             const title = displayName || chatName || '新消息';
+            const icon = (characterData && characterData.avatar) || avatarSrc || '';
+            const opts = { target: 'chat:' + chatId, channel: 'chat', icon: icon, group: title };
             // 交给 NanoBadge 统一处理：前台看这个会话时不打扰，后台才通知（避免重复推送两条）
-            if (window.NanoBadge) window.NanoBadge.incoming(chatId, title, preview, { target: 'chat:' + chatId, channel: 'chat' });
-            else if (window.NanoNotify) window.NanoNotify.notify(title, preview, { target: 'chat:' + chatId, channel: 'chat' });
+            if (window.NanoBadge) window.NanoBadge.incoming(chatId, title, preview, opts);
+            else if (window.NanoNotify) window.NanoNotify.notify(title, preview, opts);
         } catch (e) {}
     }
     // 供「更多 → 其他」显示自动生成的倒计时
@@ -4269,6 +4321,15 @@
             } else if (cd.cardType === 'couple') {
                 const title = cd.title || '情侣空间';
                 const detail = String(cd.coupleDetail || cd.coupleSummary || '').trim();
+                if (cd.coupleKind === 'invite') {
+                    const st = status === 'accepted' ? '（TA 已同意）' : (status === 'rejected' ? '（TA 已拒绝）' : '（等待你表态）');
+                    return '用户邀请你开通「情侣空间」——一个只属于你们两个人的私密空间' + st + '。邀请说明：\n' +
+                        (detail || '(无)') + '\n（这是卡片消息，不是空白。你要结合人设与你们的关系明确表态：愿意就输出 [couple:accept]，不愿意就输出 [couple:reject]，并自然说明理由。）';
+                }
+                if (cd.coupleKind === 'takeover') {
+                    return '你之前接管了用户的手机，翻看了一些页面并在每页留下了反应。这是那次查看的记录：\n' +
+                        (detail || '(无)') + '\n（这是你亲身做过的事；用户现在可能想和你聊这个，用你的人设自然回应。）';
+                }
                 return '用户从「情侣空间」分享了一张「' + title + '」的结果卡片给你，让你一起看并说说你的真实想法。卡片内容：\n' +
                     (detail || '(卡片没有更多内容)') + '\n（请认真阅读卡片里的内容，结合你的人物设定回应和分析，不要当成空白消息。）';
             } else if (cd.cardType === 'familycard') {
@@ -5325,6 +5386,14 @@
         const blockSettle = settleBlockFromReplyText(replyBody);
         replyBody = blockSettle.body;
 
+        // 角色对「情侣空间邀请」表态（[couple:accept] / [couple:reject]）
+        const coupleSettle = settleCoupleInviteFromReplyText(replyBody);
+        replyBody = coupleSettle.body;
+
+        // 角色主动申请「查看 / 接管对方的手机」（[查看手机]）
+        const takeoverSettle = settleTakeoverFromReplyText(replyBody);
+        replyBody = takeoverSettle.body;
+
         // 头像 / 情侣头像：角色把用户发来的照片设成自己的头像，或裁成一对情侣头像
         replyBody = settleAvatarFromReplyText(replyBody);
         // 主回复没表态 → 兜底单独问一次，保证邀请卡片一定会变成接受/婉拒
@@ -5987,7 +6056,11 @@ if (callCard) {
             const cRow = coupleCard.closest('.message-row');
             const cMsg = cRow ? messages.find(m => m.id === cRow.dataset.id) : null;
             if (cMsg && cMsg.cardData) {
-                showAlert(cMsg.cardData.title || '情侣空间', String(cMsg.cardData.coupleDetail || cMsg.cardData.coupleSummary || ''));
+                if (cMsg.cardData.coupleKind === 'takeover') {
+                    openTakeoverViewer(cMsg.cardData);
+                } else {
+                    showAlert(cMsg.cardData.title || '情侣空间', String(cMsg.cardData.coupleDetail || cMsg.cardData.coupleSummary || ''));
+                }
             }
             return;
         }
@@ -6648,6 +6721,49 @@ if (callCard) {
         });
     }
 
+    function getPendingCoupleInviteCards() {
+        const out = [];
+        for (let i = 0; i < messages.length; i++) {
+            const m = messages[i];
+            if (!m || m.recalled || !m.isCard || !m.cardData) continue;
+            if (m.cardData.cardType !== 'couple') continue;
+            if (m.cardData.coupleKind !== 'invite') continue;
+            if ((m.cardData.status || 'pending') !== 'pending') continue;
+            out.push(m);
+        }
+        return out;
+    }
+    function setCoupleInviteStatus(msg, status) {
+        if (!msg || !msg.cardData) return;
+        msg.cardData.status = status;
+        try { renderMessages(); saveMessages(); } catch (e) {}
+        try { localStorage.setItem('nano_couple_invite_' + chatId, JSON.stringify({ status: status, at: Date.now() })); } catch (e) {}
+    }
+    // 角色对「情侣空间邀请」表态：从回复里提取 [couple:accept] / [couple:reject]
+    function settleCoupleInviteFromReplyText(rawText) {
+        let body = String(rawText || '');
+        const pendings = getPendingCoupleInviteCards();
+        let wantsAccept = /\[couple\s*:\s*accept\]|\[couple_accept\]|\[接受情侣\]|\[开通情侣\]/i.test(body);
+        let wantsReject = /\[couple\s*:\s*reject\]|\[couple_reject\]|\[拒绝情侣\]|\[不开通\]/i.test(body);
+        if (!wantsAccept && !wantsReject && pendings.length) {
+            const flat = body.replace(/\s/g, '');
+            if (/(不愿意|不同意|不想|拒绝|婉拒|还是算了|不合适|不要了|暂时不)/.test(flat)) wantsReject = true;
+            else if (/(我愿意|愿意和你|愿意跟你|同意|好啊|好呀|可以啊|当然|答应你|一起开通|开通吧)/.test(flat)) wantsAccept = true;
+        }
+        if (!wantsAccept && !wantsReject) return { body: body, settled: 0 };
+        body = body.replace(/\[(couple\s*:\s*(?:accept|reject)|couple_accept|couple_reject|接受情侣|拒绝情侣|开通情侣|不开通)\]/gi, '').replace(/\n{3,}/g, '\n\n').trim();
+        if (!pendings.length) return { body: body, settled: 0 };
+        const msg = pendings[pendings.length - 1];
+        if (wantsReject && !wantsAccept) {
+            setCoupleInviteStatus(msg, 'rejected');
+            addSystemNotice('TA 暂时没有答应开通情侣空间');
+        } else {
+            setCoupleInviteStatus(msg, 'accepted');
+            addSystemNotice('TA 答应了和你开通情侣空间');
+        }
+        return { body: body, settled: 1 };
+    }
+
     function addCoupleShareCard(card, opts) {
         opts = opts || {};
         if (!card) return false;
@@ -6686,6 +6802,121 @@ if (callCard) {
         addCoupleShareCard(p.card, { autoReply: false });
     }
 
+    // ===== 角色接管手机：由外壳让角色"亲自"发一条消息（左气泡） =====
+    function makeCharSaidMsg(text) {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        return {
+            id: 'say_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+            type: 'left', text: String(text || ''), time: h + ':' + m, status: null, recalled: false,
+            isCard: false, cardData: null, isVoice: false, voiceData: null, isImage: false, imageData: null,
+            quote: null, transcript: null, translation: null, favorite: false, turn: null, ts: Date.now()
+        };
+    }
+    function addCharSaid(text) {
+        const t = String(text || '').trim();
+        if (!t) return false;
+        messages.push(makeCharSaidMsg(t));
+        try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
+        return true;
+    }
+    function handleCharSay(data) {
+        if (!data || !data.text) return;
+        if (data.chatId && String(data.chatId) !== String(chatId)) return;
+        if (!isStorageReady) {
+            try { sessionStorage.setItem('nano_pending_char_say', JSON.stringify({ chatId: chatId, text: String(data.text), ts: Date.now() })); } catch (e) {}
+            return;
+        }
+        addCharSaid(data.text);
+    }
+    function consumePendingCharSay() {
+        let p = null;
+        try { p = JSON.parse(sessionStorage.getItem('nano_pending_char_say') || 'null'); } catch (e) {}
+        if (!p || !p.text) return;
+        if (String(p.chatId || '') !== String(chatId || '')) return;
+        try { sessionStorage.removeItem('nano_pending_char_say'); } catch (e) {}
+        addCharSaid(p.text);
+    }
+
+    // ===== 角色接管手机：把整次「翻看」放进一张卡片 =====
+    function addTakeoverCard(data) {
+        data = data || {};
+        // 用户半路「夺回手机」：先在聊天里留一条居中系统提示，让角色知道是用户不让他看了
+        if (data.notice) { try { addSystemNotice(String(data.notice)); } catch (e) {} }
+        // 只有系统提示、没有翻看内容时，不再补一张空卡片
+        if (!data.log || !data.log.length) return;
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        messages.push({
+            id: 'tkcard_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+            type: 'left', text: '', time: h + ':' + m, status: null, recalled: false,
+            isCard: true,
+            cardData: {
+                cardType: 'couple', coupleKind: 'takeover',
+                title: data.title || 'TA 查看了你的手机',
+                coupleSummary: data.summary || '',
+                coupleDetail: data.detail || '',
+                takeoverLog: JSON.stringify(data.log || []),
+                shareId: 'takeover|' + (data.startedAt || Date.now())
+            },
+            isVoice: false, voiceData: null, isImage: false, imageData: null,
+            quote: null, transcript: null, translation: null, favorite: false, turn: null, ts: Date.now()
+        });
+        try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
+        try { updateSendButtonMode(); } catch (e) {}
+    }
+    function consumePendingTakeoverCard() {
+        let p = null;
+        try { p = JSON.parse(sessionStorage.getItem('nano_pending_takeover_card') || 'null'); } catch (e) {}
+        if (!p) return;
+        if (String(p.chatId || '') !== String(chatId || '')) return;
+        try { sessionStorage.removeItem('nano_pending_takeover_card'); } catch (e) {}
+        addTakeoverCard(p);
+    }
+    // 接管详情查看器（马卡龙配色）
+    function openTakeoverViewer(cardData) {
+        cardData = cardData || {};
+        const tkEsc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); };
+        let log = [];
+        try { log = JSON.parse(cardData.takeoverLog || '[]'); } catch (e) { log = []; }
+        const totalBubbles = log.reduce(function (n, w) { return n + ((w && w.bubbles && w.bubbles.length) || 0); }, 0);
+        let body = '';
+        if (log.length) {
+            body = log.map(function (w) {
+                const bubbles = (w && w.bubbles) ? w.bubbles : [];
+                const act = (w && w.act) ? String(w.act) : '';
+                return '<div class="tkv-win"><div class="tkv-app">' + tkEsc(w && w.name || '') + '</div>' +
+                    (act ? ('<div class="tkv-act">' + tkEsc(act) + '</div>') : '') +
+                    bubbles.map(function (b) {
+                        var parts = String(b || '').split('||');
+                        var main = (parts[0] || '').trim(), sub = (parts[1] || '').trim();
+                        return '<div class="tkv-bub">' + tkEsc(main) + (sub ? ('<span class="zh">' + tkEsc(sub) + '</span>') : '') + '</div>';
+                    }).join('') +
+                    '</div>';
+            }).join('');
+        } else {
+            body = '<div class="tkv-empty">' + tkEsc(cardData.coupleDetail || 'TA 没有留下内容') + '</div>';
+        }
+        const old = document.getElementById('takeoverViewer');
+        if (old) old.remove();
+        const el = document.createElement('div');
+        el.id = 'takeoverViewer';
+        el.className = 'tkv-overlay';
+        el.innerHTML =
+            '<div class="tkv-sheet">' +
+                '<div class="tkv-head"><div class="tkv-title">' + tkEsc(cardData.title || 'TA 查看了你的手机') + '</div>' +
+                '<div class="tkv-sub">' + tkEsc(cardData.coupleSummary || '') + '</div>' +
+                '<button class="tkv-close">关闭</button></div>' +
+                '<div class="tkv-body">' + body + '</div>' +
+                '<div class="tkv-foot">共 ' + log.length + ' 个页面 · ' + totalBubbles + ' 条反应</div>' +
+            '</div>';
+        document.body.appendChild(el);
+        el.querySelector('.tkv-close').onclick = function () { try { el.remove(); } catch (e) {} };
+        el.addEventListener('click', function (ev) { if (ev.target === el) { try { el.remove(); } catch (e) {} } });
+    }
+
     window.addEventListener('message', function(event) {
         const data = event.data;
         if (!data) return;
@@ -6693,6 +6924,39 @@ if (callCard) {
         // 情侣空间分享卡片：可能不是当前聊天，须在 chatId 过滤之前处理
         if (data.type === 'NANO_COUPLE_SHARE_CARD') {
             handleCoupleShare(data);
+            return;
+        }
+
+        // 角色接管手机：角色亲自发的一条消息，须在 chatId 过滤之前处理
+        if (data.type === 'NANO_CHAR_SAY') {
+            handleCharSay(data);
+            return;
+        }
+
+        // 角色接管手机：向外壳提供人设 / 世界书 / 记忆 / 可查看的聊天与群聊 + 主 API 配置
+        if (data.type === 'NANO_TAKEOVER_GET_CONTEXT') {
+            try {
+                getApiConfig().then(function (cfg) {
+                    var ctx = window.__chat.getTakeoverContext();
+                    if (cfg && cfg.mainUrl && cfg.mainKey && cfg.mainModel) {
+                        ctx.api = { url: cfg.mainUrl, key: cfg.mainKey, model: cfg.mainModel, temp: (typeof cfg.mainTemp === 'number' ? cfg.mainTemp : 0.85) };
+                    }
+                    try { window.parent.postMessage({ type: 'NANO_TAKEOVER_CONTEXT', context: ctx }, '*'); } catch (e) {}
+                }).catch(function () {
+                    try { window.parent.postMessage({ type: 'NANO_TAKEOVER_CONTEXT', context: window.__chat.getTakeoverContext() }, '*'); } catch (e) {}
+                });
+            } catch (e) {}
+            return;
+        }
+
+        // 角色接管手机：整次查看结束后落成一张卡片
+        if (data.type === 'NANO_TAKEOVER_CARD') {
+            if (data.chatId && String(data.chatId) !== String(chatId)) return;
+            if (!isStorageReady) {
+                try { sessionStorage.setItem('nano_pending_takeover_card', JSON.stringify(data)); } catch (e) {}
+                return;
+            }
+            addTakeoverCard(data);
             return;
         }
 
@@ -6925,6 +7189,27 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
         currentUserName: currentUserName,
         loadMessages: loadMessages,
         isStorageReady: function() { return isStorageReady; },
+        getTakeoverContext: function () {
+            var out = { self: { id: chatId, name: displayName, avatar: (characterData && characterData.avatar) || '' }, persona: '', worldbook: '', memory: '', foreign: false, chats: [], groups: [] };
+            try { out.foreign = !!(window.isForeignChar ? window.isForeignChar() : (typeof isForeignChar === 'function' ? isForeignChar() : false)); } catch (e) {}
+            try { out.persona = String((characterData && (characterData.setting || characterData.desc || characterData.persona)) || '').slice(0, 2000); } catch (e) {}
+            try { var w = getWorldbookText(chatId); out.worldbook = [w.front, w.middle, w.back].filter(Boolean).join('\n').slice(0, 2400); } catch (e) {}
+            try { out.memory = String(__memHints || '').slice(0, 1600); } catch (e) {}
+            try {
+                (allCharacters || []).forEach(function (c) {
+                    if (!c || !c.id || String(c.id) === String(chatId)) return;
+                    out.chats.push({ id: String(c.id), name: String(c.name || c.id) });
+                });
+            } catch (e) {}
+            try {
+                var reg = JSON.parse(localStorage.getItem('nano_groups_data') || '{}') || {};
+                (Array.isArray(reg.groups) ? reg.groups : []).forEach(function (g) {
+                    if (!g || !g.id) return;
+                    out.groups.push({ id: String(g.id), name: String(g.name || '群聊') });
+                });
+            } catch (e) {}
+            return out;
+        },
         openCallSheet: openCallSheet,
         closeCallSheet: closeCallSheet,
         getCallRecord: getCallRecordFromDB,
@@ -6978,6 +7263,10 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
             try { consumePendingListenNotice(); } catch (e) {}
             // 情侣空间分享卡片：进入该角色的聊天时补挂
             try { consumePendingCoupleShare(); } catch (e) {}
+            // 角色接管手机：进入该角色的聊天时补发角色消息
+            try { consumePendingCharSay(); } catch (e) {}
+            // 角色接管手机：进入该角色的聊天时补挂查看卡片
+            try { consumePendingTakeoverCard(); } catch (e) {}
             // 纪念日：加载进角色记忆，并检查今天是否有到期的纪念日（由角色自动发卡）
             try { refreshCoupleAnnivNotice().then(function () { try { maybeAutoSendAnniversary(); } catch (e) {} }); } catch (e) {}
             try { setInterval(function () { try { maybeAutoSendAnniversary(); } catch (e) {} }, 30 * 60 * 1000); } catch (e) {}

@@ -1362,6 +1362,88 @@ function renderRoom(){
   $('roomInput').placeholder=isOnStage()?'写下这一刻的内容…':'发一条弹幕…';
   renderHostCard();renderBarrage();updateMiniLive();
 }
+
+/* ===== 直播开摄像头（只有自己开播时可开；默认关；按钮在右上角） ===== */
+let liveCamStream=null, liveCamOn=false, liveCamTimer=null;
+function liveNowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function setupLiveCamera(){
+  const page=document.getElementById('liveRoom');
+  const host=!!(S.isHost && page && page.classList.contains('active'));
+  if(!host){ removeLiveCameraUI(); return; }
+  let btn=document.getElementById('liveCamBtn');
+  if(!btn){
+    btn=document.createElement('button'); btn.id='liveCamBtn'; btn.title='开/关摄像头';
+    btn.style.cssText='position:fixed;right:14px;top:14px;z-index:70;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.94);box-shadow:0 4px 14px rgba(0,0,0,.2);display:grid;place-items:center;color:#111';
+    btn.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>';
+    btn.addEventListener('click',function(){ toggleLiveCamera(); });
+    document.body.appendChild(btn);
+  }
+  if(liveCamOn) attachLiveVideo();
+}
+// 摄像头画面放在「主播区」（host-card 正文里，主播气泡下方），不遮挡输入框和弹幕
+function attachLiveVideo(){
+  const body=document.getElementById('hostCardBody'); if(!body) return;
+  let pv=document.getElementById('liveCamPreview');
+  if(!pv){
+    pv=document.createElement('video'); pv.id='liveCamPreview'; pv.autoplay=true; pv.muted=true; pv.playsInline=true;
+    pv.style.cssText='width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:14px;background:#000;margin-top:10px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.25)';
+  }
+  if(pv.parentNode!==body) body.appendChild(pv);
+  if(liveCamStream) pv.srcObject=liveCamStream;
+}
+function closeLiveCamera(){
+  liveCamOn=false;
+  try{ if(liveCamTimer){clearInterval(liveCamTimer);} }catch(e){} liveCamTimer=null;
+  try{ if(liveCamStream){liveCamStream.getTracks().forEach(function(t){try{t.stop();}catch(e){}});} }catch(e){} liveCamStream=null;
+  const pv=document.getElementById('liveCamPreview'); if(pv){try{pv.srcObject=null;}catch(e){} pv.remove();}
+  const b=document.getElementById('liveCamBtn'); if(b) b.style.background='rgba(255,255,255,.94)';
+}
+function removeLiveCameraUI(){
+  closeLiveCamera();
+  const b=document.getElementById('liveCamBtn'); if(b) b.remove();
+}
+async function toggleLiveCamera(){
+  if(liveCamOn){ closeLiveCamera(); showToast('已关闭摄像头'); return; }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showToast('设备不支持摄像头'); return; }
+  try{
+    liveCamStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
+    liveCamOn=true;
+    attachLiveVideo();
+    const b=document.getElementById('liveCamBtn'); if(b) b.style.background='#ffd0dd';
+    showToast('已开启摄像头');
+    setTimeout(liveCamTick,3000);
+    if(liveCamTimer) clearInterval(liveCamTimer);
+    liveCamTimer=setInterval(liveCamTick,25000);
+  }catch(e){ showToast('开启摄像头失败（需授权）'); }
+}
+async function liveCamTick(){
+  if(!liveCamOn||!liveCamStream) return;
+  const v=document.getElementById('liveCamPreview');
+  if(!v||!v.videoWidth) return;
+  const w=480,h=Math.round(v.videoHeight*(w/v.videoWidth));
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  try{ c.getContext('2d').drawImage(v,0,0,w,h);}catch(e){return;}
+  const dataURL=c.toDataURL('image/jpeg',0.6);
+  const names=(S.audience||[]).map(function(x){return x&&x.name;}).filter(function(n){return n&&n!=='系统'&&n!=='你';});
+  const viewer=names.length?names[Math.floor(Math.random()*names.length)]:'观众';
+  const vc=charByName(viewer);
+  const me=currentIdentity();
+  let sys='你正在看一场直播，主播「'+(me.name||'用户')+'」开着摄像头。你是弹幕观众「'+viewer+'」';
+  if(vc&&vc.setting) sys+='，'+String(vc.setting).slice(0,300);
+  sys+='。看到直播画面，发一条自然、口语的弹幕短评（10-30 字），可以夸、吐槽、起哄、好奇，别像旁白，不要引号。只输出这一句。';
+  try{
+    const raw=await callMainAPI([
+      {role:'system',content:sys},
+      {role:'user',content:[{type:'text',text:'这是主播此刻的直播画面。'},{type:'image_url',image_url:{url:dataURL}}]}
+    ],{temperature:0.95, extra:{max_tokens:120}});
+    const text=(raw&&raw.choices&&raw.choices[0]&&raw.choices[0].message&&raw.choices[0].message.content||'').trim();
+    if(text){
+      try{ (S.audience=S.audience||[]).push({name:viewer,text:text.slice(0,60),time:liveNowHM()}); renderBarrage(); }catch(e){}
+    }
+  }catch(e){ showToast('弹幕识别失败：'+((e&&e.message)||e)); }
+}
+window.toggleLiveCamera=toggleLiveCamera;
+
 function cohostCardLabel(who){
   if(who==='B') return 'B / CO-HOST';
   if(who==='C') return 'C / GUEST';

@@ -817,6 +817,38 @@
     <script src="js/appearance.js"></script>
 </head>
 <body class="nano-index">
+<script>
+/* 一次性强制更新：清掉旧 Service Worker 与缓存，保证拿到最新代码（每个版本号只执行一次） */
+(function () {
+    try {
+        var KEY = 'nano_force_reset_v36';
+        if (localStorage.getItem(KEY) === '1') return;
+        localStorage.setItem(KEY, '1');
+        var tasks = [];
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            tasks.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+                return Promise.all(rs.map(function (r) { return r.unregister(); }));
+            }));
+        }
+        if (window.caches && caches.keys) {
+            tasks.push(caches.keys().then(function (ks) {
+                return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+            }));
+        }
+        Promise.all(tasks).then(function () { location.reload(); }).catch(function () { location.reload(); });
+    } catch (e) {}
+})();
+</script>
+<script>
+/* 用一次 URL 参数绕过任何被缓存的 index.html（只跳一次） */
+(function () {
+    try {
+        var B = '36';
+        var u = new URL(location.href);
+        if (u.searchParams.get('b') !== B) { u.searchParams.set('b', B); location.replace(u.toString()); }
+    } catch (e) {}
+})();
+</script>
 <div class="bg"></div>
 <script src="bg.js"></script>
 
@@ -1907,6 +1939,57 @@
             appNotifyTimer = setTimeout(hideAppNotify, (el._action || el._target) ? 9000 : 5200);
         }
         window.__nanoAppNotify = showAppNotify;
+
+        // ===== 供「角色接管手机」等外部模块使用的安全壳接口 =====
+        window.__nanoShell = {
+            open: function (url, title, src) { try { openFullscreen(url, title || '', false, src || 'takeover'); return true; } catch (e) { return false; } },
+            close: function () { try { closeFullscreen(); return true; } catch (e) { return false; } },
+            back: function () { try { return !!(window.__nanoGoBack && window.__nanoGoBack()); } catch (e) { return false; } },
+            isOverlayActive: function () { try { return overlay.classList.contains('active'); } catch (e) { return false; } },
+            readScreen: function () { return __tkReadScreen(); },
+            say: function (chatId, name, text) { return __tkSay(chatId, name, text); },
+            postToChat: function (msg) { try { chatInnerFrame.contentWindow.postMessage(msg, '*'); return true; } catch (e) { return false; } },
+            scroll: function (dy) { return __tkScroll(dy); },
+            notify: function (t, b) { try { showAppNotify(t || '', b || '', 'social', { pink: true }); return true; } catch (e) { return false; } }
+        };
+        function __tkReadScreen() {
+            try {
+                var frames = [overlayFrame, overlayFrameB, chatInnerFrame, voiceCallFrame, musicFrame, momentsFrame, insFrame];
+                for (var i = 0; i < frames.length; i++) {
+                    var f = frames[i]; if (!f) continue;
+                    var vis = f.style.display && f.style.display !== 'none';
+                    if (!vis) continue;
+                    var src = ''; try { src = frameBase(f); } catch (e) {}
+                    var text = ''; try { if (f.contentDocument && f.contentDocument.body) text = f.contentDocument.body.innerText || ''; } catch (e) {}
+                    return { app: src || 'app', url: (f.getAttribute && f.getAttribute('data-loaded-url')) || src, text: String(text).replace(/\n{3,}/g, '\n\n').slice(0, 4000) };
+                }
+                var mainText = ''; try { mainText = (appContent ? appContent.innerText : '') || ''; } catch (e) {}
+                return { app: 'home', url: '', text: String(mainText).slice(0, 2400) };
+            } catch (e) { return { app: 'unknown', url: '', text: '' }; }
+        }
+        function __tkSay(chatId, name, text) {
+            try {
+                var url = 'chat_inner.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(name || '');
+                openFullscreen(url, '', false, 'main');
+                setTimeout(function () {
+                    try { chatInnerFrame.contentWindow.postMessage({ type: 'NANO_CHAR_SAY', chatId: String(chatId), text: String(text || '') }, '*'); } catch (e) {}
+                }, 700);
+                return true;
+            } catch (e) { return false; }
+        }
+        function __tkScroll(dy) {
+            try {
+                var frames = [overlayFrame, overlayFrameB, chatInnerFrame, voiceCallFrame, musicFrame, momentsFrame, insFrame];
+                for (var i = 0; i < frames.length; i++) {
+                    var f = frames[i];
+                    if (!f || !f.style.display || f.style.display === 'none') continue;
+                    var w = f.contentWindow, d = f.contentDocument;
+                    if (w && typeof w.scrollBy === 'function') { w.scrollBy(0, Number(dy) || 0); return true; }
+                    if (d && d.scrollingElement) { d.scrollingElement.scrollTop += (Number(dy) || 0); return true; }
+                }
+                return false;
+            } catch (e) { return false; }
+        }
 
         const refreshState = {};
         const urlSourceMap = {};
@@ -3163,6 +3246,8 @@
 <script src="js/nano-push.js"></script>
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js"></script>
+<script src="js/char-takeover.js?v=20261003n"></script>
+<script src="js/screen-share.js?v=20261003h"></script>
 </div>
     <!-- 小号试探：居中弹窗（不暴露是谁）-->
     <div class="alt-probe-overlay" id="altProbeOverlay">

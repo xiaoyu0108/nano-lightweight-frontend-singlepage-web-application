@@ -55,7 +55,7 @@
     }
     function isConfigured(cfg) {
         cfg = cfg || {};
-        return !!(cleanUrl(cfg.ttsUrl) && cfg.ttsKey && cfg.ttsModel);
+        return !!(cleanUrl(cfg.ttsUrl) && cfg.ttsKey && (cfg.ttsModel || cfg.ttsVoice));
     }
     function hexToBytes(hex) {
         var h = String(hex || '').replace(/[^0-9a-fA-F]/g, '');
@@ -75,7 +75,7 @@
                 model: cfg.ttsModel,
                 text: text,
                 stream: false,
-                voice_setting: { voice_id: cfg.ttsModel, speed: 1, vol: 1, pitch: 0 },
+                voice_setting: { voice_id: cfg.ttsVoice || cfg.ttsModel, speed: 1, vol: 1, pitch: 0 },
                 audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3' }
             };
             var mmResp = await fetch(mmUrl, {
@@ -185,13 +185,25 @@
         if (!t) return false;
         var cfg = await getConfig();
         if (opts.config) cfg = Object.assign({}, cfg, opts.config);
-        if (!isConfigured(cfg)) return false;
+        if (!isConfigured(cfg)) { console.warn('[TTS] 未配置：需要 地址 + Key +（音色/模型 或 声音 ID）'); return false; }
+        var blob = await synth(t, cfg);
+        return await playBlob(blob);
+    }
+
+    // 试听/诊断用：配置不完整或接口报错时直接抛错，方便在界面上看到原因
+    async function preview(text, opts) {
+        opts = opts || {};
+        var t = String(text == null ? '' : text).trim() || '这是一段语音测试。';
+        var cfg = await getConfig();
+        if (opts.config) cfg = Object.assign({}, cfg, opts.config);
+        if (!isConfigured(cfg)) throw new Error('配置不完整：需要 地址 + Key +（音色/模型 或 声音 ID）');
         var blob = await synth(t, cfg);
         return await playBlob(blob);
     }
 
     window.NanoTTS = {
         speak: function (text, opts) { return speak(text, opts).catch(function (e) { console.warn('[TTS] 失败:', e && e.message ? e.message : e); return false; }); },
+        preview: function (text, opts) { return preview(text, opts); },
         stop: stop,
         isConfigured: function (cb) {
             getConfig().then(function (cfg) { try { cb(isConfigured(cfg)); } catch (e) {} });

@@ -78,6 +78,18 @@
             icon: '<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
             color: '#32ADE6'
         },
+        {
+            id: 'takeover',
+            label: '接管手机',
+            icon: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/><path d="M9 8.5c1.2-1 4.8-1 6 0"/>',
+            color: '#FF4D94'
+        },
+        {
+            id: 'screenshare',
+            label: '看屏幕',
+            icon: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+            color: '#FFB020'
+        },
     ];
 
     // 旧版本曾加入过「接收/结束一起听」，这里移除，避免老用户菜单里残留
@@ -190,6 +202,8 @@
             if (b && b.id === 'reroll') return 1;
             return 0;
         });
+        // 接管手机 / 看屏幕：普通角色聊天才有，纳米助手不显示
+        if (IS_NANO) items = items.filter(function (it) { return it && it.id !== 'takeover' && it.id !== 'screenshare'; });
         // 纳米助手：加号菜单里加入「发送文件」
         if (IS_NANO && !items.some(function (it) { return it && it.id === 'file'; })) {
             items.push({
@@ -262,6 +276,49 @@
         input.click();
     }
 
+    // 触发外壳的「接管手机 / 看屏幕」：优先直接调用（比 postMessage 可靠），不行再发消息
+    function fireHost(kind) {
+        const info = chatCharInfo();
+        const type = kind === 'screenshare' ? 'startScreenShare' : 'startTakeover';
+        const targets = [];
+        try { if (window.parent) targets.push(window.parent); } catch (e) {}
+        try { if (window.top && window.top !== window.parent) targets.push(window.top); } catch (e) {}
+        let sawStale = false;
+        for (let i = 0; i < targets.length; i++) {
+            const t = targets[i]; if (!t) continue;
+            try {
+                if (kind === 'screenshare' && t.ScreenShare && t.ScreenShare.start) {
+                    if (!t.ScreenShare.version) { sawStale = true; continue; }
+                    t.ScreenShare.start(info); return;
+                }
+                if (kind === 'takeover' && t.CharTakeover && t.CharTakeover.start) {
+                    if (!t.CharTakeover.version) { sawStale = true; continue; }
+                    t.CharTakeover.start(info); return;
+                }
+            } catch (e) {}
+        }
+        if (sawStale) {
+            try { if (window.__chat && window.__chat.showAlert) window.__chat.showAlert('需要更新', '外壳里的接管模块还是旧版。请完全关闭 Nano 再重新打开（或清除一次站点数据）后重试。'); } catch (e) {}
+            return;
+        }
+        let posted = false;
+        for (let j = 0; j < targets.length; j++) {
+            try { targets[j].postMessage({ type: type, charId: info.id, charName: info.name, avatar: info.avatar }, '*'); posted = true; } catch (e) {}
+        }
+        if (!posted) {
+            try { if (window.__chat && window.__chat.showAlert) window.__chat.showAlert('用不了', '接管模块没连上，请刷新 Nano 后重试。'); } catch (e) {}
+        }
+    }
+
+    // 当前聊天角色信息（供接管手机 / 看屏幕用）
+    function chatCharInfo() {
+        const info = { id: '', name: '', avatar: '' };
+        try { const sp = new URLSearchParams(window.location.search); info.id = sp.get('chat') || ''; info.name = decodeURIComponent(sp.get('name') || ''); } catch (e) {}
+        try { if (window.__chat && window.__chat.displayName) info.name = window.__chat.displayName; } catch (e) {}
+        try { const av = document.getElementById('avatarImage'); if (av && av.src && av.src.indexOf('data:') === 0) info.avatar = av.src; } catch (e) {}
+        return info;
+    }
+
     // ===== 处理动作 =====
     function handleAction(action) {
         moreOverlay.classList.remove('active');
@@ -272,6 +329,12 @@
                 break;
             case 'file':
                 pickFileForNano();
+                break;
+            case 'takeover':
+                fireHost('takeover');
+                break;
+            case 'screenshare':
+                fireHost('screenshare');
                 break;
             case 'transfer':
                 document.getElementById('transferAmount').value = '';

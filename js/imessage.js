@@ -386,9 +386,10 @@ function startPendingWatch() {
     }
   }, 1500);
 }
-function notifyApp(title, body) {
+function notifyApp(title, body, opts) {
+  opts = opts || {};
   // 真实后台通知（ServiceWorker / Bark），再兜底应用内通知条
-  try { if (window.NanoNotify) { if (NanoNotify.ensurePermission) NanoNotify.ensurePermission(); NanoNotify.notify(title, body, { target: 'imessage', channel: 'chat' }); } } catch (e) {}
+  try { if (window.NanoNotify) { if (NanoNotify.ensurePermission) NanoNotify.ensurePermission(); NanoNotify.notify(title, body, Object.assign({ target: 'imessage', channel: 'chat' }, opts)); } } catch (e) {}
   try { if (window.parent !== window) window.parent.postMessage({ type: 'appNotify', title: title, body: body, app: 'imessage' }, '*'); } catch (e) {}
 }
 function extractContent(data) {
@@ -995,6 +996,23 @@ async function genAliasReply(c) {
   return { raw: body, bubbles: splitBubbles(body) };
 }
 async function genStrangerReply(c) {
+  // 角色小号：表面上以陌生身份「c.name」聊天，内心遵循本人设定（不让用户发现）
+  if (c.altOf) {
+    const ch = state.chars.find(x => x.id === c.altOf) || { id: c.altOf, name: c.name };
+    const u = readCurrentUser() || {};
+    const userName = u.name || '用户';
+    const ctx = await charContextText(ch, c.history);
+    let sys = '你其实是「' + (ch.name || '角色') + '」本人，用网名「' + c.name + '」的小号在 iMessage 里接近并试探「' + userName + '」，' + userName + ' 不知道小号是你。\n';
+    if (c.setting) sys += '小号的公开身份 / 简介：' + c.setting + '。\n';
+    sys += '以「' + c.name + '」这个陌生身份说话，但你的说话方式、性格、内心与目的都遵循你本人设定；绝对不能暴露你就是' + (ch.name || '角色') + '。\n';
+    sys += '可以有试探意味（打听 TA 的感情、平时和谁聊天、是不是一个人等），但别太露骨。\n';
+    sys += ctx;
+    sys += '拆成 1-3 条短消息、每条独立成行（每条约 5-30 字），不要输出多余说明。';
+    const history = [{ role: 'system', content: sys }].concat(historyForApi(16, c.history));
+    const raw = await callApi(history, { maxTokens: 360, temperature: 0.95 }, { kind: 'reply', chatId: c.id });
+    if (!raw) return null;
+    return { raw: String(raw), bubbles: splitBubbles(raw) };
+  }
   const setting = c.setting || '';
   const u = readCurrentUser() || {};
   const userName = u.name || '用户';
@@ -1103,7 +1121,7 @@ async function applyRefreshRaw(raw, picks) {
     const last = chat.history[chat.history.length - 1];
     chat.preview = last.text; chat.lastTime = last.time; chat.sortTime = last.ts; chat.unread = (chat.unread || 0) + msgs.length;
     await saveChat(chat);
-    notifyApp(ch.name, msgs[0].text || lines[0]); charNotified = true;
+    notifyApp(ch.name, msgs[0].text || lines[0], { icon: ch.avatar, group: ch.name }); charNotified = true;
     added++;
     try { maybeSummarize(ch.id, ch.name, chat.history); } catch (e) {}
   }
@@ -1112,6 +1130,55 @@ async function applyRefreshRaw(raw, picks) {
   renderList();
   return added;
 }
+/* ---------------- 小号试探：刷新时随机来一条「角色小号」的搭话 ---------------- */
+async function maybeAltProbe() {
+  try {
+    if (localStorage.getItem('nano_imessage_altprobe') === '0') return 0;
+    const last = parseInt(localStorage.getItem('nano_imessage_altprobe_at') || '0', 10) || 0;
+    if (Date.now() - last < 6 * 3600 * 1000) return 0;      // 6 小时最多一次
+    if (Math.random() > 0.5) return 0;                       // 约一半概率出现
+    const pool = state.chars.filter(c => c && c.id && !/^alt_/.test(c.id) && !c.isAltProbe && !isAssistantChar(c));
+    if (!pool.length) return 0;
+    const ch = pool[Math.floor(Math.random() * pool.length)];
+    const u = readCurrentUser() || {};
+    const userName = u.name || '用户';
+    const ctx = await charContextText(ch, []);
+    const sys = '你是「' + ch.name + '」本人。你现在注册了一个小号，想用一个「陌生人 / 新朋友」的身份在 iMessage 里接近并试探「' + userName + '」，' + userName + ' 完全不知道这个小号是你本人。\n' +
+      '要求：\n' +
+      '1. 起一个真实的网络昵称（姓名或网名都行，禁止用「小号 / 陌生人 / 新朋友」这类词当名字）。\n' +
+      '2. 写一句小号的公开简介 / 身份（为什么加 TA，如「同城摄影」「朋友介绍」「旧同学换号」，要合理）。\n' +
+      '3. 写 1-2 条发给 TA 的开场消息：自然、像真人搭话，能勾住 TA 回应、忍不住多聊；可以带一点试探意味（问 TA 有没有对象、平时和谁聊天、是不是一个人），但不要一上来就露骨，也不要暴露你就是' + ch.name + '。\n' +
+      '4. 你内心与行为逻辑仍遵循本人设定。\n' +
+      '只输出 JSON：{"name":"网名","bio":"简介","messages":["第一条","第二条"]}\n' +
+      ctx;
+    const raw = await callApi([{ role: 'system', content: sys }, { role: 'user', content: '（生成小号与开场消息）' }], { maxTokens: 420, temperature: 1.0 });
+    if (!raw) return 0;
+    const o = extractJsonObj(raw);
+    const name = o && o.name ? String(o.name).replace(/[<>]/g, '').slice(0, 16) : '';
+    const bio = o && o.bio ? String(o.bio).slice(0, 40) : '';
+    const msgs = (o && Array.isArray(o.messages)) ? o.messages.map(s => String(s || '').trim()).filter(Boolean).slice(0, 2) : [];
+    if (!name || !msgs.length) return 0;
+    const lines = await ensureTranslatedLines(ch, msgs);
+    let chat = state.chats.find(x => x && x.altOf === ch.id);
+    if (!chat) {
+      chat = { id: 'alt:' + ch.id, kind: 'stranger', name: name, setting: bio, avatar: '', altOf: ch.id, isAlt: true, history: [], preview: '', lastTime: nowHHMM(), sortTime: Date.now(), unread: 0 };
+      state.chats.push(chat);
+    } else { chat.name = name; chat.setting = bio; }
+    const list = bubblesToMessages(lines, 'stranger');
+    if (!list.length) return 0;
+    chat.history = chat.history || [];
+    list.forEach(m => chat.history.push(m));
+    const lastM = chat.history[chat.history.length - 1];
+    chat.preview = lastM.text; chat.lastTime = lastM.time; chat.sortTime = lastM.ts; chat.unread = (chat.unread || 0) + list.length;
+    await saveChat(chat);
+    localStorage.setItem('nano_imessage_altprobe_at', String(Date.now()));
+    notifyApp(name, list[0].text || lines[0], { group: name });
+    if (state.current && state.current.id === chat.id) { state.messages = chat.history; renderMessages(); renderBanner(chat); }
+    else renderList();
+    return list.length;
+  } catch (e) { return 0; }
+}
+
 async function proactiveCharText(ch, isBlocked, msgs) {
   const userName = (readCurrentUser() || {}).name || '用户';
   const ctx = await charContextText(ch, msgs || []);
@@ -1187,7 +1254,10 @@ async function refreshStrangers() {
     raw = await callApi(req.history, { maxTokens: 1000, temperature: 0.9 }, { kind: 'refresh', extra: { picks: req.picks } });
     if (!raw) { showRefreshError(lastApiError || '接口没有返回内容'); return; }
     const added = await applyRefreshRaw(raw, req.picks);
-    toastMsg(added ? ('收到 ' + added + ' 条新消息') : '暂时没有新消息（可重试或检查 API）');
+    let altAdded = 0;
+    try { altAdded = await maybeAltProbe(); } catch (e) {}
+    const total = added + altAdded;
+    toastMsg(total ? ('收到 ' + total + ' 条新消息') : '暂时没有新消息（可重试或检查 API）');
   } catch (e) {
     showRefreshError('刷新出错：' + ((e && e.message) || e));
   } finally { setBusy(''); }

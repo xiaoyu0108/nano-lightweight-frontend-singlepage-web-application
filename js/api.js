@@ -242,6 +242,7 @@
             ttsUrl: normUrl((document.getElementById('ttsUrl') || {}).value),
             ttsKey: (document.getElementById('ttsKey') || {}).value || '',
             ttsGroupId: (document.getElementById('ttsGroupId') || {}).value || '',
+            ttsVoice: (document.getElementById('ttsVoice') || {}).value || '',
             ttsType: (document.getElementById('ttsType') || {}).value || 'openai',
             ttsPreset: (document.getElementById('ttsPreset') || {}).value || '',
             ttsModel: (document.getElementById('ttsModelSelect') || {}).value || '',
@@ -255,25 +256,55 @@
         await saveModelList('ttsModelSelect');
     }
 
+    // TTS：按接口类型切换默认地址 / 显隐 GroupId / 拉取按钮文案
+    function applyTtsTypeUI(type, forceUrl) {
+        type = type || 'openai';
+        var urlEl = document.getElementById('ttsUrl');
+        var groupWrap = document.getElementById('ttsGroupWrap');
+        var fetchBtn = document.getElementById('ttsFetch');
+        var defUrl = {
+            openai: 'https://api.openai.com/v1',
+            minimax: 'https://api.minimax.chat/v1',
+            fishaudio: 'https://api.fish.audio',
+            custom: ''
+        }[type] || '';
+        var ph = {
+            openai: 'https://api.openai.com/v1',
+            minimax: 'https://api.minimax.chat/v1',
+            fishaudio: 'https://api.fish.audio',
+            custom: 'https://api.example.com/v1'
+        }[type] || 'https://api.example.com/v1';
+        if (urlEl) {
+            var cur = (urlEl.value || '').trim();
+            var isDefault = /^https?:\/\/(api\.openai\.com|api\.fish\.audio|api\.minimax\.chat|api\.minimaxi\.com)/i.test(cur);
+            urlEl.placeholder = ph;
+            if (defUrl && (forceUrl || !cur || isDefault)) urlEl.value = defUrl;
+        }
+        if (groupWrap) groupWrap.style.display = (type === 'minimax') ? '' : 'none';
+        if (fetchBtn) {
+            var label = (type === 'minimax') ? '拉取音色' : '拉取模型';
+            fetchBtn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> ' + label;
+        }
+    }
+
     async function loadAllFromStorage() {
         var data = await getData(CONFIG_KEY, null);
-        if (!data) return;
+        if (!data) {
+            var tsel0 = document.getElementById('ttsType');
+            applyTtsTypeUI(tsel0 ? tsel0.value : 'openai', false);
+            return;
+        }
 
         function setVal(id, val) { var el = document.getElementById(id); if (el && val !== undefined && val !== null) el.value = val; }
         setVal('mainUrl', data.mainUrl); setVal('mainKey', data.mainKey); setVal('mainPreset', data.mainPreset); setVal('mainModelSelect', data.mainModel);
         setVal('subUrl', data.subUrl); setVal('subKey', data.subKey); setVal('subPreset', data.subPreset); setVal('subModelSelect', data.subModel);
         setVal('imgUrl', data.imgUrl); setVal('imgKey', data.imgKey); setVal('imgPreset', data.imgPreset); setVal('imgModelSelect', data.imgModel);
         setVal('ttsUrl', data.ttsUrl); setVal('ttsKey', data.ttsKey); setVal('ttsGroupId', data.ttsGroupId);
+        setVal('ttsVoice', data.ttsVoice);
         setVal('ttsType', data.ttsType); setVal('ttsPreset', data.ttsPreset); setVal('ttsModelSelect', data.ttsModel);
 
-        // 内置连接样式：Fish Audio 官方地址
-        if (data.ttsType === 'fishaudio') {
-            var ttsUrlEl = document.getElementById('ttsUrl');
-            if (ttsUrlEl) {
-                ttsUrlEl.placeholder = 'https://api.fish.audio';
-                if (!ttsUrlEl.value.trim()) ttsUrlEl.value = 'https://api.fish.audio';
-            }
-        }
+        // 按接口类型应用默认地址 / 显隐 GroupId / 拉取按钮文案
+        applyTtsTypeUI(data.ttsType || 'openai', false);
 
         ['main', 'sub', 'img'].forEach(function (p) {
             var t = data[p + 'Temp'];
@@ -854,18 +885,11 @@
             }
         });
 
-        // 内置连接样式：选择 Fish Audio 时自动填入官方地址
+        // 切换接口类型：自动切换默认地址、显隐 GroupId、更新拉取按钮文案
         var ttsTypeSel = document.getElementById('ttsType');
         if (ttsTypeSel) {
             ttsTypeSel.addEventListener('change', function () {
-                var urlEl = document.getElementById('ttsUrl');
-                if (!urlEl) return;
-                if (this.value === 'fishaudio') {
-                    urlEl.placeholder = 'https://api.fish.audio';
-                    if (!urlEl.value.trim()) urlEl.value = 'https://api.fish.audio';
-                } else {
-                    urlEl.placeholder = 'https://api.example.com/v1';
-                }
+                applyTtsTypeUI(this.value, true);
                 saveAllToStorage();
             });
         }
@@ -922,6 +946,30 @@
         setupSave('imgSave', 'img_', 'imgPreset', 'imgUrl', 'imgKey', 'imgModelSelect');
         setupSave('ttsSave', 'tts_', 'ttsPreset', 'ttsUrl', 'ttsKey', 'ttsModelSelect', function () {
             return { groupId: document.getElementById('ttsGroupId').value, type: document.getElementById('ttsType').value };
+        });
+
+        // 试听 TTS：直接用当前表单里的配置，不必先保存
+        var ttsTestBtn = document.getElementById('ttsTest');
+        if (ttsTestBtn) ttsTestBtn.addEventListener('click', async function () {
+            var cfg = {
+                ttsUrl: (document.getElementById('ttsUrl') || {}).value || '',
+                ttsKey: (document.getElementById('ttsKey') || {}).value || '',
+                ttsModel: (document.getElementById('ttsModelSelect') || {}).value || '',
+                ttsVoice: (document.getElementById('ttsVoice') || {}).value || '',
+                ttsGroupId: (document.getElementById('ttsGroupId') || {}).value || '',
+                ttsType: (document.getElementById('ttsType') || {}).value || 'openai'
+            };
+            if (!cfg.ttsUrl || !cfg.ttsKey || (!cfg.ttsModel && !cfg.ttsVoice)) {
+                showModal('配置不完整：请填写 地址、Key，以及 音色/模型（或声音 ID）。');
+                return;
+            }
+            if (!window.NanoTTS || !window.NanoTTS.preview) { showModal('TTS 模块未加载'); return; }
+            try {
+                await window.NanoTTS.preview('你好，这是一段语音测试。', { config: cfg });
+                showModal('试听成功。如果没听到声音，请检查浏览器是否拦截了自动播放。');
+            } catch (e) {
+                showModal('TTS 失败：' + ((e && e.message) ? e.message : e));
+            }
         });
 
         // 提示词预设

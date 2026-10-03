@@ -2397,7 +2397,7 @@ document.getElementById("chatExport").onclick = () => exportBeautifyPreset("chat
 /* ============================================================
    字体功能
    ============================================================ */
-let fontState = { name: "", source: "", type: "", data: null, size: 16 };
+let fontState = { name: "", source: "", type: "", data: null, size: 16, cssFamily: "", cssText: "" };
 let localURL = null;
 
 // ---- 字体配置：序列化后让所有 Nano 页面共享（含文件 base64 / 远程 url） ----
@@ -2424,6 +2424,94 @@ function ensureLocalFontFace(family, src, format) {
     st.textContent = '@font-face{font-family:"' + family + '";src:url("' +
       String(src).replace(/"/g, '\\"') + '")' + fmt + ';font-display:swap;}';
   } catch (e) {}
+}
+
+// ---- URL 字体：类型识别 / 校验 / 报错弹窗 ----
+function isFontFileUrl(u) {
+  return /\.(ttf|otf|tof|woff2?|ttc|eot|otc)(?:$|[?#])/i.test(String(u || ""));
+}
+function firstFamilyInCss(css) {
+  try {
+    const re = /font-family\s*:\s*([^;{}]+)[;}]/gi;
+    let m, list = [];
+    while ((m = re.exec(String(css || "")))) {
+      const f = String(m[1]).split(",")[0].replace(/["']/g, "").trim();
+      if (f && !/^(inherit|initial|unset|sans-serif|serif|monospace|system-ui)$/i.test(f)) list.push(f);
+    }
+    return list[0] || "";
+  } catch (e) { return ""; }
+}
+// 真正校验字体是否加载成功；加载不到就返回 false，绝不假装成功
+function verifyFontLoaded(family, ms) {
+  return new Promise(function (resolve) {
+    let settled = false;
+    const finish = function (v) { if (settled) return; settled = true; resolve(v); };
+    try {
+      if (!document.fonts || !document.fonts.load) { finish(true); return; }
+      document.fonts.load('16px "' + String(family).replace(/"/g, "") + '"').then(function (faces) {
+        finish(!!(faces && faces.length));
+      }, function () { finish(false); });
+      setTimeout(function () { finish(false); }, ms || 9000);
+    } catch (e) { finish(false); }
+  });
+}
+function injectStyleCss(id, css) {
+  try {
+    let st = document.getElementById(id);
+    if (!st) { st = document.createElement("style"); st.id = id; (document.head || document.documentElement).appendChild(st); }
+    st.textContent = css || "";
+    return true;
+  } catch (e) { return false; }
+}
+function loadStylesheetLink(url) {
+  return new Promise(function (resolve) {
+    try {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = url;
+      let done = false;
+      const finish = function (ok) { if (done) return; done = true; resolve(ok); };
+      link.onload = function () { finish(true); };
+      link.onerror = function () { finish(false); };
+      (document.head || document.documentElement).appendChild(link);
+      setTimeout(function () { finish(false); }, 12000);
+    } catch (e) { resolve(false); }
+  });
+}
+// 跨域 CSS 拿不到规则时，用 document.fonts 里“新出现的字体族”来识别
+async function detectCssFamilyByLink(url) {
+  const before = {};
+  try {
+    if (document.fonts && document.fonts.forEach) document.fonts.forEach(function (f) { before[f.family] = 1; });
+    else if (document.fonts) Array.prototype.forEach.call(document.fonts, function (f) { before[f.family] = 1; });
+  } catch (e) {}
+  const ok = await loadStylesheetLink(url);
+  if (!ok) throw new Error("字体 CSS 无法加载（网络或跨域被拦截）");
+  const fams = [];
+  try {
+    if (document.fonts && document.fonts.forEach) document.fonts.forEach(function (f) { if (!before[f.family]) fams.push(f.family); });
+    else if (document.fonts) Array.prototype.forEach.call(document.fonts, function (f) { if (!before[f.family]) fams.push(f.family); });
+  } catch (e) {}
+  return fams[0] || "";
+}
+function fontAlert(title, msg) {
+  try {
+    const old = document.getElementById("fontAlertBox");
+    if (old) old.remove();
+    const ov = document.createElement("div");
+    ov.id = "fontAlertBox";
+    ov.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:24px;";
+    ov.innerHTML =
+      '<div style="width:min(86vw,320px);max-width:320px;background:#fff;border-radius:18px;padding:20px 18px 14px;box-shadow:0 18px 50px rgba(0,0,0,.28);font-family:-apple-system,BlinkMacSystemFont,\'PingFang SC\',sans-serif;">' +
+        '<div style="font-size:16px;font-weight:700;color:#1c1c1e;margin-bottom:8px;">' + escapeHtmlFont(title || "提示") + '</div>' +
+        '<div style="font-size:13px;line-height:1.6;color:#3a3a3c;word-break:break-all;white-space:pre-wrap;max-height:42vh;overflow:auto;">' + escapeHtmlFont(msg || "") + '</div>' +
+        '<button id="fontAlertOk" style="margin-top:16px;width:100%;height:42px;border:0;border-radius:12px;background:#007aff;color:#fff;font-size:15px;font-weight:600;">知道了</button>' +
+      '</div>';
+    document.body.appendChild(ov);
+    const close = function () { try { ov.remove(); } catch (e) {} };
+    const okb = ov.querySelector("#fontAlertOk"); if (okb) okb.onclick = close;
+    ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
+  } catch (e) { try { alert((title || "") + "\n" + (msg || "")); } catch (e2) {} }
 }
 
 // 读取远程字体：
@@ -2526,6 +2614,8 @@ function buildFontConfig() {
     // ArrayBuffer 可被 postMessage 结构化克隆传给各页面，避免 localStorage 超配额
     cfg.data = fontState.data;
   }
+  if (fontState.cssFamily) cfg.cssFamily = fontState.cssFamily;
+  if (fontState.cssText) cfg.cssText = fontState.cssText;
   return cfg;
 }
 
@@ -2579,7 +2669,7 @@ document.getElementById("fontFile").onchange = async e => {
   if (!f) return;
   try {
     const data = await f.arrayBuffer();
-    fontState = { name: f.name, source: f.name, type: "file", data, size: fontState.size || 16 };
+    fontState = { name: f.name, source: f.name, type: "file", data, size: fontState.size || 16, cssFamily: "", cssText: "" };
     if (localURL) URL.revokeObjectURL(localURL);
     localURL = URL.createObjectURL(new Blob([data]));
     const face = new FontFace("NanoLocalFont", 'url("' + localURL + '")');
@@ -2600,21 +2690,25 @@ document.getElementById("fontFile").onchange = async e => {
 // ---- URL字体 ----
 document.getElementById("urlApply").onclick = async () => {
   const url = document.getElementById("fontUrl").value.trim();
-  if (!url) return toast("请输入字体 URL");
-  if (!/^(https?:|data:)/i.test(url)) return toast("请输入 http(s) 开头的字体链接");
-  const niceName = ((/fonts\.googleapis\.com/i.test(url) ? googleFontFamily(url) : "") || (url.split("/").pop() || "远程字体")).split("?")[0] || "远程字体";
-  fontState = { name: niceName, source: url, type: "url", data: null, size: fontState.size || 16 };
-
-  // 立即注册并广播：所有页面都会通过 @font-face / <link> 各自加载。
-  // 不再依赖 JS fetch，可绕开「能加载的直链被 fetch 跨域拦截」的问题。
-  try { localStorage.setItem("beautify_font_pending", url); } catch (e) {}
-  await applyRemoteFont(url);
-  await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
-  try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
-  document.getElementById("filename").textContent = "已应用远程字体";
-  document.getElementById("fontMeta").textContent = "当前字体：" + url;
-  renderFontQuickBar();
-  toast("已应用；若未生效，请换支持外链的字体直链（如 jsDelivr）");
+  if (!url) return fontAlert("字体连接失败", "请输入字体链接（字体文件直链，或 Google Fonts / 字体 CSS 链接）");
+  try {
+    const prepared = await prepareRemoteFont(url);
+    const niceName = (prepared.cssFamily || googleFontFamily(url) || (url.split("/").pop() || "远程字体")).split("?")[0] || "远程字体";
+    fontState = { name: niceName, source: url, type: "url", data: null, size: fontState.size || 16, cssFamily: prepared.cssFamily || "", cssText: prepared.cssText || "" };
+    try { localStorage.setItem("beautify_font_pending", url); } catch (e) {}
+    await applyRemoteFont(url, fontState.cssFamily, fontState.cssText);
+    await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
+    try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
+    document.getElementById("filename").textContent = "已应用远程字体";
+    document.getElementById("fontMeta").textContent = "当前字体：" + (fontState.name || url);
+    renderFontQuickBar();
+    toast("字体连接成功，已应用");
+  } catch (err) {
+    console.error("[font] 远程字体连接失败:", err);
+    try { localStorage.removeItem("beautify_font_pending"); } catch (e) {}
+    fontAlert("字体连接失败", (err && err.message ? err.message : String(err)) +
+      "\n\n支持的链接：\n· 字体文件直链：.ttf / .otf / .woff / .woff2\n· Google Fonts 的 CSS 链接\n· 其它 @font-face 字体 CSS 链接\n· 也可直接粘贴 @font-face CSS");
+  }
 };
 
 // ---- 字体预设 ----
@@ -2667,27 +2761,64 @@ function injectGoogleFontLink(url) {
   } catch (e) {}
 }
 
-// 应用远程字体：优先「浏览器自身加载」路径，不再依赖 JS fetch（避免把可用的直链误判为跨域失败）
-async function applyRemoteFont(url) {
-  const u = String(url || "").trim();
-  if (!u) return;
-  if (/fonts\.googleapis\.com\/css/i.test(u)) {
-    const fam = googleFontFamily(u);
-    if (fam) {
-      injectGoogleFontLink(u);
-      applyFontToPage(fam);
-      return;
-    }
+// 识别链接类型，返回 { cssFamily, cssText }：
+//   · 直链字体 / data: → 两者皆空
+//   · Google Fonts、字体 CSS 链接 → cssFamily
+//   · 直接粘贴的 @font-face CSS → cssFamily + cssText
+async function prepareRemoteFont(rawUrl) {
+  const u = String(rawUrl || "").trim();
+  if (!u) throw new Error("请输入字体链接");
+  // 直接粘贴 @font-face CSS
+  if (/@font-face/i.test(u) || (/\{/.test(u) && /font-family\s*:/i.test(u))) {
+    const fam0 = firstFamilyInCss(u);
+    if (!fam0) throw new Error("无法从粘贴的 CSS 中识别字体名称");
+    return { cssFamily: fam0, cssText: u };
   }
-  // 直链字体：先注入 @font-face 让浏览器自己加载（不受 JS fetch 的 CORS 影响）
-  ensureLocalFontFace("NanoRemoteFont", u, fontFormatFor(u));
-  applyFontToPage("NanoRemoteFont");
-  // 后台再尽力用 FontFace 注册一次，提升成功率（失败也不影响已注入的 @font-face）
-  try {
-    await loadRemoteFontFace("NanoRemoteFont", u);
-    applyFontToPage("NanoRemoteFont");
-  } catch (e) {
-    console.warn("[font] FontFace 预加载失败，继续使用 @font-face：", e);
+  if (/^data:/i.test(u)) return { cssFamily: "", cssText: "" };
+  if (!/^https?:/i.test(u)) throw new Error("请输入 http(s) 或 data: 开头的字体链接，也可直接粘贴 @font-face CSS");
+  // CSS 样式表链接（Google Fonts / 其它字体 CSS）
+  if (!isFontFileUrl(u) && (/fonts\.googleapis\.com/i.test(u) || /\.css(?:[?#]|$)/i.test(u))) {
+    let cssText = "";
+    try {
+      cssText = await nanoFontTimeout(fetch(u, { mode: "cors", credentials: "omit" }).then(r => r.text()), 12000, "读取字体 CSS");
+    } catch (e) {}
+    let fam = googleFontFamily(u) || firstFamilyInCss(cssText);
+    if (!fam) {
+      try { fam = await detectCssFamilyByLink(u); } catch (e) {}
+    }
+    if (!fam) throw new Error("无法识别该 CSS 链接里的字体名称（可改用字体文件直链）");
+    return { cssFamily: fam, cssText: "" };
+  }
+  return { cssFamily: "", cssText: "" };
+}
+
+// 应用远程字体：真正校验是否加载成功，失败则抛出错误（由调用方弹窗）
+async function applyRemoteFont(url, cssFamily, cssText) {
+  const u = String(url || "").trim();
+  const fam = String(cssFamily || "").trim();
+  // 1) CSS 字体：外链样式表 或 粘贴的 @font-face CSS
+  if (fam) {
+    if (cssText) injectStyleCss("nano-font-raw-css", cssText);
+    else if (u) {
+      const linked = await loadStylesheetLink(u);
+      if (!linked) throw new Error("字体 CSS 无法加载（网络或跨域被拦截）");
+    }
+    const okCss = await verifyFontLoaded(fam, 9000);
+    if (!okCss) throw new Error("已读到字体 CSS，但字体文件没有加载成功（多为字体服务器未开放跨域）");
+    applyFontToPage('"' + fam.replace(/"/g, "") + '"');
+    return;
+  }
+  // 2) 直链字体文件（含 data: 与无扩展名 CDN 直链）
+  if (!u) throw new Error("字体链接为空");
+  const uniq = "NanoRemoteFont" + Math.random().toString(36).slice(2, 6);
+  ensureLocalFontFace(uniq, u, fontFormatFor(u));
+  applyFontToPage(uniq);
+  if (await verifyFontLoaded(uniq, 9000)) return;
+  // 3) 代理 / FontFace 兜底
+  await loadRemoteFontFace(uniq, u);
+  applyFontToPage(uniq);
+  if (!(await verifyFontLoaded(uniq, 6000))) {
+    throw new Error("字体已下载但无法解析，请确认是有效的字体文件（.ttf/.otf/.woff/.woff2）");
   }
 }
 
@@ -2708,7 +2839,9 @@ async function applyFontPresetById(id) {
     source: found.font.source || "",
     type: found.font.type || "",
     data: found.font.data || null,
-    size: found.font.size || 16
+    size: found.font.size || 16,
+    cssFamily: found.font.cssFamily || "",
+    cssText: found.font.cssText || ""
   };
   document.getElementById("fontName").value = found.name || "";
   document.getElementById("filename").textContent = fontState.source || "已加载";
@@ -2724,8 +2857,8 @@ async function applyFontPresetById(id) {
       await face.load();
       document.fonts.add(face);
       applyFontToPage("NanoLocalFont");
-    } else if (fontState.type === "url" && fontState.source) {
-      await applyRemoteFont(fontState.source);
+    } else if (fontState.type === "url" && (fontState.source || fontState.cssText)) {
+      await applyRemoteFont(fontState.source, fontState.cssFamily, fontState.cssText);
     }
     await storePut("settings", { key: "appliedFont", value: fontState }).catch(() => {});
     persistDraft("font");
@@ -2735,7 +2868,7 @@ async function applyFontPresetById(id) {
     return true;
   } catch (e) {
     console.error(e);
-    toast("字体加载失败，请检查文件或URL");
+    fontAlert("字体加载失败", (e && e.message ? e.message : String(e)) || "请检查字体文件或 URL");
     return false;
   }
 }
@@ -2767,7 +2900,7 @@ document.getElementById("fontPresetBar").addEventListener("click", e => {
 
 // 还原系统字体：清空已应用字体并通知所有页面
 function restoreSystemFont(msg) {
-  fontState = { name: "", source: "", type: "", data: null, size: fontState.size || 16 };
+  fontState = { name: "", source: "", type: "", data: null, size: fontState.size || 16, cssFamily: "", cssText: "" };
   const u = document.getElementById("fontUrl"); if (u) u.value = "";
   const fn = document.getElementById("fontName"); if (fn) fn.value = "";
   systemFont();
@@ -2837,8 +2970,8 @@ document.getElementById("fontApply").onclick = async () => {
       await face.load();
       document.fonts.add(face);
       applyFontToPage("NanoLocalFont");
-    } else if (fontState.type === "url" && fontState.source) {
-      await applyRemoteFont(fontState.source);
+    } else if (fontState.type === "url" && (fontState.source || fontState.cssText)) {
+      await applyRemoteFont(fontState.source, fontState.cssFamily, fontState.cssText);
     } else {
       return toast("字体数据无效");
     }
@@ -2847,7 +2980,7 @@ document.getElementById("fontApply").onclick = async () => {
     toast("字体已应用 ✓");
   } catch (e) {
     console.error(e);
-    toast("字体应用失败");
+    fontAlert("字体应用失败", (e && e.message ? e.message : String(e)) || "请重新连接字体");
   }
 };
 

@@ -442,24 +442,56 @@
         return out;
     }
 
-    function buildFontCss(cfg) {
-        if (!cfg) return '';
-        var cands = fontSrcCandidates(cfg);
-        if (!cands.length) return '';
-        var family = 'NanoBeautifyFont';
-        var size = (cfg.size && cfg.size > 0) ? cfg.size : 16;
-        var stack = '"' + family + '",-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue","PingFang SC",Arial,sans-serif';
-        var srcPart = cands.map(function (c) {
-            return 'url("' + c.url + '")' + (c.format ? ' format("' + c.format + '")' : '');
-        }).join(',');
-        // 全站强制字体：除图标(i / svg / .fa-* 图标元素)外所有元素都换字体。
-        // 用 :root * 提高优先级，确保能覆盖各页面类选择器自带的 font-family（含 !important）。
-        return '@font-face{font-family:"' + family + '";src:' + srcPart + ';font-display:swap;}' +
-            'html,body{font-family:' + stack + ' !important;}' +
+    // 全站强制字体：除图标(i / svg / .fa-* 图标元素)外所有元素都换字体。
+    // 用 :root * 提高优先级，确保能覆盖各页面类选择器自带的 font-family（含 !important）。
+    function forceFontCss(familyToken, size) {
+        var stack = familyToken + ',-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue","PingFang SC",Arial,sans-serif';
+        return 'html,body{font-family:' + stack + ' !important;}' +
             '*:not(i):not(svg){font-family:' + stack + ' !important;}' +
             ':root *:not(i):not(svg):not([class*="fa-"]){font-family:' + stack + ' !important;}' +
             ':root{--iv-sans:' + stack + ';--iv-serif:' + stack + ';}' +
             'html{font-size:' + size + 'px;}';
+    }
+    function buildFontCss(cfg) {
+        if (!cfg) return '';
+        var size = (cfg.size && cfg.size > 0) ? cfg.size : 16;
+        // CSS 链接 / 粘贴 CSS 的字体：外部已提供 @font-face，直接使用它的字体族名
+        if (cfg.cssFamily) {
+            return forceFontCss('"' + String(cfg.cssFamily).replace(/"/g, '') + '"', size);
+        }
+        var cands = fontSrcCandidates(cfg);
+        if (!cands.length) return '';
+        var family = 'NanoBeautifyFont';
+        var srcPart = cands.map(function (c) {
+            return 'url("' + c.url + '")' + (c.format ? ' format("' + c.format + '")' : '');
+        }).join(',');
+        return '@font-face{font-family:"' + family + '";src:' + srcPart + ';font-display:swap;}' +
+            forceFontCss('"' + family + '"', size);
+    }
+    // 外部字体 CSS：外链样式表 或 直接注入的 @font-face CSS
+    function ensureFontLink(href) {
+        try {
+            var l = document.getElementById('nano-beautify-font-link');
+            if (!href) { if (l) l.remove(); return; }
+            if (!l) {
+                l = document.createElement('link');
+                l.id = 'nano-beautify-font-link'; l.rel = 'stylesheet';
+                (document.head || document.documentElement).appendChild(l);
+            }
+            if (l.getAttribute('href') !== href) l.setAttribute('href', href);
+        } catch (e) {}
+    }
+    function ensureFontRawCss(css) {
+        try {
+            var s = document.getElementById('nano-beautify-font-css');
+            if (!css) { if (s) s.remove(); return; }
+            if (!s) {
+                s = document.createElement('style');
+                s.id = 'nano-beautify-font-css';
+                (document.head || document.documentElement).appendChild(s);
+            }
+            s.textContent = css;
+        } catch (e) {}
     }
 
     // Google Fonts 的 css2 链接本身不是字体文件，先解析出真正的 woff2 地址再注入
@@ -477,10 +509,18 @@
     }
 
     function applyFontCfg(cfg) {
-        if (!cfg) { applyStyle('nano-beautify-font', ''); return; }
+        if (!cfg) {
+            applyStyle('nano-beautify-font', '');
+            ensureFontLink('');
+            ensureFontRawCss('');
+            return;
+        }
+        // 粘贴的 @font-face CSS / 外链字体样式表：直接注入，并用它的字体族名
+        ensureFontRawCss((cfg.type === 'url' && cfg.cssText) ? cfg.cssText : '');
+        ensureFontLink((cfg.type === 'url' && cfg.cssFamily && cfg.source && /^(https?:|data:)/i.test(cfg.source)) ? cfg.source : '');
         applyStyle('nano-beautify-font', buildFontCss(cfg));
-        // 粘贴的是 Google Fonts CSS 链接时，解析成真实字体文件后重新注入
-        if (cfg.type === 'url' && cfg.source &&
+        // 兼容旧配置：Google Fonts CSS 链接在无 cssFamily 时，解析成真实字体文件后重新注入
+        if (!cfg.cssFamily && cfg.type === 'url' && cfg.source &&
             /fonts\.googleapis\.com\/css/i.test(cfg.source) && !cfg.__resolved && !_gfontResolving[cfg.source]) {
             _gfontResolving[cfg.source] = true;
             resolveGoogleFontFile(cfg.source).then(function (fileUrl) {
@@ -532,6 +572,8 @@
                                 type: v.type || '',
                                 size: v.size || 16,
                                 format: fontFormatFor(v.source || v.name),
+                                cssFamily: v.cssFamily || '',
+                                cssText: v.cssText || '',
                                 data: v.data || null
                             });
                         } else resolve(null);

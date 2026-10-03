@@ -524,6 +524,7 @@ let currentMaskId = null;
 let charList = [];
 let currentMask = null;
 let entered = false;
+let pickMode = false;
 let busy = false;
 let apiInFlight = false;
 let resumePoll = null;
@@ -810,9 +811,34 @@ function renderRoot() {
 }
 
 function renderCharSelect() {
-  const list = charList.length ? charList : [];
+  if (pickMode) { renderCharPicker(); return; }
   const u = userProfile || {};
   const meAv = u.avatar || fallbackAvatar(u.name || '我');
+  const c = selectedChar || state.char || charList[0] || null;
+
+  if (!c) {
+    document.getElementById('root').innerHTML = `
+    <main class="app selectchar">
+      <div class="top">
+        <button class="back-home" onclick="backToDiscover()" aria-label="返回发现">‹</button>
+        <div class="me-chip">
+          <img class="avatar me-avatar" src="${esc(meAv)}">
+          <span class="me-name">${esc(u.name || '我')}</span>
+        </div>
+        <div class="eyebrow">NANO · COUPLE SPACE</div>
+        <h1>邀请 TA 开通情侣空间</h1>
+        <p>还没有可邀请的 Char。请先在角色库中创建或绑定一个角色。</p>
+      </div>
+    </main>`;
+    return;
+  }
+
+  const cid = String(c.id || c.name || 'default');
+  let invite = null;
+  try { invite = JSON.parse(localStorage.getItem('nano_couple_invite_' + cid) || 'null'); } catch (e) {}
+  const accepted = !!(invite && invite.status === 'accepted');
+  const rejected = !!(invite && invite.status === 'rejected');
+  const pending = !!(invite && invite.status === 'pending');
 
   document.getElementById('root').innerHTML = `
   <main class="app selectchar">
@@ -823,8 +849,72 @@ function renderCharSelect() {
         <span class="me-name">${esc(u.name || '我')}</span>
       </div>
       <div class="eyebrow">NANO · COUPLE SPACE</div>
-      <h1>先选择你的 Char</h1>
-      <p>所有回答、交换与小游戏，都围绕你选择的这个 Char 展开。之后可以随时切换。</p>
+      <h1>邀请 TA 开通情侣空间</h1>
+      <p>情侣空间只属于你和 TA。先发一张邀请卡片到 TA 的私聊，由 TA 决定要不要和你开通，不会对其他人开放。</p>
+    </div>
+    <div class="charlist">
+      <div class="charitem active">
+        <span class="ct"><b>${esc(c.name)}</b></span>
+        <img class="avatar" src="${esc(c.avatar || fallbackAvatar(c.name))}">
+        <i class="radio"></i>
+      </div>
+    </div>
+    ${accepted
+      ? `<button class="btn dark enter" onclick="enterSpace()">TA 已同意 · 进入情侣空间</button>`
+      : (pending
+        ? `<div class="hint" style="text-align:center;color:#a9a29a;font-size:12px;line-height:1.7;margin:6px 0 12px">邀请已发送。去私聊点右下角「回复」，让 TA 表态。</div>
+           <button class="btn dark enter" onclick="openChatWithChar()">去私聊等 TA 回复</button>
+           <button class="btn" style="margin-top:10px;background:#f3eeea;color:#8a8280" onclick="sendCoupleInvite()">重新发送邀请卡</button>`
+        : `<button class="btn dark enter" onclick="sendCoupleInvite()">发送邀请卡给 TA</button>`)}
+    ${rejected ? `<div class="hint" style="text-align:center;color:#c98b8b;font-size:12px;margin-top:12px">TA 这一次没有答应。可以再聊聊，或稍后再邀请。</div>` : ''}
+    <button class="btn" style="margin-top:10px;background:#f3eeea;color:#8a8280" onclick="openCharPicker()">换一位 Char</button>
+  </main>`;
+}
+
+function sendCoupleInvite() {
+  const c = selectedChar || state.char || charList[0] || null;
+  if (!c) { toast('没有可邀请的 Char'); return; }
+  state.char = c;
+  selectedChar = c;
+  const cid = String(c.id || c.name || 'default');
+  try { localStorage.setItem('nano_couple_invite_' + cid, JSON.stringify({ status: 'pending', at: Date.now() })); } catch (e) {}
+  shareCardToChat('invite', '情侣空间邀请',
+    '邀请你开通只属于我们两个人的情侣空间',
+    '我想和你开通一个只属于我们两个人的「情侣空间」：在里面一起做默契调查、记住纪念日、交换情书和日记。你愿意吗？');
+  renderCharSelect();
+}
+
+// 角色在私聊里同意/拒绝后，回到本页自动刷新邀请状态
+window.addEventListener('storage', function (e) {
+  if (e && e.key && e.key.indexOf('nano_couple_invite_') === 0) {
+    if (!entered) { try { renderCharSelect(); } catch (err) {} }
+  }
+});
+window.addEventListener('focus', function () {
+  if (!entered) { try { renderCharSelect(); } catch (err) {} }
+});
+
+function openCharPicker() {
+  pickMode = true;
+  renderCharSelect();
+}
+
+function renderCharPicker() {
+  const list = charList.length ? charList : [];
+  const u = userProfile || {};
+  const meAv = u.avatar || fallbackAvatar(u.name || '我');
+
+  document.getElementById('root').innerHTML = `
+  <main class="app selectchar">
+    <div class="top">
+      <button class="back-home" onclick="cancelCharPicker()" aria-label="返回">‹</button>
+      <div class="me-chip">
+        <img class="avatar me-avatar" src="${esc(meAv)}">
+        <span class="me-name">${esc(u.name || '我')}</span>
+      </div>
+      <div class="eyebrow">NANO · COUPLE SPACE</div>
+      <h1>选择要邀请的 Char</h1>
+      <p>只选择你希望开通情侣空间的那一位。确认后可以随时更换。</p>
     </div>
     <div class="charlist">
       ${list.length ? list.map((c, i) => `
@@ -835,8 +925,12 @@ function renderCharSelect() {
         </button>
       `).join('') : `<div class="hint">未读取到角色，请先在角色库中创建角色。</div>`}
     </div>
-    <button class="btn dark enter" onclick="enterSpace()">进入 Couple Space</button>
   </main>`;
+}
+
+function cancelCharPicker() {
+  pickMode = false;
+  renderCharSelect();
 }
 
 function backToDiscover() {
@@ -854,7 +948,8 @@ window.__nanoInternalBack = function () {
   try {
     const fp = document.getElementById('fullpage');
     if (fp && fp.classList.contains('show')) { closePage(); return true; }
-    if (entered) { switchChar(); return true; }
+    if (pickMode) { cancelCharPicker(); return true; }
+    if (entered) { entered = false; pickMode = false; renderCharSelect(); return true; }
   } catch (e) {}
   return false;
 };
@@ -863,10 +958,12 @@ function chooseCharByIndex(i) {
   const c = charList[i];
   if (!c) return;
   selectedChar = c;
+  pickMode = false;
   renderCharSelect();
 }
 
 async function enterSpace() {
+  if (!selectedChar) selectedChar = state.char || charList[0] || null;
   if (!selectedChar) { toast('请选择一个 Char'); return; }
   state.char = selectedChar;
   ensureAnnivBase();
@@ -878,8 +975,9 @@ async function enterSpace() {
 }
 
 function switchChar() {
-  selectedChar = state.char;
+  selectedChar = state.char || selectedChar;
   entered = false;
+  pickMode = true;
   renderCharSelect();
 }
 
