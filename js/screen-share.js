@@ -7,6 +7,7 @@
 // ============================================================
 (function () {
     'use strict';
+    try { console.log('[ScreenShare] build 20261003k loaded'); } catch (e) {}
 
     var INTERVAL = 30000; // 每 30 秒看一帧，省调用/token
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -331,7 +332,7 @@
         SS.panel = null; SS.log = null; SS.statusEl = null; SS.video = null; SS.stream = null;
     }
 
-    window.ScreenShare = { version: '20261003j', start: start, stop: stop, isActive: function () { return SS.active; } };
+    window.ScreenShare = { version: '20261003k', start: start, stop: stop, isActive: function () { return SS.active; } };
 
     window.addEventListener('message', function (e) {
         var d = e && e.data;

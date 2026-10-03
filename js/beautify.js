@@ -2494,6 +2494,32 @@ async function detectCssFamilyByLink(url) {
   } catch (e) {}
   return fams[0] || "";
 }
+let fontConnecting = false;
+// 解析中的小胶囊：固定在顶部中间、不吃点击，绝不遮挡左上角返回按钮
+function showFontLoading(text) {
+  try {
+    let el = document.getElementById("fontLoadingPill");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "fontLoadingPill";
+      el.style.cssText = "position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 62px);transform:translateX(-50%);z-index:2147482900;pointer-events:none;display:flex;align-items:center;gap:8px;background:rgba(28,28,30,.86);color:#fff;font-size:13px;line-height:1;padding:9px 15px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.22);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;max-width:64vw;";
+      el.innerHTML = '<span style="width:13px;height:13px;flex:none;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;display:inline-block;animation:nanoFontSpin .8s linear infinite;"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>';
+      document.body.appendChild(el);
+      if (!document.getElementById("fontSpinKeyframes")) {
+        const kf = document.createElement("style");
+        kf.id = "fontSpinKeyframes";
+        kf.textContent = "@keyframes nanoFontSpin{to{transform:rotate(360deg)}}";
+        document.head.appendChild(kf);
+      }
+    }
+    const txt = el.querySelector("span:last-child");
+    if (txt) txt.textContent = text || "解析中…";
+    el.style.display = "flex";
+  } catch (e) {}
+}
+function hideFontLoading() {
+  try { const el = document.getElementById("fontLoadingPill"); if (el) el.style.display = "none"; } catch (e) {}
+}
 function fontAlert(title, msg) {
   try {
     const old = document.getElementById("fontAlertBox");
@@ -2689,14 +2715,17 @@ document.getElementById("fontFile").onchange = async e => {
 
 // ---- URL字体 ----
 document.getElementById("urlApply").onclick = async () => {
+  if (fontConnecting) return; // 一次只跑一个，失败也只弹一次
   const btn = document.getElementById("urlApply");
   const url = document.getElementById("fontUrl").value.trim();
   if (!url) return fontAlert("字体连接失败", "请输入字体链接（字体文件直链，或 Google Fonts / 字体 CSS 链接）");
+  fontConnecting = true;
   const oldLabel = btn ? btn.textContent : "连接";
-  if (btn) { btn.disabled = true; btn.textContent = "连接中…"; }
-  try { var metaEl0 = document.getElementById("fontMeta"); if (metaEl0) metaEl0.textContent = "正在连接字体，请稍候…"; } catch (e) {}
+  if (btn) btn.disabled = true;
+  showFontLoading("解析中…"); // 点击立刻出现，且不遮挡返回按钮
+  try { const m = document.getElementById("fontMeta"); if (m) m.textContent = "正在解析字体链接…"; } catch (e) {}
   try {
-    // 整体限时，避免手机上“点了没反应、一直转”
+    // 内部各步骤都有超时；这里再加一层总限时，保证最终一定以成功或失败收尾
     await nanoFontTimeout((async () => {
       const prepared = await prepareRemoteFont(url);
       const niceName = (prepared.cssFamily || googleFontFamily(url) || (url.split("/").pop() || "远程字体")).split("?")[0] || "远程字体";
@@ -2708,7 +2737,7 @@ document.getElementById("urlApply").onclick = async () => {
       document.getElementById("filename").textContent = "已应用远程字体";
       document.getElementById("fontMeta").textContent = "当前字体：" + (fontState.name || url);
       renderFontQuickBar();
-    })(), 45000, "连接字体");
+    })(), 45000, "解析字体");
     toast("字体连接成功，已应用");
   } catch (err) {
     console.error("[font] 远程字体连接失败:", err);
@@ -2718,6 +2747,8 @@ document.getElementById("urlApply").onclick = async () => {
     fontAlert("字体连接失败", (err && err.message ? err.message : String(err)) + hint +
       "\n\n支持的链接：\n· 字体文件直链：.ttf / .otf / .woff / .woff2\n· Google Fonts 的 CSS 链接\n· 其它 @font-face 字体 CSS 链接\n· 也可直接粘贴 @font-face CSS");
   } finally {
+    fontConnecting = false;
+    hideFontLoading();
     if (btn) { btn.disabled = false; btn.textContent = oldLabel; }
   }
 };

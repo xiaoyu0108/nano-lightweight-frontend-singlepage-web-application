@@ -1021,6 +1021,16 @@
 
 <script>
     (function() {
+        // 全屏 / PWA 下刘海或状态栏可能压住顶栏按钮：给顶部安全区一个最小高度，
+        // 只把按钮往下让一点，仍然保持全屏。
+        try {
+            var _standalone = false;
+            try {
+                _standalone = (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone === true;
+            } catch (e) {}
+            if (_standalone) document.documentElement.style.setProperty('--safe-inset-top', 'max(env(safe-area-inset-top, 0px), 24px)');
+        } catch (e) {}
+
         const topBar = document.getElementById('topBar');
         const bottomBar = document.getElementById('bottomBar');
         const appContent = document.getElementById('appContent');
@@ -1391,7 +1401,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-02-01';
+        var BUILD = 'nano-2026-10-03-01';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -3247,7 +3257,7 @@
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js"></script>
 <script src="js/char-takeover.js?v=20261003n"></script>
-<script src="js/screen-share.js?v=20261003j"></script>
+<script src="js/screen-share.js?v=20261003k"></script>
 </div>
     <!-- 小号试探：居中弹窗（不暴露是谁）-->
     <div class="alt-probe-overlay" id="altProbeOverlay">
