@@ -7204,14 +7204,21 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
         loadMessages: loadMessages,
         isStorageReady: function() { return isStorageReady; },
         getTakeoverContext: function () {
-            var out = { self: { id: chatId, name: displayName, avatar: (characterData && characterData.avatar) || '' }, persona: '', worldbook: '', memory: '', foreign: false, chats: [], groups: [] };
+            // 这台手机属于当前角色绑定的那个人设(user)。反查时只能翻看同一个 user 名下的
+            // 角色与群聊，绝不能串到别的 user（否则 char1 能看到 char2 的聊天/群聊）。
+            var owner = String((characterData && characterData.bindUser) || '');
+            var out = { self: { id: chatId, name: displayName, avatar: (characterData && characterData.avatar) || '' }, owner: owner, persona: '', worldbook: '', memory: '', foreign: false, chats: [], groups: [] };
             try { out.foreign = !!(window.isForeignChar ? window.isForeignChar() : (typeof isForeignChar === 'function' ? isForeignChar() : false)); } catch (e) {}
             try { out.persona = String((characterData && (characterData.setting || characterData.desc || characterData.persona)) || '').slice(0, 2000); } catch (e) {}
             try { var w = getWorldbookText(chatId); out.worldbook = [w.front, w.middle, w.back].filter(Boolean).join('\n').slice(0, 2400); } catch (e) {}
             try { out.memory = String(__memHints || '').slice(0, 1600); } catch (e) {}
+            var charsById = {};
+            try { (allCharacters || []).forEach(function (c) { if (c && c.id) charsById[String(c.id)] = c; }); } catch (e) {}
             try {
                 (allCharacters || []).forEach(function (c) {
                     if (!c || !c.id || String(c.id) === String(chatId)) return;
+                    // 只列同一 user 绑定的角色（未绑定 user 的 NPC / 纳米助手不算）
+                    if (owner && String(c.bindUser || '') !== owner) return;
                     out.chats.push({ id: String(c.id), name: String(c.name || c.id) });
                 });
             } catch (e) {}
@@ -7219,6 +7226,18 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
                 var reg = JSON.parse(localStorage.getItem('nano_groups_data') || '{}') || {};
                 (Array.isArray(reg.groups) ? reg.groups : []).forEach(function (g) {
                     if (!g || !g.id) return;
+                    if (owner) {
+                        // 群主是该 user，或群成员里有绑定给该 user 的角色 → 属于这个 user
+                        var mine = String(g.createdBy || '') === owner;
+                        if (!mine) {
+                            var mem = g.members || [];
+                            for (var i = 0; i < mem.length; i++) {
+                                var mc = charsById[String(mem[i])];
+                                if (mc && String(mc.bindUser || '') === owner) { mine = true; break; }
+                            }
+                        }
+                        if (!mine) return;
+                    }
                     out.groups.push({ id: String(g.id), name: String(g.name || '群聊') });
                 });
             } catch (e) {}

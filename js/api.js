@@ -285,18 +285,6 @@
             var label = (type === 'minimax') ? '拉取音色' : '拉取模型';
             fetchBtn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> ' + label;
         }
-        // 本地语音：不需要地址/Key/拉取模型，只保留「声音（可选，填系统音色名或语言如 zh-CN）」
-        var hideIds = ['ttsUrl', 'ttsKey'];
-        hideIds.forEach(function (id) {
-            var el = document.getElementById(id);
-            var g = el && el.closest ? el.closest('.form-group') : null;
-            if (g) g.style.display = (type === 'browser') ? 'none' : '';
-        });
-        var mw = document.getElementById('ttsModelWrap'); if (mw) mw.style.display = (type === 'browser') ? 'none' : '';
-        if (fetchBtn) fetchBtn.style.display = (type === 'browser') ? 'none' : '';
-        var voiceEl = document.getElementById('ttsVoice');
-        if (voiceEl && voiceEl.closest) { var vg = voiceEl.closest('.form-group'); if (vg) vg.style.display = ''; }
-        if (voiceEl) voiceEl.placeholder = (type === 'browser') ? '可选：系统音色名，或语言如 zh-CN（留空用默认）' : '例如 Fish Audio 公开模型 id / voice_id';
     }
 
     async function loadAllFromStorage() {
@@ -839,9 +827,9 @@
             btn.addEventListener('click', function () {
                 var input = document.getElementById(this.dataset.target);
                 if (!input) return;
-                var isMasked = input.style.webkitTextSecurity === 'disc' || input.style.webkitTextSecurity === '';
-                if (isMasked) { input.style.webkitTextSecurity = 'none'; this.innerHTML = '<i class="fas fa-eye-slash"></i>'; }
-                else { input.style.webkitTextSecurity = 'disc'; this.innerHTML = '<i class="fas fa-eye"></i>'; }
+                var isMasked = input.type === 'password';
+                if (isMasked) { input.type = 'text'; this.innerHTML = '<i class="fas fa-eye-slash"></i>'; }
+                else { input.type = 'password'; this.innerHTML = '<i class="fas fa-eye"></i>'; }
             });
         });
 
@@ -971,7 +959,7 @@
                 ttsGroupId: (document.getElementById('ttsGroupId') || {}).value || '',
                 ttsType: (document.getElementById('ttsType') || {}).value || 'openai'
             };
-            if (cfg.ttsType !== 'browser' && (!cfg.ttsUrl || !cfg.ttsKey || (!cfg.ttsModel && !cfg.ttsVoice))) {
+            if (!cfg.ttsUrl || !cfg.ttsKey || (!cfg.ttsModel && !cfg.ttsVoice)) {
                 showModal('配置不完整：请填写 地址、Key，以及 音色/模型（或声音 ID）。');
                 return;
             }

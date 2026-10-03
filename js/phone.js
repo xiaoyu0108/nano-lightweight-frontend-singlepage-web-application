@@ -2323,6 +2323,7 @@ async function openSettings(){
   const av = c.avatar || "";
   const proactiveOn = (localStorage.getItem("nano_takeover_proactive") !== "0");
   const pagesN = localStorage.getItem("nano_takeover_pages") || "5";
+  const pagesLabel = (pagesN === "all") ? "全部" : (parseInt(pagesN, 10) || 5) + " 页";
   appHost.innerHTML = `<div class="st-wrap">
     <header class="st-top">
       <div class="st-top-left" data-back>
@@ -2386,9 +2387,9 @@ async function openSettings(){
         <button class="st-btn" data-act="pages">
           <div>
             <div class="st-btn-title">每次查看的页数</div>
-            <div class="st-btn-sub">越少越省调用次数</div>
+            <div class="st-btn-sub">越少越省调用次数；「全部」会翻完所有页面</div>
           </div>
-          <span style="font-size:13px;color:#8a8a8f;margin-left:8px">${pagesN} 页</span>
+          <span style="font-size:13px;color:#8a8a8f;margin-left:8px">${pagesLabel}</span>
         </button>
       </div>
 
@@ -2396,7 +2397,7 @@ async function openSettings(){
         <button class="st-btn" data-act="screenshare">
           <div>
             <div class="st-btn-title">让 TA 看我的真实屏幕</div>
-            <div class="st-btn-sub">共享屏幕让 TA 实时点评（需能识图的模型；iOS 不支持）</div>
+            <div class="st-btn-sub">共享真实屏幕让 TA 实时点评（需能识图的模型；电脑 Chrome/Edge 支持，iOS 网页端不支持）</div>
           </div>
           <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
         </button>
@@ -2482,7 +2483,7 @@ async function openSettings(){
   };
 
   appHost.querySelector('[data-act="pages"]').onclick = () => {
-    const order = ["3", "5", "7", "10"];
+    const order = ["3", "5", "7", "10", "15", "all"];
     const cur = localStorage.getItem("nano_takeover_pages") || "5";
     const i = Math.max(0, order.indexOf(cur));
     const next = order[(i + 1) % order.length];

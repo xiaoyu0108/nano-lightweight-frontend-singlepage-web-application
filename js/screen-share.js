@@ -7,7 +7,7 @@
 // ============================================================
 (function () {
     'use strict';
-    var VERSION = '20261003o';
+    var VERSION = '20261003p';
     try { console.log('[ScreenShare] build ' + VERSION + ' loaded'); } catch (e) {}
 
     var INTERVAL = 10000; // 每 10 秒看一帧
@@ -113,7 +113,7 @@
         if (ctx.worldbook) lines.push('\n【世界书设定】\n' + ctx.worldbook);
         if (ctx.memory) lines.push('\n【你和用户的共同记忆】\n' + ctx.memory);
         if (ctx.foreign) lines.push('\n【语言】你是外国角色：每条先写母语原文，再紧跟中文翻译，用 || 分隔。');
-        lines.push('\n【要求】像就在 TA 旁边看着一样，用你的人设随口点评当前画面：可以吐槽、惊讶、关心、吃醋、好奇。每次 1-2 条短气泡，口语、有细节、别像旁白。全程贴合人设，不要油腻。只输出 JSON：{"bubbles":["..."]}');
+        lines.push('\n【要求】像就在 TA 旁边看着一样，用你的人设随口点评当前画面：可以吐槽、惊讶、关心、吃醋、好奇。每次写 2~3 条完整、通顺的话（每条 15~40 字，不要碎片、不要只蹦几个字），口语、有细节、别像旁白。全程贴合人设，不要油腻。只输出 JSON：{"bubbles":["...","..."]}');
         return lines.join('\n');
     }
 
@@ -236,7 +236,7 @@
                             { type: 'image_url', image_url: { url: dataURL } }
                         ] }
                     ],
-                    max_tokens: 800,
+                    max_tokens: 3000,
                     temperature: (typeof cfg.mainTemp === 'number' ? cfg.mainTemp : 0.85)
                 }),
                 signal: ctrl ? ctrl.signal : undefined
@@ -298,29 +298,24 @@
     function canScreenShare() {
         try { return !!(navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function'); } catch (e) { return false; }
     }
-    function canCamera() {
-        try { return !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function'); } catch (e) { return false; }
-    }
 
     function start(info) {
         if (SS.active) return;
         info = info || {}; info.id = String(info.id || info.charId || ''); info.name = String(info.name || info.charName || 'TA');
         if (!info.id) return;
         injectCss();
-        var screenOk = canScreenShare(), camOk = canCamera();
+        var screenOk = canScreenShare();
         var title, desc, actions;
         if (screenOk) {
+            // 电脑 Chrome / Edge 能真正共享屏幕，保留完整流程。
             title = '让「' + escHtml(info.name) + '」看你真实的屏幕？';
             desc = '会请求屏幕共享权限（建议选「整个屏幕」，这样你切换窗口 TA 也能看到），TA 定时截帧并用你配置的「能识图的模型」点评。可随时停止。';
             actions = '<button class="ss-cancel">取消</button><button class="ss-ok">开始共享</button>';
-        } else if (camOk) {
-            title = '让「' + escHtml(info.name) + '」看你这边？';
-            desc = '这个浏览器没有提供网页录屏接口，改用摄像头也能让 TA 实时看到你这边的画面（可以把镜头对着另一个屏幕）。可随时停止。';
-            actions = '<button class="ss-cancel">取消</button><button class="ss-shot">发一张截图</button><button class="ss-cam">用摄像头</button><button class="ss-try">仍尝试屏幕共享</button>';
         } else {
-            title = '让「' + escHtml(info.name) + '」看？';
-            desc = '当前环境不支持实时共享（http:// 不安全环境，或浏览器不提供网页录屏/摄像头接口，所以不会有授权弹窗）。可以发一张截图给 TA 看；要看屏幕请改用 https:// 打开或电脑 Chrome/Edge。';
-            actions = '<button class="ss-cancel">取消</button><button class="ss-shot">发一张截图</button><button class="ss-try">仍尝试屏幕共享</button>';
+            // iOS / 隐私浏览器等拿不到录屏接口：不做「截图 / 摄像头」这种替代（那是视频聊天的事），直接说明不支持。
+            title = '当前环境不支持屏幕共享';
+            desc = '这个浏览器没有提供网页录屏接口（iOS 网页端通常不支持，http:// 不安全环境也不会有授权弹窗）。想看真实屏幕请用电脑 Chrome / Edge 打开。';
+            actions = '<button class="ss-cancel">知道了</button>';
         }
         var el = document.createElement('div'); el.className = 'ss-confirm';
         el.innerHTML = '<div class="ss-dialog"><h3>' + title + '</h3><p>' + desc + '</p>' +
@@ -331,9 +326,6 @@
         var askNotify = function () { try { if (window.NanoNotify && NanoNotify.ensurePermission) NanoNotify.ensurePermission(); } catch (e) {} };
         var c = el.querySelector('.ss-cancel'); if (c) c.onclick = close;
         var ok = el.querySelector('.ss-ok'); if (ok) ok.onclick = function () { askNotify(); close(); doStart(info); };
-        var cam = el.querySelector('.ss-cam'); if (cam) cam.onclick = function () { askNotify(); close(); startCamera(info); };
-        var shot = el.querySelector('.ss-shot'); if (shot) shot.onclick = function () { askNotify(); close(); pickScreenshot(info); };
-        var tryBtn = el.querySelector('.ss-try'); if (tryBtn) tryBtn.onclick = function () { askNotify(); close(); doStart(info); };
     }
 
     async function runStream(info, stream, mode) {
@@ -387,9 +379,9 @@
         if (!stream) {
             var msg;
             if (!window.isSecureContext) {
-                msg = '当前是 http:// 打开的不安全环境，浏览器不会提供录屏接口，所以也不会弹授权。\n请改用 https:// 打开，或点「发一张截图」。';
+                msg = '当前是 http:// 打开的不安全环境，浏览器不会提供录屏接口，所以也不会弹授权。\n请改用 https:// 打开，或用电脑 Chrome / Edge。';
             } else if (!gdm) {
-                msg = '这个浏览器的网页端没有屏幕共享接口（安卓 Chrome/Edge、iOS 的网页端通常都不支持网页录屏）。\n可改用摄像头 / 发一张截图，或用电脑 Chrome/Edge。';
+                msg = '这个浏览器的网页端没有屏幕共享接口（iOS 的网页端通常都不支持网页录屏）。\n想看真实屏幕请用电脑 Chrome / Edge 打开。';
             } else {
                 msg = '无法开始屏幕共享：' + (lastErr ? ((lastErr.name ? lastErr.name + '：' : '') + (lastErr.message || lastErr)) : '未知原因');
             }
@@ -403,65 +395,6 @@
         runStream(info, stream, 'screen');
     }
 
-    async function startCamera(info) {
-        var stream = null;
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-        } catch (e) {
-            try { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
-            catch (e2) {
-                var msg = (!window.isSecureContext)
-                    ? '摄像头也需要 https:// 环境。请改用 https 打开，或点「发一张截图」。'
-                    : ('无法打开摄像头：' + ((e2 && e2.message) || e2));
-                try { alert(msg); } catch (err) {}
-                return;
-            }
-        }
-        runStream(info, stream, 'camera');
-    }
-
-    function pickScreenshot(info) {
-        var input = document.createElement('input');
-        input.type = 'file'; input.accept = 'image/*';
-        input.style.display = 'none';
-        document.body.appendChild(input);
-        input.onchange = function () {
-            var f = input.files && input.files[0];
-            try { input.remove(); } catch (e) {}
-            if (!f) return;
-            var reader = new FileReader();
-            reader.onload = function () { doScreenshotComment(info, String(reader.result || '')); };
-            reader.onerror = function () { try { alert('读取图片失败'); } catch (e) {} };
-            reader.readAsDataURL(f);
-        };
-        input.click();
-    }
-
-    async function doScreenshotComment(info, dataURL) {
-        if (!dataURL) return;
-        SS.active = true; SS.info = info; SS.comments = []; SS.cardPosted = false; SS.mode = 'photo'; SS.stream = null;
-        try { if (window.NanoNotify && NanoNotify.ensurePermission) NanoNotify.ensurePermission(); } catch (e) {}
-        buildPanel(info, 'photo');
-        setStatus('正在读取人设与 API…');
-        SS.ctx = (await requestContext(info)) || {};
-        if (SS.ctx.api && SS.ctx.api.url && SS.ctx.api.key && SS.ctx.api.model) {
-            SS.cfg = { mainUrl: SS.ctx.api.url, mainKey: SS.ctx.api.key, mainModel: SS.ctx.api.model, mainTemp: SS.ctx.api.temp };
-        }
-        if (!SS.cfg) SS.cfg = await getApiConfig();
-        setStatus('正在看图…');
-        try {
-            var small = await resizeImage(dataURL, 720);
-            await requestComment(small, 'photo');
-        } catch (e) { addLine('出错：' + ((e && e.message) || e), true); setStatus('出错'); }
-        SS.active = false;
-        postCard();
-        setStatus('点评完成（已收进聊天卡片）');
-        setTimeout(function () {
-            try { if (SS.panel) SS.panel.remove(); } catch (e) {}
-            SS.panel = null; SS.log = null; SS.statusEl = null; SS.video = null;
-            try { document.title = 'Nano'; } catch (e) {}
-        }, 1500);
-    }
     function stop() {
         if (!SS.active) return;
         postCard();

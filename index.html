@@ -8,7 +8,7 @@
     (function () {
         try {
             var KEY = 'nano_build';
-            var CUR = 'nano-2026-10-03-06';
+            var CUR = 'nano-2026-10-03-08';
             var prev = null, ok = false;
             try { prev = localStorage.getItem(KEY); } catch (e) {}
             if (prev === CUR) return;
@@ -1372,9 +1372,13 @@
                     'padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);';
                 document.body.appendChild(probe);
                 const cs = getComputedStyle(probe);
-                const top = parseFloat(cs.paddingTop) || 0;
+                let top = parseFloat(cs.paddingTop) || 0;
                 const bottom = parseFloat(cs.paddingBottom) || 0;
                 probe.parentNode.removeChild(probe);
+                // 全屏 / PWA 下部分 iOS 会把 env(safe-area-inset-top) 报成 0，
+                // 外壳顶栏已用 24px 兜底；这里给注入子页的 --safe-top 同样的下限，
+                // 否则 chat/API/discover/more/钱包等自处理顶栏的页面会再次顶进刘海。
+                if (_standalone && top < 24) top = 24;
                 return { top: top, bottom: bottom };
             } catch (e) { return { top: 0, bottom: 0 }; }
         }
@@ -1429,7 +1433,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-03-06';
+        var BUILD = 'nano-2026-10-03-08';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -3278,14 +3282,14 @@
         }
     } catch (e) {}
 </script>
-<script src="js/api-float.js?v=20260926h"></script>
+<script src="js/api-float.js?v=20261003o"></script>
 <script src="js/aux-memory.js"></script>
 <script src="js/nano-notify.js"></script>
 <script src="js/nano-push.js"></script>
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js"></script>
-<script src="js/char-takeover.js?v=20261003n"></script>
-<script src="js/screen-share.js?v=20261003o"></script>
+<script src="js/char-takeover.js?v=20261003o"></script>
+<script src="js/screen-share.js?v=20261003p"></script>
 </div>
     <!-- 小号试探：居中弹窗（不暴露是谁）-->
     <div class="alt-probe-overlay" id="altProbeOverlay">

@@ -270,6 +270,10 @@ select.form-control {
     display: flex;
     align-items: center;
 }
+/* 密钥输入：强制系统字体。美化全局字体若缺少圆点字形，密文会显示成黑色方块 */
+html body .nano-api .key-input-wrap .form-control {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif !important;
+}
 .key-input-wrap .form-control {
     padding-right: 44px;
 }

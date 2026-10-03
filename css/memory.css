@@ -175,6 +175,10 @@ body {
 }
 .ios-input::placeholder { color: #c7c7cc; }
 .mask-text { -webkit-text-security: disc; }
+/* 密钥输入：强制系统字体，避免美化全局字体缺少圆点字形时密文变成黑色方块 */
+html body input[type="password"].ios-input {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif !important;
+}
 
 .text-action-btn {
     background: #f0f0f4;

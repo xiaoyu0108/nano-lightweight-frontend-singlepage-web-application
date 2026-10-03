@@ -977,25 +977,37 @@
             var found = (items || []).find(function (x) { return x.id === id && x.category === 'font'; });
             if (!found || !found.font) { flash('字体预设不存在', beautyStatusEl); return; }
             var fs = found.font;
+            // 必须带上 cssFamily / cssText：Google Fonts / @font-face CSS 预设在美化页里
+            // 是「字体族名 + CSS」，只把 source(url) 当字体文件地址传过去会加载失败 → 字体不切换。
             var cfg = {
                 family: 'NanoBeautifyFont',
                 name: fs.name || found.name || '',
                 source: fs.source || '',
                 type: fs.type || '',
-                size: fs.size || 16
+                size: fs.size || 16,
+                format: fs.format || '',
+                cssFamily: fs.cssFamily || '',
+                cssText: fs.cssText || ''
             };
-            if (fs.type === 'url' && fs.source) {
+            var p;
+            if (fs.type === 'url' && (fs.source || fs.cssText)) {
                 try { localStorage.setItem('beautify_font', JSON.stringify(cfg)); } catch (e) {}
-                broadcastFont(cfg);
-            } else if (fs.type === 'file' && fs.data) {
-                // 文件字体体积大，写入设置后让各页自行从 IndexedDB 重新读取
-                var frames = document.querySelectorAll('iframe');
-                for (var i = 0; i < frames.length; i++) {
-                    try { frames[i].contentWindow.postMessage({ type: 'beautify:refresh' }, '*'); } catch (e) {}
-                }
-                try { if (window.__nanoAppearance) window.__nanoAppearance.applySaved(); } catch (e) {}
+                p = bdbSet('settings', { key: 'appliedFont', value: fs }).then(function () {
+                    broadcastFont(cfg);
+                });
+            } else {
+                // 文件字体体积大，走 IndexedDB；先清掉旧的 URL 字体配置，
+                // 否则 readFontCfgSync 会一直用旧配置覆盖 IDB 里的文件字体。
+                try { localStorage.removeItem('beautify_font'); } catch (e) {}
+                p = bdbSet('settings', { key: 'appliedFont', value: fs }).then(function () {
+                    var frames = document.querySelectorAll('iframe');
+                    for (var i = 0; i < frames.length; i++) {
+                        try { frames[i].contentWindow.postMessage({ type: 'beautify:refresh' }, '*'); } catch (e) {}
+                    }
+                    try { if (window.__nanoAppearance) window.__nanoAppearance.applySaved(); } catch (e) {}
+                });
             }
-            bdbSet('settings', { key: 'appliedFont', value: fs }).then(function () {
+            p.then(function () {
                 flash('已切换字体：' + (found.name || ''), beautyStatusEl);
             });
         });

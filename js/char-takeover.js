@@ -12,7 +12,7 @@
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function enc(s) { return encodeURIComponent(String(s == null ? '' : s)); }
     function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
-    try { console.log('[CharTakeover] build 39 loaded'); } catch (e) {}
+    try { console.log('[CharTakeover] build 40 loaded'); } catch (e) {}
     function clip(s, n) { s = String(s == null ? '' : s); return s.length > n ? (s.slice(0, n) + '…') : s; }
     function shell() { return window.__nanoShell || null; }
     function readScreen() { var s = shell(); return (s && s.readScreen) ? s.readScreen() : { app: 'unknown', text: '' }; }
@@ -35,6 +35,8 @@
         { id: 'favorite',  name: '收藏',       w: 1, url: 'favorite.html' },
         { id: 'discover',  name: '发现',       w: 2, url: 'discover.html' },
         { id: 'music',     name: '音乐',       w: 2, url: 'music.html' },
+        { id: 'couple',    name: '情侣空间',   w: 3, url: 'couple-spaces.html' },
+        { id: 'familycard',name: '亲属卡',     w: 2, url: 'family-card.html', selfWith: true },
         { id: 'phone',     name: '查手机',     w: 1, url: 'phone.html' }
     ];
 
@@ -49,6 +51,8 @@
         favorite: '<path d="m12 3 2.6 5.6L20 9.5l-4 3.9 1 5.6-5-2.9-5 2.9 1-5.6-4-3.9 5.4-.9L12 3Z"/>',
         discover: '<circle cx="12" cy="12" r="9"/><path d="m15 9-2 6-4 1 2-6 4-1Z"/>',
         music: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+        couple: '<path d="M12 20s-7-4.4-9.3-9A5 5 0 0 1 12 6a5 5 0 0 1 9.3 5C19 15.6 12 20 12 20Z"/>',
+        familycard: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/><path d="M7 14h4"/>',
         phone: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>',
         chat: '<path d="M4 5h16v11H9l-5 4V5Z"/>',
         group: '<circle cx="9" cy="9" r="3"/><path d="M4 19a5 5 0 0 1 10 0"/><path d="M16 8.5a3 3 0 0 1 0 5M17 19a5 5 0 0 0-2-4"/>'
@@ -157,7 +161,7 @@
     }
     function buildTargets(ctx) {
         var list = [];
-        APPS.forEach(function (a) { list.push({ id: a.id, name: a.name, w: a.w, url: a.url || null }); });
+        APPS.forEach(function (a) { list.push({ id: a.id, name: a.name, w: a.w, url: a.url || null, selfWith: !!a.selfWith }); });
         (ctx && ctx.chats || []).slice(0, 12).forEach(function (c, i) {
             if (!c || !c.id) return;
             list.push({ id: 'chat:' + c.id, name: '聊天·' + (c.name || c.id), kind: 'chat', cid: c.id, cname: c.name || '', w: i < 5 ? 4 : 2 });
@@ -172,7 +176,17 @@
         var s = shell(); if (!s) return;
         if (t.kind === 'chat') { s.open('chat_inner.html?chat=' + enc(t.cid) + '&name=' + enc(t.cname), '', 'main'); return; }
         if (t.kind === 'group') { s.open('groups.html?group=' + enc(t.gid), '', 'main'); return; }
-        if (t.url) { s.open(t.url, t.name, 'takeover'); return; }
+        if (t.url) {
+            var u = t.url;
+            // 亲属卡等页面按角色（chatId）取数据：带上当前角色，避免落到别人的卡上
+            if (t.selfWith) {
+                var me = (TK.ctx && TK.ctx.self) || {};
+                var id = me.id || (TK.info && TK.info.id) || '';
+                var nm = me.name || (TK.info && TK.info.name) || '';
+                u += (u.indexOf('?') === -1 ? '?' : '&') + 'chat=' + enc(id) + '&name=' + enc(nm);
+            }
+            s.open(u, t.name, 'takeover'); return;
+        }
         if (s.close) s.close();
     }
     function weightedPick(pool) {
@@ -493,11 +507,15 @@
     }
 
     /* ---------------- 主流程 ---------------- */
-    function pageCount() {
-        var n = parseInt(localStorage.getItem('nano_takeover_pages') || '5', 10);
-        if (!n || n < 3) n = 5; if (n > 10) n = 10;
-        var lo = Math.max(3, n - 1), hi = Math.min(10, n + 1);
-        return lo + Math.floor(Math.random() * (hi - lo + 1));
+    function pageCount(total) {
+        var raw = String(localStorage.getItem('nano_takeover_pages') || '5').trim();
+        var max = Math.max(1, Number(total) || 5);
+        // “全部”：把这次能翻的页面全看完（App + 该 user 名下的聊天与群聊）
+        if (raw === 'all' || raw === '全部') return max;
+        var n = parseInt(raw, 10);
+        if (!n || n < 1) n = 5;
+        if (n > max) n = max;
+        return n;
     }
 
     async function begin(info) {
@@ -536,7 +554,7 @@
         barLog('可查看页面：' + targets.length + ' 个');
         if (!targets.length) { end('empty'); return; }
         var seen = loadSeen();
-        var N = pageCount();
+        var N = pageCount(targets.length);
         TK.total = N;
         var used = {}, seenNames = [], viewedIds = [];
         var cur = pickNext(targets, used, seen);
@@ -699,7 +717,7 @@
     }
 
     window.CharTakeover = {
-        version: '20261003j',
+        version: '20261003k',
         start: start,
         stop: function () { end('manual'); },
         isActive: function () { return TK.active; },
