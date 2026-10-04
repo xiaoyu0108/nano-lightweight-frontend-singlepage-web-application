@@ -36,7 +36,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .app{max-width:520px;margin:auto;min-height:100vh;padding:env(safe-area-inset-top) 20px 34px;position:relative}
 
 /* ---------- 首页 ---------- */
-.brand{margin-top:28px}
+.brand{margin-top:14px}
 .brand h1{
   font-family:Georgia,"Times New Roman",serif;
   font-weight:400;font-size:46px;line-height:1.05;
@@ -49,7 +49,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .brand p{margin:14px 0 0;font-size:13px;color:var(--muted);line-height:1.7;max-width:360px;text-align:left}
 
 /* ---------- 角色卡片轮播 ---------- */
-.carousel-wrap{margin-top:30px;position:relative}
+.carousel-wrap{margin-top:20px;position:relative}
 .carousel{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding:8px 2px 16px;-webkit-overflow-scrolling:touch}
 .char-card{
   flex:0 0 78%;
@@ -125,7 +125,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 }
 
 /* ---------- 内页顶栏 ---------- */
-.top{height:56px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.top{height:calc(56px + max(0px, var(--safe-top, env(safe-area-inset-top, 0px))));padding-top:max(0px, var(--safe-top, env(safe-area-inset-top, 0px)));display:flex;align-items:center;justify-content:space-between;gap:10px}
 .back-btn{
   width:36px;height:36px;
   display:flex;align-items:center;justify-content:center;

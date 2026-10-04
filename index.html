@@ -8,7 +8,7 @@
     (function () {
         try {
             var KEY = 'nano_build';
-            var CUR = 'nano-2026-10-04-01';
+            var CUR = 'nano-2026-10-04-02';
             var prev = null, ok = false;
             try { prev = localStorage.getItem(KEY); } catch (e) {}
             if (prev === CUR) return;
@@ -849,7 +849,7 @@
 /* 一次性强制更新：清掉旧 Service Worker 与缓存，保证拿到最新代码（每个版本号只执行一次） */
 (function () {
     try {
-        var KEY = 'nano_force_reset_v37';
+        var KEY = 'nano_force_reset_v38';
         if (localStorage.getItem(KEY) === '1') return;
         localStorage.setItem(KEY, '1');
         var tasks = [];
@@ -871,7 +871,7 @@
 /* 用一次 URL 参数绕过任何被缓存的 index.html（只跳一次） */
 (function () {
     try {
-        var B = '37';
+        var B = '38';
         var u = new URL(location.href);
         if (u.searchParams.get('b') !== B) { u.searchParams.set('b', B); location.replace(u.toString()); }
     } catch (e) {}
@@ -1051,15 +1051,19 @@
     (function() {
         // 全屏 / PWA 下刘海或状态栏可能压住顶栏按钮：给顶部安全区一个最小高度，
         // 只把按钮往下让一点，仍然保持全屏。
-        try {
-            var _standalone = false;
+        // 顶部安全区 = 刚好越过灵动岛的像素值。默认 48px；可用
+        // 「其他 → 界面 → 灵动岛安全区」或 localStorage.nano_top_inset 覆盖微调。
+        function applyTopInset() {
+            var custom = NaN;
+            try { custom = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
             try {
-                _standalone = (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone === true;
+                document.documentElement.style.setProperty(
+                    '--safe-inset-top',
+                    (isFinite(custom) && custom >= 0) ? (custom + 'px') : 'max(env(safe-area-inset-top, 0px), 48px)'
+                );
             } catch (e) {}
-            // 灵动岛兜底：部分 iOS/WebView 在全屏下把 env(safe-area-inset-top) 报成 0，
-            // 这里给一个足够越过灵动岛的下限，保证顶栏不会被挡住。
-            document.documentElement.style.setProperty('--safe-inset-top', 'max(env(safe-area-inset-top, 0px), 59px)');
-        } catch (e) {}
+        }
+        try { applyTopInset(); } catch (e) {}
 
         // 外壳内置顶栏已移除；保留空壳以便旧逻辑的 classList 调用不报错
         const topBar = document.getElementById('topBar') || { classList: { add: function () {}, remove: function () {}, contains: function () { return false; } } };
@@ -1379,9 +1383,12 @@
                 const bottom = parseFloat(cs.paddingBottom) || 0;
                 probe.parentNode.removeChild(probe);
                 // 全屏 / PWA / WebView 下部分 iOS 会把 env(safe-area-inset-top) 报成 0。
-                // 灵动岛安全区约 59px：探测值明显偏小时统一抬到 59px，
-                // 否则 chat/API/discover/more/imessage/豆包等自处理顶栏的页面会再次顶进刘海。
-                if (top < 44) top = 59;
+                // 默认抬到「刚好越过灵动岛」的 48px（不追求 59px 的整块安全区，避免离灵动岛太远）；
+                // 可用 localStorage.nano_top_inset 覆盖微调，例如 setItem('nano_top_inset','44')。
+                var _customTop = NaN;
+                try { _customTop = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
+                if (isFinite(_customTop) && _customTop >= 0) top = _customTop;
+                else if (top < 44) top = 48;
                 return { top: top, bottom: bottom };
             } catch (e) { return { top: 0, bottom: 0 }; }
         }
@@ -1436,7 +1443,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-04-01';
+        var BUILD = 'nano-2026-10-04-02';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -2669,6 +2676,17 @@
                         try { f.contentWindow.postMessage(data, '*'); } catch (e) {}
                     }
                 });
+            }
+
+            // 「其他 → 界面 → 灵动岛安全区」微调：更新外壳与所有子页的顶部安全区
+            if (data.type === 'nanoTopInset') {
+                try {
+                    var _v = parseFloat(data.value);
+                    if (isFinite(_v) && _v >= 0) localStorage.setItem('nano_top_inset', String(_v));
+                    else localStorage.removeItem('nano_top_inset');
+                } catch (e) {}
+                try { applyTopInset(); } catch (e) {}
+                try { pumpSafeTop(); } catch (e) {}
             }
 
             if (data.type === 'closeBeautify') {

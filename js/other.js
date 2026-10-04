@@ -344,20 +344,32 @@
 (function () {
     'use strict';
     var STEP = 4, MIN = -160, MAX = 200;
-    var KEYS = { top: 'nanoTopShift', bottom: 'nanoBottomShift' };
+    var INSET_DEFAULT = 48;
+    var KEYS = { top: 'nanoTopShift', bottom: 'nanoBottomShift', inset: 'nano_top_inset' };
+    var VAL_ID = { top: 'topShiftVal', bottom: 'bottomShiftVal', inset: 'insetShiftVal' };
     function read(k) {
-        try { return parseInt(localStorage.getItem(k) || '0', 10) || 0; } catch (e) { return 0; }
+        try {
+            var v = localStorage.getItem(k);
+            if (v === null || v === '') return k === KEYS.inset ? INSET_DEFAULT : 0;
+            return parseInt(v, 10) || 0;
+        } catch (e) { return k === KEYS.inset ? INSET_DEFAULT : 0; }
     }
     function render(target, n) {
-        var el = document.getElementById(target === 'top' ? 'topShiftVal' : 'bottomShiftVal');
+        var el = document.getElementById(VAL_ID[target]);
         if (el) el.textContent = (n > 0 ? '+' : '') + n;
     }
     function apply(target, n) {
         n = parseInt(n, 10) || 0;
-        n = Math.max(MIN, Math.min(MAX, n));
+        if (target === 'inset') n = Math.max(0, Math.min(220, n));
+        else n = Math.max(MIN, Math.min(MAX, n));
         var key = KEYS[target];
         try { localStorage.setItem(key, String(n)); } catch (e) {}
         render(target, n);
+        if (target === 'inset') {
+            // 顶部安全区：通知主框架重新测量并下发
+            if (window.parent !== window) { try { window.parent.postMessage({ type: 'nanoTopInset', value: n }, '*'); } catch (e) {} }
+            return;
+        }
         var msg = { type: target === 'top' ? 'nanoTopShift' : 'nanoBottomShift', value: n };
         if (window.__nanoAppearance) { try { window.__nanoAppearance.applyMessage(msg); } catch (e) {} }
         if (window.parent !== window) { try { window.parent.postMessage(msg, '*'); } catch (e) {} }
@@ -367,9 +379,20 @@
             var target = this.getAttribute('data-target');
             var dir = parseInt(this.getAttribute('data-dir'), 10) || 0;
             if (!target) return;
+            if (target === 'inset') {
+                if (dir === 0) {   // 恢复默认：清掉自定义，回到 48 / env
+                    try { localStorage.removeItem(KEYS.inset); } catch (e) {}
+                    render('inset', INSET_DEFAULT);
+                    if (window.parent !== window) { try { window.parent.postMessage({ type: 'nanoTopInset', value: null }, '*'); } catch (e) {} }
+                    return;
+                }
+                apply('inset', read(KEYS.inset) + dir * 2);
+                return;
+            }
             apply(target, dir === 0 ? 0 : read(KEYS[target]) + dir * STEP);
         });
     });
     render('top', read(KEYS.top));
     render('bottom', read(KEYS.bottom));
+    render('inset', read(KEYS.inset));
 })();
