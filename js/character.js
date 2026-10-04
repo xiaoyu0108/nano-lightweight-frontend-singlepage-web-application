@@ -981,6 +981,7 @@
             setting,
             bindUser,
             isNpc: existingItem ? !!existingItem.isNpc : false,
+            nanoAssistant: existingItem ? !!existingItem.nanoAssistant : false,
             worldbookBindings: worldbookBindings.map(w => ({ ...w }))
         };
 

@@ -81,6 +81,18 @@
         <button class="ns-primary" id="nsPromptSave">保存提示词</button>
       </div>
 
+      <!-- 生成设置 -->
+      <div class="ns-card">
+        <div class="ns-card-title">生成设置</div>
+        <div class="ns-row">
+          <input class="ns-input" id="nsMaxTokens" type="number" min="256" max="32768" step="256" placeholder="最大输出 tokens（默认 8192）">
+          <button class="ns-mini-btn" id="nsMaxTokensSave">保存</button>
+        </div>
+        <label class="ns-switch-row"><span>直接执行（纳米给出动作后自动执行，不用手动点）</span><span class="ns-switch"><input type="checkbox" id="nsAutoExec"><i></i></span></label>
+        <label class="ns-switch-row"><span>减少啰嗦（只给结论 + 动作，不解释）</span><span class="ns-switch"><input type="checkbox" id="nsBrief"><i></i></span></label>
+        <div class="ns-hint">美化/世界书输出很长时容易被截断，把「最大输出」调大即可（上限 32768）。</div>
+      </div>
+
       <div style="height:40px"></div>
     </div>
 

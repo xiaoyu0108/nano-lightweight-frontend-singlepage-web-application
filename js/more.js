@@ -411,6 +411,16 @@
         try { on = localStorage.getItem('nano_assistant_enabled') === '1'; } catch (e) {}
         t.checked = on;
         if (on) ensureNanoCharacter(true);
+        else {
+            // localStorage 可能被清空/写满：从 IndexedDB 镜像恢复开关状态
+            idbGet('nano_assistant_enabled').then(function (v) {
+                if (v === '1') {
+                    try { localStorage.setItem('nano_assistant_enabled', '1'); } catch (e) {}
+                    t.checked = true;
+                    ensureNanoCharacter(true);
+                }
+            }).catch(function () {});
+        }
         var item = document.getElementById('nanoItem');
         if (item) item.addEventListener('click', function (e) {
             if (e.target.closest && e.target.closest('.nano-switch')) return;
@@ -418,8 +428,13 @@
         });
         t.addEventListener('change', async function () {
             var v = this.checked;
-            try { localStorage.setItem('nano_assistant_enabled', v ? '1' : '0'); } catch (e) {}
+            // 先真正建/删角色，再落开关：避免删除过程中被聊天页的自愈逻辑又打开
             await ensureNanoCharacter(v);
+            var flag = v ? '1' : '0';
+            var persisted = false;
+            try { localStorage.setItem('nano_assistant_enabled', flag); persisted = localStorage.getItem('nano_assistant_enabled') === flag; } catch (e) {}
+            try { idbSet('nano_assistant_enabled', flag); } catch (e) {}
+            if (!persisted) { try { showToast('浏览器存储已满，已用另一份存储记住设置'); } catch (e) {} }
             try { if (window.parent !== window) window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e) {}
             showToast(v ? '纳米助手已开启，去聊天列表找她' : '纳米助手已关闭');
         });

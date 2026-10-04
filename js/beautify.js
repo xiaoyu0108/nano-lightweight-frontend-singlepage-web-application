@@ -2424,12 +2424,16 @@ function ensureLocalFontFace(family, src, format) {
     // 直接挂「原地址 + CORS 代理」多个 src，交给浏览器按顺序回退。
     // iOS Safari 对跨域 Web 字体严格执行 CORS，很多直链因为服务器没开 ACAO 而被丢弃；
     // 加上带 CORS 头的代理，能显著提高可用字体 URL 的数量（与 appearance.js 的做法一致）。
-    const urls = [String(src)];
-    if (/^https?:/i.test(String(src))) {
-      const enc = encodeURIComponent(String(src));
+    // https 页面里加载 http 字体是「混合内容」会被直接拦掉：自动升级为 https 再试
+    let _s = String(src);
+    if (/^http:\/\//i.test(_s) && location.protocol === "https:") _s = _s.replace(/^http:\/\//i, "https://");
+    const urls = [_s];
+    if (/^https?:/i.test(_s)) {
+      const enc = encodeURIComponent(_s);
       urls.push("https://api.nano315.online/audio/proxy?url=" + enc);
       urls.push("https://api.allorigins.win/raw?url=" + enc);
       urls.push("https://corsproxy.io/?url=" + enc);
+      urls.push("https://api.codetabs.com/v1/proxy?quest=" + enc);
     }
     const srcList = urls
       .filter(function (u, i, a) { return u && a.indexOf(u) === i; })

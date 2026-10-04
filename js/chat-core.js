@@ -3756,11 +3756,13 @@
             post.maskId = getCurrentMaskId();
             await saveMomentPost(post);
             try { if (window.parent !== window) window.parent.postMessage({ type: 'momentsDataUpdated' }, '*'); } catch (e) {}
-            try {
-                if (window.NanoNotify) window.NanoNotify.notify(displayName || '朋友圈', (displayName || '') + ' 发了条朋友圈：' + String(post.text).slice(0, 50), { target: 'moments', channel: 'moment' });
-            } catch (e) {}
-            // 应用内淡粉色通知栏
-            try { if (window.parent !== window) window.parent.postMessage({ type: 'NANO_GEN_NOTIFY', title: '朋友圈已更新', body: (displayName || '') + '：' + String(post.text).slice(0, 40) }, '*'); } catch (e) {}
+            // 通知统一走 NANO_GEN_NOTIFY（前台=应用内粉色横幅，后台=系统通知），
+            // 不再额外直接调 NanoNotify，避免同一条通知被弹两次。
+            if (window.parent === window) {
+                try { if (window.NanoNotify) window.NanoNotify.notify(displayName || '朋友圈', (displayName || '') + ' 发了条朋友圈：' + String(post.text).slice(0, 50), { target: 'moments', channel: 'moment' }); } catch (e) {}
+            } else {
+                try { window.parent.postMessage({ type: 'NANO_GEN_NOTIFY', title: '朋友圈已更新', body: (displayName || '') + '：' + String(post.text).slice(0, 40) }, '*'); } catch (e) {}
+            }
         } finally { isProcessingApi = false; }
     }
     // 随机自动发「照片」动态（社交活跃度开启时可能与朋友圈交替出现）
@@ -4687,7 +4689,11 @@
                     messages: history,
                     // 纳米要输出完整 CSS + action；普通聊天也给足 token，避免 [heart]/[think] 写长后被截断。
                     // 可在「聊天设置」里用「回复字数上限」覆盖。
-                    max_tokens: isNanoChat ? 4000 : (function () {
+                    max_tokens: isNanoChat ? (function () {
+                        // 纳米要输出完整 CSS + action，默认给足（可在「纳米设置」里改）
+                        const v = parseInt(getChatSetting('nanoMaxTokens', 0), 10);
+                        return Math.min(v > 0 ? v : 8192, 32768);
+                    })() : (function () {
                         const v = parseInt(getChatSetting('replyMaxTokens', 0), 10);
                         if (v > 0) return Math.min(v, 16384);
                         return 3000;
@@ -5273,6 +5279,13 @@
             });
         }
         paint();
+        // 直接执行模式：开启后不再等用户点「立即执行」，卡片自动执行
+        try {
+            var _auto = getChatSetting('nanoAutoExec', false);
+            if ((_auto === true || _auto === 'true' || _auto === 1 || _auto === '1') && a.status !== 'done' && a.status !== 'running') {
+                setTimeout(function () { try { var rb = box.querySelector('.nano-run'); if (rb) rb.click(); } catch (e) {} }, 300);
+            }
+        } catch (e) {}
         return box;
     }
     function renderNanoAction(a, row) {
@@ -6444,6 +6457,30 @@ if (callCard) {
 
             if (action === 'reply') {
                 setQuote(msg.id, msg.text);
+            } else if (action === 'copy') {
+                const _copyText = String(msg.text || msg.transcript || '').trim();
+                const _done = function () {
+                    if (window.parent !== window) {
+                        window.parent.postMessage({ type: 'alert', message: '已复制' }, '*');
+                    } else {
+                        try { if (typeof showToast === 'function') showToast('已复制'); } catch (e) {}
+                    }
+                };
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText && _copyText) {
+                        navigator.clipboard.writeText(_copyText).then(_done, function () {
+                            try {
+                                const ta = document.createElement('textarea');
+                                ta.value = _copyText; ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+                                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); _done();
+                            } catch (e) {}
+                        });
+                    } else if (_copyText) {
+                        const ta = document.createElement('textarea');
+                        ta.value = _copyText; ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+                        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); _done();
+                    }
+                } catch (e) {}
             } else if (action === 'edit') {
                 openEditPopup(msg);
             } else if (action === 'recall') {

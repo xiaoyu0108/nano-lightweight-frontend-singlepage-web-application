@@ -452,11 +452,17 @@
         if (cfg.type === 'url' && cfg.source) {
             if (cfg.__resolved) add(cfg.__resolved, fontFormatFor(cfg.__resolved));
             add(cfg.source, cfg.format || fontFormatFor(cfg.source));
+            // https 页面里 http 字体属混合内容，会被浏览器拦掉：补一个 https 升级候选
+            if (/^http:\/\//i.test(cfg.source) && location.protocol === 'https:') {
+                add(cfg.source.replace(/^http:\/\//i, 'https://'), fontFormatFor(cfg.source));
+            }
             if (/^https?:/i.test(cfg.source)) {
-                var enc = encodeURIComponent(cfg.source);
+                var _s2 = /^http:\/\//i.test(cfg.source) && location.protocol === 'https:' ? cfg.source.replace(/^http:\/\//i, 'https://') : cfg.source;
+                var enc = encodeURIComponent(_s2);
                 add('https://api.nano315.online/audio/proxy?url=' + enc, '');
                 add('https://api.allorigins.win/raw?url=' + enc, '');
                 add('https://corsproxy.io/?url=' + enc, '');
+                add('https://api.codetabs.com/v1/proxy?quest=' + enc, '');
             }
         }
         return out;

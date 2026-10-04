@@ -270,19 +270,33 @@
     function notify(title, body, opts) {
         opts = opts || {};
         if (!enabled() && !opts.force) return;
+        // 去重：同一条通知在极短时间内被多个通道/多次调用触发时只弹一次，
+        // 解决「系统通知内容重复两次」的问题（标题+内容+target 作为 key）。
+        try {
+            var dk = String(title || '') + '|' + String(body || '') + '|' + String(opts.target || '');
+            var now = Date.now();
+            notify._seen = notify._seen || {};
+            if (notify._seen[dk] && now - notify._seen[dk] < 1500) return;
+            notify._seen[dk] = now;
+            if (Object.keys(notify._seen).length > 60) notify._seen = {};
+        } catch (e) {}
         playSound(soundFor(opts));
         // 头像作为大图标（icon），Nano 图标作为右下角角标（badge）
         var defIcon = nanoIconUrl();
         var icon = opts.icon || defIcon;
         var badge = opts.badge || defIcon;
         // Bark：应用退到后台/锁屏时，通过苹果推送弹真正的系统通知（国内可用）
+        var barkSent = false;
         try {
             var hidden = (typeof document !== 'undefined') && (document.hidden || document.visibilityState === 'hidden');
             if (barkEnabled() && barkKey() && (hidden || opts.force || opts.bark)) {
                 var bopts = Object.assign({}, opts, { icon: icon, group: opts.group || title || 'Nano' });
                 barkPush(title, body, bopts);
+                barkSent = true;
             }
         } catch (e) {}
+        // Bark 已经弹过系统通知：不再走 ServiceWorker / new Notification，避免同一条弹两次
+        if (barkSent) return;
         // 已按要求去掉应用内的黑色横幅（appNotify）；前台只保留提示音 + 未读红点
         var payload = {
             body: String(body || '').slice(0, 120),

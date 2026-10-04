@@ -48,13 +48,13 @@
         '<rect x="18" y="24" width="44" height="34" rx="12" fill="#fff" opacity="0.95"/>' +
         '<circle cx="32" cy="41" r="4.5" fill="#ff4d94"/><circle cx="48" cy="41" r="4.5" fill="#ff4d94"/>' +
         '<rect x="38" y="12" width="4" height="10" rx="2" fill="#fff"/><circle cx="40" cy="11" r="4" fill="#fff"/></svg>');
-    var nanoHealedOnce = false;
+    var nanoHealAt = 0;
     function ensureNanoCharacterExists() {
-        if (nanoHealedOnce) return Promise.resolve();
-        nanoHealedOnce = true;
+        var now = Date.now();
+        if (now - nanoHealAt < 3000) return Promise.resolve();   // 节流，避免频繁开库
+        nanoHealAt = now;
         var on = false;
         try { on = localStorage.getItem('nano_assistant_enabled') === '1'; } catch (e) {}
-        if (!on) return Promise.resolve();
         return new Promise(function(resolve) {
             try {
                 var req = indexedDB.open('nano_characters_db', 1);
@@ -72,10 +72,15 @@
                         var g = store.get(NANO_ID);
                         g.onsuccess = function() {
                             var ex = g.result;
-                            if (!ex) {
-                                store.put({ id: NANO_ID, name: '纳米', avatar: NANO_AVATAR, gender: '女', nationality: '中国', setting: '', bindUser: '', isNpc: true, worldbookBindings: [], nanoAssistant: true });
-                            } else if (!ex.nanoAssistant) {
-                                ex.nanoAssistant = true; ex.isNpc = true; store.put(ex);
+                            if (on) {
+                                if (!ex) {
+                                    store.put({ id: NANO_ID, name: '纳米', avatar: NANO_AVATAR, gender: '女', nationality: '中国', setting: '', bindUser: '', isNpc: true, worldbookBindings: [], nanoAssistant: true });
+                                } else if (!ex.nanoAssistant) {
+                                    ex.nanoAssistant = true; ex.isNpc = true; store.put(ex);
+                                }
+                            } else if (ex && ex.nanoAssistant) {
+                                // 开关被误清空但角色仍在：反向恢复开关，避免助手“消失”
+                                try { localStorage.setItem('nano_assistant_enabled', '1'); } catch (e) {}
                             }
                         };
                         tx.oncomplete = function() { db.close(); resolve(); };

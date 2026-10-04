@@ -621,6 +621,30 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    // .nano-chat-inner .topbar-avatar::before { content: "⚙"; font-size: 18px; color: #8e8e93; }
 */
 
+/* 配方 K：只移动「消息头像」，顶栏「设置」按钮原地不动、逻辑不变
+   消息头像 = .message-avatar；顶栏设置按钮 = .topbar-avatar，两者完全独立。
+   只动消息头像用本配方；要把顶栏头像/设置按钮一起重排用配方 C。三种玩法任选：
+
+   // ① 头像贴到屏幕两侧（左消息头像靠左、右消息靠右），设置按钮仍在右上角
+   .nano-chat-inner .message-avatar, .nano-groups .message-avatar { position: absolute !important; top: 0; }
+   .nano-chat-inner .message-row.left .message-avatar,
+   .nano-groups .message-row.left .message-avatar { left: 4px !important; margin: 0 !important; }
+   .nano-chat-inner .message-row.right .message-avatar,
+   .nano-groups .message-row.right .message-avatar { right: 4px !important; left: auto !important; margin: 0 !important; }
+
+   // ② 头像固定在屏幕某个位置（不随消息滚动），设置按钮照常可点
+   .nano-chat-inner .message-avatar, .nano-groups .message-avatar {
+     position: fixed !important; left: 10px !important; top: 45% !important;
+     width: 56px !important; height: 56px !important; z-index: 20 !important;
+     pointer-events: none !important;      // 装饰层不挡点击
+   }
+
+   // ③ 放大 / 换形状（只改头像，不动设置按钮）
+   .nano-chat-inner .message-avatar,
+   .nano-groups .message-avatar { width: 54px !important; height: 54px !important; border-radius: 16px !important; }
+   // 想彻底隐藏头像参考配方 B 的 ③④。
+*/
+
 /* 配方 D：气泡尾巴规则 / 已读 / 时间
    // 连发也显示尾巴（都显示）
    .nano-chat-inner .bubble.grouped::after, .nano-groups .bubble.grouped::after { display: block !important; }

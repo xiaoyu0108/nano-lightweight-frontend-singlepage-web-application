@@ -346,6 +346,30 @@
     toast('提示词已保存');
   });
 
+  /* ---------- 生成设置：token 上限 / 直接执行 / 简洁模式 ---------- */
+  function setNanoSetting(key, val) {
+    try { localStorage.setItem('chat_setting_' + key + '_' + chatId, JSON.stringify(val)); } catch (e) {}
+  }
+  function getNanoSetting(key, def) {
+    try { var v = localStorage.getItem('chat_setting_' + key + '_' + chatId); if (v === null) return def; return JSON.parse(v); } catch (e) { return def; }
+  }
+  (function initNanoGenSettings() {
+    var tok = $('nsMaxTokens'); if (tok) tok.value = getNanoSetting('nanoMaxTokens', 8192);
+    var au = $('nsAutoExec'); if (au) au.checked = !!getNanoSetting('nanoAutoExec', false);
+    var bf = $('nsBrief'); if (bf) bf.checked = !!getNanoSetting('nanoBrief', false);
+    var saveTok = $('nsMaxTokensSave');
+    if (saveTok) saveTok.addEventListener('click', function () {
+      var v = parseInt($('nsMaxTokens').value, 10);
+      if (!v || v < 256) v = 8192;
+      v = Math.min(v, 32768);
+      $('nsMaxTokens').value = v;
+      setNanoSetting('nanoMaxTokens', v);
+      toast('已保存：最大输出 ' + v + ' tokens');
+    });
+    if (au) au.addEventListener('change', function () { setNanoSetting('nanoAutoExec', !!this.checked); toast(this.checked ? '已开启直接执行' : '已关闭直接执行'); });
+    if (bf) bf.addEventListener('change', function () { setNanoSetting('nanoBrief', !!this.checked); toast(this.checked ? '已开启简洁模式' : '已关闭简洁模式'); });
+  })();
+
   loadAll();
   loadBgUI();
 })();

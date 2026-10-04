@@ -120,15 +120,29 @@ function setupThoughtExpand(el) {
 
   // ===== 默认模板（高度可 DIY）=====
   const DEFAULT_CSS = `/* ============================================================
-   默认 · 居中大头像（iOS 邮件风）— 常用 DIY 已直接写进模板
+   默认 · 居中大头像（iOS 邮件风）— 这就是「内置美化」的初始样式
    ------------------------------------------------------------
-   · 头像大小 / 圆角：改 .nano-voice-modal 的 --iv-avatar-size / --iv-avatar-radius
-   · 想恢复「左头像」经典版：在「模板管理」里选「经典 · 左头像 iOS邮件」
-   · 加一行文字：.iv-extra-text{display:block} + .iv-extra-text::before{content:"..."}
-                 （换行写 "\\A" 并配 white-space:pre-wrap）
-   · 加装饰贴图：.iv-deco-top / .iv-deco-bottom 默认 display:none，
-                 想用时设成 display:block 再配 ::before{content:url("图片地址")}
-   · 加角标 / 水印：.iv-content::after{content:"Nano";position:absolute;right:16px;bottom:12px;opacity:.35}
+   「还原」= 回到下面这套初始样式；想任意改造，直接在本框里写 CSS 覆盖即可。
+   所有元素都能隐藏 / 移动 / 放大缩小 / 换图 / 换字，JS 写入的挂点：
+     #ivAvatar(.iv-avatar) 头像 · #ivSender(.iv-name) 昵称 · .iv-caption 发送人小字
+     #ivRecipient 收件人 · #ivTime 时间 · #ivSubject(.iv-subject) 此刻印象
+     #ivThought(.iv-thought) 心声正文 · #ivExtraText 附加文字
+     #ivDecoTop / #ivDecoBottom 顶/底装饰层 · .iv-header/.iv-meta/.iv-content 结构容器
+   ---- 常用改法（复制需要的行，改完点「应用 CSS」）----
+   ① 隐藏任意文字 / 头像：选择器加 display:none !important;
+      例：.nano-voice-modal .iv-caption { display:none !important; }   隐藏“发送人”小字
+   ② 头像随意换位置（不只是平移，可放任意角落 / 固定到屏幕）：
+      .nano-voice-modal .iv-avatar{ position:absolute !important; left:auto; right:14px; top:-28px; }
+      想固定在屏幕某处：把 position 改成 fixed，left/top 填像素或百分比。
+      父级 .iv-header 需 position:relative、overflow:visible（默认已满足）。
+   ③ 重排顶栏 / 内容区：给容器 display:flex; flex-direction:column/reverse; 用 order 调整先后。
+   ④ 头像大小 / 圆角：改 --iv-avatar-size / --iv-avatar-radius（见下）。
+   ⑤ 加一行文字：.iv-extra-text{display:block} + .iv-extra-text::before{content:"文案"}
+      （换行写 "\\A" 并配 white-space:pre-wrap）。
+   ⑥ 加装饰 / 角标 / 水印：.iv-deco-top/.iv-deco-bottom 设 display:block 后
+      配 ::before{content:url("图片地址")}；.iv-content::after{content:"Nano";position:absolute;right:16px;bottom:12px;opacity:.35;}
+   ⑦ 换字体 / 配色 / 宽度：font-family / color / background / width 任意改。
+   想恢复：点「还原」即可回到下面这套初始样式。
    ============================================================ */
 .nano-voice-modal {
   --iv-avatar-size: 72px;

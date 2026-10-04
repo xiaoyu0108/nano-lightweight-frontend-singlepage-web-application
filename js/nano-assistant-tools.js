@@ -65,6 +65,14 @@
       var extra = (localStorage.getItem('nano_builtin_prompt') || '').trim();
       if (extra) lines.push('\n【用户自定义内置要求（必须遵守）】\n' + extra);
     } catch (e) {}
+    try {
+      var _briefRaw = localStorage.getItem('chat_setting_nanoBrief_nano_ai');
+      var _briefOn = _briefRaw === 'true' || _briefRaw === '"true"' || _briefRaw === '1';
+      if (_briefOn) {
+        lines.push('');
+        lines.push('【简洁模式 · 已开启】不要复述用户的话、不要解释原理和背景，先给一句话结论，随后直接输出 <action> 块；除非用户追问，不要写长段落，CSS 只给必要部分。');
+      }
+    } catch (e) {}
     return lines.join('\n');
   }
 
