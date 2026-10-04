@@ -33,7 +33,7 @@ body{overflow-x:hidden}
 ::-webkit-scrollbar{display:none}
 *{scrollbar-width:none;-ms-overflow-style:none}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
-.app{max-width:520px;margin:auto;min-height:100vh;padding:max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)) 20px 34px;position:relative}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:var(--safe-top, 0px) 20px 34px;position:relative}
 
 /* ---------- 首页 ---------- */
 .brand{margin-top:14px}

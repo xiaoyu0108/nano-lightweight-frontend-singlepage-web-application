@@ -8,7 +8,7 @@
     (function () {
         try {
             var KEY = 'nano_build';
-            var CUR = 'nano-2026-10-04-03';
+            var CUR = 'nano-2026-10-04-05';
             var prev = null, ok = false;
             try { prev = localStorage.getItem(KEY); } catch (e) {}
             if (prev === CUR) return;
@@ -849,7 +849,7 @@
 /* 一次性强制更新：清掉旧 Service Worker 与缓存，保证拿到最新代码（每个版本号只执行一次） */
 (function () {
     try {
-        var KEY = 'nano_force_reset_v39';
+        var KEY = 'nano_force_reset_v41';
         if (localStorage.getItem(KEY) === '1') return;
         localStorage.setItem(KEY, '1');
         var tasks = [];
@@ -871,7 +871,7 @@
 /* 用一次 URL 参数绕过任何被缓存的 index.html（只跳一次） */
 (function () {
     try {
-        var B = '39';
+        var B = '41';
         var u = new URL(location.href);
         if (u.searchParams.get('b') !== B) { u.searchParams.set('b', B); location.replace(u.toString()); }
     } catch (e) {}
@@ -1057,9 +1057,10 @@
             var custom = NaN;
             try { custom = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
             try {
+                // 键盘兜底：把顶部安全区夹在 48~54px，避免某些 WebView 把 env() 报得很大导致顶栏离灵动岛很远
                 document.documentElement.style.setProperty(
                     '--safe-inset-top',
-                    (isFinite(custom) && custom >= 0) ? (custom + 'px') : 'max(env(safe-area-inset-top, 0px), 48px)'
+                    (isFinite(custom) && custom >= 0) ? (custom + 'px') : 'max(min(env(safe-area-inset-top, 0px), 54px), 48px)'
                 );
             } catch (e) {}
         }
@@ -1382,13 +1383,14 @@
                 let top = parseFloat(cs.paddingTop) || 0;
                 const bottom = parseFloat(cs.paddingBottom) || 0;
                 probe.parentNode.removeChild(probe);
-                // 全屏 / PWA / WebView 下部分 iOS 会把 env(safe-area-inset-top) 报成 0。
-                // 默认抬到「刚好越过灵动岛」的 48px（不追求 59px 的整块安全区，避免离灵动岛太远）；
-                // 可用 localStorage.nano_top_inset 覆盖微调，例如 setItem('nano_top_inset','44')。
+                // 把顶部安全区夹在 48~54px：
+                //  · 报成 0 的 WebView → 48（刚好越过灵动岛）
+                //  · 报得很大的 WebView（某些内嵌浏览器 env 会到 100+）→ 54，避免顶栏离灵动岛很远
+                // 想要更精确可用「其他 → 界面 → 灵动岛安全区」或 localStorage.nano_top_inset 覆盖。
                 var _customTop = NaN;
                 try { _customTop = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
                 if (isFinite(_customTop) && _customTop >= 0) top = _customTop;
-                else if (top < 44) top = 48;
+                else top = Math.min(Math.max(top, 48), 54);
                 return { top: top, bottom: bottom };
             } catch (e) { return { top: 0, bottom: 0 }; }
         }
@@ -1443,7 +1445,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-04-03';
+        var BUILD = 'nano-2026-10-04-05';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -2045,7 +2047,15 @@
 
         const refreshState = {};
         const urlSourceMap = {};
-        function baseName(p) { try { return String(p || '').split('?')[0].split('/').pop(); } catch (e) { return ''; } }
+        // 注意：要 decodeURIComponent。带空格的页面（如 “memory palace.html”）在 iframe 的
+        // location.href 里会被编码成 memory%20palace.html，不解码就匹配不到 SELF_SAFE_PAGES /
+        // ownNavPages，外壳会误判并给它叠加一层 body 安全区留白（只有记忆宫殿受影响）。
+        function baseName(p) {
+            try {
+                var s = String(p || '').split('?')[0].split('/').pop();
+                try { return decodeURIComponent(s); } catch (e) { return s; }
+            } catch (e) { return ''; }
+        }
         // 读取 iframe 里「实际正在显示」的页面名：页面可能在 iframe 内自己 location.href 跳转过，
         // 此时 src 属性已过期，用属性判断会误以为它还停在旧页面。
         function frameBase(f) {
