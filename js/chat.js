@@ -92,6 +92,42 @@
         });
     }
 
+    // ===== 用户隔离迁移：把没有 bindUser 的 NPC / 小号归到当前人设名下 =====
+    var orphanAt = 0;
+    function migrateOrphanNpcs(maskId) {
+        var now = Date.now();
+        if (now - orphanAt < 8000) return Promise.resolve();
+        orphanAt = now;
+        if (maskId == null || maskId === '') return Promise.resolve();
+        return new Promise(function (resolve) {
+            try {
+                var req = indexedDB.open('nano_characters_db', 1);
+                req.onupgradeneeded = function (e) {
+                    try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {}
+                };
+                req.onsuccess = function () {
+                    try {
+                        var db = req.result;
+                        var tx = db.transaction('characters', 'readwrite');
+                        var store = tx.objectStore('characters');
+                        var all = store.getAll();
+                        all.onsuccess = function () {
+                            (all.result || []).forEach(function (c) {
+                                if (c && c.isNpc && !c.nanoAssistant && (c.bindUser == null || c.bindUser === '')) {
+                                    c.bindUser = String(maskId);
+                                    store.put(c);
+                                }
+                            });
+                        };
+                        tx.oncomplete = function () { db.close(); resolve(); };
+                        tx.onerror = function () { db.close(); resolve(); };
+                    } catch (e) { resolve(); }
+                };
+                req.onerror = function () { resolve(); };
+            } catch (e) { resolve(); }
+        });
+    }
+
     // ===== 获取某个聊天的最新消息 =====
     function getLastMessage(chatId) {
         try {
@@ -500,9 +536,14 @@
             return;
         }
 
+        const ddLabel = document.createElement('div');
+        ddLabel.className = 'dd-label';
+        ddLabel.textContent = '切换人设';
+        dropdown.appendChild(ddLabel);
+
         masks.forEach(m => {
             const item = document.createElement('div');
-            item.className = 'dropdown-item';
+            item.className = 'dropdown-item' + (currentUser && m.id === currentUser.id ? ' active' : '');
             const avatar = document.createElement('div');
             avatar.className = 'd-avatar';
             if (m.avatar && m.avatar.trim() !== '') {
@@ -528,11 +569,6 @@
             name.textContent = m.name || '未命名';
             item.appendChild(name);
 
-            const check = document.createElement('span');
-            check.className = 'd-check' + (currentUser && m.id === currentUser.id ? '' : ' hidden');
-            check.textContent = '✓';
-            item.appendChild(check);
-
             item.addEventListener('click', function() {
                 setCurrentUser(m.id);
                 document.getElementById('userDropdown').classList.remove('show');
@@ -541,12 +577,58 @@
 
             dropdown.appendChild(item);
         });
+
+        const manage = document.createElement('div');
+        manage.className = 'dd-manage';
+        manage.innerHTML = '<span class="plus">+</span><span>管理人设 / 新建</span>';
+        manage.addEventListener('click', function () {
+            document.getElementById('userDropdown').classList.remove('show');
+            document.getElementById('arrowIcon').classList.remove('open');
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'openFullscreen', url: 'mask.html', title: 'Mask' }, '*');
+            } else {
+                window.location.href = 'mask.html';
+            }
+        });
+        dropdown.appendChild(manage);
     }
+
+    // 角色数量用英文单词显示（eg: seven），超出范围则退回数字
+    function numWord(n) {
+        n = parseInt(n, 10) || 0;
+        var ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+            'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+        var tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+        if (n < 0 || n > 99) return String(n);
+        if (n < 20) return ones[n];
+        var t = Math.floor(n / 10), o = n % 10;
+        return tens[t] + (o ? ' ' + ones[o] : '');
+    }
+
+    // 头像行「+」的待处理好友申请红点
+    function updateMeetBadge() {
+        try {
+            const el = document.getElementById('avatarAddBtn');
+            if (!el) return;
+            let n = 0;
+            try {
+                const cur = getCurrentUser();
+                const all = JSON.parse(localStorage.getItem('nano_friend_requests') || '[]') || [];
+                n = all.filter(r => r && r.status === 'pending' && String(r.owner || '') === String(cur && cur.id || '')).length;
+            } catch (e) {}
+            el.classList.toggle('has-req', n > 0);
+        } catch (e) {}
+    }
+    updateMeetBadge();
+    setInterval(updateMeetBadge, 5000);
 
     // ===== 渲染聊天列表（改为异步） =====
     async function renderChatList() {
         const currentUser = getCurrentUser();
         await ensureNanoCharacterExists();
+        if (currentUser && currentUser.id != null) {
+            try { await migrateOrphanNpcs(currentUser.id); } catch (e) {}
+        }
         const allChars = await getCharacters();
         const groups = loadGroups();
 
@@ -563,9 +645,10 @@
 
         let displayChars = [];
         if (currentUser) {
-            displayChars = allChars.filter(c => c.bindUser === currentUser.id || c.isNpc);
+            // 用户隔离：只显示绑定到当前人设的角色 + 纳米助手；不再显示别的 user 的 NPC/小号
+            displayChars = allChars.filter(c => String(c.bindUser) === String(currentUser.id) || !!c.nanoAssistant);
         }
-        charCountDisplay.textContent = displayChars.length;
+        charCountDisplay.textContent = numWord(displayChars.length);
 
         const chatList = document.getElementById('chatList');
         const noResult = document.getElementById('noResult');
@@ -1181,6 +1264,11 @@
 
     document.getElementById('avatarAddBtn').addEventListener('click', function(e) {
         e.stopPropagation();
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'openFullscreen', url: 'meet.html', title: 'Meet', showBack: true, source: 'chat' }, '*');
+        } else {
+            window.location.href = 'meet.html';
+        }
     });
 
     // ===== 顶栏按钮：人设（mask）/ 角色库（character） =====

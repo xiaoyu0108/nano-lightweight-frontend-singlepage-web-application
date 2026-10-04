@@ -9,7 +9,8 @@
 
   function systemPrompt() {
     var lines = [];
-    lines.push('你是「纳米」，Nano 应用内置的美化/装修助手。你熟悉 Nano 的全部前端结构，人设是女生，语气亲切自然、简洁直接，用中文回答。');
+    lines.push('你是「纳米」，Nano 应用内置的美化 / 装修助手，是一个女生 AI。你善解人意、有耐心，但非常干练：不寒暄、不废话，通常直接给结论和可执行结果，用中文回答。');
+    lines.push('你精通前端与 Nano 的全部结构，能直接帮用户改好样式、世界书、人设并输出 <action>。写长 CSS / 代码时要一次性给全，不要因为篇幅长就省略关键部分、也不要说"以下省略"——输出会被截断时，尽量精简措辞，把完整代码放进去。');
     lines.push('');
     lines.push('【最重要的规则】');
     lines.push('1. Nano 是纯前端 PWA。你只能"覆盖"样式和写入存储，不能修改部署后的源码文件。');
@@ -558,9 +559,110 @@
     } catch (e) {}
     return true;
   }
+  /* ---------- 纳米扩展权限：清空美化 / 改人设 / 人设历史版本 ---------- */
+  function openCharsDb() {
+    return new Promise(function (res) {
+      try {
+        var r = indexedDB.open('nano_characters_db', 1);
+        r.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (x) {} };
+        r.onsuccess = function () { res(r.result); };
+        r.onerror = function () { res(null); };
+      } catch (e) { res(null); }
+    });
+  }
+  function findCharacter(key) {
+    return openCharsDb().then(function (db) {
+      if (!db) return null;
+      return new Promise(function (res) {
+        try {
+          var tx = db.transaction('characters', 'readonly');
+          var g = tx.objectStore('characters').getAll();
+          g.onsuccess = function () {
+            var list = g.result || [];
+            var c = list.find(function (x) { return x && (String(x.id) === String(key) || x.name === key); });
+            db.close(); res(c || null);
+          };
+          g.onerror = function () { db.close(); res(null); };
+        } catch (e) { res(null); }
+      });
+    });
+  }
+  function putCharacter(rec) {
+    return openCharsDb().then(function (db) {
+      if (!db) return false;
+      return new Promise(function (res) {
+        try {
+          var tx = db.transaction('characters', 'readwrite');
+          tx.objectStore('characters').put(rec);
+          tx.oncomplete = function () { db.close(); res(true); };
+          tx.onerror = function () { db.close(); res(false); };
+        } catch (e) { res(false); }
+      });
+    });
+  }
+  function pvKey(id) { return 'nano_persona_versions_' + id; }
+  function getVersions(id) { try { return JSON.parse(localStorage.getItem(pvKey(id)) || '[]') || []; } catch (e) { return []; } }
+  function pushVersion(id, name, setting) {
+    try {
+      var list = getVersions(id);
+      list.unshift({ ts: Date.now(), name: name || '', setting: String(setting || '') });
+      if (list.length > 30) list = list.slice(0, 30);
+      localStorage.setItem(pvKey(id), JSON.stringify(list));
+    } catch (e) {}
+  }
+  function clearBeautifyScope(scope) {
+    scope = String(scope || '').trim();
+    if (scope === 'chat') { try { localStorage.removeItem('beautify_chat'); localStorage.removeItem('beautify_chat_v2'); } catch (e) {} broadcast('chat', ''); }
+    else if (scope === 'groups') { try { localStorage.removeItem('beautify_groups'); localStorage.removeItem('beautify_groups_v2'); } catch (e) {} broadcast('groups', ''); }
+    else if (scope === 'heart') { try { localStorage.removeItem('nano_voice_applied_css'); } catch (e) {} try { window.parent.postMessage({ type: 'nanoVoiceCss', css: '', name: '' }, '*'); } catch (e) {} }
+    else if (scope === 'global') { try { localStorage.removeItem('beautify_global'); localStorage.removeItem('beautify_global_v2'); } catch (e) {} broadcast('global', ''); }
+    else if (scope === 'offline') { return setOfflineCss('').then(function () { try { window.parent.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {} }); }
+    else throw new Error('未知 scope：' + scope);
+  }
+  async function editPersona(key, setting) {
+    var c = await findCharacter(key);
+    if (!c) throw new Error('找不到角色：' + key);
+    pushVersion(c.id, c.name, c.setting || '');
+    c.setting = String(setting || '');
+    await putCharacter(c);
+    try { if (window.parent !== window) window.parent.postMessage({ type: 'contactsDataUpdated' }, '*'); } catch (e) {}
+    return true;
+  }
+  async function savePersonaVersion(key) {
+    var c = await findCharacter(key);
+    if (!c) throw new Error('找不到角色：' + key);
+    pushVersion(c.id, c.name, c.setting || '');
+    return getVersions(c.id).length;
+  }
+  async function listPersonaVersions(key) {
+    var c = await findCharacter(key);
+    if (!c) throw new Error('找不到角色：' + key);
+    var list = getVersions(c.id);
+    var text = list.map(function (v, i) { return '#' + (i + 1) + ' ' + new Date(v.ts).toLocaleString() + '：' + String(v.setting || '').slice(0, 40); }).join('\n');
+    try { window.parent.postMessage({ type: 'alert', message: '人设历史版本：\n' + (text || '（暂无）') }, '*'); } catch (e) {}
+    return text || '（暂无历史版本）';
+  }
+  async function restorePersonaVersion(key, index) {
+    var c = await findCharacter(key);
+    if (!c) throw new Error('找不到角色：' + key);
+    var list = getVersions(c.id);
+    var i = parseInt(index, 10) - 1;
+    if (!(i >= 0 && i < list.length)) throw new Error('版本号不存在：' + index);
+    pushVersion(c.id, c.name, c.setting || '');       // 回退前先存当前，便于再回退
+    c.setting = list[i].setting || '';
+    await putCharacter(c);
+    try { if (window.parent !== window) window.parent.postMessage({ type: 'contactsDataUpdated' }, '*'); } catch (e) {}
+    return true;
+  }
+
   async function execAction(a) {
     if (!a || !a.tool) throw new Error('空动作');
     var args = a.args || {};
+    if (a.tool === 'clear_beautify') return clearBeautifyScope(args.scope);
+    if (a.tool === 'edit_persona') return editPersona(args.name || args.id || args.char, args.setting);
+    if (a.tool === 'save_persona_version') return savePersonaVersion(args.name || args.id || args.char);
+    if (a.tool === 'list_persona_versions') return listPersonaVersions(args.name || args.id || args.char);
+    if (a.tool === 'restore_persona_version') return restorePersonaVersion(args.name || args.id || args.char, args.index);
     if (a.tool === 'apply_beautify') return applyBeautify(args.scope, args.name, args.css);
     if (a.tool === 'add_worldbook') return addWorldbook(args.name, args.entries, args.worldbook || args.target, args.group);
     if (a.tool === 'add_emoji') return addEmoji(args.group || args.name, args.emojis || args.items);
@@ -571,6 +673,11 @@
     throw new Error('未知动作 ' + a.tool);
   }
   function actionTitle(a) {
+    if (a.tool === 'clear_beautify') return '清空美化，恢复默认：' + (a.args.scope || '');
+    if (a.tool === 'edit_persona') return '修改人设：' + (a.args.name || a.args.id || '');
+    if (a.tool === 'save_persona_version') return '保存人设历史版本：' + (a.args.name || a.args.id || '');
+    if (a.tool === 'list_persona_versions') return '查看人设历史版本：' + (a.args.name || a.args.id || '');
+    if (a.tool === 'restore_persona_version') return '回退人设到版本 #' + (a.args.index || '') + '：' + (a.args.name || a.args.id || '');
     if (a.tool === 'apply_beautify') return '覆盖「' + (a.args.scope || '') + '」美化：' + (a.args.name || '未命名');
     if (a.tool === 'add_worldbook') {
       var wbTarget = a.args.worldbook || a.args.target;

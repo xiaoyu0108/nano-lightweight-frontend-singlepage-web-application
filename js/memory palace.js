@@ -488,7 +488,15 @@ function saveForm(){
    历史心声
    ============================================================ */
 function openHearts(){
-  const list=(W.hearts||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const raw=(W.hearts||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  // 去重：同样的心声只保留一条（按正文去重，正文为空时按主题），保留时间最新的一条
+  const _seen={};
+  const list=raw.filter(h=>{
+    const k=String(h.thought||'').trim() || String(h.subject||'').trim();
+    if(!k) return false;
+    if(_seen[k]) return false;
+    _seen[k]=1; return true;
+  });
   const body=list.length?list.map(h=>`
     <div class="heart-item">
       <div class="heart-subject">${esc(h.subject||'此刻')}</div>

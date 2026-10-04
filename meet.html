@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Meet</title>
+  <link rel="stylesheet" href="css/meet.css?v=20261004i">
+  <script src="js/appearance.js"></script>
+  <script src="js/friend-requests.js"></script>
+</head>
+<body>
+  <div class="kt-app">
+    <header class="kt-top">
+      <button class="kt-back" id="ktBack" data-back aria-label="返回">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="kt-title">Meet</span>
+      <span style="width:34px"></span>
+    </header>
+
+    <div class="kt-scroll">
+      <!-- 我的微信号（取自人设 Mask） -->
+      <section class="kt-hero">
+        <div class="kt-hero-label">MY WECHAT</div>
+        <div class="kt-wechat" id="ktWechat">未设置</div>
+        <button class="kt-edit" id="ktEditWechat">在「人设」里修改微信号</button>
+        <p class="kt-hero-hint">在 ins / halo 把微信号告诉陌生人，对方就会来加你</p>
+      </section>
+
+      <!-- 好友申请 -->
+      <section class="kt-section">
+        <div class="kt-sec-head">
+          <span class="kt-sec-title">好友申请</span>
+          <span class="kt-count" id="ktCount">0</span>
+        </div>
+        <div class="kt-list" id="ktList"></div>
+      </section>
+
+      <div style="height:44px"></div>
+    </div>
+
+    <div class="kt-toast" id="ktToast"></div>
+  </div>
+  <script src="js/meet.js?v=20261004f"></script>
+  <script src="swipe-back.js"></script>
+</body>
+</html>

@@ -158,16 +158,17 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
   padding: var(--chat-topbar-pad, var(--chat-safe-top)) 12px 6px;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
-.nano-chat-inner .back-btn {
+/* 2.1 顶栏 —— 单聊/群聊共享同一套（改这里两边一起变；玻璃色见 :root 的 --chat-glass-*） */
+.nano-chat-inner .back-btn, .nano-groups .back-btn {
   width: 44px; height: 44px; border: none; border-radius: 50%;
   background: var(--chat-glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
   border: 0.5px solid var(--chat-glass-line);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.nano-chat-inner .back-btn:active { transform: scale(0.88); background: rgba(200, 200, 210, 0.15); }
-.nano-chat-inner .back-btn i { font-size: 18px; color: var(--chat-text); }
-.nano-chat-inner .topbar-title {
+.nano-chat-inner .back-btn:active, .nano-groups .back-btn:active { transform: scale(0.88); background: rgba(200, 200, 210, 0.15); }
+.nano-chat-inner .back-btn i, .nano-groups .back-btn i { font-size: 18px; color: var(--chat-text); }
+.nano-chat-inner .topbar-title, .nano-groups .topbar-title {
   font-size: 17px; font-weight: 600; color: var(--chat-text); letter-spacing: -0.3px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
   padding: 6px 20px; background: var(--chat-glass-bg);
@@ -176,7 +177,10 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   text-align: center;
 }
-.nano-chat-inner .topbar-avatar {
+/* 群聊标题多一行人数，宽度放宽一点；顶栏胶囊透明底可被美化覆盖/去掉 */
+.nano-groups .topbar-title { max-width: 200px; flex: 0 1 auto; }
+.nano-groups .topbar-title .g-meta { display: block; font-size: 11px; color: var(--chat-sub); font-weight: 400; margin-top: 2px; }
+.nano-chat-inner .topbar-avatar, .nano-groups .topbar-avatar {
   position: relative; width: 44px; height: 44px; border-radius: 50%; overflow: hidden;
   background: var(--chat-glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border: 0.5px solid var(--chat-glass-line); cursor: pointer; flex-shrink: 0;
@@ -184,22 +188,25 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
   font-weight: 500; color: var(--chat-sub); transition: transform 0.15s;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.nano-chat-inner .topbar-avatar:active { transform: scale(0.92); }
-.nano-chat-inner .topbar-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.nano-chat-inner .multi-select-bar {
+.nano-chat-inner .topbar-avatar:active, .nano-groups .topbar-avatar:active { transform: scale(0.92); }
+.nano-chat-inner .topbar-avatar img, .nano-groups .topbar-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 多选栏：单聊/群聊共享（群聊按钮用 id 选择器） */
+.nano-chat-inner .multi-select-bar, .nano-groups .multi-select-bar {
   display: none; position: absolute; z-index: 31; left: 12px; right: 12px;
-    top: var(--chat-safe-top); height: 48px; background: var(--chat-glass-bg);
+  top: var(--chat-safe-top); height: 48px; background: var(--chat-glass-bg);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-radius: 28px; border: 0.5px solid var(--chat-glass-line);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   align-items: center; padding: 0 16px; justify-content: space-between;
 }
-.nano-chat-inner .multi-select-bar.active { display: flex; }
-.nano-chat-inner .multi-select-bar .ms-count { font-size: 15px; font-weight: 600; color: var(--chat-text); }
-.nano-chat-inner .multi-select-bar .ms-right { display: flex; gap: 12px; }
-.nano-chat-inner .multi-select-bar .ms-right button { background: none; border: none; font-size: 15px; font-weight: 500; cursor: pointer; padding: 4px 10px; border-radius: 8px; }
-.nano-chat-inner .multi-select-bar .ms-cancel { color: var(--chat-sub); }
-.nano-chat-inner .multi-select-bar .ms-delete { color: #ff3b30; }
+.nano-chat-inner .multi-select-bar.active, .nano-groups .multi-select-bar.active,
+.nano-groups .multi-select-bar.show { display: flex; }
+.nano-chat-inner .multi-select-bar .ms-count, .nano-chat-inner .multi-select-bar #msCount,
+.nano-groups .multi-select-bar #msCount { font-size: 15px; font-weight: 600; color: var(--chat-text); }
+.nano-chat-inner .multi-select-bar .ms-right, .nano-groups .multi-select-bar .ms-actions { display: flex; gap: 12px; }
+.nano-chat-inner .multi-select-bar .ms-right button, .nano-groups .multi-select-bar .ms-actions button { background: none; border: none; font-size: 15px; font-weight: 500; cursor: pointer; padding: 4px 10px; border-radius: 8px; }
+.nano-chat-inner .multi-select-bar .ms-cancel, .nano-groups .multi-select-bar #msCancel { color: var(--chat-sub); }
+.nano-chat-inner .multi-select-bar .ms-delete, .nano-groups .multi-select-bar #msDelete { color: #ff3b30; }
 
 /* 2.2 消息区 / 行 / 头像 / 气泡 */
 .nano-chat-inner .message-scroll { flex: 1; overflow-y: auto; padding: 8px 14px 14px 14px; background: transparent; -webkit-overflow-scrolling: touch; position: relative; }
@@ -436,17 +443,11 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    群顶栏高度用 --chat-topbar-pad 也可控制；群公告条可 order/margin 调整或隐藏。 */
 .nano-groups .topbar {
   position: relative; z-index: 30; width: 100%; flex-shrink: 0;
-  padding: var(--chat-topbar-pad, calc(8px + var(--safe-top, env(safe-area-inset-top, 0px)))) 8px 6px;
-  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: var(--chat-topbar-pad, var(--chat-safe-top)) 12px 6px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
-.nano-groups .back-btn { width: 40px; height: 40px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
-.nano-groups .back-btn:active { opacity: 0.5; }
-.nano-groups .back-btn i { font-size: 22px; color: var(--chat-text); }
-.nano-groups .topbar-title { font-size: 17px; font-weight: 600; color: var(--chat-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; text-align: center; flex: 1; }
-.nano-groups .topbar-title .g-meta { display: block; font-size: 11px; color: var(--chat-sub); font-weight: 400; margin-top: 2px; }
-.nano-groups .topbar-avatar { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: var(--chat-sub); background: #e8e8ec; }
-.nano-groups .topbar-avatar:active { opacity: 0.7; }
-.nano-groups .topbar-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* 群聊顶栏的返回 / 群名 / 头像与单聊共享上面「2.1 顶栏」那套透明胶囊样式。
+   想单独改群聊或去掉胶囊，在这里写 .nano-groups … 覆盖即可（例如 background: transparent）。 */
 .nano-groups .group-notice-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #fef6e0; font-size: 13px; color: #8a6d1f; flex-shrink: 0; margin: 0 12px 6px; border-radius: 8px; }
 .nano-groups .group-notice-bar .notice-icon { color: #f0a500; display: flex; flex-shrink: 0; }
 .nano-groups .group-notice-bar .notice-icon svg { width: 18px; height: 18px; }
@@ -540,7 +541,7 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 .nano-groups .more-btn { width: 42px; height: 42px; border: none; border-radius: 50%; background: rgba(255, 255, 255, 0.95); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; color: var(--chat-text); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08); }
 .nano-groups .more-btn:active { transform: scale(0.92); background: #f0f0f3; }
 .nano-groups .more-btn svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2; fill: none; }
-.nano-groups .input-shell { flex: 1; min-width: 0; display: flex; flex-direction: column; background: rgba(255, 255, 255, 0.95); border-radius: 22px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); position: relative; overflow: visible; }
+.nano-groups .input-shell { flex: 1; min-width: 0; display: flex; flex-direction: column; background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 22px; border: 0.5px solid rgba(255,255,255,0.5); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6); position: relative; overflow: visible; }
 .nano-groups .input-row { display: flex; align-items: center; gap: 4px; padding: 4px 12px; min-height: 42px; }
 .nano-groups .input { flex: 1; border: none; outline: none; background: transparent; font-size: 16px; color: var(--chat-text); padding: 6px 2px; min-width: 0; font-family: inherit; }
 .nano-groups .input::placeholder { color: #aeaeb2; }
@@ -621,7 +622,30 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    // .nano-chat-inner .topbar-avatar::before { content: "⚙"; font-size: 18px; color: #8e8e93; }
 */
 
-/* 配方 K：只移动「消息头像」，顶栏「设置」按钮原地不动、逻辑不变
+/* 配方 K：顶栏整体 DIY（移动 / 隐藏 / 换样式；返回、设置按钮功能保持不变）
+   顶栏 = .nano-chat-inner .topbar（群聊为 .nano-groups .topbar）。三个子元素：
+   .back-btn 返回 · .topbar-title 昵称 · .topbar-avatar 设置按钮。改样式不影响点击逻辑。
+
+   // ① 整条顶栏再往下让一点（默认已紧贴灵动岛）
+   .nano-chat-inner .topbar { padding-top: calc(var(--chat-topbar-pad, 28px) + 10px) !important; }
+   // ② 隐藏整条顶栏（注意会失去返回/设置入口，慎用）：
+   .nano-chat-inner .topbar { display: none !important; }
+   // ③ 只隐藏昵称，保留返回和设置：
+   .nano-chat-inner .topbar-title { display: none !important; }
+   // ④ 顶栏改透明 / 悬浮玻璃 / 纯色：
+   .nano-chat-inner .topbar { background: rgba(255,255,255,.72) !important; backdrop-filter: blur(20px) !important; }
+   .nano-chat-inner .back-btn, .nano-chat-inner .topbar-title, .nano-chat-inner .topbar-avatar {
+     background: transparent !important; box-shadow: none !important; border: none !important;
+   }
+   // ⑤ 把顶栏固定到屏幕顶部（可再配 left/right 微调）：
+   .nano-chat-inner .topbar { position: fixed !important; top: 0 !important; left: 0; right: 0; }
+   // ⑥ 设置按钮换成图片（隐藏图标但保留点击）：
+   .nano-chat-inner .topbar-avatar > img, .nano-chat-inner .topbar-avatar > span { visibility: hidden; }
+   .nano-chat-inner .topbar-avatar { background: url("https://your.cdn/settings.png") center / cover no-repeat !important; }
+   // 想把「头像」从设置按钮上剥离单独移动 → 配方 C；只移动消息头像 → 配方 L。
+*/
+
+/* 配方 L：只移动「消息头像」，顶栏「设置」按钮原地不动、逻辑不变
    消息头像 = .message-avatar；顶栏设置按钮 = .topbar-avatar，两者完全独立。
    只动消息头像用本配方；要把顶栏头像/设置按钮一起重排用配方 C。三种玩法任选：
 

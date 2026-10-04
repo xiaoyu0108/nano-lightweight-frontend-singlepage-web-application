@@ -707,7 +707,8 @@
             if (TK.active) return;
             if (localStorage.getItem('nano_takeover_proactive') === '0') return;
             var last = parseInt(localStorage.getItem('nano_takeover_proactive_at') || '0', 10);
-            if (Date.now() - last < 35 * 60 * 1000) return;
+            // 主动「反查手机」的最小间隔：拉长一点，别太频繁（90 分钟）
+            if (Date.now() - last < 90 * 60 * 1000) return;
             var lc = JSON.parse(localStorage.getItem('nano_last_chat') || 'null');
             if (!lc || !lc.id) return;
             localStorage.setItem('nano_takeover_proactive_at', String(Date.now()));

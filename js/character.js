@@ -102,10 +102,13 @@
             if (!chars || !chars.length) return;
             const maskId = user.id;
             const del = [];
+            const toBind = [];
             const bestByName = {};
             chars.forEach(c => {
                 const bindUser = c.bindUser || '';
-                // 群聊里添加的 NPC 没有 bindUser，但要保留（可编辑人设/头像）
+                // 没有 bindUser 的 NPC（含小号）：归到当前人设名下，避免串到别的 user。
+                // 纳米助手不参与（它用 nanoAssistant 标记、bindUser 留空）。
+                if (bindUser === '' && c.isNpc && !c.nanoAssistant) { toBind.push(c); return; }
                 if (bindUser === '' && !c.isNpc) { del.push(c.id); return; }
                 if (bindUser === '') return;
                 if (bindUser !== maskId) return;
@@ -118,6 +121,16 @@
                     else { del.push(c.id); }
                 }
             });
+            // 先把无主的 NPC / 小号绑定到当前人设
+            for (const c of toBind) {
+                try {
+                    c.bindUser = maskId;
+                    await idbPut(c);
+                    const inMem = (data.chars || []).find(x => x && x.id === c.id);
+                    if (inMem) inMem.bindUser = maskId;
+                } catch (e) {}
+            }
+            if (toBind.length) renderAll();
             if (!del.length) return;
             const delSet = new Set(del);
             await idbDelete(del);
@@ -684,7 +697,7 @@
         
         // ===== 修复：如果有当前 User，显示绑定的角色；群聊里添加的 NPC 也显示 =====
         if (currentUser) {
-            chars = chars.filter(c => c.bindUser === currentUser.id || c.isNpc);
+            chars = chars.filter(c => String(c.bindUser) === String(currentUser.id));
         }
         // 如果没有当前 User，显示所有角色（让用户能看到）
         

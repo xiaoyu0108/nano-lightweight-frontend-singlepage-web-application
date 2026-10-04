@@ -338,6 +338,12 @@ html.keyboard-open .chat-container {
 .bubble-card.listen .card-btn.return-btn { background: #ececf0; color: #555; }
 .bubble-card.listen .card-btn.return-btn:active { background: #e0e0e5; }
 
+/* 文件 / 手机内容分享卡片：给个底色，别透明 */
+.bubble-card.file { background: #ffffff; color: #111; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+.bubble-card.file .icon-wrap { background: rgba(0,0,0,0.06); color: #111; }
+.bubble-card.file .card-title { color: #111; }
+.bubble-card.file .card-sub { color: #999; }
+
 .bubble-card.couple { background: linear-gradient(135deg, #fff6f8, #f7eef4); color: #6b4b57; box-shadow: 0 6px 18px rgba(201,139,157,0.12); }
 .bubble-card.couple .icon-wrap { background: rgba(201,139,157,0.16); color: #c07d93; }
 .bubble-card.couple .card-title { font-family: "Songti SC","STSong",serif; font-size: 16px; color: #6b4b57; }
@@ -632,7 +638,7 @@ body.popup-open .bottom-bar { display: none !important; }
 .input-shell {
     flex: 1; min-width: 0; display: flex; flex-direction: column;
     padding: 2px 6px 2px 14px;
-    background: rgba(255,255,255,0.5); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    background: rgba(255,255,255,0.32); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border-radius: 30px; border: 0.5px solid rgba(255,255,255,0.5);
     box-shadow: 0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.6);
     min-height: 42px; justify-content: center;

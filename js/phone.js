@@ -2374,16 +2374,6 @@ async function openSettings(){
       </div>
 
       <div class="st-row">
-        <button class="st-btn" data-act="proactive-now">
-          <div>
-            <div class="st-btn-title">现在让 TA 主动申请</div>
-            <div class="st-btn-sub">测试：让 TA 自己发起一次查看</div>
-          </div>
-          <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
-        </button>
-      </div>
-
-      <div class="st-row">
         <button class="st-btn" data-act="pages">
           <div>
             <div class="st-btn-title">每次查看的页数</div>
@@ -2398,6 +2388,16 @@ async function openSettings(){
           <div>
             <div class="st-btn-title">让 TA 看我的真实屏幕</div>
             <div class="st-btn-sub">共享真实屏幕让 TA 实时点评（需能识图的模型；电脑 Chrome/Edge 支持，iOS 网页端不支持）</div>
+          </div>
+          <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div class="st-row">
+        <button class="st-btn" data-act="share">
+          <div>
+            <div class="st-btn-title">把手机内容分享给 TA</div>
+            <div class="st-btn-sub">选择要分享的 App，TA 会在聊天里收到并和你讨论</div>
           </div>
           <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
         </button>
@@ -2472,16 +2472,6 @@ async function openSettings(){
     openSettings();
   };
 
-  appHost.querySelector('[data-act="proactive-now"]').onclick = () => {
-    try{
-      if(window.parent && window.parent !== window){
-        window.parent.postMessage({ type:"takeoverProactive" }, "*");
-      }else if(window.CharTakeover && window.CharTakeover.proactiveNow){
-        window.CharTakeover.proactiveNow();
-      }
-    }catch(e){}
-  };
-
   appHost.querySelector('[data-act="pages"]').onclick = () => {
     const order = ["3", "5", "7", "10", "15", "all"];
     const cur = localStorage.getItem("nano_takeover_pages") || "5";
@@ -2509,6 +2499,68 @@ async function openSettings(){
     for(const a of SETTINGS_APPS) await dataSet(`icon_${currentChar.id}_${a.id}`, "");
     await applyIcons(currentChar.id);
     openSettings();
+  };
+  const shareBtn = appHost.querySelector('[data-act="share"]');
+  if (shareBtn) shareBtn.onclick = () => openPhoneSharePicker();
+}
+
+/* ---------- 查手机：把内容按 App 分享给 TA ---------- */
+function phoneShareEsc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function phoneShareToast(msg){
+  let t = document.getElementById("phoneShareToast");
+  if(!t){ t = document.createElement("div"); t.id = "phoneShareToast";
+    t.style.cssText = "position:fixed;left:50%;bottom:46px;transform:translateX(-50%) translateY(8px);background:rgba(20,20,20,.9);color:#fff;padding:9px 16px;border-radius:999px;font-size:13px;z-index:300;opacity:0;transition:all .2s;pointer-events:none";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  requestAnimationFrame(()=>{ t.style.opacity = "1"; t.style.transform = "translateX(-50%) translateY(0)"; });
+  clearTimeout(t._tm);
+  t._tm = setTimeout(()=>{ t.style.opacity = "0"; t.style.transform = "translateX(-50%) translateY(8px)"; }, 1800);
+}
+async function buildAppShareText(appId){
+  const app = SETTINGS_APPS.find(a => a.id === appId);
+  const label = app ? app.name : appId;
+  let text = "";
+  try { const saved = await dataGet(`app_${currentChar.id}_${appId}`); text = saved ? JSON.stringify(saved.data, null, 1) : ""; } catch(e){}
+  if(!text || text === "null") text = "（这个 App 还没有生成内容）";
+  if(text.length > 4000) text = text.slice(0, 4000) + "\n…（已截断）";
+  return { app: appId, name: label, text: text };
+}
+function openPhoneSharePicker(){
+  const old = document.getElementById("phoneSharePicker");
+  if(old) old.remove();
+  const rows = SETTINGS_APPS.map(a => `<label style="display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid #f0f0f0"><input type="checkbox" data-app="${a.id}" checked style="width:20px;height:20px"><span style="font-size:15px">${phoneShareEsc(a.name)}</span></label>`).join("");
+  const ov = document.createElement("div");
+  ov.id = "phoneSharePicker";
+  ov.style.cssText = "position:fixed;inset:0;z-index:250;background:rgba(0,0,0,.4);display:flex;align-items:flex-end";
+  ov.innerHTML = `<div style="width:100%;max-width:430px;margin:0 auto;background:#fff;border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));max-height:82vh;display:flex;flex-direction:column">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">分享给 TA</div>
+    <div style="font-size:12px;color:#8e8e93;margin-bottom:10px">勾选要分享的 App，TA 会在聊天里收到并和你讨论</div>
+    <div style="overflow:auto;flex:1">${rows}</div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button id="psAll" style="flex:1;height:44px;border:0;border-radius:12px;background:#f2f2f7;font-size:15px;font-weight:600">全选 / 全不选</button>
+      <button id="psGo" style="flex:1;height:44px;border:0;border-radius:12px;background:#111;color:#fff;font-size:15px;font-weight:600">分享</button>
+    </div>
+    <button id="psCancel" style="margin-top:8px;height:40px;border:0;background:transparent;color:#8e8e93;font-size:14px">取消</button>
+  </div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.addEventListener("click", e => { if(e.target === ov) close(); });
+  ov.querySelector("#psCancel").onclick = close;
+  ov.querySelector("#psAll").onclick = () => {
+    const boxes = ov.querySelectorAll("input[data-app]");
+    const anyOff = Array.from(boxes).some(b => !b.checked);
+    boxes.forEach(b => b.checked = anyOff);
+  };
+  ov.querySelector("#psGo").onclick = async () => {
+    const picks = Array.from(ov.querySelectorAll("input[data-app]")).filter(b => b.checked).map(b => b.getAttribute("data-app"));
+    if(!picks.length){ phoneShareToast("请至少选择一个 App"); return; }
+    const items = [];
+    for(const id of picks){ try { items.push(await buildAppShareText(id)); } catch(e){} }
+    try { localStorage.setItem("nano_pending_phone_share", JSON.stringify({ chatId: currentChar.id, name: currentChar.name, ts: Date.now(), items: items })); } catch(e){}
+    close();
+    try { if(window.parent && window.parent !== window) window.parent.postMessage({ type: "NANO_PHONE_SHARE", chatId: currentChar.id, name: currentChar.name }, "*"); } catch(e){}
+    phoneShareToast("已分享 " + items.length + " 个 App 给 TA");
   };
 }
 

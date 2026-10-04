@@ -492,15 +492,16 @@
     // 从角色库(IndexedDB)中得到“绑定/可用”的真实角色（当前 User 绑定的角色）
     function dbCharsBoundList() {
         if (!dbCharsCache || !dbCharsCache.length) return [];
-        var boundOnly = dbCharsCache.filter(function(c) { return c && c.name && c.bindUser === currentUser.id && !c.isNpc; });
+        var boundOnly = dbCharsCache.filter(function(c) { return c && c.name && String(c.bindUser) === String(currentUser && currentUser.id) && !c.isNpc; });
         if (boundOnly.length) return boundOnly.slice();
-        return dbCharsCache.filter(function(c) { return c && c.name && !c.isNpc; }).slice();
+        return [];
     }
 
     // NPC：优先用角色库 isNpc 的真实 NPC，其次用按面具生成的「关系人物花名册」
     function dbNpcs() {
         return (dbCharsCache || []).filter(function(c) {
-            return c && c.name && c.isNpc && !c.nanoAssistant && !isGenericNpcName(c.name);
+            return c && c.name && c.isNpc && !c.nanoAssistant && !isGenericNpcName(c.name) &&
+                String(c.bindUser) === String(currentUser && currentUser.id);
         }).map(function(c) {
             return {
                 id: c.id || ('npc_' + c.name),

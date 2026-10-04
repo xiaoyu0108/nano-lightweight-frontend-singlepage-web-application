@@ -396,3 +396,103 @@
     render('bottom', read(KEYS.bottom));
     render('inset', read(KEYS.inset));
 })();
+
+// ===== 顶部分段导航：一次只显示一个面板 =====
+(function () {
+    'use strict';
+    var bar = document.getElementById('segBar');
+    if (!bar) return;
+    var panels = document.querySelectorAll('.seg-panel');
+    function show(seg) {
+        Array.prototype.forEach.call(bar.querySelectorAll('.seg-btn'), function (b) {
+            b.classList.toggle('active', b.getAttribute('data-seg') === seg);
+        });
+        Array.prototype.forEach.call(panels, function (p) {
+            p.classList.toggle('active', p.getAttribute('data-seg') === seg);
+        });
+    }
+    Array.prototype.forEach.call(bar.querySelectorAll('.seg-btn'), function (b) {
+        b.addEventListener('click', function () { show(this.getAttribute('data-seg')); });
+    });
+    var first = bar.querySelector('.seg-btn.active') || bar.querySelector('.seg-btn');
+    if (first) show(first.getAttribute('data-seg'));
+})();
+
+// ===== 纳米助手开关（放在「其他 → 助手」）=====
+(function () {
+    'use strict';
+    var t = document.getElementById('nanoToggle');
+    if (!t) return;
+    var NANO_ID = 'nano_ai';
+    var NANO_AVATAR = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">' +
+        '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9ecb"/><stop offset="1" stop-color="#ff4d94"/></linearGradient></defs>' +
+        '<rect width="80" height="80" rx="20" fill="url(#g)"/>' +
+        '<rect x="18" y="24" width="44" height="34" rx="12" fill="#fff" opacity="0.95"/>' +
+        '<circle cx="32" cy="41" r="4.5" fill="#ff4d94"/><circle cx="48" cy="41" r="4.5" fill="#ff4d94"/>' +
+        '<rect x="38" y="12" width="4" height="10" rx="2" fill="#fff"/><circle cx="40" cy="11" r="4" fill="#fff"/></svg>');
+
+    function openCharsDb() {
+        return new Promise(function (resolve) {
+            try {
+                var req = indexedDB.open('nano_characters_db', 1);
+                req.onupgradeneeded = function (e) {
+                    try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {}
+                };
+                req.onsuccess = function () { resolve(req.result); };
+                req.onerror = function () { resolve(null); };
+            } catch (e) { resolve(null); }
+        });
+    }
+    function ensureNanoCharacter(on) {
+        return openCharsDb().then(function (db) {
+            if (!db) return false;
+            return new Promise(function (resolve) {
+                try {
+                    var tx = db.transaction('characters', 'readwrite');
+                    var st = tx.objectStore('characters');
+                    var g = st.get(NANO_ID);
+                    g.onsuccess = function () {
+                        var ex = g.result;
+                        if (on) {
+                            if (!ex) {
+                                st.put({ id: NANO_ID, name: '纳米', avatar: NANO_AVATAR, gender: '女', nationality: '中国', setting: '', bindUser: '', isNpc: true, worldbookBindings: [], nanoAssistant: true });
+                            } else {
+                                ex.name = ex.name || '纳米'; ex.isNpc = true; ex.nanoAssistant = true; st.put(ex);
+                            }
+                        } else if (ex) {
+                            st.delete(NANO_ID);
+                        }
+                    };
+                    tx.oncomplete = function () { try { db.close(); } catch (e) {} resolve(true); };
+                    tx.onerror = function () { try { db.close(); } catch (e) {} resolve(false); };
+                } catch (e) { resolve(false); }
+            });
+        });
+    }
+
+    var on = false;
+    try { on = localStorage.getItem('nano_assistant_enabled') === '1'; } catch (e) {}
+    t.checked = on;
+    if (on) ensureNanoCharacter(true);
+    t.addEventListener('change', async function () {
+        var v = this.checked;
+        await ensureNanoCharacter(v);
+        var flag = v ? '1' : '0';
+        try { localStorage.setItem('nano_assistant_enabled', flag); } catch (e) {}
+        try { if (window.parent !== window) window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e) {}
+    });
+
+    var settingRow = document.getElementById('nanoSettingRow');
+    if (settingRow) {
+        settingRow.addEventListener('click', function () {
+            try {
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'openFullscreen', url: 'nano-setting.html', title: '纳米设置', showBack: true, source: 'other' }, '*');
+                } else {
+                    location.href = 'nano-setting.html';
+                }
+            } catch (e) {}
+        });
+    }
+})();

@@ -270,6 +270,7 @@ async function refreshDMViaAI(selectedNames){
     +(friends.length?'1) 为下面每个已有联系人生成 1-2 条新消息（像真人连发几条短句，每条单独一行），语气必须严格符合他的人设。若某个 char 的人设决定TA此刻不会主动发消息，可以跳过该联系人，在 JSON 里给该条 "skip":true。\n':'')
     +'2) 创造 '+strangerCount+' 位【全新】的陌生人（中文网名，绝不能与已有联系人重名），为每人写一段 30-80 字的【马甲人设】（身份、性格、为什么会来找用户），并各生成 1-2 条与【用户身份】强相关、与马甲人设完全一致的开场私信，不要写空泛套话。\n'
     +'3) 【仅偶尔】大多数刷新都不要安排小号。只有当个别 char 的人设适合偷偷摸摸、且大约三成概率时，才让最多 1 位新陌生人其实是某个已有 char 的「小号/马甲」，用来在陌生人里伪装试探用户；若这样请加 "maskOf":"该 char 的名字"，表面人设写在 persona 里。小号通常绝不会主动暴露真实身份，也不要每轮都出现。\n'
+    +'3.5) 支持陌生人【主动】加用户好友/微信：不必等用户开口，自然时可以主动提出（例如“加个微信吧/我加你了”），并在该消息末尾加 [加好友]（系统会向用户发起好友申请，用户在 Meet 同意后即可私聊）；偶尔出现即可。\n'
     +'4) 最多让 1 位已有联系人（好友/主播）邀请用户去看一场TA感兴趣的直播：在该联系人条目加 "liveInvite":{"title":"标题","topic":"话题","intro":"一句简介","card":{"narration":"2-3句画面描写","speech":"主播台词"},"barrage":[{"name":"观众网名","text":"弹幕"}]}；话题要与这个人设相关，弹幕 6-10 条。其他联系人不要带 liveInvite。\n'
     +DIVERSITY_NOTE+'\n'
     +aliasNote
@@ -461,6 +462,26 @@ function joinDiscoveredGroup(i){
 }
 
 /* ============ 私聊设置（独立页面） ============ */
+// 把「我的微信号」（取自人设 Mask）告诉陌生人/联系人 → 对方发来 Meet 好友申请
+function giveWechatHalo(name){
+  if(!name)return;
+  let owner='';
+  try{ const md=JSON.parse(localStorage.getItem('nano_mask_data')||localStorage.getItem('nano_home_data')||'null'); if(md&&md.currentMaskId!=null) owner=String(md.currentMaskId); }catch(e){}
+  let wx='';
+  try{
+    const md2=JSON.parse(localStorage.getItem('nano_mask_data')||localStorage.getItem('nano_home_data')||'null');
+    if(md2&&Array.isArray(md2.masks)){ const me=md2.masks.find(x=>String(x.id)===owner); if(me&&me.wechat&&me.wechat!=='未设置') wx=me.wechat; }
+  }catch(e){}
+  if(!wx){ showToast('请先在「人设(Mask)」里设置你的微信号'); return; }
+  const meta=dmMeta(name)||{};
+  let all=[]; try{ all=JSON.parse(localStorage.getItem('nano_friend_requests')||'[]')||[]; }catch(e){}
+  if(all.some(x=>x&&x.status==='pending'&&x.source==='halo'&&x.name===name)){ showToast('已经把微信号告诉过 TA 了'); return; }
+  all.push({ id:'fr_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6), owner:owner, name:name, avatar:meta.avatar||'', source:'halo', app:'halo', setting:String(meta.persona||meta.setting||''), requestNote:'通过微信号加你', ts:Date.now(), status:'pending' });
+  try{ localStorage.setItem('nano_friend_requests', JSON.stringify(all.slice(-400))); }catch(e){}
+  showToast('已把微信号告诉 TA，TA 会来加你（去 Meet 同意）');
+  try{ if(window.parent&&window.parent!==window) window.parent.postMessage({type:'homeDataUpdated'},'*'); }catch(e){}
+}
+
 function openDmSettings(name){
   if(!name)return;
   S._dmSettingsName=name;
@@ -495,6 +516,7 @@ function renderDmSettings(){
     <div class="settings-item"><div><div class="label">昵称</div><div class="desc">${esc(name)}</div></div><button class="pill-action" onclick="editDmProfile()">修改</button></div>
     <div class="settings-item"><div><div class="label">人设</div><div class="desc">${esc(String(meta.persona||meta.setting||(char&&char.setting)||'（无）').slice(0,80))}</div></div><button class="pill-action" onclick="editDmProfile()">修改</button></div>
     ${isStranger?'<button class="secondary-wide" style="margin-top:10px" onclick="saveStrangerAsFriend()">存为好友</button>':''}
+    ${isStranger?`<button class="secondary-wide" style="margin-top:10px;color:var(--accent)" onclick="giveWechatHalo('${esc(name)}')">把微信号告诉 TA（TA 会来加你）</button>`:''}
     ${isStreamer?`<button class="secondary-wide" style="margin-top:10px" onclick="inviteStreamerLive('${esc(name)}')">邀请 TA 开播</button>`:''}
     <button class="secondary-wide" style="margin-top:10px;color:var(--accent)" onclick="clearCurrentDm()">清空本会话记录</button>
     <button class="secondary-wide" style="margin-top:10px;color:var(--accent)" onclick="deleteDmContact()">删除联系人</button>
@@ -861,8 +883,33 @@ function markChatRead(name){
   if(m&&m.unread){m.unread=false;saveHaloState();renderDM();}
 }
 /* 把一段回复按换行拆成多个气泡 */
+// 陌生人/联系人发来 [加好友] → 写入 Meet 好友申请（绑定当前 user）
+function nanoRequestFriendHalo(name){
+  try{
+    if(!name) return;
+    const meta=dmMeta(name)||{};
+    let owner='';
+    try{ const md=JSON.parse(localStorage.getItem('nano_mask_data')||localStorage.getItem('nano_home_data')||'null'); if(md){ if(md.currentMaskId!=null) owner=String(md.currentMaskId); else if(Array.isArray(md.masks)&&md.masks.length) owner=String(md.masks[0].id||''); } }catch(e){}
+    const all=JSON.parse(localStorage.getItem('nano_friend_requests')||'[]')||[];
+    if(all.some(x=>x&&x.status==='pending'&&x.source==='halo'&&x.name===name)) return;
+    all.push({ id:'fr_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6), owner:owner, name:name, avatar:meta.avatar||'', source:'halo', app:'halo', setting:String(meta.persona||meta.setting||''), requestNote:'在 Halo 加你', ts:Date.now(), status:'pending' });
+    localStorage.setItem('nano_friend_requests', JSON.stringify(all.slice(-400)));
+    try{ if(window.parent&&window.parent!==window) window.parent.postMessage({type:'homeDataUpdated'},'*'); }catch(e){}
+  }catch(e){}
+}
+// 判断来信是否表达「想加你好友/微信」的意图
+function haloAddIntent(t){
+  t=String(t||'');
+  if(/\[(?:加好友|加微信|加我|申请加好友)\]/i.test(t)) return true;
+  return /(加|添加|发)(?:个|一下|你|你的|个你)?(?:的)?(?:好友|微信|联系方式|微信好友)|我(已经)?加(你|上你|你了)|加上你|想(要)?加(你|一下)|加一下你|加你个/.test(t);
+}
 function pushSplitChat(name,who,text,speaker){
-  const raw=String(text==null?'':text).replace(/\r/g,'').trim();
+  let raw=String(text==null?'':text).replace(/\r/g,'');
+  if(who!=='user' && haloAddIntent(raw)){
+    try{ nanoRequestFriendHalo(name); }catch(e){}
+    raw=raw.replace(/\[(?:加好友|加微信|加我|申请加好友)\]/gi,'');
+  }
+  raw=raw.trim();
   if(!raw) return 0;
   const parts=raw.split('\n').map(s=>s.trim()).filter(Boolean);
   const list=parts.length?parts:[raw];

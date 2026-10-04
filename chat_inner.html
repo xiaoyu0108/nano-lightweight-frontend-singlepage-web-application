@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>聊天</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="css/chat-inner.css?v=20261003c">
-    <link rel="stylesheet" href="css/heart.css?v=20260926i">
+    <link rel="stylesheet" href="css/chat-inner.css?v=20261004o">
+    <link rel="stylesheet" href="css/heart.css?v=20261004n">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://unpkg.com">
     <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
-    <script src="js/appearance.js?v=20261003b"></script>
+    <script src="js/appearance.js?v=20261004c"></script>
     <script src="js/nano-notify.js"></script>
     <script src="js/nano-badge.js"></script>
     <script src="js/keep-alive.js"></script>
@@ -539,6 +539,12 @@
             <label class="iv-quick-row"><span class="iv-quick-label">显示「此刻 · 印象」</span><span class="iv-switch"><input type="checkbox" id="ivShowSubject" checked><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">显示收件信息</span><span class="iv-switch"><input type="checkbox" id="ivShowMeta" checked><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">隐藏未读红点</span><span class="iv-switch"><input type="checkbox" id="ivHideUnread"><i></i></span></label>
+        <div class="iv-quick-field">
+          <span class="iv-quick-field-title">头像框</span>
+          <div class="iv-quick-field-row">
+            <button class="iv-template-btn primary" type="button" onclick="window.NanoAvatarFrame&&NanoAvatarFrame.openUI('heart')">设置头像框 / 预设</button>
+          </div>
+        </div>
             <div class="iv-quick-field">
               <span class="iv-quick-field-title">按钮文案</span>
               <div class="iv-quick-field-row">
@@ -558,9 +564,8 @@
       <div class="iv-custom-foot">
         <button class="iv-btn-action iv-btn-copy" id="ivCopyTemplate">复制模板</button>
         <button class="iv-btn-action iv-btn-clear" id="ivClearBtn">清空</button>
-        <div class="iv-divider"></div>
         <button class="iv-btn-action iv-btn-restore" id="ivRestore">还原</button>
-        <button class="iv-btn-action iv-btn-apply" id="ivApply">应用 CSS</button>
+        <button class="iv-btn-action iv-btn-apply" id="ivApply">应用</button>
       </div>
     </div>
 
@@ -603,6 +608,7 @@
 })();
 </script>
 <script src="js/api-float.js?v=20260926h"></script>
+<script src="js/avatar-frame.js"></script>
 <script src="swipe-back.js"></script>
 <script>
 // iOS 键盘：收缩聊天容器，让输入栏位于键盘上方（父页面也会 postMessage 同步）

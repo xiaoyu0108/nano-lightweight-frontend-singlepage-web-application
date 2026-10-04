@@ -1788,6 +1788,13 @@ function parseStrangers(raw, exclude) {
   let arr = null;
   const m = text.match(/\[[\s\S]*\]/);
   if (m) { try { arr = JSON.parse(m[0]); } catch (e) { arr = null; } }
+  if (!Array.isArray(arr)) {
+    // 兼容模型返回 {"strangers":[...]} / {"list":[...]} 这类对象
+    try {
+      const o = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+      arr = (o && (o.strangers || o.list || o.data || o.items || o.result)) || null;
+    } catch (e) { arr = null; }
+  }
   const ex = (exclude || []).map(normName);
   const seen = {};
   const out = [];
@@ -1805,7 +1812,8 @@ function parseStrangers(raw, exclude) {
   return out.slice(0, 6);
 }
 
-async function refreshStrangerDMs(silent) {
+async function refreshStrangerDMs(silent, count) {
+  const wantCount = Math.max(1, parseInt(count, 10) || 6);
   const myPosts = posts.filter(p => p.user === userProfile.name);
   const bound = getSelectableChars();
   const persona = buildPersonaBlock(bound.slice(0, 3));
@@ -1823,20 +1831,22 @@ async function refreshStrangerDMs(silent) {
   const sys = '你是一个社交论坛的陌生用户群体。请扮演多个真实感的陌生人，他们在论坛上看到用户后主动发私信。贴合用户的人设与世界书，口语化、自然，不要 AI 腔。所有人物均为成年人。' + ADULT_PLATFORM_NOTE;
   const userMsg = userPersona + persona +
     '\n\n【用户发的帖子】\n' + (postText || '（用户还没有发过帖子）') +
-    '\n\n请生成 5 个不同的陌生人给「' + userProfile.name + '」发的私信。\n' +
+    '\n\n请生成 ' + wantCount + ' 个不同的陌生人给「' + userProfile.name + '」发的私信。\n' +
     '要求：\n' +
     '- 名字必须是真实感强的具体人名（中文角色用中文名，外国角色用该国真实姓名），不要「陌生人、网友、路人、新朋友」这类占位名；\n' +
     (postText ? '- 私信内容要自然提到或回应上面的某条帖子；\n' : '- 用户没有发帖，请根据用户人设编一个自然的搭讪/私信理由；\n') +
     '- 每个陌生人的私信不超过 30 字；\n' +
     emojiHint +
-    '- 不要与这些已有名字重复：' + (exclude.join('、') || '（无）') + '。\n\n' +
+    '- 不要与这些已有名字重复：' + (exclude.join('、') || '（无）') + '。\n' +
+    '- 支持陌生人【主动】加用户好友/微信：不必等用户开口，自然时可以主动提出（例如“加个微信吧”），并在该消息末尾加 [加好友]（系统会向用户发起好友申请，用户在 Meet 同意后即可私聊）；偶尔出现即可。\n\n' +
     '严格输出 JSON 数组（不要 markdown、不要解释）：[{"name":"名字","gender":"男","setting":"一句话身份/性格","message":"私信内容"}]';
 
   let newOnes = [];
   try {
     const raw = await callChatApi([{ role: 'system', content: sys }, { role: 'user', content: userMsg }], 'sub');
     newOnes = parseStrangers(raw, exclude);
-  } catch (e) { newOnes = []; }
+  } catch (e) { throw e; }   // 失败就是失败：把错误抛给上层提示，不静默吞掉
+  if (!newOnes.length) throw new Error('这次没有生成陌生人，请重试（可能是接口返回格式异常）');
 
   for (let i = 0; i < newOnes.length; i++) {
     const s = newOnes[i];
@@ -2481,6 +2491,54 @@ function renderDMList() {
   switchDmTab(dmActiveTab);
 }
 
+// 刷新私信：弹窗选择要刷新的角色；不选则只生成 6 个陌生人
+function openDMRefreshPicker() {
+  const old = document.getElementById('insDmRefreshPicker');
+  if (old) old.remove();
+  const chars = (typeof getSelectableChars === 'function' ? getSelectableChars() : []) || [];
+  const rows = chars.map(c => `<label style="display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid #f0f0f0"><input type="checkbox" data-ic="${escapeHtml(c.id)}" style="width:20px;height:20px"><span style="font-size:15px">${escapeHtml(c.name)}</span></label>`).join('')
+    || '<div style="color:#999;font-size:13px;padding:16px 0;text-align:center">没有可选的绑定角色</div>';
+  const ov = document.createElement('div');
+  ov.id = 'insDmRefreshPicker';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.4);display:flex;align-items:flex-end';
+  ov.innerHTML = `<div style="width:100%;max-width:430px;margin:0 auto;background:#fff;border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));max-height:80vh;display:flex;flex-direction:column">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">刷新私信</div>
+    <div style="font-size:12px;color:#8e8e93;margin-bottom:10px">勾选要刷新消息的角色；<b>不选则只生成 6 个陌生人</b>。</div>
+    <div style="overflow:auto;flex:1">${rows}</div>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button id="idrCancel" style="flex:1;height:44px;border:0;border-radius:12px;background:#f2f2f7;font-size:15px;font-weight:600">取消</button>
+      <button id="idrGo" style="flex:1;height:44px;border:0;border-radius:12px;background:#111;color:#fff;font-size:15px;font-weight:600">刷新</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  ov.querySelector('#idrCancel').onclick = close;
+  ov.querySelector('#idrGo').onclick = async function () {
+    const picked = Array.from(ov.querySelectorAll('input[data-ic]:checked')).map(b => b.getAttribute('data-ic'));
+    close();
+    await refreshDMWith(picked);
+  };
+}
+async function refreshDMWith(picked) {
+  if (insBusy.dm) { showToast('正在刷新中，请稍候…'); return; }
+  insBusy.dm = true;
+  showLoading('正在刷新私信…');
+  try {
+    let a = 0, b = 0;
+    if (picked && picked.length) { a = await refreshFriendDMs(true); }
+    b = await refreshStrangerDMs(true, 6);
+    renderDMList();
+    showToast('已刷新：好友 ' + a + ' 条，陌生人 ' + b + ' 条');
+    notifyInsDone('Instagram', '私信刷新完成：好友 ' + a + '，陌生人 ' + b);
+  } catch (e) {
+    renderDMList();
+    showError('刷新私信失败', e && e.message ? e.message : String(e));
+  } finally {
+    insBusy.dm = false;
+    hideLoading();
+  }
+}
+
 // 总刷新：好友 + 陌生人一起刷新（同一时间只允许一次）
 async function refreshDM() {
   if (insBusy.dm) { showToast('正在刷新中，请稍候…'); return; }
@@ -2515,6 +2573,13 @@ document.addEventListener('click', function (e) {
 
 // 点击头像 / 用户名进入人物主页
 document.addEventListener('click', function (e) {
+  const gw = e.target.closest('[data-give-wechat]');
+  if (gw) {
+    const nm = gw.getAttribute('data-give-wechat');
+    const u = (friends.concat(strangers)).find(x => x.name === nm) || {};
+    giveWechatTo(nm, u.setting || '');
+    return;
+  }
   const el = e.target.closest('[data-profile]');
   if (!el) return;
   e.stopPropagation();
@@ -2544,6 +2609,36 @@ document.addEventListener('click', function (e) {
   const d = e.target.closest('[data-dm]');
   if (d) { e.stopPropagation(); startChatWith(d.getAttribute('data-dm')); }
 });
+
+// 把「我的微信号」告诉陌生人：写入 Meet 好友申请（绑定当前 user）
+function giveWechatTo(name, setting) {
+  try {
+    var owner = '';
+    try { var md = JSON.parse(localStorage.getItem('nano_mask_data') || 'null'); if (md && md.currentMaskId != null) owner = String(md.currentMaskId); } catch (e0) {}
+    var wx = '';
+    try {
+      var md2 = JSON.parse(localStorage.getItem('nano_mask_data') || localStorage.getItem('nano_home_data') || 'null');
+      if (md2 && Array.isArray(md2.masks)) {
+        var me = md2.masks.find(function (x) { return x && String(x.id) === owner; });
+        if (me && me.wechat && me.wechat !== '未设置') wx = me.wechat;
+      }
+    } catch (e0) {}
+    if (!wx) { showToast('请先在「人设(Mask)」里设置你的微信号'); return; }
+    var all = JSON.parse(localStorage.getItem('nano_friend_requests') || '[]') || [];
+    if (all.some(function (x) { return x && x.status === 'pending' && x.source === 'ins' && x.name === name; })) {
+      showToast('已经把你的微信号告诉过 TA 了');
+      return;
+    }
+    all.push({
+      id: 'fr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+      owner: owner, name: name, avatar: '', source: 'ins', app: 'ins',
+      setting: setting || '', requestNote: '通过微信号加你', ts: Date.now(), status: 'pending'
+    });
+    localStorage.setItem('nano_friend_requests', JSON.stringify(all.slice(-400)));
+    showToast('已把微信号告诉 TA，TA 会来加你（去 Meet 同意）');
+    try { if (window.parent !== window) window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e) {}
+  } catch (e) {}
+}
 
 function openChat(id, name, handle, verified, type) {
   const info = friends.concat(strangers).find(x => x.id === id) || {};
@@ -2585,6 +2680,7 @@ function renderChatBody() {
       <div class="big-name">${u.name}</div>
       <div class="big-sub">Forum · ${u.type === 'stranger' ? '陌生网友' : '好友'}</div>
       <div class="view-profile" data-profile="${escapeHtml(u.name)}">查看资料</div>
+      ${u.type === 'stranger' ? `<div class="view-profile give-wechat" style="margin-top:10px;color:#3897f0" data-give-wechat="${escapeHtml(u.name)}">告诉 TA 我的微信号</div>` : ''}
     </div>
   `;
   const msgs = chatHistories[u.id] || [];
@@ -2602,7 +2698,8 @@ function renderChatBody() {
     }
     let replyTag = '';
     if (m.replyTo) {
-      replyTag = `<div class="msg-reply-tag"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>${isOut ? u.name : userProfile.name} 回复了 ${isOut ? u.name : userProfile.name}</div>`;
+      const _q = m.quote ? (escapeHtml(m.quoteName || '') + '：' + escapeHtml(m.quote)) : (isOut ? u.name : userProfile.name);
+      replyTag = `<div class="msg-reply-tag"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">${_q}</span></div>`;
     }
     let inner = '';
     if (m.sticker && m.sticker.url) {
@@ -2623,7 +2720,7 @@ function renderChatBody() {
     } else {
       inner = `<div class="msg ${isOut ? 'out' : 'in'}">${m.text}</div>`;
     }
-    html += `<div class="msg-row ${isOut ? 'out' : ''}"><div class="msg-avatar avatar-link" data-profile="${escapeHtml(isOut ? userProfile.name : u.name)}" style="${avatarStyle}">${avatarTxt}</div><div class="msg-content">${replyTag}${inner}</div></div>`;
+    html += `<div class="msg-row ${isOut ? 'out' : ''}" data-mi="${idx}" data-text="${escapeHtml(m.text || '')}"><div class="msg-avatar avatar-link" data-profile="${escapeHtml(isOut ? userProfile.name : u.name)}" style="${avatarStyle}">${avatarTxt}</div><div class="msg-content">${replyTag}${inner}</div></div>`;
   });
   if (insTyping[u.id]) {
     let tStyle, tTxt;
@@ -2827,9 +2924,44 @@ function parseStickerTags(text) {
   return { parts: parts, had: had };
 }
 
+// 判断一条来信是否表达了「想加你好友/微信」的意图（不依赖模型一定输出标签）
+function insAddIntent(t) {
+  t = String(t || '');
+  if (/\[(?:加好友|加微信|加我|申请加好友)\]/i.test(t)) return true;
+  return /(加|添加|发)(?:个|一下|你|你的|个你)?(?:的)?(?:好友|微信|联系方式|微信好友)|我(已经)?加(你|上你|你了)|加上你|想(要)?加(你|一下)|加一下你|加你个/.test(t);
+}
+
+// 陌生人/好友发来 [加好友] → 写入 Meet 好友申请（绑定当前 user）
+function nanoRequestFriendIns(id) {
+  try {
+    const u = strangers.find(s => s.id === id) || friends.find(f => f.id === id) || {};
+    const name = String(u.name || '').trim();
+    if (!name) return;
+    let owner = '';
+    try {
+      const md = JSON.parse(localStorage.getItem('nano_mask_data') || localStorage.getItem('nano_home_data') || 'null');
+      if (md) { if (md.currentMaskId != null) owner = String(md.currentMaskId); else if (Array.isArray(md.masks) && md.masks.length) owner = String(md.masks[0].id || ''); }
+    } catch (e) {}
+    const all = JSON.parse(localStorage.getItem('nano_friend_requests') || '[]') || [];
+    if (all.some(x => x && x.status === 'pending' && x.source === 'ins' && x.name === name)) return;
+    all.push({
+      id: 'fr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+      owner: owner, name: name, avatar: u.avatar || '', source: 'ins', app: 'ins',
+      setting: String(u.setting || ''), requestNote: '在 Instagram 加你', ts: Date.now(), status: 'pending'
+    });
+    localStorage.setItem('nano_friend_requests', JSON.stringify(all.slice(-400)));
+    try { if (window.parent !== window) window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e) {}
+  } catch (e) {}
+}
+
 // 把角色回复写入聊天记录（含表情包），返回用于预览的最后一条内容
 async function deliverIncoming(id, reply) {
   if (!chatHistories[id]) chatHistories[id] = [];
+  // 表达了加好友意图（标签或「我加你了」这类话）→ 写入 Meet 好友申请
+  if (insAddIntent(String(reply || ''))) {
+    try { nanoRequestFriendIns(id); } catch (e) {}
+    reply = String(reply || '').replace(/\[(?:加好友|加微信|加我|申请加好友)\]/gi, '').trim();
+  }
   const parsed = parseStickerTags(reply);
   let data = null;
   if (parsed.had) data = await getInsEmojiData();
@@ -2854,6 +2986,11 @@ async function deliverIncoming(id, reply) {
     chatHistories[id].push({ from: 'in', text: plain || '……' });
     preview = plain || '……';
   }
+  // 更新联系人卡片预览为最新一条，避免列表显示旧消息
+  try {
+    const c = strangers.find(s => s.id === id) || friends.find(f => f.id === id);
+    if (c) { c.preview = preview; c.time = '刚刚'; try { saveInsChatState && saveInsChatState(); } catch (e) {} }
+  } catch (e) {}
   return preview;
 }
 
@@ -2962,6 +3099,29 @@ async function generateChatReply(id, info) {
   await deliverIncoming(id, (reply || '').trim() || '……');
 }
 
+// 引用：在输入框上方显示一个独立引用条，发送后变成引用气泡
+function showInsQuote(q) {
+  window.__insQuote = q || null;
+  let bar = document.getElementById('insQuoteBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'insQuoteBar';
+    const ib = document.querySelector('.chat-input-bar');
+    if (ib && ib.parentNode) ib.parentNode.insertBefore(bar, ib);
+    else document.body.appendChild(bar);
+  }
+  bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f7f7fa;border-top:1px solid #eee;font-size:12px;color:#666';
+  bar.innerHTML = '<div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">引用 '
+    + escapeHtml((q && q.name) || '') + '：' + escapeHtml((q && q.text) || '')
+    + '</div><button id="insQuoteCancel" style="border:0;background:transparent;color:#999;font-size:18px;line-height:1;cursor:pointer">×</button>';
+  bar.querySelector('#insQuoteCancel').onclick = clearInsQuote;
+}
+function clearInsQuote() {
+  window.__insQuote = null;
+  const bar = document.getElementById('insQuoteBar');
+  if (bar) bar.remove();
+}
+
 async function sendChatMessage() {
   if (!currentChatUser) return;
   const input = document.getElementById('chatInput');
@@ -2970,7 +3130,11 @@ async function sendChatMessage() {
   if (!chatHistories[id]) chatHistories[id] = [];
   if (text) {
     // 有字：只发送消息，不调用 API
-    chatHistories[id].push({ from: 'out', text });
+    const _q = window.__insQuote;
+    const _msg = { from: 'out', text };
+    if (_q) { _msg.replyTo = true; _msg.quote = _q.text; _msg.quoteName = _q.name; }
+    chatHistories[id].push(_msg);
+    clearInsQuote();
     input.value = ''; updateChatBtn(); renderChatBody();
     const contact = friends.concat(strangers).find(x => x.id === id);
     if (contact) { contact.preview = text; contact.time = '刚刚'; }
@@ -3174,7 +3338,8 @@ async function loadInsData() {
 
   const allChars = await getCharacters();
   if (mask) {
-    currentUserChars = allChars.filter(c => c.bindUser === mask.id || (c.isNpc && !c.nanoAssistant));
+    // 用户隔离：只取当前人设绑定的角色（含已绑定的小号/NPC），不再把别人的 NPC 也算进来
+    currentUserChars = allChars.filter(c => String(c.bindUser) === String(mask.id));
   } else {
     currentUserChars = allChars;
   }
@@ -3333,6 +3498,54 @@ window.openInsEmojiPanel = openInsEmojiPanel;
 window.closeInsEmojiPanel = closeInsEmojiPanel;
 window.sendInsSticker = sendInsSticker;
 window.openForumRefreshPicker = openForumRefreshPicker;
+window.openDMRefreshPicker = openDMRefreshPicker;
+
+// 双击 / 长按气泡：复制 / 引用 / 编辑 / 删除（与单聊一致的菜单）
+(function () {
+  let pressTimer = null;
+  function openMsgMenu(row) {
+    if (!row) return;
+    const idx = parseInt(row.getAttribute('data-mi'), 10);
+    const text = row.getAttribute('data-text') || '';
+    const id = currentChatUser && currentChatUser.id;
+    if (!id || isNaN(idx)) return;
+    const h = chatHistories[id] || [];
+    if (!h[idx]) return;
+    const old = document.getElementById('insMsgMenu'); if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'insMsgMenu';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.32);display:flex;align-items:center;justify-content:center';
+    ov.innerHTML = '<div style="width:220px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 16px 44px rgba(0,0,0,.25)">'
+      + '<button data-act="copy" style="width:100%;height:48px;border:0;background:#fff;font-size:15px;border-bottom:1px solid #f0f0f0">复制</button>'
+      + '<button data-act="quote" style="width:100%;height:48px;border:0;background:#fff;font-size:15px;border-bottom:1px solid #f0f0f0">引用</button>'
+      + '<button data-act="edit" style="width:100%;height:48px;border:0;background:#fff;font-size:15px;border-bottom:1px solid #f0f0f0">编辑</button>'
+      + '<button data-act="del" style="width:100%;height:48px;border:0;background:#fff;font-size:15px;color:#e0245e">删除</button>'
+      + '</div>';
+    ov.addEventListener('click', function (e) {
+      if (e.target === ov) { ov.remove(); return; }
+      const a = e.target.getAttribute('data-act');
+      if (!a) return;
+      if (a === 'copy') { try { navigator.clipboard.writeText(text); } catch (err) {} showToast('已复制'); }
+      else if (a === 'quote') {
+        showInsQuote({ name: (h[idx].from === 'out' ? userProfile.name : (currentChatUser && currentChatUser.name) || ''), text: text });
+        const inp = document.querySelector('.chat-input-bar input'); if (inp) inp.focus();
+      }
+      else if (a === 'edit') { const nt = window.prompt('编辑这条消息', text); if (nt != null) { h[idx].text = nt; try { saveInsChatState(); } catch (err) {} renderChatBody(); } }
+      else if (a === 'del') { h.splice(idx, 1); try { saveInsChatState(); } catch (err) {} renderChatBody(); }
+      ov.remove();
+    });
+    document.body.appendChild(ov);
+  }
+  document.addEventListener('dblclick', function (e) { const row = e.target.closest('.msg-row[data-mi]'); if (row) openMsgMenu(row); });
+  document.addEventListener('touchstart', function (e) {
+    const row = e.target.closest('.msg-row[data-mi]'); if (!row) return;
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(function () { openMsgMenu(row); }, 480);
+  }, { passive: true });
+  ['touchend', 'touchmove', 'touchcancel'].forEach(function (ev) {
+    document.addEventListener(ev, function () { clearTimeout(pressTimer); pressTimer = null; }, { passive: true });
+  });
+})();
 window.confirmForumRefresh = confirmForumRefresh;
 window.openChat = openChat;
 window.sendChatMessage = sendChatMessage;

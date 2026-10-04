@@ -125,31 +125,40 @@
     // 想给顶/底栏加遮罩：在聊天 CSS 里设置变量即可（默认透明）：
     //   :root{ --chat-topbar-mask: linear-gradient(#fff 60%, transparent); }
     //   :root{ --chat-bottom-mask: linear-gradient(transparent, #fff 40%); }
+    // 单聊(chat-inner) 与 群聊(groups) 共用同一套悬浮结构；群聊额外的群公告条也一起悬浮，
+    // 避免它继续占用文档流把气泡顶下去、或被美化 CSS 打乱层级。
+    // 注意：这里必须把每段选择器都补全成两个完整选择器（不能只写 "body.a,body.b .x"，否则第一段会选中 body 本身）。
+    var NANO_FLOAT_SEL = function (part) {
+        return 'body.nano-chat-inner ' + part + ',body.nano-groups ' + part;
+    };
     var NANO_CHAT_FLOAT_CSS =
-        'body.nano-chat-inner .message-scroll{' +
+        NANO_FLOAT_SEL('.message-scroll') + '{' +
         'position:absolute !important;top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
         'flex:none !important;z-index:1 !important;background:transparent !important;' +
         'padding-top:calc(var(--chat-top-inset,60px) + var(--chat-top-extra,8px)) !important;' +
         'padding-bottom:calc(var(--chat-bottom-inset,72px) + var(--chat-bottom-extra,14px)) !important;}' +
-        'body.nano-chat-inner .topbar{' +
+        NANO_FLOAT_SEL('.topbar') + '{' +
         'position:absolute !important;top:0 !important;left:0 !important;right:0 !important;width:auto !important;' +
         'z-index:30 !important;flex-shrink:0 !important;' +
         'background:var(--chat-topbar-mask,transparent) !important;pointer-events:none !important;}' +
-        'body.nano-chat-inner .topbar > *{pointer-events:auto !important;}' +
-        'body.nano-chat-inner .multi-select-bar{' +
+        NANO_FLOAT_SEL('.topbar > *') + '{pointer-events:auto !important;}' +
+        NANO_FLOAT_SEL('.multi-select-bar') + '{' +
         'position:absolute !important;top:var(--chat-topbar-h,60px) !important;' +
         'left:12px !important;right:12px !important;margin:0 !important;z-index:31 !important;}' +
-        'body.nano-chat-inner .bottom-bar{' +
+        NANO_FLOAT_SEL('.bottom-bar') + '{' +
         'position:absolute !important;left:0 !important;right:0 !important;bottom:0 !important;width:auto !important;' +
         'z-index:40 !important;flex-shrink:0 !important;' +
         'background:var(--chat-bottom-mask,transparent) !important;pointer-events:none !important;}' +
-        'body.nano-chat-inner .bottom-bar > *{pointer-events:auto !important;}';
+        NANO_FLOAT_SEL('.bottom-bar > *') + '{pointer-events:auto !important;}' +
+        'body.nano-groups .group-notice-bar{' +
+        'position:absolute !important;top:var(--chat-topbar-h,60px) !important;' +
+        'left:12px !important;right:12px !important;margin:0 !important;z-index:29 !important;}';
 
-    // 层叠顺序（决定覆盖优先级）：聊天CSS -> 结构修复 -> 全局CSS -> 悬浮结构 -> 头像
+    // 层叠顺序（决定覆盖优先级）：聊天CSS -> 结构修复 -> 全局CSS -> 悬浮结构 -> 底栏留白 -> 头像
     function reorderChatLayers() {
         try {
             var host = document.body || document.head || document.documentElement;
-            ['nano-beautify-chat', 'nano-beautify-chat-fix', 'nano-beautify-global', 'nano-chat-float']
+            ['nano-beautify-chat', 'nano-beautify-chat-fix', 'nano-beautify-global', 'nano-chat-float', 'nano-flush-fix']
                 .forEach(function (id) {
                     var el = getEl(id);
                     if (el && el.parentNode === host) host.appendChild(el);
@@ -676,7 +685,7 @@
             // 底栏上移（负值）时会给聊天输入栏留出动态底部留白，避免它压住最后几条气泡
             (kind === 'bottom'
                 ? ':root{--nano-bottom-overlap:' + (v < 0 ? -v : 0) + 'px;}' +
-                  '.nano-chat-inner .message-scroll{padding-bottom:calc(22px + var(--nano-bottom-overlap,0px)) !important;}'
+                  '.nano-chat-inner .message-scroll,.nano-groups .message-scroll{padding-bottom:calc(22px + var(--nano-bottom-overlap,0px)) !important;}'
                 : ''));
     }
     function applyTopShift(px) { applyShift('top', px); }

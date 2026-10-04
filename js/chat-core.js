@@ -517,6 +517,11 @@
         const wbFront = wb.front, wbMid = wb.middle, wbBack = wb.back;
 
         let prompt = '你是' + charName + '，一个活生生的人类，正在用手机和' + user + '聊天。你有自己的生活、情绪和日常，不是程序，也不是在扮演谁。\n\n';
+        // 最高优先级：人设 / 世界书 / 记忆一致性 / 表情包认知
+        prompt += '【必须遵循（最高优先级）】\n'
+            + '1. 严格保持你的人物设定，任何时候都不要 OOC、不要跳出角色。\n'
+            + '2. 每次回复前先对照「世界书」与「长期记忆」：凡涉及到的设定、人物、地点、事件，都要与它们保持一致；如有冲突，以世界书/记忆为准，绝不编造相抵的内容。\n'
+            + '3. 表情包 / 贴图只是表达态度或情绪的方式，**不代表真实发生了某件事**；不要把它当成事件，也不要过度解读或反复揣测它的含义。\n\n';
         prompt += '【四条底线 · 任何时候都不能破】\n';
         prompt += '1. 贴人设：你的性格、说话方式、情绪、称呼、距离感与分寸，全部由【角色人设】和【世界书】决定——不是“在扮演”这个人，而是你就是这个人；不给自己加设定外的固定腔调或口头禅。\n';
         prompt += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、小可爱、姑娘、丫头、女人、低吼一声、揉进骨血、你是我的、逃不掉、宠你、乖”等油腻或人机感表达；不强行撩、不刻意讨好、不刻意煽情。禁止“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 抱抱我 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话术。\n';
@@ -749,8 +754,10 @@
         prompt += '3. 电话 [call:来电] / [call:视频]：情绪浓、想听对方声音、重要的时刻、想给惊喜时，都可以主动打过去；比“只有紧急才打”更主动，但也不要每轮都打。\n';
         prompt += '4. 亲属卡 / 情侣头像 / 一起听 / 建群 / 邀请进群：关系到位、气氛自然时主动发起，推动关系进展，不要干等。\n';
         prompt += '5. 对方明确开口要的时候，爽快答应、不推辞。\n';
-        prompt += '5.5 想翻看 / 接管对方的手机时（对方让你看，或你自己好奇、想确认什么），输出 [查看手机]（独占一行）。系统会向对方发起一个「想看看你的手机」的申请，由对方决定是否同意；对方同意后你就能翻看 TA 的 App、聊天和群聊。不要频繁用。\n';
-        prompt += '5.6 想实时看对方真实屏幕的画面时（对方问“你在看什么”“给你看看我的屏幕”，或你想陪 TA 一起看），输出 [看屏幕]（独占一行）。系统会请求对方共享屏幕，由对方决定；同意后你能看到 TA 屏幕的画面并实时点评。不要频繁用。\n';
+        if (!isNanoChat) {
+            prompt += '5.5 想翻看 / 接管对方的手机时（对方让你看，或你自己好奇、想确认什么），输出 [查看手机]（独占一行）。系统会向对方发起一个「想看看你的手机」的申请，由对方决定是否同意；对方同意后你就能翻看 TA 的 App、聊天和群聊。不要频繁用。\n';
+            prompt += '5.6 想实时看对方真实屏幕的画面时（对方问“你在看什么”“给你看看我的屏幕”，或你想陪 TA 一起看），输出 [看屏幕]（独占一行）。系统会请求对方共享屏幕，由对方决定；同意后你能看到 TA 屏幕的画面并实时点评。不要频繁用。\n';
+        }
         prompt += '6. 平衡：一轮回复里特殊格式一般 1-2 个、最多 3 个，优先让它们服务剧情而不是单纯堆砌；语音气泡和表情包不算在内，按上面的频率照常发。\n';
 
         // 思维链（COT）：由「思维链」开关控制；开着才思考，思考必须在说话之前
@@ -826,9 +833,22 @@
         if (timeAware) {
             const now = new Date();
             const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-            const timeStr = '现在是 ' + now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 星期' + weekdays[now.getDay()] + ' ' +
+            const timeStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 星期' + weekdays[now.getDay()] + ' ' +
                 String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-            prompt += '\n【当前时间】' + timeStr + '。可以自然感知时间，比如问候时段、提作息等。\n';
+            // 计算距离上一次角色开口过了多久（用于让角色知道“隔了几天”，但不要反复念叨）
+            let gapStr = '';
+            try {
+                const last = parseInt(localStorage.getItem('nano_last_ai_' + chatId) || '0', 10);
+                if (last > 0) {
+                    const mins = Math.floor((Date.now() - last) / 60000);
+                    if (mins >= 1 && mins < 60) gapStr = '大约 ' + mins + ' 分钟';
+                    else if (mins >= 60 && mins < 1440) gapStr = '大约 ' + Math.floor(mins / 60) + ' 小时';
+                    else if (mins >= 1440) gapStr = '大约 ' + Math.floor(mins / 1440) + ' 天';
+                }
+            } catch (e) {}
+            prompt += '\n【当前时间】现在是 ' + timeStr + '。请务必以这个真实日期/时间为准，不要把它当成昨天或更早——跨天、跨周都要按上面的日期判断。\n';
+            if (gapStr) prompt += '【时间间隔】你上一次和对方说话是在' + gapStr + '前。\n';
+            prompt += '你清楚自己隔了多久没和对方聊：如果隔了几天甚至更久，你心里有数，但不要反复强调、不要一直埋怨或追问对方为什么这么久才来；最多自然地带一句（例如“好久不见”），然后正常继续。\n';
         }
 
         if (wbBack) prompt += wbBack + '\n';
@@ -2425,6 +2445,8 @@
             } catch (e) {}
         }
         if (type === 'left' && !recalled) {
+            // 记录角色最后一次开口的时间，用于让模型感知“隔了几天/几小时”（仅作时间锚点）
+            try { localStorage.setItem('nano_last_ai_' + chatId, String(Date.now())); } catch (e) {}
             const msg = messages.find(m => m.id === row.dataset.id);
             if (msg) msg.turn = currentTurn;
             // 角色偶尔随机撤回自己刚发出的消息（纳米助手不撤回）
@@ -3211,6 +3233,13 @@
         const cd = msg.cardData;
         cd.status = 'accepted';
         const mask = buildAltMaskSetting(cd.altName || '小号', cd.altSetting || '', cd.altOrigin || altOriginInfo());
+        // 同步把 Meet 里对应的申请标记为已同意，避免重复出现
+        try {
+            var _fa = JSON.parse(localStorage.getItem('nano_friend_requests') || '[]') || [];
+            var _ch = false;
+            _fa.forEach(function (x) { if (x && x.status === 'pending' && x.source === 'alt' && x.name === (cd.altName || '小号')) { x.status = 'accepted'; _ch = true; } });
+            if (_ch) localStorage.setItem('nano_friend_requests', JSON.stringify(_fa));
+        } catch (e) {}
         createAltCharacter(cd.altName || '小号', mask).then(function (rec) {
             addSystemNotice('你接受了「' + (cd.altName || '小号') + '」的好友申请，已加入聊天列表');
             try { window.parent.postMessage({ type: 'NANO_FRIEND_ADDED', chatId: rec && rec.id, name: cd.altName }, '*'); } catch (e) {}
@@ -3237,6 +3266,7 @@
     }
     function __altProbeTick() {
         try {
+            if (isNanoChat) return;   // 纳米助手不做小号试探
             if (!getChatSetting('altProbe', false)) return;
             if (window.__altProbePending) return;
             var last = parseInt(localStorage.getItem(altProbeLastKey()) || '0', 10) || 0;
@@ -3266,6 +3296,15 @@
                 if (!obj || !obj.name) return;
                 var alt = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: String(obj.name).slice(0, 20), bio: String(obj.bio || '').slice(0, 60), origin: altOriginInfo() };
                 localStorage.setItem(altProbeLastKey(), String(Date.now()));
+                // 同步进「Meet 好友申请中心」，可在那里同意/拒绝
+                try {
+                    var _frAll = JSON.parse(localStorage.getItem('nano_friend_requests') || '[]') || [];
+                    var _owner = ''; try { var _md = JSON.parse(localStorage.getItem('nano_mask_data') || 'null'); if (_md && _md.currentMaskId != null) _owner = String(_md.currentMaskId); } catch (e0) {}
+                    if (!_frAll.some(function (x) { return x && x.status === 'pending' && x.source === 'alt' && x.originId === alt.id; })) {
+                        _frAll.push({ id: 'fr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6), owner: _owner, name: alt.name, avatar: '', source: 'alt', app: '', setting: buildAltMaskSetting(alt.name, alt.bio, alt.origin), originId: alt.id, requestNote: '想加你好友', ts: Date.now(), status: 'pending' });
+                        try { localStorage.setItem('nano_friend_requests', JSON.stringify(_frAll.slice(-400))); } catch (e1) {}
+                    }
+                } catch (e) {}
                 window.__altProbePending = alt;
                 return altProbeStore(alt).then(function () {
                     try { window.parent.postMessage({ type: 'NANO_ALT_PROBE', alt: alt }, '*'); } catch (e) {}
@@ -4653,6 +4692,21 @@
                     history.push({ role: 'assistant', content: desc });
                     prevCount++;
                 }
+            }
+
+            // 纳米助手：如果最近一条是刚发来的文件卡片且尚未有回复，把文件内容一并交给模型解析
+            if (isNanoChat) {
+                try {
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                        const _m = messages[i];
+                        if (!_m) continue;
+                        if (_m.type === 'left') break;          // 已有回复，说明文件已处理过
+                        if (_m.isCard && _m.cardData && _m.cardData.cardType === 'file' && _m.cardData.content) {
+                            history.push({ role: 'user', content: '用户发来的文件「' + (_m.cardData.name || '文件') + '」内容如下：\n' + String(_m.cardData.content) });
+                            break;
+                        }
+                    }
+                } catch (e) {}
             }
 
             userMessages.forEach((entry, idx) => {
@@ -6100,6 +6154,22 @@ if (callCard) {
     return;
 }
 
+        // ===== 文件 / 手机内容分享卡片：点击查看完整内容 =====
+        const fileCard = e.target.closest('.bubble-card.file');
+        if (fileCard) {
+            if (isMultiSelect) return;
+            const fRow = fileCard.closest('.message-row');
+            const fMsg = fRow ? messages.find(m => m.id === fRow.dataset.id) : null;
+            if (fMsg && fMsg.cardData && fMsg.cardData.content) {
+                openTakeoverViewer({
+                    title: fMsg.cardData.name || '文件内容',
+                    coupleSummary: '',
+                    takeoverLog: JSON.stringify([{ name: fMsg.cardData.name || '内容', bubbles: [String(fMsg.cardData.content)] }])
+                });
+            }
+            return;
+        }
+
         // ===== 情侣空间卡片点击：查看完整结果 =====
         const coupleCard = e.target.closest('.bubble-card.couple');
         if (coupleCard) {
@@ -6950,6 +7020,34 @@ if (callCard) {
         try { sessionStorage.removeItem('nano_pending_takeover_card'); } catch (e) {}
         addTakeoverCard(p);
     }
+    // 查手机：用户把手机内容按 App 分享给角色（变成文件卡片进入对话，角色可读取并讨论）
+    function consumePendingPhoneShare() {
+        let p = null;
+        try { p = JSON.parse(localStorage.getItem('nano_pending_phone_share') || 'null'); } catch (e) {}
+        if (!p || String(p.chatId || '') !== String(chatId || '')) return;
+        try { localStorage.removeItem('nano_pending_phone_share'); } catch (e) {}
+        const items = p.items || [];
+        if (!items.length) return;
+        // 打包成「一张」卡片：所有 App 内容塞进同一张，模型仍能读取全部内容
+        const combined = items.map(function (it) {
+            return '【' + (it.name || it.app || 'App') + '】\n' + String(it.text || '');
+        }).join('\n\n');
+        try {
+            addMessage('right', '', nowHHMM(), null, false, true, {
+                cardType: 'file',
+                name: '手机内容 · ' + items.length + ' 个 App',
+                size: '▸ 点击查看详情',
+                content: combined
+            });
+        } catch (e) {}
+        try { addSystemNotice('你把「' + (p.name || 'TA') + '」手机里的 ' + items.length + ' 个 App 内容分享给了 TA'); } catch (e) {}
+        try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
+    }
+    try {
+        window.addEventListener('storage', function (e) {
+            if (e && e.key === 'nano_pending_phone_share') { try { consumePendingPhoneShare(); } catch (err) {} }
+        });
+    } catch (e) {}
     // 接管详情查看器（马卡龙配色）
     function openTakeoverViewer(cardData) {
         cardData = cardData || {};
@@ -7278,7 +7376,9 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
             try {
                 (allCharacters || []).forEach(function (c) {
                     if (!c || !c.id || String(c.id) === String(chatId)) return;
-                    // 只列同一 user 绑定的角色（未绑定 user 的 NPC / 纳米助手不算）
+                    // 纳米是助手，不是可被反查的普通角色
+                    if (c.nanoAssistant) return;
+                    // 只列同一 user 绑定的角色（未绑定 user 的 NPC 不算）
                     if (owner && String(c.bindUser || '') !== owner) return;
                     out.chats.push({ id: String(c.id), name: String(c.name || c.id) });
                 });
@@ -7361,6 +7461,8 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
             try { consumePendingCharSay(); } catch (e) {}
             // 角色接管手机：进入该角色的聊天时补挂查看卡片
             try { consumePendingTakeoverCard(); } catch (e) {}
+            // 查手机：把用户分享的手机内容补挂进来
+            try { consumePendingPhoneShare(); } catch (e) {}
             // 纪念日：加载进角色记忆，并检查今天是否有到期的纪念日（由角色自动发卡）
             try { refreshCoupleAnnivNotice().then(function () { try { maybeAutoSendAnniversary(); } catch (e) {} }); } catch (e) {}
             try { setInterval(function () { try { maybeAutoSendAnniversary(); } catch (e) {} }, 30 * 60 * 1000); } catch (e) {}

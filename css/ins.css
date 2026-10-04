@@ -12,7 +12,7 @@ button,input,textarea{font:inherit}button{border:0;background:none;padding:0;cur
 
 /* ===== 主顶�?===== */
 .topbar{height:56px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex:none;background:var(--bg);z-index:6}
-.brand{font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:27px;font-weight:900;letter-spacing:-1.5px;cursor:pointer;user-select:none;background:linear-gradient(135deg,#f8b04d,#ef476f,#a343d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.brand{font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:27px;font-weight:900;letter-spacing:0;padding:0 8px 4px 0;line-height:1.4;flex:none;cursor:pointer;user-select:none;background:linear-gradient(135deg,#f8b04d,#ef476f,#a343d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .top-actions{display:flex;gap:18px;align-items:center}
 .top-actions button{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px}
 .top-actions button:active{background:#f0f0f0}

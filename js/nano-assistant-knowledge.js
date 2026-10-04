@@ -99,6 +99,11 @@ window.NANO_ASSISTANT_KB = {
     { tool: 'set_chat_background', args: { color: '#ffffff', image: '图片URL（可选）' }, note: '直接更换当前聊天背景（颜色或图片）；用户说“换背景”优先用这个' },
     { tool: 'set_avatar', args: { useLast: true }, note: '把当前角色头像换成用户刚发送的图片（用户在纳米聊天里发图后说「用这张当头像」时用这个，不要用 apply_beautify）；也可用 url 指定图片地址' },
     { tool: 'read_file', args: { path: 'js/chat-core.js' }, note: '只读，用于准确回答/给出修改步骤' },
-    { tool: 'open_page', args: { url: 'beautify.html' }, note: '帮用户打开对应页面' }
+    { tool: 'open_page', args: { url: 'beautify.html' }, note: '帮用户打开对应页面' },
+  { tool: 'clear_beautify', args: { scope: 'chat|groups|heart|offline|global' }, note: '清空对应范围的美化，恢复默认样式（用户说「清空线上/群聊/心声/线下/全局美化」时用这个）' },
+  { tool: 'edit_persona', args: { name: '角色名或id', setting: '新的完整人设文本' }, note: '修改某个角色的完整人设（会自动先存一个历史版本，可回退）' },
+  { tool: 'save_persona_version', args: { name: '角色名或id' }, note: '为某角色人设手动存一个历史版本' },
+  { tool: 'list_persona_versions', args: { name: '角色名或id' }, note: '列出某角色保存过的人设历史版本（含版本号，用于回退）' },
+  { tool: 'restore_persona_version', args: { name: '角色名或id', index: 1 }, note: '把某角色人设回退到第 index 个历史版本（index 从 1 开始，1=最新保存的版本）' }
   ]
 };

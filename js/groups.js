@@ -232,7 +232,35 @@
         if (group.avatar) av.innerHTML = '<img src="' + group.avatar + '">';
         else av.textContent = '群';
         if (window.parent !== window) window.parent.postMessage({ type:'groupChatTitle', title: group.name || '群聊' }, '*');
+        try { applyChatInsets(); } catch (e) {}
     }
+
+    // ===== 悬浮顶/底栏：实时量出顶/底留白，气泡可从栏下穿过且不被遮住 =====
+    function applyChatInsets(){
+        try {
+            var c = document.querySelector('.chat-container');
+            if (!c) return;
+            var tb = c.querySelector('.topbar');
+            var nb = c.querySelector('.group-notice-bar');
+            var bb = c.querySelector('.bottom-bar');
+            var th = tb ? Math.round(tb.getBoundingClientRect().height) : 60;
+            var nh = (nb && nb.offsetParent !== null) ? Math.round(nb.getBoundingClientRect().height) + 6 : 0;
+            var bh = bb ? Math.round(bb.getBoundingClientRect().height) : 64;
+            // 底栏被「底栏位置」滑杆上移时（--nano-bottom-shift 为负），把上移量并进底部留白
+            var shift = 0;
+            try {
+                var sv = getComputedStyle(document.documentElement).getPropertyValue('--nano-bottom-shift');
+                shift = parseFloat(sv) || 0;
+            } catch (e) {}
+            if (shift < 0) bh += Math.round(-shift);
+            c.style.setProperty('--chat-topbar-h', th + 'px');
+            c.style.setProperty('--chat-top-inset', (th + nh) + 'px');
+            c.style.setProperty('--chat-bottom-inset', bh + 'px');
+        } catch (e) {}
+    }
+    window.addEventListener('resize', applyChatInsets);
+    window.addEventListener('orientationchange', function(){ setTimeout(applyChatInsets, 300); });
+    try { if (window.visualViewport) window.visualViewport.addEventListener('resize', applyChatInsets); } catch (e) {}
 
     function getMember(id){
         if (!id) return null;
@@ -668,6 +696,9 @@
                     var g = db.transaction('characters','readonly').objectStore('characters').get(who.id);
                     g.onsuccess = function(){
                         if (g.result) { showAlert('提示', '你们已经是好友啦'); db.close(); return; }
+                        // 群 NPC 加为好友后绑定到当前人设，避免串到别的 user
+                        var _bind = '';
+                        try { var _d = JSON.parse(localStorage.getItem('nano_mask_data') || 'null'); if (_d && _d.currentMaskId != null) _bind = String(_d.currentMaskId); } catch (e0) {}
                         var rec = {
                             id: who.id,
                             name: who.nick || who.name,
@@ -675,7 +706,8 @@
                             gender: '未知',
                             nationality: '未知',
                             setting: who.setting || ('在群聊「' + (group.name||'') + '」里认识的朋友。' + (who.title ? ('头衔：' + who.title) : '')),
-                            isNpc: true
+                            isNpc: true,
+                            bindUser: _bind
                         };
                         var tx = db.transaction('characters','readwrite');
                         tx.objectStore('characters').put(rec);
@@ -1224,6 +1256,7 @@
         prompt += '- 发语音：[voice:秒数|语音内容]  例：[voice:4|我晚点到]\n';
         prompt += (settings.allowImage === false ? '' : '- 发图片：[image:画面描述]  例：[image:一只在窗台打盹的橘猫]\n');
         prompt += '（标签必须单独放在该角色这一行；请自然、偶尔使用，不要每条都发功能。）\n';
+        prompt += '- 想加用户好友/微信：[加好友]  例：某成员愿意和用户私聊时，在 TA 这一行的末尾加 [加好友]（系统会向用户发起好友申请，用户在 Meet 同意后即可私聊）。只在自然需要时偶尔使用。\n';
 
         prompt += '\n【输出格式示例】\n';
         prompt += 'Lambert：这个方案我觉得可以\n';
@@ -1329,8 +1362,9 @@
         s = s.replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*?\\[\\s*\\/\\s*(?:' + TW + ')\\s*\\]', 'gi'), '');
         s = s.replace(new RegExp('<\\s*(?:' + TW + ')\\s*>[\\s\\S]*?<\\s*\\/\\s*(?:' + TW + ')\\s*>', 'gi'), '');
         s = s.replace(new RegExp('【\\s*(?:' + TW + ')\\s*】[\\s\\S]*?【\\s*\\/\\s*(?:' + TW + ')\\s*】', 'gi'), '');
-        s = s.replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*$', 'i'), '');
-        s = s.replace(new RegExp('<\\s*(?:' + TW + ')\\s*>[\\s\\S]*$', 'i'), '');
+        // 未闭合的思维链只在整个回复「以它开头」时才吞到结尾，避免误吞正文/后续气泡
+        s = s.replace(new RegExp('^\\s*\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*$', 'i'), '');
+        s = s.replace(new RegExp('^\\s*<\\s*(?:' + TW + ')\\s*>[\\s\\S]*$', 'i'), '');
         s = s.replace(new RegExp('\\[\\s*\\/?\\s*(?:' + TW + ')\\s*\\]', 'gi'), '');
         s = s.replace(new RegExp('【\\s*\\/?\\s*(?:' + TW + ')\\s*】', 'gi'), '');
         s = s.replace(new RegExp('<\\s*\\/?\\s*(?:' + TW + ')\\s*>', 'gi'), '');
@@ -1371,6 +1405,7 @@
         s = s.replace(/\[title\s*:\s*([^\]]*)\]/gi, function(_, v){ tags.push({ kind:'title', payload:(v||'').trim() }); return ''; });
         s = s.replace(/\[groupname\s*:\s*([^\]]*)\]/gi, function(_, v){ tags.push({ kind:'groupname', payload:(v||'').trim() }); return ''; });
         s = s.replace(/\[voice\s*:\s*([^\]]*)\]/gi, function(_, v){ tags.push({ kind:'voice', payload:(v||'').trim() }); return ''; });
+        s = s.replace(/\[(?:加好友|加微信|加我|申请加好友|addfriend)\]/gi, function(){ tags.push({ kind:'friendreq', payload:'' }); return ''; });
         s = s.replace(/\[image\s*:\s*([^\]]*)\]/gi, function(_, v){ tags.push({ kind:'image', payload:(v||'').trim() }); return ''; });
         s = s.replace(/【(红包|接龙|公告|昵称|头衔|群名)\s*[:：]\s*([^】]*?)】/g, function(_, k, v){
             var map = { '红包':'redpacket', '接龙':'chain', '公告':'notice', '昵称':'nickname', '头衔':'title', '群名':'groupname' };
@@ -1450,6 +1485,32 @@
     function notifyGroupChange(text){
         pushTip(text);
         pendingNotes.push(text);
+    }
+
+    // 群成员申请加好友 → 写进 Meet 好友申请（绑定当前人设，同意后进入好友/角色库）
+    function requestFriendFromGroup(member){
+        if (!member) return;
+        var name = member.nick || member.name || '群友';
+        try {
+            var owner = '';
+            try {
+                var md = JSON.parse(localStorage.getItem('nano_mask_data') || localStorage.getItem('nano_home_data') || 'null');
+                if (md) { if (md.currentMaskId != null) owner = String(md.currentMaskId); else if (Array.isArray(md.masks) && md.masks.length) owner = String(md.masks[0].id || ''); }
+            } catch (e0) {}
+            var all = []; try { all = JSON.parse(localStorage.getItem('nano_friend_requests') || '[]') || []; } catch (e0) {}
+            if (all.some(function (x) { return x && x.status === 'pending' && x.source === 'groupnpc' && x.name === name; })) {
+                pushTip(name + ' 已经在等你同意好友申请了');
+                return;
+            }
+            all.push({
+                id: 'fr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+                owner: owner, name: name, avatar: member.avatar || '', source: 'groupnpc', app: 'group',
+                setting: member.setting || member.role || '', requestNote: '在群聊里加你', ts: Date.now(), status: 'pending'
+            });
+            localStorage.setItem('nano_friend_requests', JSON.stringify(all.slice(-400)));
+            try { if (window.parent !== window) window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e0) {}
+        } catch (e0) {}
+        pushTip(name + ' 申请加你好友，去 Meet 同意');
     }
 
     function applyNicknameChange(member, payload){
@@ -1649,6 +1710,7 @@
             parsed.tags.forEach(function(tag, ti){
                 // 红包卡片放到本轮最后再出现，方便用户先看完互动再决定要不要抢
                 if (tag.kind === 'redpacket') { deferredRedPackets.push({ member: member, tag: tag, timeStr: timeStr }); return; }
+                if (tag.kind === 'friendreq') { setTimeout(function(){ requestFriendFromGroup(member); }, i * 450 + ti * 180); return; }
                 setTimeout(function(){ handleGroupTag(member, tag, timeStr); }, i * 450 + ti * 180);
             });
 
@@ -2782,4 +2844,53 @@ messageContainer.addEventListener('click', function(e){
         setTimeout(function(){ requestGroupReply(); }, 400);
     }
     resolveIdentities().then(function(){ renderHeader(); renderMessages(); });
+})();
+
+/* iOS 键盘：收缩群聊容器，让输入栏位于键盘（含附属栏）上方；父页面也会 postMessage 同步 */
+(function () {
+    var parentKb = 0, localKb = 0, kbBaseH = 0;
+    function apply() {
+        var kb = Math.max(parentKb, localKb);
+        document.documentElement.style.setProperty('--nano-kb', kb + 'px');
+        document.documentElement.classList.toggle('keyboard-open', kb > 0.5);
+    }
+    function computeLocalKb(vv) {
+        kbBaseH = Math.max(kbBaseH, window.innerHeight || 0, vv.height || 0);
+        return Math.max(0, Math.round(kbBaseH - vv.height - vv.offsetTop));
+    }
+    try {
+        if (window.visualViewport) {
+            var vv = window.visualViewport;
+            var upd = function () { localKb = computeLocalKb(vv); apply(); };
+            vv.addEventListener('resize', upd);
+            vv.addEventListener('scroll', upd);
+            window.addEventListener('orientationchange', function () { kbBaseH = 0; setTimeout(upd, 350); });
+        }
+    } catch (e) {}
+    window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (d && d.type === 'nanoKeyboard') { parentKb = Math.max(0, Math.round(Number(d.kb) || 0)); apply(); }
+    });
+    function isField(t) { return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
+    function requery() {
+        try { if (window.parent !== window) window.parent.postMessage({ type: 'nanoKeyboardQuery' }, '*'); } catch (err) {}
+        try { if (window.visualViewport) localKb = computeLocalKb(window.visualViewport); } catch (err) {}
+        apply();
+        // iOS 键盘弹起后把消息滚到最新，避免输入栏下方内容被键盘/附属栏挡住
+        try {
+            var ae = document.activeElement;
+            if (isField(ae)) {
+                var sc = document.getElementById('messageScroll');
+                if (sc) sc.scrollTop = sc.scrollHeight;
+            }
+        } catch (err) {}
+    }
+    document.addEventListener('focusin', function (e) {
+        if (!isField(e.target)) return;
+        [60, 160, 320, 520].forEach(function (t) { setTimeout(requery, t); });
+    });
+    document.addEventListener('focusout', function () {
+        setTimeout(requery, 80);
+        setTimeout(requery, 320);
+    });
 })();

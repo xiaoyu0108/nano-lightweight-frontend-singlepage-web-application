@@ -181,13 +181,40 @@ let messages = [];
 // 供记忆同步：本 offline 会话属于哪个角色
 let offlineChatId = '';
 try { offlineChatId = new URLSearchParams(window.location.search).get('chat') || ''; } catch (e) { offlineChatId = ''; }
-// 场景：story=剧情（默认，计入记忆）；theater=小剧场（番外，不计入记忆）
+// 美化预览模式：同一套真实页面，只用来在设置页里实时展示样式，不读写消息、不跑定时
+let OFFLINE_PREVIEW = false;
+try { OFFLINE_PREVIEW = new URLSearchParams(window.location.search).get('preview') === '1'; } catch (e) { OFFLINE_PREVIEW = false; }
+// 场景：story=剧情（默认，计入记忆）；theater:<sid>=小剧场/番外（可多开，各自独立存档，不计入记忆）
 let offlineScene = 'story';
 const SCENE_KEY = 'offline_scene_' + (offlineChatId || 'none');
+function _theaterKey() { return 'offline_theaters_' + (offlineChatId || 'none'); }
+function loadTheaters() { try { return JSON.parse(localStorage.getItem(_theaterKey()) || '[]') || []; } catch (e) { return []; } }
+function saveTheaters(list) { try { localStorage.setItem(_theaterKey(), JSON.stringify(list || [])); } catch (e) {} }
+function theaterName(sid) { var t = loadTheaters().find(function (x) { return x.id === sid; }); return t ? t.name : ''; }
+function newTheater(name) {
+  var list = loadTheaters();
+  var id = 'th_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+  list.push({ id: id, name: name || ('番外 ' + (list.length + 1)), ts: Date.now() });
+  saveTheaters(list);
+  return id;
+}
+function isTheaterScene(s) { return String(s || offlineScene).indexOf('theater') === 0; }
 try {
   const _s = localStorage.getItem(SCENE_KEY);
-  if (_s === 'theater' || _s === 'story') offlineScene = _s;
-} catch (e) {}
+  if (_s === 'theater') {
+    // 旧版单一番外 → 迁移成命名会话
+    const _list = loadTheaters();
+    const _sid = _list.length ? _list[0].id : newTheater('番外 1');
+    offlineScene = 'theater:' + _sid;
+    try { localStorage.setItem(SCENE_KEY, offlineScene); } catch (e) {}
+  } else if (_s && _s.indexOf('theater:') === 0) {
+    let _sid = _s.slice(8);
+    if (!loadTheaters().some(function (t) { return t.id === _sid; })) _sid = newTheater();
+    offlineScene = 'theater:' + _sid;
+  } else {
+    offlineScene = 'story';
+  }
+} catch (e) { offlineScene = 'story'; }
 let offlineIsGroup = false;
 let groupMemberList = [];
 let groupMemberMap = {};
@@ -459,7 +486,12 @@ function parseContent(text) {
 // ============================================================
 function updateTopTitle() {
   const name = settings.charName || 'char';
-  topTitle.textContent = offlineScene === 'theater' ? (name + ' · 小剧场') : name;
+  if (isTheaterScene()) {
+    const tn = theaterName(offlineScene.slice(8)) || '小剧场';
+    topTitle.textContent = name + ' · ' + tn;
+  } else {
+    topTitle.textContent = name;
+  }
 }
 
 function render() {
@@ -469,7 +501,7 @@ function render() {
     if (isReplying) {
       chat.appendChild(buildTypingCard());
     } else {
-      chat.innerHTML = '<div class="empty">' + (offlineScene === 'theater' ? '写一段番外小剧场吧。' : '开始一段新的长文聊天吧。') + '</div>';
+      chat.innerHTML = '<div class="empty">' + (isTheaterScene() ? '写一段番外小剧场吧。' : '开始一段新的长文聊天吧。') + '</div>';
     }
     updateSelectBar();
     return;
@@ -847,14 +879,16 @@ document.getElementById('deleteSelected').onclick = () => {
 // ============================================================
 // 9. 顶栏
 // ============================================================
-document.getElementById('settingsBtn').onclick = () => {
+document.getElementById('settingsBtn').onclick = (e) => {
+  try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
   const q = offlineChatId ? ('?chat=' + encodeURIComponent(offlineChatId) + '&name=' + encodeURIComponent(settings.charName || '')) : '';
   location.href = 'offline-setting.html' + q;
 };
 // 返回按钮已移除，由外层页面（chat-inner）负责返回；这里仅兜底
 const backBtnEl = document.getElementById('backBtn');
 if (backBtnEl) {
-  backBtnEl.onclick = async () => {
+  backBtnEl.onclick = async (e) => {
+    try { e && e.stopPropagation(); } catch (_) {}
     // 结束线下：强制补一次总结（把本轮剩余未总结的剧情写进长期记忆）
     try { if (typeof summarizeOfflineMemories === 'function') await summarizeOfflineMemories(true); } catch (e) {}
     if (window.parent && window.parent !== window) {
@@ -875,9 +909,85 @@ if (backBtnEl) {
 function updateSceneTabs() {
   const tabs = document.getElementById('sceneTabs');
   if (!tabs) return;
-  tabs.dataset.scene = offlineScene;
+  const isTheater = isTheaterScene();
+  tabs.dataset.scene = isTheater ? 'theater' : 'story';
   tabs.querySelectorAll('.scene-tab').forEach(b => {
-    b.classList.toggle('active', b.dataset.scene === offlineScene);
+    b.classList.toggle('active', (b.dataset.scene === 'theater') === isTheater);
+  });
+}
+
+function _tpEsc(s) {
+  return String(s || '').replace(/[<>&"]/g, function (c) {
+    return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c];
+  });
+}
+function deleteTheaterMessages(sceneValue) {
+  openDB().then(function (db) {
+    const tx = db.transaction(MESSAGES_STORE, 'readwrite');
+    const store = tx.objectStore(MESSAGES_STORE);
+    const all = store.getAll();
+    all.onsuccess = function () {
+      const keep = (all.result || []).filter(function (m) {
+        return !((m.chatId || '') === (offlineChatId || '') && (m.scene || 'story') === sceneValue);
+      });
+      store.clear();
+      keep.forEach(function (m) { store.put(m); });
+    };
+    tx.oncomplete = function () { try { db.close(); } catch (e) {} };
+    tx.onerror = function () { try { db.close(); } catch (e) {} };
+  }).catch(function () {});
+}
+function openTheaterPicker() {
+  const old = document.getElementById('theaterPicker');
+  if (old) old.remove();
+  const list = loadTheaters();
+  const rows = list.map(function (t) {
+    const active = offlineScene === 'theater:' + t.id ? ' active' : '';
+    return '<div class="tp-row' + active + '">'
+      + '<button class="tp-open" data-open="' + t.id + '">' + _tpEsc(t.name) + '</button>'
+      + '<button class="tp-mini" data-rename="' + t.id + '">改名</button>'
+      + '<button class="tp-mini tp-danger" data-del="' + t.id + '">删除</button></div>';
+  }).join('');
+  const ov = document.createElement('div');
+  ov.id = 'theaterPicker';
+  ov.className = 'tp-mask';
+  ov.innerHTML = '<div class="tp-sheet">'
+    + '<div class="tp-head">小剧场 · 番外</div>'
+    + '<div class="tp-sub">每个番外独立存档、互不干扰，也不计入记忆</div>'
+    + '<div class="tp-list">' + (rows || '<div class="tp-empty">还没有番外，新建一个吧</div>') + '</div>'
+    + '<div class="tp-actions"><button class="tp-new">＋ 新建番外</button><button class="tp-cancel">取消</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+  ov.querySelector('.tp-cancel').onclick = function () { ov.remove(); };
+  ov.querySelector('.tp-new').onclick = function () {
+    let nm = null; try { nm = window.prompt('给这个番外起个名字', '番外 ' + (loadTheaters().length + 1)); } catch (e) {}
+    const sid = newTheater(nm && nm.trim() ? nm.trim() : undefined);
+    ov.remove();
+    switchScene('theater:' + sid);
+  };
+  ov.querySelectorAll('[data-open]').forEach(function (b) {
+    b.onclick = function () { ov.remove(); switchScene('theater:' + this.getAttribute('data-open')); };
+  });
+  ov.querySelectorAll('[data-rename]').forEach(function (b) {
+    b.onclick = function () {
+      const id = this.getAttribute('data-rename');
+      const l2 = loadTheaters(); const t = l2.find(function (x) { return x.id === id; });
+      let nm = null; try { nm = window.prompt('重命名番外', t ? t.name : ''); } catch (e) {}
+      if (nm && nm.trim() && t) { t.name = nm.trim(); saveTheaters(l2); if (isTheaterScene() && offlineScene === 'theater:' + id) updateTopTitle(); openTheaterPicker(); }
+    };
+  });
+  ov.querySelectorAll('[data-del]').forEach(function (b) {
+    b.onclick = function () {
+      const id = this.getAttribute('data-del');
+      if (!window.confirm('删除这个番外？其中的聊天记录会一起删除。')) return;
+      saveTheaters(loadTheaters().filter(function (x) { return x.id !== id; }));
+      deleteTheaterMessages('theater:' + id);
+      if (offlineScene === 'theater:' + id) { offlineScene = 'story'; try { localStorage.setItem(SCENE_KEY, 'story'); } catch (e) {} }
+      openTheaterPicker();
+      updateSceneTabs();
+      getMessages().then(function (ms) { messages = ms; render(); });
+    };
   });
 }
 
@@ -897,7 +1007,10 @@ async function switchScene(scene) {
   const tabs = document.getElementById('sceneTabs');
   if (!tabs) return;
   tabs.querySelectorAll('.scene-tab').forEach(b => {
-    b.addEventListener('click', function () { switchScene(this.dataset.scene); });
+    b.addEventListener('click', function () {
+      if (this.dataset.scene === 'theater') openTheaterPicker();
+      else switchScene('story');
+    });
   });
   updateSceneTabs();
 })();
@@ -1195,9 +1308,16 @@ async function callMainAPI(history) {
     // 线下长文按「目标字数」估算输出 token：中文约 1.8 token/字，再加思维链/心声/剧情选项的余量。
     // 之前这里写死 1024，模型最多只能吐 ~1500 字，小剧场/长文必然被截断 —— 与破限无关，是 max_tokens 限制。
     const wantChars = parseInt(settings.wordCount, 10) || 0;
-    let offlineMaxTokens = Math.ceil(wantChars * 1.8) + 1600;
-    offlineMaxTokens = Math.max(4096, offlineMaxTokens);
-    offlineMaxTokens = Math.min(offlineMaxTokens, 16384);
+    const wantTokens = parseInt(settings.maxTokens, 10) || 0;
+    let offlineMaxTokens;
+    if (wantTokens > 0) {
+      // 用户在「线下设置 → 输出上限」里手动指定
+      offlineMaxTokens = Math.min(Math.max(wantTokens, 1024), 32768);
+    } else {
+      offlineMaxTokens = Math.ceil(wantChars * 1.8) + 1600;
+      offlineMaxTokens = Math.max(4096, offlineMaxTokens);
+      offlineMaxTokens = Math.min(offlineMaxTokens, 16384);
+    }
 
     const body = {
       model: mainModel,
@@ -1438,6 +1558,18 @@ async function init() {
   }
   messages = stored || [];
 
+  if (OFFLINE_PREVIEW) {
+    document.body.classList.add('offline-preview');
+    if (!messages.length) {
+      messages = [
+        { role: 'user', name: settings.userName || '我', content: '今天想和你聊聊最近的安排。', heart: '', thinking: '', time: '' },
+        { role: 'char', name: settings.charName || '角色', content: '这是正文预览，用来看配色、字体与排版效果。', heart: '这是一句心声预览。', thinking: '这是一段思维链预览。', time: '' }
+      ];
+    }
+    render();
+    return;
+  }
+
   try { if (window.NanoBadge && offlineChatId) window.NanoBadge.setContext(offlineChatId); } catch (e) {}
 
   // 给历史消息补上 chatId / scene（便于线上线下记忆互通、场景隔离）
@@ -1506,6 +1638,22 @@ window.addEventListener('focus', reloadSettings);
 window.addEventListener('message', function (e) {
   var d = e.data;
   if (d && d.type === 'offlineSettingsChanged') reloadSettings();
+  // 美化预览：接收设置页发来的草稿 CSS，实时套用到预览页
+  if (d && d.type === 'offlinePreviewCss') {
+    try {
+      let tag = document.getElementById('offline-preview-css');
+      if (!tag) { tag = document.createElement('style'); tag.id = 'offline-preview-css'; document.head.appendChild(tag); }
+      tag.textContent = String(d.css || '');
+    } catch (err) {}
+  }
+  // 美化预览：头像框变化
+  if (d && d.type === 'offlinePreviewFrame') {
+    try {
+      let tag = document.getElementById('offline-preview-frame');
+      if (!tag) { tag = document.createElement('style'); tag.id = 'offline-preview-frame'; document.head.appendChild(tag); }
+      tag.textContent = String(d.css || '');
+    } catch (err) {}
+  }
 });
 
 init();

@@ -102,15 +102,14 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px 8px 8px;
+    padding: 7px 12px 7px 8px;
     background: #ffffff;
-    border-radius: 16px;
+    border-radius: 14px;
     cursor: pointer;
     transition: background 0.15s;
-    min-height: 44px;
+    min-height: 48px;
     width: 100%;
-    border: 0.5px solid rgba(0, 0, 0, 0.03);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+    border: 0.5px solid rgba(0, 0, 0, 0.04);
 }
 .user-status-bar:active { background: #f5f5f7; }
 
@@ -122,16 +121,16 @@ html, body {
     min-width: 0;
 }
 .user-status-bar .left .user-avatar {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     overflow: hidden;
-    background: #e8e8ec;
+    background: #f0f0f3;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     color: #8e8e93;
     border: 0.5px solid rgba(0, 0, 0, 0.04);
@@ -164,15 +163,15 @@ html, body {
     flex-shrink: 0;
 }
 .user-status-bar .right .char-count {
-    color: #1c1c1e;
-    font-weight: 600;
+    color: #bcbcbc;
+    font-style: italic;
+    font-weight: 500;
     font-size: 14px;
+    font-family: Georgia, "Times New Roman", "Songti SC", serif;
+    letter-spacing: 0.02em;
 }
 .user-status-bar .right .arrow {
-    font-size: 12px;
-    color: #8e8e93;
-    transition: transform 0.25s ease;
-    margin-left: 2px;
+    display: none;
 }
 .user-status-bar .right .arrow.open {
     transform: rotate(180deg);
@@ -182,33 +181,61 @@ html, body {
 .user-dropdown {
     display: none;
     position: absolute;
-    top: calc(100% + 6px);
+    top: calc(100% + 8px);
     left: 0;
     right: 0;
     background: #ffffff;
     border-radius: 14px;
-    border: 0.5px solid rgba(0, 0, 0, 0.04);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    border: 0.5px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
     z-index: 50;
-    max-height: 200px;
+    max-height: 260px;
     overflow-y: auto;
-    padding: 6px 6px;
+    padding: 6px;
+    animation: ddIn 0.14s ease;
 }
+@keyframes ddIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .user-dropdown::-webkit-scrollbar { width: 0; }
 .user-dropdown.show { display: block; }
 .user-dropdown .dropdown-item {
     display: flex;
     align-items: center;
     padding: 10px 12px;
-    gap: 10px;
+    gap: 11px;
     cursor: pointer;
-    transition: background 0.1s;
-    border-radius: 10px;
+    transition: background 0.12s;
+    border-radius: 13px;
 }
-.user-dropdown .dropdown-item:active { background: #f5f5f7; }
+.user-dropdown .dropdown-item:active { background: #f2f2f7; }
+.user-dropdown .dropdown-item.active .d-name { font-weight: 700; }
+.user-dropdown .dd-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #aeaeb2;
+    padding: 6px 12px 4px;
+    letter-spacing: 0.02em;
+}
+.user-dropdown .dd-manage {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    padding: 11px 12px;
+    border-radius: 13px;
+    color: #ff2d78;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.user-dropdown .dd-manage:active { background: rgba(255, 77, 148, 0.1); }
+.user-dropdown .dd-manage .plus {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 77, 148, 0.12); font-size: 18px; line-height: 1;
+}
 .user-dropdown .dropdown-item .d-avatar {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: #f0f0f3;
     display: flex;
@@ -278,9 +305,17 @@ html, body {
     border: 0.5px solid rgba(0, 0, 0, 0.04);
     color: #aeaeb2;
     font-size: 26px;
-    cursor: default;
-    opacity: 0.6;
+    cursor: pointer;
+    opacity: 1;
+    box-shadow: none;
 }
+.avatar-add:active { background: #e8e8ec; }
+.avatar-add.has-req {
+    background: #ffe3ef;
+    border-color: #ffc9dd;
+    color: #ff8fbf;
+}
+.avatar-add.has-req::after { content: none; }
 .avatar-item img {
     width: 100%;
     height: 100%;
@@ -420,7 +455,7 @@ html, body {
 .chat-avatar {
     width: 48px;
     height: 48px;
-    border-radius: 48px;
+    border-radius: 50%;
     background: #f0f0f3;
     flex-shrink: 0;
     overflow: hidden;

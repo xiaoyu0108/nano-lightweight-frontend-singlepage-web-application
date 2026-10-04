@@ -78,17 +78,11 @@
             icon: '<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
             color: '#32ADE6'
         },
-        {
-            id: 'takeover',
-            label: '接管手机',
-            icon: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/><path d="M9 8.5c1.2-1 4.8-1 6 0"/>',
-            color: '#FF4D94'
-        },
     ];
 
-    // 旧版本曾加入过「接收/结束一起听」「看屏幕」，这里移除，避免老用户菜单里残留
-    // （看屏幕入口只保留在「查手机 → 设置」里）
-    const REMOVED_MENU_IDS = ['listen-accept', 'listen-end', 'screenshare'];
+    // 「接管手机 / 反查」「看屏幕 / 屏幕共享」入口统一收进「查手机 → 设置」，
+    // 聊天加号菜单不再重复出现（这里同时过滤掉老用户数据库里已保存的旧项）。
+    const REMOVED_MENU_IDS = ['listen-accept', 'listen-end', 'screenshare', 'takeover'];
 
     // ===== IndexedDB 操作 =====
     const DB_NAME = 'nano_chat_menu_db';
@@ -197,15 +191,16 @@
             if (b && b.id === 'reroll') return 1;
             return 0;
         });
-        // 接管手机 / 看屏幕：普通角色聊天才有，纳米助手不显示
-        if (IS_NANO) items = items.filter(function (it) { return it && it.id !== 'takeover' && it.id !== 'screenshare'; });
-        // 纳米助手：加号菜单里加入「发送文件」
-        if (IS_NANO && !items.some(function (it) { return it && it.id === 'file'; })) {
-            items.push({
-                id: 'file', label: '文件',
-                icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/>',
-                color: '#FF4D94'
-            });
+        // 纳米助手：加号菜单精简为「重roll / 发实体照片 / 发文件 / 美化清空」
+        if (IS_NANO) {
+            items = [
+                { id: 'reroll', label: '重roll', icon: '<path d="M21 12a9 9 0 1 1-9-9m0 0v6m0-6h-6"/>', color: '#007AFF' },
+                { id: 'image', label: '图片', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5-5 5-3-3-5 5"/>', color: '#FF9500' },
+                { id: 'file', label: '文件', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/>', color: '#FF4D94' },
+                { id: 'clearlive', label: '清空线上', icon: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/>', color: '#007AFF' },
+                { id: 'clearoffline', label: '清空线下', icon: '<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>', color: '#34C759' },
+                { id: 'clearheart', label: '清空心声', icon: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/>', color: '#FF2D55' }
+            ];
         }
         items.forEach(function(item) {
             const btn = document.createElement('button');
@@ -305,6 +300,43 @@
         }
     }
 
+    function notifyCleared(msg) {
+        try { if (window.parent !== window) window.parent.postMessage({ type: 'alert', message: msg }, '*'); } catch (e) {}
+    }
+    // 单聊/群聊线上美化
+    function clearLiveBeautify() {
+        try { localStorage.removeItem('beautify_chat'); localStorage.removeItem('beautify_chat_v2'); localStorage.removeItem('beautify_groups'); localStorage.removeItem('beautify_groups_v2'); } catch (e) {}
+        notifyCleared('已清空线上美化，恢复默认样式');
+    }
+    // 心声美化
+    function clearHeartBeautify() {
+        try { localStorage.removeItem('nano_voice_applied_css'); } catch (e) {}
+        notifyCleared('已清空心声美化，恢复默认样式');
+    }
+    // 线下美化
+    function clearOfflineBeautify() {
+        try {
+            var req = indexedDB.open('MeetSettingsDB');
+            req.onsuccess = function () {
+                try {
+                    var db = req.result;
+                    if (!db.objectStoreNames.contains('settings')) { db.close(); return; }
+                    var tx = db.transaction('settings', 'readwrite');
+                    var st = tx.objectStore('settings');
+                    var g = st.getAll();
+                    g.onsuccess = function () {
+                        (g.result || []).forEach(function (rec) {
+                            if (rec && rec.customCSS !== undefined) { rec.customCSS = ''; st.put(rec); }
+                        });
+                    };
+                    tx.oncomplete = function () { db.close(); };
+                    tx.onerror = function () { db.close(); };
+                } catch (e) {}
+            };
+        } catch (e) {}
+        notifyCleared('已清空线下美化，恢复默认样式');
+    }
+
     // 当前聊天角色信息（供接管手机 / 看屏幕用）
     function chatCharInfo() {
         const info = { id: '', name: '', avatar: '' };
@@ -324,6 +356,15 @@
                 break;
             case 'file':
                 pickFileForNano();
+                break;
+            case 'clearlive':
+                clearLiveBeautify();
+                break;
+            case 'clearoffline':
+                clearOfflineBeautify();
+                break;
+            case 'clearheart':
+                clearHeartBeautify();
                 break;
             case 'takeover':
                 fireHost('takeover');

@@ -402,7 +402,8 @@ button, input, textarea { font: inherit; outline: none; }
 .iv-btn-clear { color: #ff3b30; }
 .iv-btn-copy { color: #5856d6; }
 .iv-btn-restore { color: #ff9500; }
-.iv-custom-foot .iv-btn-action { font-size: 14px; padding: 0 4px; }
+.iv-custom-foot .iv-btn-action { font-size: 14px; padding: 0 4px; flex: 1; }
+.iv-custom-foot .iv-divider { display: none; }
 
 /* 动画 */
 @keyframes ivFade { from { opacity: 0; } to { opacity: 1; } }

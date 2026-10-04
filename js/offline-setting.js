@@ -89,7 +89,7 @@ const CSS_PRESETS_ID = 'css_presets';
 const COT_PRESETS_ID = 'cot_presets';
 const MESSAGES_STORE = 'messages';
 
-let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', autoSummary: true, memThreshold: 5, nsfw: false };
+let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '' };
 let ruleGroups = [];
 let stylePresets = [];
 let cssPresets = [];
@@ -113,9 +113,9 @@ async function loadAllData() {
           enabled: true,
           expanded: true,
           rules: [
-            { id: 'g1-c1', name: '晋江体', content: '文字细腻克制，节奏舒缓，注重环境与心理描写。', enabled: true },
-            { id: 'g1-c2', name: '长佩体', content: '温柔舒缓，情感含蓄内敛，注重氛围营造。', enabled: true },
-            { id: 'g1-c3', name: '海棠体', content: '直白热烈，情感外放，语言富有张力。', enabled: true },
+            { id: 'g1-c1', name: '晋江体', content: '细腻克制、节奏舒缓，重心理与环境描写；遣词考究，善用留白和暗示，情绪层层递进，不直白喊口号；长短句交错，画面感与呼吸感强。', enabled: true },
+            { id: 'g1-c2', name: '长佩体', content: '温柔舒展、情感含蓄内敛；重氛围与日常细节，把心动藏在动作和景物里，甜而不腻；语言干净清爽，善用光线、声音、气味等感官描写。', enabled: true },
+            { id: 'g1-c3', name: '海棠体', content: '直白热烈、情感外放，语言富有张力与冲击力；善写亲密与情欲张力，节奏快、句子短促有力；大胆热烈但贴合人设，不 OOC。', enabled: true },
           ]
         },
         {
@@ -131,6 +131,27 @@ async function loadAllData() {
       ];
       await saveRules();
     }
+
+    // 内置文风升级：把旧的简短描述替换为更丰盈的版本（只升级内置的这三条，用户自定义的长文风不动）
+    try {
+      if (localStorage.getItem('nano_offline_style_v2') !== '1') {
+        const STYLE_UP = {
+          '晋江体': '细腻克制、节奏舒缓，重心理与环境描写；遣词考究，善用留白和暗示，情绪层层递进，不直白喊口号；长短句交错，画面感与呼吸感强。',
+          '长佩体': '温柔舒展、情感含蓄内敛；重氛围与日常细节，把心动藏在动作和景物里，甜而不腻；语言干净清爽，善用光线、声音、气味等感官描写。',
+          '海棠体': '直白热烈、情感外放，语言富有张力与冲击力；善写亲密与情欲张力，节奏快、句子短促有力；大胆热烈但贴合人设，不 OOC。'
+        };
+        let _upgraded = false;
+        (ruleGroups || []).forEach(function (g) {
+          (g.rules || []).forEach(function (r) {
+            if (r && STYLE_UP[r.name] && (!r.content || String(r.content).length < 30)) {
+              r.content = STYLE_UP[r.name]; _upgraded = true;
+            }
+          });
+        });
+        if (_upgraded) await saveRules();
+        try { localStorage.setItem('nano_offline_style_v2', '1'); } catch (e) {}
+      }
+    } catch (e) {}
 
     const styleData = await getStoreData('stylePresets');
     const foundStyle = styleData.find(s => s.id === STYLE_PRESETS_ID);
@@ -174,7 +195,134 @@ function generateId() { return 'id-' + Date.now() + '-' + Math.random().toString
 // ============================================================
 //  3. 常量 & 工具
 // ============================================================
-const INITIAL_CSS = `/* 初始 CSS 模板 - 灰粉色系（只换配色，不改任何按钮位置） */
+const INITIAL_CSS = `/* ============================================================
+   线下初始模板（灰粉色系）· 分区 DIY 说明
+   ------------------------------------------------------------
+   这个模板 = 「线下」页面样式。下面按「顶栏 / 卡片区 / 底栏 / 其它」
+   分区写清能改什么、怎么改；把想用的示例取消注释，改完点「应用 CSS」。
+   想回到现在这套初始外观：把「模板」切回「初始 CSS」再应用。
+   ============================================================ */
+
+/* ── 1. 顶栏 .topbar ──────────────────────────────────────────
+   结构：.topbar > .top-btn(#backBtn 返回) + .top-title + .top-btn(#settingsBtn 设置)
+   可改：高度 / 背景 / 圆角 / 是否吸顶 / 隐藏按钮 / 换图标 / 铺一张背景图。
+   .topbar{height:64px;background:#fff;border-bottom:1px solid #eee;border-radius:0;box-shadow:none}
+   .topbar{position:fixed;top:var(--safe-top,0px);left:0;right:0;z-index:30}       // 吸顶
+   .top-title{font-family:Georgia,serif;letter-spacing:.22em;color:#c58ea0}        // 标题字体/颜色
+   .top-btn{color:#c58ea0}                                                          // 按钮颜色
+   #backBtn{display:none}                                                           // 隐藏返回
+   #settingsBtn{background:url("https://你的图标.png") center/22px no-repeat}        // 换设置图标
+   #settingsBtn svg{opacity:0}                                                      // 换图后隐藏原 svg
+   .topbar::before{content:url("https://顶栏图.png");position:absolute;inset:0;z-index:-1;opacity:.35}  // 顶栏铺图覆盖
+   */
+
+/* ── 2. 卡片区 .message ───────────────────────────────────────
+   一条消息 = article.message，内部元素：
+     .message-head > .diary-title      顶部 Diary 条
+     .identity-row > button.avatar      头像（点它 = 切换心声）
+                     > .nickname        昵称
+     .heart-state   心声（.message.show-heart 时才显示）
+     .thinking      思维链（.message.show-thinking 时才显示）
+     .content[data-role=content]        正文
+     .time-row > .clock-icon            时间
+     .plot-area > .plot-toggle + .plot-options > .plot-opt   推荐剧情
+     .actions > .action(编辑/删除) + .action.more-action      卡片底栏
+     .more-menu > [data-action=thinking] / [data-action=select]
+   (A) 去掉 Diary 卡片包裹、完全重构：
+       .message-head{display:none}
+       .message{background:transparent;border:0;box-shadow:none;padding:0}
+       .message .content{background:#fff;border-radius:18px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.05)}
+   (B) 头像单独移出、移到任意地方（.identity-row 已是 relative）：
+       .message{position:relative}
+       .identity-row .avatar{position:absolute;right:18px;top:-42px;left:auto;width:64px;height:64px}
+       // 想钉在屏幕某处：position 改 fixed，left/top 填像素
+   (C) 加头像框 / 圆角 / 光环：
+       .identity-row .avatar{border:3px solid #e7cdd6;border-radius:20px;box-shadow:0 0 0 4px rgba(231,205,214,.35)}
+   (D) 重写卡片样式（颜色/形状/描边）：
+       .message{background:#fffdfd;border:1px solid #efe3e6;border-radius:22px;box-shadow:0 8px 24px rgba(120,90,100,.06)}
+   (E) 卡片底栏（编辑/删除/更多）移动 / 美化 / 打包：
+       .actions{position:absolute;right:14px;bottom:14px;gap:4px;background:#f7f0f2;border-radius:999px;padding:4px 6px}
+       .actions .action span{display:none}                    // 只留图标
+       .actions .action{color:#b98a9a}
+       // 想挪到底部中间：.actions{left:0;right:0;justify-content:center}
+   (F) 心声 / 思维链：触发方式 + 单独美化框
+       // 默认触发：点头像切换「心声」；「更多 → 显示/隐藏思维链」切换「思维链」。
+       .heart-state,.thinking{background:#fff7fa;border:1px solid #f0d7e0;border-radius:14px;padding:10px 12px;color:#a87b8b}
+       .message.show-heart .heart-state{display:block}
+       .message.show-thinking .thinking{display:block}
+       .heart-state::before{content:"♥ ";color:#e08fb0}       // 给心声加小图标/标题
+       .message{cursor:pointer}                                 // 让整卡看起来可点
+       // 注意：点击「触发逻辑」是 JS，纯 CSS 改不了；要换触发点/新按键需加 JS（可让纳米帮你加）。
+   (G) 推荐剧情样式 / 颜色：
+       .plot-toggle{background:#f6eef1;color:#a87b8b;border-radius:999px;padding:6px 14px}
+       .plot-options{gap:8px}
+       .plot-opt{background:#fff;border:1px solid #f0d7e0;border-radius:12px;color:#7a6a70}
+       .plot-opt:hover{background:#fbeef3}
+   */
+
+/* ── 3. 底栏 .bottom ──────────────────────────────────────────
+   结构：.bottom > .composer > .round-btn(#rerollBtn 重roll) + .input + .round-btn.send(#sendBtn)
+   可改：整体样式、按钮位置/顺序/颜色/图标、加装饰插件。
+   .bottom{background:#fff;border-top:1px solid #eee}
+   .composer{background:#f6f2f3;border:0;border-radius:18px;padding:6px 8px}
+   .round-btn{color:#b98a9a}
+   .round-btn.send{background:#c58ea0;color:#fff}
+   .composer{display:flex;flex-direction:row-reverse}          // 调换按钮左右
+   #rerollBtn svg{opacity:0}
+   #rerollBtn{background:url("https://重roll.png") center/20px no-repeat}   // 换图标
+   #sendBtn svg{opacity:0}
+   #sendBtn{background:url("https://发送.png") center/20px no-repeat}
+   // 加「装饰性」插件（纯 CSS 只能加不可点的装饰；真正的新功能需加 HTML/JS，可让纳米帮你加）：
+   .composer::before{content:"";width:36px;height:36px;border-radius:50%;align-self:center;margin-right:6px;background:#eee url("https://图标.png") center/16px no-repeat}
+   */
+
+/* ── 4. 其它：颜色 / 图标 / 字体 ──────────────────────────────
+   · 全局配色：改最下面的 :root 变量（--page 背景 / --card 卡片 / --ink 文字 / --pink-deep 点缀 …）
+   · 整页背景图：body{background:url("https://背景.png") center/cover fixed}
+   · 换任意按钮图标：给该按钮加 background-image，并让其 svg 透明度设为 0（见上）
+   · 字体：body,.content{font-family:"你的字体",serif}
+   */
+
+/* ── 5. 进阶：几个常见需求怎么改 ──────────────────────────────
+   (1) 把头像「提出卡片」、独立于卡片之外 / 任意位置：
+       卡片 = .message；头像 = .identity-row .avatar。
+       .message{position:relative;overflow:visible}                 /* 卡片可定位，别 hidden */
+       .identity-row .avatar{position:absolute;left:-22px;top:14px;z-index:5}   /* 挪到卡片外 */
+       /* 想完全脱离卡片、钉在屏幕：position 改 fixed，left/top 填像素 */
+       .identity-row{padding-left:8px}                              /* 提走后给昵称留点空 */
+       /* 注意：聊天滚动区 .chat 是 overflow:auto，会裁掉超出「内边距」的部分；
+          想让头像「完全」移到卡片外还看得见，给它留出空间：
+          .chat{padding-left:26px;padding-right:26px}  然后把头像 left/top 调小一点即可。 */
+       /* 头像框（URL 图片框，最省事）：.identity-row .avatar::after{content:url("https://框.png");position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);border:0;pointer-events:none} */
+   (2) 完全重构「剧情 / 小剧场」切换 tab（.scene-tabs）：
+       .scene-tabs{display:flex;gap:8px;padding:10px 16px;background:transparent}
+       .scene-tab{border:0;border-radius:999px;padding:8px 18px;background:#efe7e9;color:#7a6a70;font-weight:600}
+       .scene-tab.active{background:#c58ea0;color:#fff}
+       /* 想换成分段控件 / 下划线 / 竖排：改 .scene-tabs 布局与 .scene-tab 样式即可 */
+   (3) 给头像加头像框并完美适配：
+       .identity-row .avatar{position:relative;overflow:visible}
+       .identity-row .avatar::after{
+         content:"";position:absolute;inset:-6px;border-radius:inherit;
+         border:2px solid #e7cdd6;pointer-events:none;              /* 框比头像大一圈，且不挡点按 */
+       }
+       /* 图片框：content:url("https://框.png");width:calc(100% + 12px);height:calc(100% + 12px);border:0 */
+   (4) 修改「设置页」的配色：
+       设置页不吃这里的美化 CSS（否则会改坏它的按钮）。它自己的变量在 css/offline-setting.css 顶部：
+         --paper 背景 / --ink 主文字 / --sub 次要文字 / --line 分割线 / --accent 强调色
+       要改设置页颜色，改这几个 :root 变量即可（纯颜色安全；别改它的尺寸/布局）。
+   (5) 把顶栏改成「悬浮」又不影响点击的安全写法：
+       .topbar{
+         position:fixed;top:0;left:0;right:0;z-index:40;
+         height:calc(64px + var(--safe-top,0px));padding-top:var(--safe-top,0px);
+         display:flex;align-items:center;justify-content:space-between;   /* 必须保留 flex */
+         background:rgba(255,255,255,.8);backdrop-filter:blur(20px);
+       }
+       .topbar .top-title{flex:1;min-width:0;pointer-events:none}          /* 标题不挡点击 */
+       .topbar .top-btn{flex:0 0 auto;width:50px;height:50px}              /* 按钮固定尺寸 */
+       .chat{padding-top:calc(74px + var(--safe-top,0px))}                  /* 给悬浮顶栏留位 */
+       /* 关键：悬浮后务必保留 display:flex 并给按钮固定尺寸；
+          否则按钮会被拉成整条，点哪儿都像点到了返回。 */
+   */
 :root{
   --page:#f5f0f0;
   --card:#f7f2f3;
@@ -198,7 +346,7 @@ body{background:var(--page);color:var(--ink)}
 .message{background:var(--card);border-color:var(--line-strong);box-shadow:var(--shadow)}
 .message-head{background:linear-gradient(var(--header),var(--gray-pink));border-bottom:1px solid var(--line)}
 .diary-title{color:var(--pink-deep)}
-.identity-row{background:transparent}
+.identity-row{background:transparent;position:relative}
 .nickname{color:var(--ink)}
 .content{color:var(--ink)}
 /* 底栏：重roll / 输入栏 / 发送 */
@@ -207,6 +355,8 @@ body{background:var(--page);color:var(--ink)}
 .input{color:var(--ink)}
 .round-btn{color:var(--ink)}
 .round-btn.send{background:var(--pink-deep);color:#fff}
+/* 场景切换 */
+.scene-tabs{background:transparent}
 `;
 
 const BUILTIN_CSS = {
@@ -857,7 +1007,7 @@ document.getElementById('cssPreset').onchange = function() {
   }
 };
 
-document.getElementById('clearCssBtn').onclick = function() { document.getElementById('cssText').value = ''; showToast('已清空CSS'); };
+document.getElementById('clearCssBtn').onclick = function() { document.getElementById('cssText').value = ''; applyCssPreview(''); showToast('已清空CSS'); };
 document.getElementById('cssExport').onclick = function() {
   const sel = document.getElementById('cssPreset');
   const val = sel ? sel.value : 'custom';
@@ -882,10 +1032,8 @@ document.getElementById('applyCss').onclick = function() {
   settings.customCSS = document.getElementById('cssText').value;
   saveSettings();
   updateSummary();
-  // 让当前设置页也即时套用配色（:root 变量生效）
-  let live = document.getElementById('offline-set-live-css');
-  if (!live) { live = document.createElement('style'); live.id = 'offline-set-live-css'; document.head.appendChild(live); }
-  live.textContent = settings.customCSS;
+  // 只在预览 iframe 内套用，绝不注入到设置页本身（否则会改掉设置页自己的按钮/顶栏）
+  renderCssPreview(settings.customCSS);
   showToast('CSS已应用');
 };
 
@@ -906,6 +1054,7 @@ document.getElementById('copyTemplate').onclick = async function() {
 
 document.getElementById('restoreCss').onclick = function() {
   document.getElementById('cssText').value = INITIAL_CSS;
+  applyCssPreview(INITIAL_CSS);
   showToast('已恢复默认');
 };
 
@@ -1108,6 +1257,7 @@ function updateSummary() {
   document.getElementById('cssValue').textContent = settings.customCSS ? '已自定义' : '默认';
   document.getElementById('wordCount').value = settings.wordCount || '';
   document.getElementById('person').value = settings.person || 'auto';
+  { const mt = document.getElementById('maxTokens'); if (mt) mt.value = settings.maxTokens || ''; }
   const nsfwSwitch = document.getElementById('nsfwSwitch');
   if (nsfwSwitch) nsfwSwitch.classList.toggle('on', settings.nsfw === true);
 }
@@ -1150,11 +1300,37 @@ document.getElementById('cotOpen').onclick = function() {
   openSheet('cotSheet');
 };
 
+// 用「真实的线下页面」做实时预览：同一套 offline.html + offline.js，只是走 preview 模式
+function renderCssPreview(css) {
+  const f = document.getElementById('cssPreviewFrame');
+  if (!f) return;
+  if (!f.getAttribute('src')) {
+    let chat = '';
+    try { chat = new URLSearchParams(location.search).get('chat') || ''; } catch (e) {}
+    f.setAttribute('src', 'offline.html?preview=1' + (chat ? ('&chat=' + encodeURIComponent(chat)) : ''));
+  }
+  const send = function () {
+    try { f.contentWindow.postMessage({ type: 'offlinePreviewCss', css: String(css || '') }, '*'); } catch (e) {}
+  };
+  if (f.dataset.ready === '1') send();
+  else f.addEventListener('load', function () { f.dataset.ready = '1'; send(); }, { once: true });
+}
+function applyCssPreview(css) { renderCssPreview(css); }
 document.getElementById('beautifyOpen').onclick = function() {
   document.getElementById('cssText').value = settings.customCSS || '';
   populateCssPresets();
+  applyCssPreview(settings.customCSS || '');
   openSheet('beautifySheet');
 };
+(function bindCssPreview() {
+  const ta = document.getElementById('cssText');
+  if (ta) {
+    let t;
+    ta.addEventListener('input', function () { clearTimeout(t); const v = this.value; t = setTimeout(function () { applyCssPreview(v); }, 180); });
+  }
+  const sel = document.getElementById('cssPreset');
+  if (sel) sel.addEventListener('change', function () { setTimeout(function () { applyCssPreview(document.getElementById('cssText').value); }, 0); });
+})();
 
 // ===== 记忆总结（线下→共享记忆库，与线上互通） =====
 const autoSummarySwitch = document.getElementById('autoSummarySwitch');
@@ -1299,6 +1475,7 @@ document.querySelectorAll('.sheet-backdrop').forEach(b => b.addEventListener('cl
 //  15. 保存 & 返回
 // ============================================================
 document.getElementById('saveBtn').onclick = function() {
+  { const mt = document.getElementById('maxTokens'); if (mt) settings.maxTokens = mt.value; }
   settings.style = document.getElementById('styleText').value.trim();
   settings.cot = document.getElementById('cotText').value.trim();
   settings.customCSS = document.getElementById('cssText').value;
@@ -1330,8 +1507,6 @@ document.getElementById('backBtn').onclick = function() {
   await loadAllData();
   fillSettings();
   renderRules();
-  // 重新进入设置页时也套用已保存的配色，避免又回到默认
-  let live = document.getElementById('offline-set-live-css');
-  if (!live) { live = document.createElement('style'); live.id = 'offline-set-live-css'; document.head.appendChild(live); }
-  live.textContent = settings.customCSS || '';
+  // 重新进入设置页时把已保存的配色渲染进预览 iframe（不影响设置页本身）
+  renderCssPreview(settings.customCSS || '');
 })();

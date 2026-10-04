@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>其他</title>
-    <link rel="stylesheet" href="css/other.css">
+    <link rel="stylesheet" href="css/other.css?v=20261004d">
     <script src="js/appearance.js"></script>
     <script src="js/nano-notify.js"></script>
 </head>
@@ -17,8 +17,17 @@
     </div>
 
     <div class="container">
+        <div class="seg-bar" id="segBar">
+            <button class="seg-btn active" data-seg="bg">后台</button>
+            <button class="seg-btn" data-seg="notify">通知</button>
+            <button class="seg-btn" data-seg="push">推送</button>
+            <button class="seg-btn" data-seg="ball">悬浮球</button>
+            <button class="seg-btn" data-seg="ui">界面</button>
+            <button class="seg-btn" data-seg="nano">助手</button>
+        </div>
 
-        <section class="card-group">
+        <!-- 后台 -->
+        <section class="card-group seg-panel active" data-seg="bg">
             <div class="group-title">后台</div>
             <div class="list-group">
                 <div class="list-item switch-row">
@@ -44,7 +53,8 @@
             </div>
         </section>
 
-        <section class="card-group">
+        <!-- 通知声音 -->
+        <section class="card-group seg-panel" data-seg="notify">
             <div class="group-title">通知声音</div>
             <div class="list-group" id="soundGroup">
                 <div class="list-item sound-row">
@@ -59,7 +69,8 @@
             <div class="list-group" id="channelSoundList"></div>
         </section>
 
-        <section class="card-group">
+        <!-- Bark 推送 -->
+        <section class="card-group seg-panel" data-seg="push">
             <div class="group-title">iPhone 后台推送（Bark）</div>
             <div class="list-group">
                 <div class="list-item switch-row">
@@ -86,7 +97,8 @@
             </div>
         </section>
 
-        <section class="card-group">
+        <!-- 悬浮球 -->
+        <section class="card-group seg-panel" data-seg="ball">
             <div class="group-title">API 悬浮球</div>
             <div class="list-group">
                 <div class="list-item switch-row">
@@ -108,10 +120,7 @@
                     <svg class="row-chevron" viewBox="0 0 8 13" width="8" height="13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
             </div>
-        </section>
-
-        <section class="card-group">
-            <div class="group-title">悬浮球外观</div>
+            <div class="group-title" style="margin-top:16px;">悬浮球外观</div>
             <div class="list-group">
                 <div class="list-item tap-row" id="apiBallPickImage">
                     <div class="item-info">
@@ -126,7 +135,8 @@
             </div>
         </section>
 
-        <section class="card-group">
+        <!-- 界面 -->
+        <section class="card-group seg-panel" data-seg="ui">
             <div class="group-title">界面</div>
             <div class="list-group">
                 <div class="list-item">
@@ -157,9 +167,29 @@
                     </div>
                 </div>
             </div>
+            <div class="hint">提示：通知需要浏览器授权；保活会尝试保持屏幕常亮，尽量让后台回复不中断。</div>
         </section>
 
-        <div class="hint">提示：通知需要浏览器授权；保活会尝试保持屏幕常亮，尽量让后台回复不中断。</div>
+        <!-- 助手 -->
+        <section class="card-group seg-panel" data-seg="nano">
+            <div class="group-title">纳米助手</div>
+            <div class="list-group">
+                <div class="list-item switch-row">
+                    <div class="item-info">
+                        <span class="item-title">纳米助手</span>
+                        <span class="item-desc">内置美化 / 装修助手，独立于其他角色。开启后聊天列表会出现「纳米」，可以让她帮你改样式、写世界书、读文件。</span>
+                    </div>
+                    <label class="ios-switch"><input type="checkbox" id="nanoToggle"><span class="ios-switch-track"></span></label>
+                </div>
+                <div class="list-item" id="nanoSettingRow" style="cursor:pointer;">
+                    <div class="item-info">
+                        <span class="item-title">纳米设置</span>
+                        <span class="item-desc">头像、昵称、生成设置、token 上限、简洁模式等</span>
+                    </div>
+                    <svg class="row-chevron" viewBox="0 0 8 13" width="8" height="13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </div>
+        </section>
     </div>
 
     <input type="file" accept="image/*" id="apiBallImageInput" hidden>

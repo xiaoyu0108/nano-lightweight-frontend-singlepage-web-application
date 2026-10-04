@@ -8,7 +8,7 @@
     (function () {
         try {
             var KEY = 'nano_build';
-            var CUR = 'nano-2026-10-04-05';
+            var CUR = 'nano-2026-10-04-21';
             var prev = null, ok = false;
             try { prev = localStorage.getItem(KEY); } catch (e) {}
             if (prev === CUR) return;
@@ -849,7 +849,7 @@
 /* 一次性强制更新：清掉旧 Service Worker 与缓存，保证拿到最新代码（每个版本号只执行一次） */
 (function () {
     try {
-        var KEY = 'nano_force_reset_v41';
+        var KEY = 'nano_force_reset_v57';
         if (localStorage.getItem(KEY) === '1') return;
         localStorage.setItem(KEY, '1');
         var tasks = [];
@@ -871,7 +871,7 @@
 /* 用一次 URL 参数绕过任何被缓存的 index.html（只跳一次） */
 (function () {
     try {
-        var B = '41';
+        var B = '57';
         var u = new URL(location.href);
         if (u.searchParams.get('b') !== B) { u.searchParams.set('b', B); location.replace(u.toString()); }
     } catch (e) {}
@@ -1401,7 +1401,7 @@
             'discover.html', 'api.html', 'moments.html', 'ins.html', 'inner-setting.html', 'beautify.html',
             'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
             'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html', 'appstore.html',
-            'imessage.html', 'memory palace.html', 'app-host.html'];
+            'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html'];
         // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
         function applySafeFallback(f) {
             try {
@@ -1445,7 +1445,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-04-05';
+        var BUILD = 'nano-2026-10-04-21';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -1520,7 +1520,7 @@
                 if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
                     overlayFrame.src = url;
                 }
-                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html', 'imessage.html', 'memory palace.html', 'app-host.html'];
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html', 'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
                 if (noOuterHeader) {

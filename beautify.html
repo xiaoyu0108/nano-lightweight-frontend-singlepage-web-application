@@ -66,6 +66,8 @@
 <div class="tune-row"><span class="tune-label">大小</span><input type="range" class="tune-slider" id="avatarSize" min="20" max="80" step="1" value="36"><span class="tune-val" id="avatarSizeVal">36px</span></div>
 <div class="tune-row"><span class="tune-label">头像框 PNG</span><input type="text" id="avatarFrameUrl" placeholder="粘贴扣好的透明 PNG 链接" style="flex:1;min-width:0;padding:8px 10px;border:1px solid rgba(60,60,67,0.12);border-radius:10px;font-size:13px;background:#fff;color:#1c1c1e;outline:none"></div>
 <div class="tune-row"><span class="tune-label">框大小</span><input type="range" class="tune-slider" id="avatarFrameScale" min="0" max="40" step="1" value="16"><span class="tune-val" id="avatarFrameScaleVal">16%</span></div>
+<div class="tune-row"><span class="tune-label">头像框预设</span><select id="avatarFramePreset" style="flex:1;min-width:0;height:34px;border:1px solid rgba(60,60,67,0.12);border-radius:10px;padding:0 8px;font-size:13px;background:#fff;color:#1c1c1e"><option value="">选择预设…</option></select><button class="tool-sm" id="avatarFramePresetSave" title="存为预设" style="margin-left:6px;display:flex;align-items:center;justify-content:center;width:36px;padding:0;flex:none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg></button>
+<button class="tool-sm" id="avatarFramePresetDel" title="删除选中预设" style="margin-left:4px;display:flex;align-items:center;justify-content:center;width:36px;padding:0;flex:none;color:#e0245e"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m7 7 1 13h8l1-13"/><path d="M10 11v5M14 11v5"/></svg></button></div>
 </div>
 <div class="live-preview" id="chatPreviewCard">
 <div class="lp-head" data-lp="chat" role="button" tabindex="0" aria-expanded="false">
@@ -133,9 +135,52 @@
 <div class="toast" id="toast"></div>
 
 <script src="js/nano-global-template.js"></script>
-<script src="js/nano-chat-template.js?v=20260926i"></script>
+<script src="js/nano-chat-template.js?v=20261004p"></script>
+<script src="js/avatar-frame.js"></script>
 <script src="js/beautify.js?v=20261003d"></script>
 <script src="js/api-float.js?v=20260926h"></script>
 <script src="swipe-back.js"></script>
+<script>
+(function () {
+  function fill() {
+    var s = document.getElementById('avatarFramePreset'); if (!s || !window.NanoAvatarFrame) return;
+    var ps = NanoAvatarFrame.getPresets();
+    s.innerHTML = '<option value="">选择预设…</option>' + ps.map(function (p, i) { return '<option value="' + i + '">' + String(p.name || ('预设' + (i + 1))).replace(/[<>&]/g, '') + '</option>'; }).join('');
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    fill();
+    var s = document.getElementById('avatarFramePreset');
+    if (s) s.addEventListener('change', function () {
+      var ps = window.NanoAvatarFrame ? NanoAvatarFrame.getPresets() : [];
+      var p = ps[parseInt(this.value, 10)];
+      var inp = document.getElementById('avatarFrameUrl');
+      if (p && inp) { inp.value = p.url || ''; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); }
+    });
+    var b = document.getElementById('avatarFramePresetSave');
+    if (b) b.addEventListener('click', function () {
+      var inp = document.getElementById('avatarFrameUrl');
+      var url = (inp && inp.value || '').trim();
+      if (!url) { alert('先粘贴头像框链接'); return; }
+      if (!window.NanoAvatarFrame) return;
+      var name = prompt('给这个头像框起个名字', '头像框 ' + (NanoAvatarFrame.getPresets().length + 1));
+      if (name == null) return;
+      var ps = NanoAvatarFrame.getPresets();
+      ps.push({ name: (name || '').trim() || ('头像框' + (ps.length + 1)), url: url });
+      try { localStorage.setItem('avatar_frame_presets', JSON.stringify(ps)); } catch (e) {}
+      fill(); alert('已保存预设');
+    });
+    var d = document.getElementById('avatarFramePresetDel');
+    if (d) d.addEventListener('click', function () {
+      if (!window.NanoAvatarFrame) return;
+      var s = document.getElementById('avatarFramePreset');
+      var idx = s ? parseInt(s.value, 10) : NaN;
+      if (isNaN(idx)) { alert('先在下拉里选一个预设'); return; }
+      var ps = NanoAvatarFrame.getPresets(); ps.splice(idx, 1);
+      try { localStorage.setItem('avatar_frame_presets', JSON.stringify(ps)); } catch (e) {}
+      fill(); alert('已删除预设');
+    });
+  });
+})();
+</script>
 </body>
 </html>
