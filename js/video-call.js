@@ -461,6 +461,7 @@
         showTyping();
         callApi(text).then(function (reply) {
             hideTyping();
+            if (window.nanoStripThink) reply = window.nanoStripThink(reply);
             splitBubbles(reply).forEach(function (line) { addMessage(line, false); });
             isWaiting = false;
             replyBtn.classList.remove('loading');

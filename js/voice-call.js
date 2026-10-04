@@ -961,7 +961,8 @@ function showToast(text) {
 
         callApi(userMsgs, messages).then(function(reply) {
             hideTyping();
-            // 分句拆成多条独立气泡
+            // 分句拆成多条独立气泡（先清掉可能漏出的思维链标记）
+            if (window.nanoStripThink) reply = window.nanoStripThink(reply);
             splitBubbles(reply).forEach(function(line) { addMessage(line, false); });
             isWaiting = false;
             replyBtn.classList.remove('loading');

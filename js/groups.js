@@ -1325,14 +1325,15 @@
         s = s.replace(/```/g, ' ');
         s = s.replace(/\[heart\s*:\s*[\s\S]*?\]/gi, '');
         // 思维链：成对 + 未闭合（跑到结尾）都要去掉，避免 [think] 漏进群聊
-        s = s.replace(/\[\s*think\s*\][\s\S]*?\[\s*\/\s*think\s*\]/gi, '');
-        s = s.replace(/<\s*think\s*>[\s\S]*?<\s*\/\s*think\s*>/gi, '');
-        s = s.replace(/【(?:think|思考|思维链)】[\s\S]*?【\/(?:think|思考|思维链)】/gi, '');
-        s = s.replace(/\[(?:思考|思维链)\][\s\S]*?\[\/(?:思考|思维链)\]/gi, '');
-        s = s.replace(/\[\s*think\s*\][\s\S]*$/i, '');
-        s = s.replace(/<\s*think\s*>[\s\S]*$/i, '');
-        s = s.replace(/\[\s*\/?\s*(?:think|思考|思维链)\s*\]/gi, '');
-        s = s.replace(/【\s*\/?\s*(?:think|思考|思维链)\s*】/gi, '');
+        var TW = 'think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链';
+        s = s.replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*?\\[\\s*\\/\\s*(?:' + TW + ')\\s*\\]', 'gi'), '');
+        s = s.replace(new RegExp('<\\s*(?:' + TW + ')\\s*>[\\s\\S]*?<\\s*\\/\\s*(?:' + TW + ')\\s*>', 'gi'), '');
+        s = s.replace(new RegExp('【\\s*(?:' + TW + ')\\s*】[\\s\\S]*?【\\s*\\/\\s*(?:' + TW + ')\\s*】', 'gi'), '');
+        s = s.replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*$', 'i'), '');
+        s = s.replace(new RegExp('<\\s*(?:' + TW + ')\\s*>[\\s\\S]*$', 'i'), '');
+        s = s.replace(new RegExp('\\[\\s*\\/?\\s*(?:' + TW + ')\\s*\\]', 'gi'), '');
+        s = s.replace(new RegExp('【\\s*\\/?\\s*(?:' + TW + ')\\s*】', 'gi'), '');
+        s = s.replace(new RegExp('<\\s*\\/?\\s*(?:' + TW + ')\\s*>', 'gi'), '');
         s = s.replace(/<[^>]+>/g, '');
         s = s.replace(/\[(?:Info|info|Thought|thought|思考|推理|Reasoning)[\s\S]*?\]/g, '');
         return s.trim();

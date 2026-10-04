@@ -253,6 +253,50 @@ function loadCharacters() {
     if (!db.objectStoreNames.contains('characters')) db.createObjectStore('characters', { keyPath: 'id' });
   }).then(db => dbGetAll(db, 'characters')).then(list => (list || []).filter(c => c && c.id && c.name));
 }
+/* ---------------- 用户隔离 ---------------- */
+// 当前人设（user）命名空间；不同人设之间 iMessage 互不可见
+function currentNs() {
+  try {
+    const u = readCurrentUser();
+    if (u && u.id != null && u.id !== '') return String(u.id);
+  } catch (e) {}
+  return 'default';
+}
+// 判断角色是否属于当前人设：绑定角色，或本人生成的「小号」（isAltProbe 且 origin 属于当前人设）
+function isCharOfUser(ch, all) {
+  if (!ch) return false;
+  const ns = currentNs();
+  if (ch.bindUser != null && String(ch.bindUser) === ns) return true;
+  if (ch.isAltProbe && ch.altOriginId) {
+    const origin = (all || state.allChars || []).find(x => x && x.id === ch.altOriginId);
+    if (origin && origin.bindUser != null && String(origin.bindUser) === ns) return true;
+  }
+  // 兼容旧数据的 NPC（没有 bindUser 也没有小号来源）：不归属任何绑定角色，保留以免丢会话
+  if (ch.isNpc && (ch.bindUser == null || ch.bindUser === '') && !ch.altOriginId) return true;
+  return false;
+}
+function filterCharsForUser(list) {
+  return (list || []).filter(c => isCharOfUser(c, list));
+}
+// 推断某个会话归属：优先用显式 owner，其次用绑定角色，最后归到当前人设
+function inferOwner(c) {
+  try {
+    if (c && c.owner != null && c.owner !== '') return String(c.owner);
+    const cid = c && (c.charId || c.altOf);
+    if (cid) {
+      const ch = (state.allChars || []).find(x => x && x.id === cid);
+      if (ch && ch.bindUser != null && ch.bindUser !== '') return String(ch.bindUser);
+    }
+  } catch (e) {}
+  return currentNs();
+}
+function claimAndFilterChats(list) {
+  const ns = currentNs();
+  return (list || []).filter(c => c && c.id).map(c => {
+    if (c.owner == null || c.owner === '') c.owner = inferOwner(c);
+    return c;
+  }).filter(c => String(c.owner) === ns);
+}
 
 /* ---------------- 设置 ---------------- */
 function getSetting(charId, key, def) {
@@ -330,9 +374,9 @@ function sendApiFetch(payload, tokenOverride, resultKeyOverride) {
   });
 }
 let lastApiError = '';
-const PENDING_KEY = 'nano_imessage_pending';
-function loadPending() { return safeParse(localStorage.getItem(PENDING_KEY), []) || []; }
-function savePending(l) { try { localStorage.setItem(PENDING_KEY, JSON.stringify(l)); } catch (e) {} }
+function pendingKey() { return 'nano_imessage_pending_' + currentNs(); }
+function loadPending() { return safeParse(localStorage.getItem(pendingKey()), []) || []; }
+function savePending(l) { try { localStorage.setItem(pendingKey(), JSON.stringify(l)); } catch (e) {} }
 function addPending(p) { const l = loadPending(); l.push(p); savePending(l); updatePendingIndicator(); }
 function removePending(token) { savePending(loadPending().filter(p => p.token !== token)); updatePendingIndicator(); }
 let busyLabel = '';
@@ -351,10 +395,10 @@ let pendingWatch = null;
 async function reloadChatsFromDB() {
   try {
     const chats = await dbGetAll(imdb, 'chats');
-    state.chats = (chats || []).filter(c => c && c.id);
+    state.chats = claimAndFilterChats(chats);
     state.chats.forEach(c => { if (!Array.isArray(c.history)) c.history = []; });
     // 合并 localStorage 镜像（外部写入时 DB 万一没落盘也能拿到）
-    const lsChats = loadChatsFromLS();
+    const lsChats = claimAndFilterChats(loadChatsFromLS());
     if (lsChats.length) {
       const byId = {};
       state.chats.forEach(c => { byId[c.id] = c; });
@@ -486,6 +530,7 @@ async function maybeSummarize(charId, charName, history) {
 /* ---------------- 状态 ---------------- */
 const state = {
   chars: [],
+  allChars: [],     // 全部角色（含其它人设，仅用于归属推断）
   chats: [],        // 所有 iMessage 会话（独立存储）
   hidden: [],       // 从列表隐藏的空角色卡片（charId）
   aliases: [],      // 马甲
@@ -498,10 +543,10 @@ let imdb = null;
 let editing = false;
 
 /* ---------------- 会话持久化（IndexedDB + localStorage 双写兜底） ---------------- */
-const LS_CHAT_INDEX = 'nano_imessage_chat_index';
-function lsChatKey(id) { return 'nano_imessage_chat_' + id; }
-function readLSIndex() { return safeParse(localStorage.getItem(LS_CHAT_INDEX), []) || []; }
-function writeLSIndex(list) { try { localStorage.setItem(LS_CHAT_INDEX, JSON.stringify(list)); } catch (e) {} }
+function lsIndexKey() { return 'nano_imessage_chat_index_' + currentNs(); }
+function lsChatKey(id) { return 'nano_imessage_chat_' + currentNs() + '_' + id; }
+function readLSIndex() { return safeParse(localStorage.getItem(lsIndexKey()), []) || []; }
+function writeLSIndex(list) { try { localStorage.setItem(lsIndexKey(), JSON.stringify(list)); } catch (e) {} }
 function mirrorChat(chat) {
   if (!chat || !chat.id) return;
   try { localStorage.setItem(lsChatKey(chat.id), JSON.stringify(chat)); }
@@ -775,15 +820,16 @@ function stripThinkTags(text) {
     return t;
   });
   s = s.replace(/```/g, ' ');
-  s = s.replace(/\[\s*think\s*\][\s\S]*?\[\s*\/\s*think\s*\]/gi, ' ');
-  s = s.replace(/<\s*think\s*>[\s\S]*?<\s*\/\s*think\s*>/gi, ' ');
-  s = s.replace(/【\s*(?:think|思考|思维链)\s*】[\s\S]*?【\s*\/\s*(?:think|思考|思维链)\s*】/gi, ' ');
-  s = s.replace(/\[\s*(?:思考|思维链)\s*\][\s\S]*?\[\s*\/\s*(?:思考|思维链)\s*\]/gi, ' ');
-  s = s.replace(/\[\s*think\s*\][\s\S]*$/i, ' ');
-  s = s.replace(/<\s*think\s*>[\s\S]*$/i, ' ');
-  s = s.replace(/\[\s*\/?\s*(?:think|思考|思维链)\s*\]/gi, ' ');
-  s = s.replace(/【\s*\/?\s*(?:think|思考|思维链)\s*】/gi, ' ');
-  s = s.replace(/<\s*\/?\s*think\s*>/gi, ' ');
+  const TW = 'think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链';
+  s = s.replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*:[\\s\\S]*?\\]', 'gi'), ' ');
+  s = s.replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*?\\[\\s*\\/\\s*(?:' + TW + ')\\s*\\]', 'gi'), ' ');
+  s = s.replace(new RegExp('<\\s*(?:' + TW + ')\\s*>[\\s\\S]*?<\\s*\\/\\s*(?:' + TW + ')\\s*>', 'gi'), ' ');
+  s = s.replace(new RegExp('【\\s*(?:' + TW + ')\\s*】[\\s\\S]*?【\\s*\\/\\s*(?:' + TW + ')\\s*】', 'gi'), ' ');
+  s = s.replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*$', 'i'), ' ');
+  s = s.replace(new RegExp('<\\s*(?:' + TW + ')\\s*>[\\s\\S]*$', 'i'), ' ');
+  s = s.replace(new RegExp('\\[\\s*\\/?\\s*(?:' + TW + ')\\s*\\]', 'gi'), ' ');
+  s = s.replace(new RegExp('【\\s*\\/?\\s*(?:' + TW + ')\\s*】', 'gi'), ' ');
+  s = s.replace(new RegExp('<\\s*\\/?\\s*(?:' + TW + ')\\s*>', 'gi'), ' ');
   return s.replace(/\n{3,}/g, '\n\n').trim();
 }
 function bubblesToMessages(bubbles, kind) {
@@ -1121,7 +1167,7 @@ async function applyRefreshRaw(raw, picks) {
     if (!text) continue;
     if (state.chats.some(s => s.kind === 'stranger' && s.name === o.name && (s.history || []).some(h => h.text === text))) continue;
     const sc = {
-      id: 's:' + uid('sg_'), kind: 'stranger', name: String(o.name || '陌生号码').slice(0, 20),
+      id: 's:' + uid('sg_'), kind: 'stranger', owner: currentNs(), name: String(o.name || '陌生号码').slice(0, 20),
       setting: String(o.setting || '').slice(0, 40), avatar: '',
       history: [{ id: uid(), who: 'them', text: text.slice(0, 60), time: nowHHMM(), ts: Date.now() }],
       preview: text.slice(0, 60), lastTime: nowHHMM(), sortTime: Date.now(), unread: 1
@@ -1160,8 +1206,8 @@ async function applyRefreshRaw(raw, picks) {
 /* ---------------- 小号试探：刷新时随机来一条「角色小号」的搭话 ---------------- */
 async function maybeAltProbe() {
   try {
-    if (localStorage.getItem('nano_imessage_altprobe') === '0') return 0;
-    const last = parseInt(localStorage.getItem('nano_imessage_altprobe_at') || '0', 10) || 0;
+    if (localStorage.getItem('nano_imessage_altprobe_' + currentNs()) === '0') return 0;
+    const last = parseInt(localStorage.getItem('nano_imessage_altprobe_at_' + currentNs()) || '0', 10) || 0;
     if (Date.now() - last < 6 * 3600 * 1000) return 0;      // 6 小时最多一次
     if (Math.random() > 0.5) return 0;                       // 约一半概率出现
     const pool = state.chars.filter(c => c && c.id && !/^alt_/.test(c.id) && !c.isAltProbe && !isAssistantChar(c));
@@ -1188,7 +1234,7 @@ async function maybeAltProbe() {
     const lines = await ensureTranslatedLines(ch, msgs);
     let chat = state.chats.find(x => x && x.altOf === ch.id);
     if (!chat) {
-      chat = { id: 'alt:' + ch.id, kind: 'stranger', name: name, setting: bio, avatar: '', altOf: ch.id, isAlt: true, history: [], preview: '', lastTime: nowHHMM(), sortTime: Date.now(), unread: 0 };
+      chat = { id: 'alt:' + ch.id, kind: 'stranger', owner: currentNs(), name: name, setting: bio, avatar: '', altOf: ch.id, isAlt: true, history: [], preview: '', lastTime: nowHHMM(), sortTime: Date.now(), unread: 0 };
       state.chats.push(chat);
     } else { chat.name = name; chat.setting = bio; }
     const list = bubblesToMessages(lines, 'stranger');
@@ -1198,7 +1244,7 @@ async function maybeAltProbe() {
     const lastM = chat.history[chat.history.length - 1];
     chat.preview = lastM.text; chat.lastTime = lastM.time; chat.sortTime = lastM.ts; chat.unread = (chat.unread || 0) + list.length;
     await saveChat(chat);
-    localStorage.setItem('nano_imessage_altprobe_at', String(Date.now()));
+    localStorage.setItem('nano_imessage_altprobe_at_' + currentNs(), String(Date.now()));
     notifyApp(name, list[0].text || lines[0], { group: name });
     if (state.current && state.current.id === chat.id) { state.messages = chat.history; renderMessages(); renderBanner(chat); }
     else renderList();
@@ -1297,18 +1343,18 @@ function ensureCharChat(charRec) {
   if (hi !== -1) { state.hidden.splice(hi, 1); saveHidden(); }
   let c = state.chats.find(x => x.id === id);
   if (!c) {
-    c = { id: id, kind: 'char', charId: charRec.id, name: charRec.name, avatar: charRec.avatar || '', setting: charRec.setting || '', history: [], preview: '', lastTime: '', sortTime: 0, unread: 0 };
+    c = { id: id, kind: 'char', charId: charRec.id, owner: currentNs(), name: charRec.name, avatar: charRec.avatar || '', setting: charRec.setting || '', history: [], preview: '', lastTime: '', sortTime: 0, unread: 0 };
     state.chats.push(c); saveChat(c);
   }
   return c;
 }
-function saveHidden() { if (imdb) dbPut(imdb, 'meta', { key: 'hidden', value: state.hidden }); }
+function saveHidden() { if (imdb) dbPut(imdb, 'meta', { key: 'hidden:' + currentNs(), value: state.hidden }); }
 function ensureAliasChat(charRec, alias) {
   const id = 'a:' + alias.id + ':' + charRec.id;
   let c = state.chats.find(x => x.id === id);
   if (!c) {
     c = {
-      id: id, kind: 'alias', charId: charRec.id, aliasId: alias.id, aliasName: alias.name,
+      id: id, kind: 'alias', charId: charRec.id, owner: currentNs(), aliasId: alias.id, aliasName: alias.name,
       aliasSetting: alias.setting || '', name: charRec.name, avatar: charRec.avatar || '',
       history: [], preview: '', lastTime: '', sortTime: 0, unread: 0
     };
@@ -1710,10 +1756,10 @@ $('#listTitle').addEventListener('click', () => {
 async function loadIM() {
   imdb = await openIMDB();
   const chats = await dbGetAll(imdb, 'chats');
-  state.chats = (chats || []).filter(c => c && c.id);
+  state.chats = claimAndFilterChats(chats);
   state.chats.forEach(c => { if (!Array.isArray(c.history)) c.history = []; });
   // 兜底：IndexedDB 不可用 / 被清空时，用 localStorage 镜像恢复（切页不丢消息）
-  const lsChats = loadChatsFromLS();
+  const lsChats = claimAndFilterChats(loadChatsFromLS());
   if (lsChats.length) {
     const byId = {};
     state.chats.forEach(c => { byId[c.id] = c; });
@@ -1730,12 +1776,13 @@ async function loadIM() {
   });
   const aliasRec = await dbGet(imdb, 'meta', 'aliases');
   state.aliases = (aliasRec && Array.isArray(aliasRec.value)) ? aliasRec.value : [];
-  const hiddenRec = await dbGet(imdb, 'meta', 'hidden');
+  const hiddenRec = await dbGet(imdb, 'meta', 'hidden:' + currentNs());
   state.hidden = (hiddenRec && Array.isArray(hiddenRec.value)) ? hiddenRec.value : [];
 }
 (async function boot() {
   try { loadWorldbooksFromDB(); } catch (e) {}
-  try { state.chars = await loadCharacters(); } catch (e) { state.chars = []; }
+  try { state.allChars = await loadCharacters(); } catch (e) { state.allChars = []; }
+  state.chars = filterCharsForUser(state.allChars);
   state.chars.forEach(c => { const r = getSetting(c.id, 'remark', null); if (r) c.remark = r; });
   try { await loadIM(); } catch (e) {}
   syncWave();
@@ -1746,7 +1793,12 @@ async function loadIM() {
   window.addEventListener('message', e => {
     const d = e.data;
     if (d && (d.type === 'contactsDataUpdated' || d.type === 'currentMaskChanged' || d.type === 'homeDataUpdated')) {
-      loadCharacters().then(list => { state.chars = list; state.chars.forEach(c => { const r = getSetting(c.id, 'remark', null); if (r) c.remark = r; }); });
+      loadCharacters().then(list => {
+        state.allChars = list;
+        state.chars = filterCharsForUser(list);
+        state.chars.forEach(c => { const r = getSetting(c.id, 'remark', null); if (r) c.remark = r; });
+        if (d.type === 'currentMaskChanged') { loadIM().then(() => renderList()).catch(() => {}); }
+      });
     }
     if (d && (d.type === 'nanoIMessageUpdated' || d.type === 'nanoBlockChanged')) {
       reloadChatsFromDB();

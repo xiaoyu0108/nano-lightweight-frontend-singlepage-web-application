@@ -29,9 +29,9 @@ button{border:0;background:none;color:inherit}
   overflow:hidden;
 }
 .topbar{
-  height:92px;
-  flex:0 0 92px;
-  padding:16px 25px 8px;
+  height:calc(92px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
+  flex:0 0 calc(92px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
+  padding:calc(16px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 25px 8px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -52,7 +52,7 @@ button{border:0;background:none;color:inherit}
 .title-wrap{
   position:absolute;
   left:50%;
-  top:13px;
+  top:calc(13px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
   transform:translateX(-50%);
   text-align:center;
   white-space:nowrap;
@@ -203,7 +203,7 @@ button{border:0;background:none;color:inherit}
 .voice:active,.plus:active{background:#f2f2f2}
 .voice svg,.plus svg{width:28px;height:28px;stroke:#111;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 @media (max-width:700px){
-  .topbar{height:74px;flex-basis:74px;padding:10px 13px 5px}
+  .topbar{height:calc(74px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));flex-basis:calc(74px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));padding:calc(10px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 13px 5px}
   .left-tools,.right-tools{width:128px;gap:8px}
   .icon-btn{width:40px;height:40px}
   .icon-btn svg{width:26px;height:26px}

@@ -15,8 +15,10 @@ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Pin
 button,input{font:inherit;border:0;background:none;color:inherit}
 .app{height:100dvh;width:100%;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
 .top{
-  height:58px;flex:0 0 58px;background:rgba(255,255,255,.94);
-  display:flex;align-items:center;padding:0 12px;position:relative;z-index:20;
+  height:calc(58px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
+  flex:0 0 calc(58px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
+  background:rgba(255,255,255,.94);
+  display:flex;align-items:center;padding:max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)) 12px 0;position:relative;z-index:20;
   border-bottom:1px solid rgba(0,0,0,.07)
 }
 .back,.refresh{width:40px;height:40px;display:grid;place-items:center;border-radius:12px}

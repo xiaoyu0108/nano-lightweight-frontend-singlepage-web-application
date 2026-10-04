@@ -10,7 +10,7 @@ button,input,textarea{font:inherit}button{border:0;background:none;color:inherit
 
 /* ================= 列表页 ================= */
 .list-screen{position:absolute;inset:0;background:#fff}
-.list-top{position:absolute;z-index:50;left:0;right:0;top:0;height:120px;padding:44px 16px 0;
+.list-top{position:absolute;z-index:50;left:0;right:0;top:0;height:120px;padding:max(44px, var(--safe-top, env(safe-area-inset-top, 0px))) 16px 0;
  display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
 .list-top .nav-btn{pointer-events:auto}
 .nav-btn{
@@ -26,10 +26,10 @@ button,input,textarea{font:inherit}button{border:0;background:none;color:inherit
 }
 .nav-btn:active{transform:scale(.96);opacity:.85}
 .menu-btn{width:36px;padding:0}
-.list-title{position:absolute;z-index:10;top:96px;left:16px;margin:0;
+.list-title{position:absolute;z-index:10;top:max(96px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 42px));left:16px;margin:0;
  font-size:34px;line-height:1.1;font-weight:700;letter-spacing:-.6px;cursor:pointer}
 /* 列表一直铺到底：滑动卡片从悬浮的搜索栏/马甲按钮下面穿过，不再被白色挡住 */
-.list-scroll{position:absolute;inset:150px 0 0;overflow:auto;
+.list-scroll{position:absolute;inset:max(150px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 96px)) 0 0;overflow:auto;
  padding:0 16px calc(76px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch;background:#fff}
 .list-screen.editing .list-scroll{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
 .thread-wrap{position:relative;overflow:hidden;background:#fff;
@@ -135,7 +135,7 @@ button,input,textarea{font:inherit}button{border:0;background:none;color:inherit
 .chat-screen.show{display:block}
 .chat-bg{position:absolute;inset:0;background:#fff;background-size:cover;background-position:center}
 .chat-header{position:absolute;z-index:20;top:0;left:0;right:0;height:150px;
- padding:38px 22px 0;display:flex;justify-content:space-between;align-items:flex-start;
+ padding:max(38px, var(--safe-top, env(safe-area-inset-top, 0px))) 22px 0;display:flex;justify-content:space-between;align-items:flex-start;
  pointer-events:none;background:transparent}
 .chat-header .circle-btn,
 .chat-header .chat-person{pointer-events:auto}
@@ -150,7 +150,7 @@ button,input,textarea{font:inherit}button{border:0;background:none;color:inherit
 }
 .circle-btn:active{opacity:.6}
 .circle-btn svg{width:20px;height:20px}
-.chat-person{position:absolute;left:50%;top:22px;transform:translateX(-50%);
+.chat-person{position:absolute;left:50%;top:max(22px, var(--safe-top, env(safe-area-inset-top, 0px)));transform:translateX(-50%);
  text-align:center;display:flex;flex-direction:column;align-items:center;cursor:pointer}
 .mini-avatar{
  width:66px;height:66px;border-radius:50%;overflow:hidden;
@@ -381,7 +381,7 @@ button,input,textarea{font:inherit}button{border:0;background:none;color:inherit
 .chat-settings{position:absolute;inset:0;z-index:300;background:#fff;
  display:none;flex-direction:column}
 .chat-settings.show{display:flex}
-.cs-nav{height:96px;padding:44px 16px 0;flex:none;
+.cs-nav{height:calc(96px + max(0px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) - 44px)));padding:max(44px, var(--safe-top, env(safe-area-inset-top, 0px))) 16px 0;flex:none;
  display:flex;align-items:center;justify-content:space-between}
 .cs-nav-btn{font-size:17px;color:var(--blue);cursor:pointer}
 .cs-nav-title{font-size:17px;font-weight:600}
@@ -415,7 +415,7 @@ button,input,textarea{font:inherit}button{border:0;background:none;color:inherit
 /* ================= 新信杯页 ================= */
 .newmsg-screen{position:absolute;inset:0;z-index:200;background:#fff;display:none;flex-direction:column}
 .newmsg-screen.show{display:flex}
-.nm-header{height:96px;padding:44px 16px 0;flex:none;
+.nm-header{height:calc(96px + max(0px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) - 44px)));padding:max(44px, var(--safe-top, env(safe-area-inset-top, 0px))) 16px 0;flex:none;
  display:flex;align-items:center;justify-content:space-between}
 .nm-cancel{font-size:17px;color:var(--blue)}
 .nm-send{font-size:17px;font-weight:600;color:var(--blue)}

@@ -62,7 +62,7 @@
         tx.onerror = function() { if (callback) callback(false); };
     }
 
-    function currentMaskId() { return (currentUser && currentUser.id) || 'default'; }
+    function currentMaskId() { return String((currentUser && currentUser.id) || 'default'); }
 
     function normalizeMaskScoped(items, cb) {
         var mid = currentMaskId();
@@ -71,7 +71,7 @@
         (items || []).forEach(function (it) {
             if (!it || !it.id) return;
             if (!it.maskId) { it.maskId = mid; changed = true; mine.push(it); return; }
-            if (it.maskId === mid) mine.push(it);
+            if (String(it.maskId) === mid) mine.push(it);
         });
         mine.sort(function (a, b) { return new Date(b.time) - new Date(a.time); });
         if (changed && db) { dbPutMany(mine, function () {}); }

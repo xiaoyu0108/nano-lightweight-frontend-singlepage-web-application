@@ -654,12 +654,21 @@ async function boot(){
     if(id==='nano'||id.indexOf('nano_')===0||id.indexOf('assistant')!==-1) return false;
     if(c.isNano||c.isAssistant) return false;
     if(nm==='纳米'||nm==='娜娜'||nm==='Nano') return false;
+    // 用户隔离：只显示当前人设绑定的角色 / 本人生成的小号，不同 user 之间不互通
+    if(maskId!=null&&maskId!==''){
+      if(c.bindUser!=null&&String(c.bindUser)===String(maskId)) return true;
+      if(c.isAltProbe&&c.altOriginId){
+        const origin=chars.find(x=>x&&x.id===c.altOriginId);
+        if(origin&&origin.bindUser!=null&&String(origin.bindUser)===String(maskId)) return true;
+      }
+      return false;
+    }
     return true;
   });
   // 绑定到当前 user 的角色排在最前
   list.sort((a,b)=>{
-    const ab=(maskId&&a.bindUser===maskId)?0:1;
-    const bb=(maskId&&b.bindUser===maskId)?0:1;
+    const ab=(maskId&&String(a.bindUser)===String(maskId))?0:1;
+    const bb=(maskId&&String(b.bindUser)===String(maskId))?0:1;
     if(ab!==bb)return ab-bb;
     return String(a.name).localeCompare(String(b.name),'zh');
   });

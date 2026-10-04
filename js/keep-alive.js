@@ -308,7 +308,23 @@
         setTimeout(function () {
             if (!pendingAck[id]) return;         // 已被某个 frame 认领
             delete pendingAck[id];
-            // 没有任何 frame 在跑：退化为一条系统通知，保证不静默丢推送
+            // autoMoment（自动朋友圈）：只有在某个 frame 真正调用 API 生成并写入朋友圈后才算完成。
+            // 没有任何 frame 认领时，绝不能谎报「发了条新动态」——改为稍后重试。
+            if (task.owner === 'autoMoment') {
+                fireDue(task, false);
+                var tries = Number(task._retries) || 0;
+                if (tries < 3) {
+                    try {
+                        var retry = Object.assign({}, task);
+                        retry.id = id;
+                        retry._retries = tries + 1;
+                        retry.at = Date.now() + 60000;
+                        schedule(retry);
+                    } catch (e) {}
+                }
+                return;
+            }
+            // 其他 generate 任务：退化为一条系统通知，保证不静默丢推送
             notifyTask({ id: id, title: task.title || 'Nano', body: task.body || '到点了', target: task.target, channel: task.channel });
             fireDue(task, false);
         }, ACK_WAIT_MS);

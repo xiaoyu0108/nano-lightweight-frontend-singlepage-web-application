@@ -421,7 +421,7 @@
 <script src="js/chat-more.js?v=20261003d"></script>
 <script src="js/chat-place.js"></script>
 <script src="js/chat-voice.js"></script>
-<script src="js/heart.js?v=20260926i"></script>
+<script src="js/heart.js?v=20261004a"></script>
 
 
 <!-- ===== 心声弹窗 ===== -->
@@ -474,12 +474,6 @@
       <div class="iv-custom-head">
         <div class="iv-custom-title">心声 · 样式</div>
         <div class="iv-head-actions">
-          <button class="iv-icon-btn-sm" id="ivReset" aria-label="恢复默认" title="恢复默认">
-            <svg viewBox="0 0 24 24">
-              <path d="M23 4v6h-6" />
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-            </svg>
-          </button>
           <button class="iv-icon-btn-sm" id="ivCustomizeClose" aria-label="关闭美化">
             <svg viewBox="0 0 24 24">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -561,8 +555,10 @@
       </div>
 
       <div class="iv-custom-foot">
+        <button class="iv-btn-action iv-btn-copy" id="ivCopyTemplate">复制模板</button>
         <button class="iv-btn-action iv-btn-clear" id="ivClearBtn">清空</button>
         <div class="iv-divider"></div>
+        <button class="iv-btn-action iv-btn-restore" id="ivRestore">还原</button>
         <button class="iv-btn-action iv-btn-apply" id="ivApply">应用 CSS</button>
       </div>
     </div>

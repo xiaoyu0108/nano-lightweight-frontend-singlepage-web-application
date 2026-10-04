@@ -1340,7 +1340,8 @@ async function replyFromChar(){
     removeTyping();
     if(reply){
       addTimeDivider();
-      const segs=splitBubbles(reply);
+      const cleanReply = window.nanoStripThink ? window.nanoStripThink(reply) : reply;
+      const segs=splitBubbles(cleanReply);
       const rid='r'+Date.now();
       for(let si=0; si<segs.length; si++){
         const el=addMsg('char', currentCharName, currentChar.avatar, null, segs[si], '');

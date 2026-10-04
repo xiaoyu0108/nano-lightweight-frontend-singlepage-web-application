@@ -2421,8 +2421,21 @@ function ensureLocalFontFace(family, src, format) {
       (document.head || document.documentElement).appendChild(st);
     }
     const fmt = format ? ' format("' + format + '")' : "";
-    st.textContent = '@font-face{font-family:"' + family + '";src:url("' +
-      String(src).replace(/"/g, '\\"') + '")' + fmt + ';font-display:swap;}';
+    // 直接挂「原地址 + CORS 代理」多个 src，交给浏览器按顺序回退。
+    // iOS Safari 对跨域 Web 字体严格执行 CORS，很多直链因为服务器没开 ACAO 而被丢弃；
+    // 加上带 CORS 头的代理，能显著提高可用字体 URL 的数量（与 appearance.js 的做法一致）。
+    const urls = [String(src)];
+    if (/^https?:/i.test(String(src))) {
+      const enc = encodeURIComponent(String(src));
+      urls.push("https://api.nano315.online/audio/proxy?url=" + enc);
+      urls.push("https://api.allorigins.win/raw?url=" + enc);
+      urls.push("https://corsproxy.io/?url=" + enc);
+    }
+    const srcList = urls
+      .filter(function (u, i, a) { return u && a.indexOf(u) === i; })
+      .map(function (u) { return 'url("' + String(u).replace(/"/g, '\\"') + '")' + fmt; })
+      .join(',');
+    st.textContent = '@font-face{font-family:"' + family + '";src:' + srcList + ';font-display:swap;}';
   } catch (e) {}
 }
 
@@ -2842,12 +2855,18 @@ async function applyRemoteFont(url, cssFamily, cssText) {
   if (fam) {
     if (cssText) injectStyleCss("nano-font-raw-css", cssText);
     else if (u) {
+      if (/fonts\.googleapis\.com/i.test(u)) injectGoogleFontLink(u);
       const linked = await loadStylesheetLink(u);
-      if (!linked) throw new Error("字体 CSS 无法加载（网络或跨域被拦截）");
+      // 样式表加载失败也不再硬中断：仍把 family 应用上去，能加载就生效，不能则回退系统字体
+      if (!linked) { try { injectGoogleFontLink(u); } catch (e) {} }
     }
     const okCss = await verifyFontLoaded(fam, 9000);
-    if (!okCss) throw new Error("已读到字体 CSS，但字体文件没有加载成功（多为字体服务器未开放跨域）");
     applyFontToPage('"' + fam.replace(/"/g, "") + '"');
+    if (!okCss) {
+      // 字体 CSS 已挂上但字体文件在限时内没加载：常见于服务器未开放跨域。
+      // 不抛错（旧版会直接失败），浏览器后续仍可能加载成功，失败则回退系统字体。
+      try { console.warn("[font] CSS 已应用，但字体文件未在限时内加载（可能跨域被拦），已回退系统字体"); } catch (e) {}
+    }
     return;
   }
   // 2) 直链字体文件（含 data: 与无扩展名 CDN 直链）

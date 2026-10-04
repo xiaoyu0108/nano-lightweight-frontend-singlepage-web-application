@@ -8,6 +8,54 @@
   const $ = id => document.getElementById(id);
 
   // ============================================
+  // 心声模板 DIY 配方：给 AI 读的说明（「复制模板」会把这段 + 当前 CSS 一起复制）
+  // 模板本质是可覆盖的 CSS；以下 id/类名是 JS 写入数据的挂点，只需保留选择器、样式可任意重构。
+  // ============================================
+  window.NANO_HEART_RECIPE = `【Nano 心声模板 DIY 配方（交给 AI 修改时请一并提供）】
+你可以在下面的 CSS 里任意重构「心声」卡片：隐藏任意文字/头像、把头像或名字移到任意位置、重排顶栏 / 内容区 / 底栏，全部通过 CSS 完成。
+JS 会写入文本/图片的挂点（请保留这些 id 或类名，只改样式，不要删元素）：
+  #ivAvatar / .iv-avatar          头像图片
+  .iv-avatar-fallback             头像兜底字母
+  #ivSender / .iv-name            发送人昵称
+  .iv-caption                     “发送人”小字
+  #ivRecipient / .user-name       收件人
+  #ivTime                         时间
+  #ivSubject / .iv-subject        此刻·印象
+  #ivThought / .iv-thought        心声正文
+  #ivExtraText / .iv-extra-text   附加文字（默认为空，可设 display:block 显示）
+  #ivDecoTop / .iv-deco-top       顶部装饰层（默认隐藏）
+  #ivDecoBottom / .iv-deco-bottom 底部装饰层（默认隐藏）
+  .iv-sender / .iv-header / .iv-meta / .iv-content / .iv-custom-foot   结构容器
+可用的重构手段：
+  1) 隐藏：selector{display:none !important}
+  2) 任意移动：给元素 position:absolute/fixed; left/top/right/bottom/transform；父级需 position:relative 且 overflow:visible
+  3) 重排：父级 display:flex; flex-direction:column/reverse；用 order 调整顺序
+  4) 换头像/图片：selector::before{content:url("图片地址")} 或改 background-image
+  5) 加文字/角标/水印：selector::after{content:"文案"}
+  6) 换字体/颜色/尺寸/圆角/间距：font-family / font-size / color / background / border-radius 任意改
+  7) 想“覆盖 HTML”：CSS 无法新增可交互 DOM，但可用 ::before/::after 的 content 加文字/贴图，并把原元素 display:none 后在其位置摆新内容
+注意：不要写 <script>；.nano-voice-modal 是卡片本体；.iv-customize 是编辑面板（仅打开美化时出现，勿改其 display）。`;
+
+  // 复制文本到剪贴板（带 execCommand 兜底，兼容 WebView）
+  function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    } catch (e) {}
+    return new Promise(function (resolve) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      } catch (e) {}
+      resolve();
+    });
+  }
+
+  // ============================================
 // 提示词定义（放在 heart.js 开头）
 // ============================================
 
@@ -709,12 +757,33 @@ function setupThoughtExpand(el) {
       }
     });
 
-    // 清空
-    $('ivClearBtn').addEventListener('click', function() {
+    // 清空：清掉编辑框 + 已应用的覆盖样式，回到初始 UI（快捷 DIY 开关保持不变）
+    if ($('ivClearBtn')) $('ivClearBtn').addEventListener('click', function() {
       $('ivCss').value = '';
       const select = $('ivTemplateSelect');
       if (select) select.value = '';
       currentTemplateId = '';
+      const styleTag = document.getElementById('nanoVoiceCustomCSS');
+      if (styleTag) styleTag.textContent = '';
+      saveAppliedCss('');
+    });
+
+    // 复制模板：把「DIY 配方 + 当前编辑器/预设的 CSS」一起复制到剪贴板，方便交给 AI 改造
+    if ($('ivCopyTemplate')) $('ivCopyTemplate').addEventListener('click', async function() {
+      let css = $('ivCss').value || '';
+      if (!css) {
+        try {
+          const all = await getAllTemplates();
+          const id = $('ivTemplateSelect').value;
+          const tpl = all.find(t => t.id === id) || all.find(t => t.id === 'default');
+          if (tpl) css = tpl.css || '';
+        } catch (e) {}
+      }
+      if (!css) css = DEFAULT_CSS;
+      const text = (window.NANO_HEART_RECIPE || '') + '\n\n/* ===== 当前心声模板 ===== */\n' + css;
+      copyText(text).then(function () {
+        alert('已复制「模板 + DIY 配方」，粘贴给 AI 即可任意重构。');
+      });
     });
 
     // 应用 CSS
@@ -730,8 +799,8 @@ function setupThoughtExpand(el) {
       setCustomizing(false);
     });
 
-    // 恢复默认：还原初始 UI，并同步让 CSS 覆盖输入栏恢复为初始 UI 的 css 代码
-    $('ivReset').addEventListener('click', async function() {
+    // 还原：还原初始 UI，并同步让 CSS 覆盖输入栏恢复为初始 UI 的 css 代码（唯一的重置按钮）
+    if ($('ivRestore')) $('ivRestore').addEventListener('click', async function() {
       const styleTag = document.getElementById('nanoVoiceCustomCSS');
       if (styleTag) styleTag.textContent = '';
       saveAppliedCss('');

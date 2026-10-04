@@ -768,6 +768,9 @@
             }
             prompt += '[/think] 之后再按【对话规则】正常输出对话气泡；思考内容不会展示给对方。\n';
             prompt += '顺序只能是「先 [think]…[/think]，后正文」：绝对禁止把 [think] 或思考内容放到正文后面 / 结尾，也绝对禁止重复输出 [think]。\n';
+        } else {
+            // 思维链关闭：明确禁止任何思考标记，避免模型把 [think] 当作口头禅漏进正文
+            prompt += '\n【禁止思考链】本轮不要输出任何思维链 / 思考标签：严禁出现 [think]、[/think]、<think>、<thinking>、[thinking]、[思考]、[思维链]、[thought]、[reasoning]、[analysis]、[cot] 等任何形式的思考标记或思考内容，请直接输出正文。\n';
         }
 
         // 拉黑状态：用户拉黑角色 / 角色拉黑用户，都会影响角色此刻的态度
@@ -3145,13 +3148,13 @@
         origin = origin || {};
         const charName = origin.name || displayName || chatName || '角色';
         const persona = String(origin.setting || '').slice(0, 6000);
-        return '【小号身份】你是「' + charName + '」本人开的小号，网名「' + (name || '小号') + '」。'
-            + '你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。'
-            + '绝对不能让用户察觉你就是「' + charName + '」：不要承认、不要暗示，不要用本人平时标志性的称呼或口头禅自曝。'
-            + (bio ? ('\n【小号的公开简介】' + bio) : '')
-            + (persona ? ('\n\n【你本人（' + charName + '）的完整设定，请以本人性格来扮演小号】\n' + persona) : '')
-            + '\n\n【铁律】以网名「' + (name || '小号') + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定；'
-            + '用户若起疑，要自然地圆过去，始终不承认自己和「' + charName + '」是同一个人。';
+        const nn = name || '小号';
+        // 公开内容放最前（列表 / 记忆宫殿只截前 20~42 字做简介预览）；
+        // 「是谁的小号」这类身份说明一律放最后一句，避免被用户从预览里看到。
+        return (bio ? (bio + '\n') : ('网名「' + nn + '」。\n'))
+            + (persona ? ('【你本人的完整设定，请以本人性格来扮演这个身份】\n' + persona + '\n\n') : '')
+            + '【铁律】以网名「' + nn + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定；用户若起疑，要自然地圆过去，不承认另一个身份。\n'
+            + '【小号身份】你是「' + charName + '」本人开的小号，网名「' + nn + '」。你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。绝对不能让用户察觉你就是「' + charName + '」：不要承认、不要暗示，不要用本人平时标志性的称呼或口头禅自曝。';
     }
     function handleAltProbeTag(payload, timeStr) {
         const parts = String(payload || '').split(/[|｜]/);
@@ -3191,7 +3194,8 @@
                 req.onsuccess = function () {
                     try {
                         var db = req.result;
-                        var rec = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: name, avatar: '', gender: '未知', nationality: '未知', setting: setting || '', isNpc: true };
+                        var _bind = ''; try { _bind = getCurrentMaskId(); } catch (e) {}
+                        var rec = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: name, avatar: '', gender: '未知', nationality: '未知', setting: setting || '', isNpc: true, bindUser: _bind };
                         var tx = db.transaction('characters', 'readwrite');
                         tx.objectStore('characters').put(rec);
                         tx.oncomplete = function () { resolve(rec); };
@@ -3573,7 +3577,7 @@
         try {
             const reply = await callApi('（现在没有新消息，你突然想找对方说句话。请主动发一条自然、简短的消息，不要问“在吗”。）');
             if (reply) {
-                const parsed = extractTagsFromText(reply);
+                const parsed = extractTagsFromText(stripThinkBlocks(reply));
                 const line = String(parsed.cleanedText || '').split(/\n+/).map(function(s){ return s.trim(); }).filter(Boolean)[0] || '';
                 if (line) return line;
             }
@@ -3858,7 +3862,7 @@
                 window.NanoKeepAlive.schedule({
                     id: autoMomentTaskId(), at: Date.now() + ms, type: 'generate', owner: 'autoMoment',
                     chatId: chatId, title: displayName || chatName || '朋友圈',
-                    body: '（' + (displayName || chatName || '角色') + ' 发了条新动态）',
+                    body: '（' + (displayName || chatName || '角色') + ' 有新动态排队）',
                     target: 'moments'
                 });
             }
@@ -4738,14 +4742,34 @@
             return t;
         });
         s = s.replace(/```/g, '');
-        // 思维链标签归一化：模型可能写成 <think>、［think］、【思考】等，统一成 [think] 再解析
-        s = s.replace(/<\s*think\s*>/gi, '[think]').replace(/<\s*\/\s*think\s*>/gi, '[/think]');
-        s = s.replace(/［\s*think\s*］/gi, '[think]').replace(/［\s*\/\s*think\s*］/gi, '[/think]');
-        s = s.replace(/（\s*think\s*）/gi, '[think]').replace(/（\s*\/\s*think\s*）/gi, '[/think]');
+        // 思维链标签归一化：模型可能写成 <think>、<thinking>、[thinking]、［think］、【思考】、(thought)、[reasoning] 等，
+        // 统一成 [think]/[/think] 再解析，避免各种变体漏进正文气泡。
+        s = s.replace(/[<\[（【［]\s*\/?\s*(?:think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链)\s*[>\]）】］]/gi, function (m) {
+            return /[\/＼]/.test(m) ? '[/think]' : '[think]';
+        });
         s = s.replace(/<[^>]+>/g, '');
         s = s.replace(/\[(?:Info|info|Thought|thought|推理|Reasoning)[\s\S]*?\]/g, '');
         s = s.replace(/^(?:思考过程|推理过程|让我们一步步|好的，我先|好，我来)[^\n]*\n?/g, '');
         s = s.replace(/[ \t]*\n[ \t]*/g, '\n');
+        return s.trim();
+    }
+
+    // 彻底移除思考链内容（用于不需要展示思维链的路径：纳米助手、主动消息、书籍、通话等）。
+    // 与 processReply 的「提取并展示」不同，这里只做删除，保证 [think]/<thinking> 等不会漏进气泡。
+    function stripThinkBlocks(raw) {
+        if (typeof raw !== 'string') return raw;
+        let s = cleanReplyText(raw);
+        const W = 'think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链';
+        // [think: ...] / [thinking: ...] 单标签形式
+        s = s.replace(new RegExp('\\[\\s*(?:' + W + ')\\s*:[\\s\\S]*?\\]', 'gi'), ' ');
+        // 成对 [think]...[/think]
+        s = s.replace(new RegExp('\\[\\s*(?:' + W + ')\\s*\\]([\\s\\S]*?)\\[\\s*\\/\\s*(?:' + W + ')\\s*\\]', 'gi'), ' ');
+        // 未闭合 [think] 一直吞到结尾
+        s = s.replace(new RegExp('\\[\\s*(?:' + W + ')\\s*\\]([\\s\\S]*)$', 'i'), ' ');
+        // 残留的单个标记
+        s = s.replace(new RegExp('\\[\\s*\\/?\\s*(?:' + W + ')\\s*\\]', 'gi'), ' ');
+        s = s.replace(/^[ \t]*[\/]?[ \t]*think[ \t]*$/gim, '');
+        s = s.replace(/\n{3,}/g, '\n\n');
         return s.trim();
     }
 
@@ -5283,7 +5307,7 @@
     async function processNanoReply(reply, depth) {
         var NA = window.NanoAssistant;
         if (!NA) return;
-        var parsed = NA.parseActions(reply);
+        var parsed = NA.parseActions(stripThinkBlocks(reply));
         var row = null;
         if (parsed.clean) {
             row = addMessage('left', parsed.clean, nowHHMM(), null, false, false, null, null, null, null);
@@ -5362,13 +5386,13 @@
             if (!roundThink && inner && String(inner).trim()) roundThink = String(inner).trim();
             return ' ';
         };
-        replyBody = replyBody.replace(/\[\s*think\s*\]([\s\S]*?)\[\s*\/\s*think\s*\]/gi, grabThink);
-        replyBody = replyBody.replace(/<\s*think\s*>([\s\S]*?)<\s*\/\s*think\s*>/gi, grabThink);
-        replyBody = replyBody.replace(/【\s*(?:think|思考|思维链)\s*】([\s\S]*?)【\s*\/\s*(?:think|思考|思维链)\s*】/gi, grabThink);
-        replyBody = replyBody.replace(/\[\s*(?:思考|思维链)\s*\]([\s\S]*?)\[\s*\/\s*(?:思考|思维链)\s*\]/gi, grabThink);
+        const THINK_W = 'think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链';
+        replyBody = replyBody.replace(new RegExp('\\[\\s*(?:' + THINK_W + ')\\s*\\]([\\s\\S]*?)\\[\\s*\\/\\s*(?:' + THINK_W + ')\\s*\\]', 'gi'), grabThink);
+        replyBody = replyBody.replace(new RegExp('<\\s*(?:' + THINK_W + ')\\s*>([\\s\\S]*?)<\\s*\\/\\s*(?:' + THINK_W + ')\\s*>', 'gi'), grabThink);
+        replyBody = replyBody.replace(new RegExp('【\\s*(?:' + THINK_W + ')\\s*】([\\s\\S]*?)【\\s*\\/\\s*(?:' + THINK_W + ')\\s*】', 'gi'), grabThink);
         // 未闭合的思维链：从 [think] 一直吞到结尾（不管它在开头还是结尾），避免思考内容漏进正文
-        replyBody = replyBody.replace(/\[\s*think\s*\]([\s\S]*)$/i, function (m, inner) {
-            const t = String(inner || '').replace(/\[\s*\/\s*think\s*\]/i, '').trim();
+        replyBody = replyBody.replace(new RegExp('\\[\\s*(?:' + THINK_W + ')\\s*\\]([\\s\\S]*)$', 'i'), function (m, inner) {
+            const t = String(inner || '').replace(new RegExp('\\[\\s*\\/\\s*(?:' + THINK_W + ')\\s*\\]', 'gi'), '').trim();
             if (!roundThink && t) roundThink = t;
             return ' ';
         });
@@ -5380,9 +5404,9 @@
 
         // 二次清理：防止未闭合 / 多余的思维链标记漏进正文气泡
         replyBody = replyBody
-            .replace(/\[\s*\/?\s*(?:think|思考|思维链)\s*\]/gi, ' ')
-            .replace(/【\s*\/?\s*(?:think|思考|思维链)\s*】/gi, ' ')
-            .replace(/<\s*\/?\s*think\s*>/gi, ' ')
+            .replace(new RegExp('\\[\\s*\\/?\\s*(?:' + THINK_W + ')\\s*\\]', 'gi'), ' ')
+            .replace(new RegExp('【\\s*\\/?\\s*(?:' + THINK_W + ')\\s*】', 'gi'), ' ')
+            .replace(new RegExp('<\\s*\\/?\\s*(?:' + THINK_W + ')\\s*>', 'gi'), ' ')
             .replace(/^[ \t]*[\/]?[ \t]*think[ \t]*$/gim, '')
             .replace(/\n{3,}/g, '\n\n')
             .trim();

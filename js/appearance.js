@@ -10,6 +10,26 @@
 (function() {
     'use strict';
 
+    // 全局思维链清洗：各页面在渲染模型回复前调用，彻底移除 [think]/<thinking>/【思考】等标记与内容。
+    // 兼容成对、未闭合、残缺标记，以及 thinking/thought/reasoning/analysis/cot 等变体。
+    window.nanoStripThink = function (raw) {
+        var s = String(raw == null ? '' : raw);
+        var W = 'think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链';
+        try {
+            s = s.replace(new RegExp('\\[\\s*(?:' + W + ')\\s*:[\\s\\S]*?\\]', 'gi'), ' ');
+            s = s.replace(new RegExp('\\[\\s*(?:' + W + ')\\s*\\]([\\s\\S]*?)\\[\\s*\\/\\s*(?:' + W + ')\\s*\\]', 'gi'), ' ');
+            s = s.replace(new RegExp('<\\s*(?:' + W + ')\\s*>([\\s\\S]*?)<\\s*\\/\\s*(?:' + W + ')\\s*>', 'gi'), ' ');
+            s = s.replace(new RegExp('【\\s*(?:' + W + ')\\s*】([\\s\\S]*?)【\\s*\\/\\s*(?:' + W + ')\\s*】', 'gi'), ' ');
+            s = s.replace(new RegExp('\\[\\s*(?:' + W + ')\\s*\\]([\\s\\S]*)$', 'i'), ' ');
+            s = s.replace(new RegExp('<\\s*(?:' + W + ')\\s*>([\\s\\S]*)$', 'i'), ' ');
+            s = s.replace(new RegExp('\\[\\s*\\/?\\s*(?:' + W + ')\\s*\\]', 'gi'), ' ');
+            s = s.replace(new RegExp('【\\s*\\/?\\s*(?:' + W + ')\\s*】', 'gi'), ' ');
+            s = s.replace(new RegExp('<\\s*\\/?\\s*(?:' + W + ')\\s*>', 'gi'), ' ');
+            s = s.replace(/^[ \t]*[\/]?[ \t]*think[ \t]*$/gim, '');
+        } catch (e) {}
+        return s.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+$/gm, '').trim();
+    };
+
     var fileName = '';
     try {
         fileName = (window.location.pathname.split('/').pop() || '').split('?')[0];

@@ -3059,6 +3059,18 @@ async function openHostedApp(appId, file, renderName){
   if(!frame) return;
   frame.addEventListener("load", async () => {
     if(!appHost.contains(frame)) return;
+    // 把宿主(phone.html)从主框架拿到的安全区像素值透传给内嵌 App 的 iframe，
+    // 否则豆包/淘宝/地图等顶栏会因为读不到 --safe-top 而顶进灵动岛。
+    try{
+      const de = frame.contentDocument && frame.contentDocument.documentElement;
+      if(de){
+        const cs = getComputedStyle(document.documentElement);
+        const top = cs.getPropertyValue('--safe-top').trim();
+        const bot = cs.getPropertyValue('--safe-bottom').trim();
+        if(top) de.style.setProperty('--safe-top', top);
+        if(bot) de.style.setProperty('--safe-bottom', bot);
+      }
+    }catch(e){}
     let data = null;
     try{ const saved = await dataGet(`app_${currentChar.id}_${appId}`); data = saved ? saved.data : null; }catch(e){}
     if(!appHost.contains(frame)) return;

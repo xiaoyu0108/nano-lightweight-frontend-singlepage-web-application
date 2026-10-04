@@ -930,6 +930,13 @@ function extractMeta(content) {
       }
     }
   });
+  // 思维链：去掉 [think]/<thinking>/【思考】等成对或未闭合标记（离线也用 [think] 时同样清洗）
+  const TW = 'think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链';
+  text = text
+    .replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*?\\[\\s*\\/\\s*(?:' + TW + ')\\s*\\]', 'gi'), '')
+    .replace(new RegExp('<\\s*(?:' + TW + ')\\s*>[\\s\\S]*?<\\s*\\/\\s*(?:' + TW + ')\\s*>', 'gi'), '')
+    .replace(new RegExp('\\[\\s*(?:' + TW + ')\\s*\\][\\s\\S]*$', 'i'), '')
+    .replace(new RegExp('\\[\\s*\\/?\\s*(?:' + TW + ')\\s*\\]', 'gi'), '');
   text = text
     .replace(/\[(heart|心声|thinking|思维链|思考|plot):[\s\S]*?\]/gi, '')
     .replace(/\n{3,}/g, '\n\n')

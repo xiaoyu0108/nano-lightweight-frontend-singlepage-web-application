@@ -8,7 +8,7 @@
     (function () {
         try {
             var KEY = 'nano_build';
-            var CUR = 'nano-2026-10-03-08';
+            var CUR = 'nano-2026-10-04-01';
             var prev = null, ok = false;
             try { prev = localStorage.getItem(KEY); } catch (e) {}
             if (prev === CUR) return;
@@ -849,7 +849,7 @@
 /* 一次性强制更新：清掉旧 Service Worker 与缓存，保证拿到最新代码（每个版本号只执行一次） */
 (function () {
     try {
-        var KEY = 'nano_force_reset_v36';
+        var KEY = 'nano_force_reset_v37';
         if (localStorage.getItem(KEY) === '1') return;
         localStorage.setItem(KEY, '1');
         var tasks = [];
@@ -871,7 +871,7 @@
 /* 用一次 URL 参数绕过任何被缓存的 index.html（只跳一次） */
 (function () {
     try {
-        var B = '36';
+        var B = '37';
         var u = new URL(location.href);
         if (u.searchParams.get('b') !== B) { u.searchParams.set('b', B); location.replace(u.toString()); }
     } catch (e) {}
@@ -998,7 +998,7 @@
 
 <div class="app">
 <div class="app-container">
-    <div class="top-bar" id="topBar"></div>
+    <!-- 外壳不再提供内置顶栏：各页面用自己的顶栏，并固定在灵动岛下方 -->
 
     <div class="app-content" id="appContent">
         <div class="iframe-container active" id="iframeChat">
@@ -1056,10 +1056,13 @@
             try {
                 _standalone = (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone === true;
             } catch (e) {}
-            if (_standalone) document.documentElement.style.setProperty('--safe-inset-top', 'max(env(safe-area-inset-top, 0px), 24px)');
+            // 灵动岛兜底：部分 iOS/WebView 在全屏下把 env(safe-area-inset-top) 报成 0，
+            // 这里给一个足够越过灵动岛的下限，保证顶栏不会被挡住。
+            document.documentElement.style.setProperty('--safe-inset-top', 'max(env(safe-area-inset-top, 0px), 59px)');
         } catch (e) {}
 
-        const topBar = document.getElementById('topBar');
+        // 外壳内置顶栏已移除；保留空壳以便旧逻辑的 classList 调用不报错
+        const topBar = document.getElementById('topBar') || { classList: { add: function () {}, remove: function () {}, contains: function () { return false; } } };
         const bottomBar = document.getElementById('bottomBar');
         const appContent = document.getElementById('appContent');
         const circleMoreBtn = document.getElementById('circleMore');
@@ -1375,10 +1378,10 @@
                 let top = parseFloat(cs.paddingTop) || 0;
                 const bottom = parseFloat(cs.paddingBottom) || 0;
                 probe.parentNode.removeChild(probe);
-                // 全屏 / PWA 下部分 iOS 会把 env(safe-area-inset-top) 报成 0，
-                // 外壳顶栏已用 24px 兜底；这里给注入子页的 --safe-top 同样的下限，
-                // 否则 chat/API/discover/more/钱包等自处理顶栏的页面会再次顶进刘海。
-                if (_standalone && top < 24) top = 24;
+                // 全屏 / PWA / WebView 下部分 iOS 会把 env(safe-area-inset-top) 报成 0。
+                // 灵动岛安全区约 59px：探测值明显偏小时统一抬到 59px，
+                // 否则 chat/API/discover/more/imessage/豆包等自处理顶栏的页面会再次顶进刘海。
+                if (top < 44) top = 59;
                 return { top: top, bottom: bottom };
             } catch (e) { return { top: 0, bottom: 0 }; }
         }
@@ -1433,7 +1436,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-03-08';
+        var BUILD = 'nano-2026-10-04-01';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -3348,13 +3351,12 @@
             var persona = String(origin.setting || '').slice(0, 6000);
             var name = alt.name || '小号';
             var bio = alt.bio || '';
-            return '【小号身份】你是「' + charName + '」本人开的小号，网名「' + name + '」。'
-                + '你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。'
-                + '绝对不能让用户察觉你就是「' + charName + '」：不要承认、不要暗示，不要用本人平时标志性的称呼或口头禅自曝。'
-                + (bio ? ('\n【小号的公开简介】' + bio) : '')
-                + (persona ? ('\n\n【你本人（' + charName + '）的完整设定，请以本人性格来扮演小号】\n' + persona) : '')
-                + '\n\n【铁律】以网名「' + name + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定；'
-                + '用户若起疑，要自然地圆过去，始终不承认自己和「' + charName + '」是同一个人。';
+            // 公开内容放最前（列表 / 记忆宫殿只截前 20~42 字做简介预览）；
+            // 「是谁的小号」这类身份说明一律放最后一句，避免被用户从预览里看到。
+            return (bio ? (bio + '\n') : ('网名「' + name + '」。\n'))
+                + (persona ? ('【你本人的完整设定，请以本人性格来扮演这个身份】\n' + persona + '\n\n') : '')
+                + '【铁律】以网名「' + name + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定；用户若起疑，要自然地圆过去，不承认另一个身份。\n'
+                + '【小号身份】你是「' + charName + '」本人开的小号，网名「' + name + '」。你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。绝对不能让用户察觉你就是「' + charName + '」：不要承认、不要暗示，不要用本人平时标志性的称呼或口头禅自曝。';
         }
         function addFriend(alt) {
             try {
@@ -3363,6 +3365,12 @@
                 req.onsuccess = function () {
                     try {
                         var db = req.result;
+                        // 小号只归属当前人设：写入 bindUser，避免不同 user 之间串号
+                        var _bind = '';
+                        try {
+                            var _d = JSON.parse(localStorage.getItem('nano_mask_data') || localStorage.getItem('nano_home_data') || 'null');
+                            if (_d && Array.isArray(_d.masks) && _d.masks.length) _bind = String(_d.currentMaskId || (_d.masks[0] && _d.masks[0].id) || '');
+                        } catch (e) {}
                         var rec = {
                             id: alt.id || ('alt_' + Date.now()),
                             name: alt.name || '小号',
@@ -3372,6 +3380,7 @@
                             setting: buildAltMaskSetting(alt),
                             isNpc: true,
                             isAltProbe: true,
+                            bindUser: _bind,
                             altOriginId: (alt.origin && alt.origin.id) || ''
                         };
                         var tx = db.transaction('characters', 'readwrite');
