@@ -139,16 +139,19 @@
         'padding-bottom:calc(var(--chat-bottom-inset,72px) + var(--chat-bottom-extra,14px)) !important;}' +
         NANO_FLOAT_SEL('.topbar') + '{' +
         'position:absolute !important;top:0 !important;left:0 !important;right:0 !important;width:auto !important;' +
-        'z-index:30 !important;flex-shrink:0 !important;' +
-        'background:var(--chat-topbar-mask,transparent) !important;pointer-events:none !important;}' +
+        'z-index:30 !important;flex-shrink:0 !important;pointer-events:none !important;}' +
+        // 底色用 :where() 降到 0 优先级、且不加 !important：
+        // 默认取变量 --chat-topbar-mask（透明），美化里既能改这个变量，
+        // 也能直接写 .topbar{background:#fff} 覆盖（和线下一致，不再被悬浮层压住）。
+        ':where(' + NANO_FLOAT_SEL('.topbar') + '){background:var(--chat-topbar-mask,transparent);}' +
         NANO_FLOAT_SEL('.topbar > *') + '{pointer-events:auto !important;}' +
         NANO_FLOAT_SEL('.multi-select-bar') + '{' +
         'position:absolute !important;top:var(--chat-topbar-h,60px) !important;' +
         'left:12px !important;right:12px !important;margin:0 !important;z-index:31 !important;}' +
         NANO_FLOAT_SEL('.bottom-bar') + '{' +
         'position:absolute !important;left:0 !important;right:0 !important;bottom:0 !important;width:auto !important;' +
-        'z-index:40 !important;flex-shrink:0 !important;' +
-        'background:var(--chat-bottom-mask,transparent) !important;pointer-events:none !important;}' +
+        'z-index:40 !important;flex-shrink:0 !important;pointer-events:none !important;}' +
+        ':where(' + NANO_FLOAT_SEL('.bottom-bar') + '){background:var(--chat-bottom-mask,transparent);}' +
         NANO_FLOAT_SEL('.bottom-bar > *') + '{pointer-events:auto !important;}' +
         'body.nano-groups .group-notice-bar{' +
         'position:absolute !important;top:var(--chat-topbar-h,60px) !important;' +

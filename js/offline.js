@@ -164,14 +164,15 @@ async function loadSettingsFromDB() {
           wordCount: data.wordCount || '',
           person: data.person || 'auto',
           customCSS: data.customCSS || '',
+          bgImage: data.bgImage || '',
           memThreshold: data.memThreshold || 5,
           autoSummary: data.autoSummary !== false,
           nsfw: data.nsfw === true
         });
       };
-      req.onerror = () => resolve({ userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true, nsfw: false });
+      req.onerror = () => resolve({ userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', bgImage: '', memThreshold: 5, autoSummary: true, nsfw: false });
     });
-  } catch { return { userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true, nsfw: false }; }
+  } catch { return { userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', bgImage: '', memThreshold: 5, autoSummary: true, nsfw: false }; }
 }
 
 // ============================================================
@@ -184,6 +185,15 @@ try { offlineChatId = new URLSearchParams(window.location.search).get('chat') ||
 // 美化预览模式：同一套真实页面，只用来在设置页里实时展示样式，不读写消息、不跑定时
 let OFFLINE_PREVIEW = false;
 try { OFFLINE_PREVIEW = new URLSearchParams(window.location.search).get('preview') === '1'; } catch (e) { OFFLINE_PREVIEW = false; }
+// 预览 iframe 不是由外壳注入 --safe-top 的，会回退到设备 safe-area（平板上会顶出一条空白）。
+// 预览里强制把安全区归零，顶栏就能从最顶部开始、背景完整延伸，所见即所得。
+if (OFFLINE_PREVIEW) {
+  try {
+    document.documentElement.style.setProperty('--safe-top', '0px');
+    document.documentElement.style.setProperty('--safe-bottom', '0px');
+    document.documentElement.style.setProperty('--nano-safe-bottom', '0px');
+  } catch (e) {}
+}
 // 场景：story=剧情（默认，计入记忆）；theater:<sid>=小剧场/番外（可多开，各自独立存档，不计入记忆）
 let offlineScene = 'story';
 const SCENE_KEY = 'offline_scene_' + (offlineChatId || 'none');
@@ -219,7 +229,7 @@ let offlineIsGroup = false;
 let groupMemberList = [];
 let groupMemberMap = {};
 let groupCharData = {};
-let settings = { userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', wordCount: '', person: 'auto', customCSS: '', memThreshold: 5, autoSummary: true, nsfw: false };
+let settings = { userName: 'user', charName: 'char', userAvatar: '', charAvatar: '', style: '', wordCount: '', person: 'auto', customCSS: '', bgImage: '', memThreshold: 5, autoSummary: true, nsfw: false };
 let selectMode = false;
 let deleteTarget = null;
 let isReplying = false;
@@ -576,18 +586,15 @@ function render() {
 
       <div class="actions">
         <button class="action" data-action="edit">
-          <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m4 16.5-.8 3.3 3.3-.8L17.9 7.6a2.2 2.2 0 0 0-3.1-3.1L3.4 15.9"/>
-            <path d="m13.6 5.5 4.9 4.9"/>
+          <svg class="action-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
+            <path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
           </svg>
           <span>编辑</span>
         </button>
         <button class="action" data-action="delete">
-          <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 7h14"/>
-            <path d="M9 7V4.5h6V7"/>
-            <path d="M7 7l.8 12.2h8.4L17 7"/>
-            <path d="M10 10.5v5.5M14 10.5v5.5"/>
+          <svg class="action-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
           </svg>
           <span>删除</span>
         </button>
@@ -1539,11 +1546,37 @@ async function summarizeOfflineMemories(force) {
 // ============================================================
 // 15. 启动
 // ============================================================
+// 线下背景图：只铺在页面底色上（.app / .chat 透明化），卡片本身 UI 不受影响。
+// 上传后「以背景图为准」：这里用 !important 保证主题色/旧预设盖不住它；
+// 但样式插在「自定义 CSS」之前，所以想显式盖住仍可用 !important 覆盖，
+// 例如 body{background:#fff!important} 或 .chat{background:#fff!important}。
+// 顶栏/底栏是独立元素，直接写实色 .topbar/.bottom{background:#fff} 即可覆盖，不受影响。
+function ensureBgStyleTag() {
+  let tag = document.getElementById('offline-bg-image');
+  if (tag) return tag;
+  tag = document.createElement('style');
+  tag.id = 'offline-bg-image';
+  const custom = document.getElementById('offline-custom-css') || document.getElementById('offline-preview-css');
+  if (custom && custom.parentNode) custom.parentNode.insertBefore(tag, custom);
+  else document.head.appendChild(tag);
+  return tag;
+}
+function applyBackgroundImage(src) {
+  const tag = ensureBgStyleTag();
+  const url = src ? String(src) : '';
+  if (!url) { tag.textContent = ''; return; }
+  tag.textContent =
+    'body{background-image:url("' + url + '")!important;background-size:cover!important;' +
+    'background-position:center!important;background-repeat:no-repeat!important}' +
+    '.app,.chat{background:transparent!important}';
+}
+
 async function init() {
   await syncGlobalIdentity();
   await loadGroupMembers();
   const dbSettings = await loadSettingsFromDB();
   settings = { ...dbSettings, userName: settings.userName || dbSettings.userName, charName: settings.charName || dbSettings.charName, userAvatar: settings.userAvatar || dbSettings.userAvatar, charAvatar: settings.charAvatar || dbSettings.charAvatar };
+  try { applyBackgroundImage(settings.bgImage); } catch (e) {}
 
   let stored = await getMessages();
   if ((!stored || !stored.length) && offlineScene === 'story') {
@@ -1629,6 +1662,7 @@ async function reloadSettings() {
       if (!tag) { tag = document.createElement('style'); tag.id = 'offline-custom-css'; document.head.appendChild(tag); }
       tag.textContent = settings.customCSS;
     }
+    try { applyBackgroundImage(settings.bgImage); } catch (e) {}
     render();
   } catch (e) {} finally { __settingsReloading = false; }
 }
@@ -1645,6 +1679,10 @@ window.addEventListener('message', function (e) {
       if (!tag) { tag = document.createElement('style'); tag.id = 'offline-preview-css'; document.head.appendChild(tag); }
       tag.textContent = String(d.css || '');
     } catch (err) {}
+  }
+  // 美化预览：背景图变化
+  if (d && d.type === 'offlinePreviewBg') {
+    try { applyBackgroundImage(String(d.image || '')); } catch (err) {}
   }
   // 美化预览：头像框变化
   if (d && d.type === 'offlinePreviewFrame') {

@@ -41,7 +41,7 @@ button:active{opacity:.55}
   border-bottom:1px solid rgba(220,212,213,.6);position:relative;z-index:30;
 }
 .top-title{
-  flex:1;min-width:0;text-align:center;font-size:17px;font-weight:650;letter-spacing:.15px;color:#5a4e50!important;
+  flex:1;min-width:0;text-align:center;font-size:17px;font-weight:650;letter-spacing:.15px;color:#5a4e50;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px;
   pointer-events:none;position:relative;z-index:1;
 }
@@ -49,6 +49,7 @@ button:active{opacity:.55}
 #settingsBtn{z-index:3}
 /* 美化预览模式：只展示，不允许在预览里操作输入/切换 */
 .offline-preview .bottom,.offline-preview .scene-tabs,.offline-preview .select-bar{pointer-events:none}
+.offline-preview .composer{pointer-events:none}
 /* 顶栏点击保护：即使外面把它改成悬浮/全宽，也保证按钮各占自己那一块、标题不挡点击 */
 .topbar .top-btn{flex:0 0 auto;max-width:64px}
 .topbar .top-title{pointer-events:none}
@@ -76,7 +77,7 @@ button:active{opacity:.55}
 .scene-tabs[data-scene="theater"] .scene-indicator{transform:translateX(calc(100% + 6px))}
 
 .chat{
-  flex:1;overflow-y:auto;padding:16px 22px 122px;
+  flex:1;overflow-y:auto;padding:16px 22px calc(150px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)));
   -webkit-overflow-scrolling:touch;scroll-behavior:smooth;
   scrollbar-width:none;
   -ms-overflow-style:none;
@@ -245,7 +246,7 @@ button:active{opacity:.55}
 .input{
   width:100%;min-height:42px;max-height:126px;resize:none;outline:none;
   border:1px solid var(--line-strong);border-radius:21px;background:var(--card);
-  padding:10px 14px;font-size:14px;line-height:1.5;color:var(--ink,#3d3536)!important;
+  padding:10px 14px;font-size:14px;line-height:1.5;color:var(--ink,#3d3536);
 }
 .input::-webkit-scrollbar{display:none}
 .input{scrollbar-width:none;-ms-overflow-style:none}
@@ -253,7 +254,7 @@ button:active{opacity:.55}
 .input::placeholder{color:#cdbec0}
 
 .select-bar{
-  display:none;position:fixed;left:0;right:0;top:calc(64px + 52px);z-index:24;padding:8px 14px;
+  display:none;position:fixed;left:0;right:0;top:calc(116px + var(--safe-top, env(safe-area-inset-top, 0px)));z-index:24;padding:8px 14px;
   background:#6f6164;color:#fff;font-size:12px;justify-content:space-between;align-items:center;
 }
 .select-bar.open{display:flex}
@@ -296,7 +297,7 @@ button:active{opacity:.55}
 /* ===== 让内置主题的变量也作用到卡片底栏按钮与剧情选项 ===== */
 .action{color:var(--ink, #a89094)}
 .action:hover{color:var(--pink-deep, #bca8ab)}
-.action svg, .action-icon{stroke:currentColor;fill:none}
+.action svg, .action-icon{fill:currentColor;stroke:none}
 .more-action svg{fill:currentColor;stroke:none}
 .actions{border-color:var(--line, #e5ddde)}
 .plot-toggle{color:var(--pink-deep, #bca8ab)}
@@ -304,19 +305,19 @@ button:active{opacity:.55}
 
 
 /* ===== 让内置主题变量完整作用：卡片顶栏Diary / 底栏按钮 / 输入�?===== */
-.message-head{background:linear-gradient(135deg, var(--header,#f0eaea), var(--gray-pink,#e8dfe0))!important;border-bottom:1px solid var(--line,#e5ddde)}
-.diary-title{color:var(--pink-deep,#bca8ab)!important}
-.round-btn{color:var(--ink,#3d3536)!important}
-.round-btn.send{background:var(--pink-deep,#bca8ab)!important;color:#fff!important}
-.input{color:var(--ink,#3d3536)!important}
-.input::placeholder{color:var(--muted,#b0a2a4)!important}
-.composer{background:var(--card,#fffdfe)!important;border-color:var(--line-strong,#d9cfd0)!important}
-.bottom{background:var(--page,#f5f0f0)!important;border-top:1px solid var(--line,#e5ddde)}
+.message-head{background:linear-gradient(135deg, var(--header,#f0eaea), var(--gray-pink,#e8dfe0));border-bottom:1px solid var(--line,#e5ddde)}
+.diary-title{color:var(--pink-deep,#bca8ab)}
+.round-btn{color:var(--ink,#3d3536)}
+.round-btn.send{background:var(--pink-deep,#bca8ab);color:#fff}
+.input{color:var(--ink,#3d3536)}
+.input::placeholder{color:var(--muted,#b0a2a4)}
+.composer{background:var(--card,#fffdfe);border-color:var(--line-strong,#d9cfd0)}
+.bottom{background:var(--page,#f5f0f0);border-top:1px solid var(--line,#e5ddde)}
 
 
 /* ===== 修复：底部无白条、段落缩进与空行 ===== */
 html, body, .app{background:var(--page,#f5f0f0)}
-.bottom{background:var(--header,#f0eaea)!important;padding:8px 10px 10px!important}
+.bottom{background:var(--header,#f0eaea);padding:8px 10px 10px}
 .content .env-block,.content .psych-block,.content .dialogue-block,.content .action-block,.content .inner-block{
   text-indent:2em;margin-top:0;margin-bottom:2px;
 }
@@ -328,26 +329,31 @@ html, body, .app{background:var(--page,#f5f0f0)}
 .load-more a{font-size:12px;color:var(--pink-deep,#bca8ab);cursor:pointer;line-height:1.4}
 
 
-/* ===== offline 底栏：统一成一个整体圆角容器，并加底部遮罩（避免透明露内容） ===== */
+/* ===== offline 底栏：完全透明悬浮，只留输入胶囊；不遮挡卡片，四周也不加遮罩 ===== */
 .bottom{
-  background:linear-gradient(to top, var(--page,#f5f0f0) 76%, rgba(245,240,240,0))!important;
-  border-top:none!important;
-  padding:12px 12px calc(12px + 0px)!important;
+  background:transparent;
+  border-top:none;
+  box-shadow:none;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  pointer-events:none;
+  padding:10px 12px calc(10px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)));
 }
 .composer{
-  display:flex!important;
-  align-items:center!important;
-  background:var(--card,#fffdfe)!important;
-  border:1px solid var(--line-strong,#d9cfd0)!important;
-  border-radius:26px!important;
-  padding:5px 8px!important;
-  gap:6px!important;
-  box-shadow:var(--shadow,0 4px 16px rgba(0,0,0,.05))!important;
+  pointer-events:auto;
+  display:flex;
+  align-items:center;
+  background:var(--card,#fffdfe);
+  border:1px solid var(--line-strong,#d9cfd0);
+  border-radius:26px;
+  padding:5px 8px;
+  gap:6px;
+  box-shadow:var(--shadow,0 4px 16px rgba(0,0,0,.05));
 }
-.composer .round-btn{background:transparent!important;border:none!important;color:var(--ink,#3d3536)!important;flex-shrink:0}
-.composer .round-btn.send{background:var(--pink-deep,#bca8ab)!important;color:#fff!important;border:none!important}
-.composer .input{border:none!important;background:transparent!important;box-shadow:none!important;flex:1!important;min-width:0!important;width:auto!important}
-.composer .input:focus{box-shadow:none!important}
+.composer .round-btn{background:transparent;border:none;color:var(--ink,#3d3536);flex-shrink:0}
+.composer .round-btn.send{background:var(--pink-deep,#bca8ab);color:#fff;border:none}
+.composer .input{border:none;background:transparent;box-shadow:none;flex:1;min-width:0;width:auto}
+.composer .input:focus{box-shadow:none}
 
 /* ===== 小剧场 · 番外选择弹层 ===== */
 .tp-mask{position:fixed;inset:0;z-index:120;background:rgba(40,30,32,.34);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}

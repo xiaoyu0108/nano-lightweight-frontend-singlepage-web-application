@@ -1053,6 +1053,16 @@
         // 只把按钮往下让一点，仍然保持全屏。
         // 顶部安全区 = 刚好越过灵动岛的像素值。默认 48px；可用
         // 「其他 → 界面 → 灵动岛安全区」或 localStorage.nano_top_inset 覆盖微调。
+        // 灵动岛安全区开关：仅 iPhone 全面屏需要。关闭时顶部安全区一律按 0 处理，
+        // 这样安卓/不需要的机型不会多出一块空白，也不会让顶栏被透明点击带盖住。
+        function topInsetEnabled() {
+            try {
+                var v = localStorage.getItem('nano_top_inset_enabled');
+                if (v === '1') return true;
+                if (v === '0') return false;
+            } catch (e) {}
+            try { return /iPhone/.test(navigator.userAgent); } catch (e) { return false; }
+        }
         function applyTopInset() {
             var custom = NaN;
             try { custom = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
@@ -1060,7 +1070,9 @@
                 // 键盘兜底：把顶部安全区夹在 48~54px，避免某些 WebView 把 env() 报得很大导致顶栏离灵动岛很远
                 document.documentElement.style.setProperty(
                     '--safe-inset-top',
-                    (isFinite(custom) && custom >= 0) ? (custom + 'px') : 'max(min(env(safe-area-inset-top, 0px), 54px), 48px)'
+                    topInsetEnabled()
+                        ? ((isFinite(custom) && custom >= 0) ? (custom + 'px') : 'max(min(env(safe-area-inset-top, 0px), 54px), 48px)')
+                        : '0px'
                 );
             } catch (e) {}
         }
@@ -1387,6 +1399,7 @@
                 //  · 报成 0 的 WebView → 48（刚好越过灵动岛）
                 //  · 报得很大的 WebView（某些内嵌浏览器 env 会到 100+）→ 54，避免顶栏离灵动岛很远
                 // 想要更精确可用「其他 → 界面 → 灵动岛安全区」或 localStorage.nano_top_inset 覆盖。
+                if (!topInsetEnabled()) return { top: 0, bottom: bottom };
                 var _customTop = NaN;
                 try { _customTop = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
                 if (isFinite(_customTop) && _customTop >= 0) top = _customTop;
@@ -1445,7 +1458,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-05-01';
+        var BUILD = 'nano-2026-10-05-02';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -2691,6 +2704,7 @@
             // 「其他 → 界面 → 灵动岛安全区」微调：更新外壳与所有子页的顶部安全区
             if (data.type === 'nanoTopInset') {
                 try {
+                    if (typeof data.enabled === 'boolean') localStorage.setItem('nano_top_inset_enabled', data.enabled ? '1' : '0');
                     var _v = parseFloat(data.value);
                     if (isFinite(_v) && _v >= 0) localStorage.setItem('nano_top_inset', String(_v));
                     else localStorage.removeItem('nano_top_inset');

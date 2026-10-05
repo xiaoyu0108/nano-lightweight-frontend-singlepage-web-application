@@ -89,7 +89,7 @@ const CSS_PRESETS_ID = 'css_presets';
 const COT_PRESETS_ID = 'cot_presets';
 const MESSAGES_STORE = 'messages';
 
-let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '' };
+let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '' };
 let ruleGroups = [];
 let stylePresets = [];
 let cssPresets = [];
@@ -206,7 +206,9 @@ const INITIAL_CSS = `/* ========================================================
 /* ── 1. 顶栏 .topbar ──────────────────────────────────────────
    结构：.topbar > .top-btn(#backBtn 返回) + .top-title + .top-btn(#settingsBtn 设置)
    可改：高度 / 背景 / 圆角 / 是否吸顶 / 隐藏按钮 / 换图标 / 铺一张背景图。
-   .topbar{height:64px;background:#fff;border-bottom:1px solid #eee;border-radius:0;box-shadow:none}
+   顶栏默认是「半透明 + 毛玻璃」，想改成实色不透底，加这几行即可：
+   .topbar{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+   .topbar{height:64px;border-bottom:1px solid #eee;border-radius:0;box-shadow:none}
    .topbar{position:fixed;top:var(--safe-top,0px);left:0;right:0;z-index:30}       // 吸顶
    .top-title{font-family:Georgia,serif;letter-spacing:.22em;color:#c58ea0}        // 标题字体/颜色
    .top-btn{color:#c58ea0}                                                          // 按钮颜色
@@ -262,8 +264,14 @@ const INITIAL_CSS = `/* ========================================================
 
 /* ── 3. 底栏 .bottom ──────────────────────────────────────────
    结构：.bottom > .composer > .round-btn(#rerollBtn 重roll) + .input + .round-btn.send(#sendBtn)
-   可改：整体样式、按钮位置/顺序/颜色/图标、加装饰插件。
-   .bottom{background:#fff;border-top:1px solid #eee}
+   默认：.bottom 完全透明（气泡能滚到底栏下方穿过、看得见），只有 .composer 是那个输入胶囊。
+   可改：整体样式、按钮位置/顺序/颜色/图标、加装饰插件。示例直接覆盖即可（无需 !important）：
+   // 把透明底栏改成「实色整条覆盖」（像普通 App 那样一条白底/黑底）：
+   .bottom{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none;border-top:1px solid #eee}
+   // 只把输入胶囊改实色、底栏仍透明：
+   .composer{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+   // 深色实底示例：
+   .bottom{background:#1c1c1e;border-top:1px solid #2c2c2e}
    .composer{background:#f6f2f3;border:0;border-radius:18px;padding:6px 8px}
    .round-btn{color:#b98a9a}
    .round-btn.send{background:#c58ea0;color:#fff}
@@ -272,56 +280,67 @@ const INITIAL_CSS = `/* ========================================================
    #rerollBtn{background:url("https://重roll.png") center/20px no-repeat}   // 换图标
    #sendBtn svg{opacity:0}
    #sendBtn{background:url("https://发送.png") center/20px no-repeat}
+   // 注意：底栏默认透明是为了滑动时不遮挡卡片；若给 .bottom 加了不透明底色，
+   // 就相当于又盖住了卡片，可按需给 .chat 加大 padding-bottom 或只在中间留胶囊。
    // 加「装饰性」插件（纯 CSS 只能加不可点的装饰；真正的新功能需加 HTML/JS，可让纳米帮你加）：
    .composer::before{content:"";width:36px;height:36px;border-radius:50%;align-self:center;margin-right:6px;background:#eee url("https://图标.png") center/16px no-repeat}
    */
 
 /* ── 4. 其它：颜色 / 图标 / 字体 ──────────────────────────────
    · 全局配色：改最下面的 :root 变量（--page 背景 / --card 卡片 / --ink 文字 / --pink-deep 点缀 …）
-   · 整页背景图：body{background:url("https://背景.png") center/cover fixed}
+   · 整页背景图：body 上铺图后，必须让 .app 和 .chat 透明才看得到（否则被页面底色盖住）：
+       body{background:url("https://背景.png") center/cover no-repeat}
+       .app,.chat{background:transparent}
+     更省事：设置页「美化 → 上传背景图」已经内置了这个能力，会自适应铺满且不影响卡片。
+   · 上传的背景图「以图为底」，主题色/旧预设盖不住它。想显式盖住整页，加 !important：
+       body{background:#fff!important}   或   .app{background:#fff!important}
+     只盖顶栏/底栏不受影响：直接写 .topbar{background:#fff} / .bottom{background:#fff} 即可（无需 !important）。
+   · 把「透明 / 毛玻璃」改成实色覆盖：目标元素写实色 background + 关掉毛玻璃即可。
+     顶栏 / 底栏 / 场景切换都适用：
+       .topbar{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+       .bottom{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+       .scene-tabs{background:#fff}
+     深色系就把 #fff 换成 #1c1c1e 之类；半透明就用 rgba(255,255,255,.7)。
    · 换任意按钮图标：给该按钮加 background-image，并让其 svg 透明度设为 0（见上）
    · 字体：body,.content{font-family:"你的字体",serif}
    */
 
-/* ── 5. 进阶：几个常见需求怎么改 ──────────────────────────────
+/* ── 5. 进阶：几个常见需求怎么改（下面示例默认全部注释，要用时复制到本模板最下面）──
    (1) 把头像「提出卡片」、独立于卡片之外 / 任意位置：
        卡片 = .message；头像 = .identity-row .avatar。
-       .message{position:relative;overflow:visible}                 /* 卡片可定位，别 hidden */
-       .identity-row .avatar{position:absolute;left:-22px;top:14px;z-index:5}   /* 挪到卡片外 */
-       /* 想完全脱离卡片、钉在屏幕：position 改 fixed，left/top 填像素 */
-       .identity-row{padding-left:8px}                              /* 提走后给昵称留点空 */
-       /* 注意：聊天滚动区 .chat 是 overflow:auto，会裁掉超出「内边距」的部分；
-          想让头像「完全」移到卡片外还看得见，给它留出空间：
-          .chat{padding-left:26px;padding-right:26px}  然后把头像 left/top 调小一点即可。 */
-       /* 头像框（URL 图片框，最省事）：.identity-row .avatar::after{content:url("https://框.png");position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);border:0;pointer-events:none} */
-   (2) 完全重构「剧情 / 小剧场」切换 tab（.scene-tabs）：
-       .scene-tabs{display:flex;gap:8px;padding:10px 16px;background:transparent}
-       .scene-tab{border:0;border-radius:999px;padding:8px 18px;background:#efe7e9;color:#7a6a70;font-weight:600}
-       .scene-tab.active{background:#c58ea0;color:#fff}
-       /* 想换成分段控件 / 下划线 / 竖排：改 .scene-tabs 布局与 .scene-tab 样式即可 */
+       // .message{position:relative;overflow:visible}
+       // .identity-row .avatar{position:absolute;left:-22px;top:14px;z-index:5}
+       // .identity-row{padding-left:8px}
+       注意：聊天滚动区 .chat 是 overflow:auto，会裁掉超出内边距的部分；
+       想让头像「完全」移到卡片外还看得见，给它留出空间：
+       // .chat{padding-left:26px;padding-right:26px}   然后把头像 left/top 调小一点即可。
+       头像框（URL 图片框，最省事）：
+       // .identity-row .avatar::after{content:url("https://框.png");position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);border:0;pointer-events:none}
+   (2) 剧情 / 小剧场 Tab（.scene-tabs）：
+       默认选中项外面有一个「白色滑块」.scene-indicator，整条 tab 还有一层灰底。
+       想「完全恢复成只有文字、没有任何外部色块包裹」，把下面三行复制到最下面：
+       // .scene-tabs{background:transparent;border:0;box-shadow:none}
+       // .scene-indicator{display:none}
+       // .scene-tab,.scene-tab.active{background:transparent;box-shadow:none}
+       之后只靠文字颜色区分选中态即可：
+       // .scene-tab{color:#b3a5a7;font-weight:600}
+       // .scene-tab.active{color:#c58ea0}
+       想重新做成分段控件 / 下划线 / 竖排：改 .scene-tabs 布局与 .scene-tab 样式即可。
    (3) 给头像加头像框并完美适配：
-       .identity-row .avatar{position:relative;overflow:visible}
-       .identity-row .avatar::after{
-         content:"";position:absolute;inset:-6px;border-radius:inherit;
-         border:2px solid #e7cdd6;pointer-events:none;              /* 框比头像大一圈，且不挡点按 */
-       }
-       /* 图片框：content:url("https://框.png");width:calc(100% + 12px);height:calc(100% + 12px);border:0 */
+       // .identity-row .avatar{position:relative;overflow:visible}
+       // .identity-row .avatar::after{content:"";position:absolute;inset:-6px;border-radius:inherit;border:2px solid #e7cdd6;pointer-events:none}
+       图片框：content:url("https://框.png");width:calc(100% + 12px);height:calc(100% + 12px);border:0
    (4) 修改「设置页」的配色：
        设置页不吃这里的美化 CSS（否则会改坏它的按钮）。它自己的变量在 css/offline-setting.css 顶部：
          --paper 背景 / --ink 主文字 / --sub 次要文字 / --line 分割线 / --accent 强调色
        要改设置页颜色，改这几个 :root 变量即可（纯颜色安全；别改它的尺寸/布局）。
    (5) 把顶栏改成「悬浮」又不影响点击的安全写法：
-       .topbar{
-         position:fixed;top:0;left:0;right:0;z-index:40;
-         height:calc(64px + var(--safe-top,0px));padding-top:var(--safe-top,0px);
-         display:flex;align-items:center;justify-content:space-between;   /* 必须保留 flex */
-         background:rgba(255,255,255,.8);backdrop-filter:blur(20px);
-       }
-       .topbar .top-title{flex:1;min-width:0;pointer-events:none}          /* 标题不挡点击 */
-       .topbar .top-btn{flex:0 0 auto;width:50px;height:50px}              /* 按钮固定尺寸 */
-       .chat{padding-top:calc(74px + var(--safe-top,0px))}                  /* 给悬浮顶栏留位 */
-       /* 关键：悬浮后务必保留 display:flex 并给按钮固定尺寸；
-          否则按钮会被拉成整条，点哪儿都像点到了返回。 */
+       // .topbar{position:fixed;top:0;left:0;right:0;z-index:40;height:calc(64px + var(--safe-top,0px));padding-top:var(--safe-top,0px);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.8);backdrop-filter:blur(20px)}
+       // .topbar .top-title{flex:1;min-width:0;pointer-events:none}
+       // .topbar .top-btn{flex:0 0 auto;width:50px;height:50px}
+       // .chat{padding-top:calc(74px + var(--safe-top,0px))}
+       关键：悬浮后务必保留 display:flex 并给按钮固定尺寸；
+       否则按钮会被拉成整条，点哪儿都像点到了返回。
    */
 :root{
   --page:#f5f0f0;
@@ -337,8 +356,7 @@ const INITIAL_CSS = `/* ========================================================
   --shadow:0 5px 18px rgba(80,65,68,.05);
   --danger:#c28388;
 }
-body{background:var(--page);color:var(--ink)}
-.chat{background:var(--page)}
+body{color:var(--ink)}
 /* 顶栏 */
 .topbar{background:rgba(248,243,244,.92);color:var(--ink)}
 .top-title{color:var(--ink)}
@@ -349,8 +367,8 @@ body{background:var(--page);color:var(--ink)}
 .identity-row{background:transparent;position:relative}
 .nickname{color:var(--ink)}
 .content{color:var(--ink)}
-/* 底栏：重roll / 输入栏 / 发送 */
-.bottom{background:var(--header);border-top:1px solid var(--line)}
+/* 底栏：重roll / 输入栏 / 发送（.bottom 保持透明，只让输入胶囊有底色） */
+.bottom{background:transparent;border-top:none}
 .composer{background:var(--card);border:1px solid var(--line-strong)}
 .input{color:var(--ink)}
 .round-btn{color:var(--ink)}
@@ -360,42 +378,8 @@ body{background:var(--page);color:var(--ink)}
 `;
 
 const BUILTIN_CSS = {
-  soft: `:root{--page:#f7f4f5;--card:#fffdfd;--header:#fbf6f7;--line:#f1e7e9;--line-strong:#ead9dc;--ink:#40393b;--muted:#b5a8aa;--pink:#f3cdd4;--pink-deep:#e6b3bb;--gray-pink:#f1e6e8}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 5px 20px rgba(105,82,100,.06)}.topbar,.bottom{background:rgba(251,246,247,.92)}`,
-  minimal: `:root{--page:#f0f1f3;--card:#fff;--header:#f6f7f8;--line:#e6e7ea;--line-strong:#d9dbe0;--ink:#2c2e32;--muted:#96989d;--pink:#e2e3e7;--pink-deep:#c9cbd2;--gray-pink:#eceef0}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 3px 14px rgba(30,35,40,.04)}.topbar,.bottom{background:rgba(246,247,248,.95)}`,
-  mono: `:root{--page:#e8e8ea;--card:#fbfbfc;--header:#f0f0f2;--line:#e1e1e3;--line-strong:#d2d2d5;--ink:#2b2b2d;--muted:#98989b;--pink:#dedee0;--pink-deep:#c8c8cb;--gray-pink:#efeff0}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 3px 12px rgba(20,20,25,.05)}.topbar,.bottom{background:rgba(248,248,249,.96)}`,
-  seablue: `:root{--page:#eaf3f9;--card:#fff;--header:#f2f8fc;--line:#dce9f1;--line-strong:#c8d9e6;--ink:#26303a;--muted:#86a0b1;--pink:#d8e8f2;--pink-deep:#b9d2e4;--gray-pink:#e4eef5}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 4px 16px rgba(50,90,120,.06)}.topbar,.bottom{background:rgba(244,250,254,.92)}`,
-  mint: `:root{--page:#ecf5f0;--card:#fff;--header:#f2f8f5;--line:#deece5;--line-strong:#cddfd5;--ink:#26342c;--muted:#8aa893;--pink:#d6e8de;--pink-deep:#b8d8c7;--gray-pink:#e5efe9}body{background:var(--page)}.chat{background:var(--page)}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 4px 16px rgba(40,90,70,.06)}.topbar,.bottom{background:rgba(242,248,245,.92)}`,
-  free: `/* 线下 · 自由排版（任意移动 / 隐藏文字 / 头像大小位置）
-   变量：
-     --msg-x / --msg-y      整条消息相对位置偏移
-     --msg-width            消息宽度（默认 760px）
-     --avatar-size          头像大小
-     --avatar-x / --avatar-y 头像相对位置偏移
-   隐藏文字：给对应元素加 display:none（把下面的注释取消即可）
-*/
-.message{
-  --msg-x: 0px;
-  --msg-y: 0px;
-  --msg-width: 760px;
-  --avatar-size: 46px;
-  --avatar-x: 0px;
-  --avatar-y: 0px;
-  width: min(var(--msg-width), 100%);
-  transform: translate(var(--msg-x), var(--msg-y));
-}
-.identity-row{ position: relative; }
-.message .avatar{
-  width: var(--avatar-size);
-  height: var(--avatar-size);
-  flex: 0 0 var(--avatar-size);
-  transform: translate(var(--avatar-x), var(--avatar-y));
-}
-/* 想隐藏就取消注释：
-.diary-title{ display: none; }
-.nickname{ display: none; }
-.time-row{ display: none; }
-.role-label{ display: none; }
-*/`
+  soft: `:root{--page:#f7f4f5;--card:#fffdfd;--header:#fbf6f7;--line:#f1e7e9;--line-strong:#ead9dc;--ink:#40393b;--muted:#b5a8aa;--pink:#f3cdd4;--pink-deep:#e6b3bb;--gray-pink:#f1e6e8}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 5px 20px rgba(105,82,100,.06)}.topbar{background:rgba(251,246,247,.92)}`,
+  minimal: `:root{--page:#f0f1f3;--card:#fff;--header:#f6f7f8;--line:#e6e7ea;--line-strong:#d9dbe0;--ink:#2c2e32;--muted:#96989d;--pink:#e2e3e7;--pink-deep:#c9cbd2;--gray-pink:#eceef0}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 3px 14px rgba(30,35,40,.04)}.topbar{background:rgba(246,247,248,.95)}`
 };
 
 function escapeHTML(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c)); }
@@ -944,7 +928,7 @@ document.getElementById('cotPresetSelect').onchange = function() {
 function populateCssPresets() {
   const sel = document.getElementById('cssPreset');
   const current = sel.value;
-  sel.innerHTML = '<option value="initial">初始 CSS</option><option value="soft">Soft Pink</option><option value="minimal">Minimal Gray</option><option value="mono">黑白灰</option><option value="seablue">蓝白</option><option value="mint">清新绿</option><option value="custom">当前 CSS</option>';
+  sel.innerHTML = '<option value="initial">初始 CSS</option><option value="soft">Soft Pink</option><option value="minimal">Minimal Gray</option><option value="custom">当前 CSS</option>';
   cssPresets.forEach((p, i) => {
     const opt = document.createElement('option');
     opt.value = 'user-' + i;
@@ -995,10 +979,6 @@ document.getElementById('cssPreset').onchange = function() {
   if (val === 'initial') { document.getElementById('cssText').value = INITIAL_CSS; document.getElementById('cssPresetName').value = ''; return; }
   if (val === 'soft') { document.getElementById('cssText').value = BUILTIN_CSS.soft; document.getElementById('cssPresetName').value = ''; return; }
   if (val === 'minimal') { document.getElementById('cssText').value = BUILTIN_CSS.minimal; document.getElementById('cssPresetName').value = ''; return; }
-  if (val === 'mono') { document.getElementById('cssText').value = BUILTIN_CSS.mono; document.getElementById('cssPresetName').value = ''; return; }
-  if (val === 'seablue') { document.getElementById('cssText').value = BUILTIN_CSS.seablue; document.getElementById('cssPresetName').value = ''; return; }
-  if (val === 'mint') { document.getElementById('cssText').value = BUILTIN_CSS.mint; document.getElementById('cssPresetName').value = ''; return; }
-  if (val === 'free') { document.getElementById('cssText').value = BUILTIN_CSS.free; document.getElementById('cssPresetName').value = ''; return; }
   if (val === 'custom') { document.getElementById('cssText').value = settings.customCSS || ''; document.getElementById('cssPresetName').value = ''; return; }
   if (val.startsWith('user-')) {
     const idx = parseInt(val.replace('user-', ''));
@@ -1008,6 +988,78 @@ document.getElementById('cssPreset').onchange = function() {
 };
 
 document.getElementById('clearCssBtn').onclick = function() { document.getElementById('cssText').value = ''; applyCssPreview(''); showToast('已清空CSS'); };
+
+// ===== 线下背景图：上传图片作为页面底色背景（不影响卡片 UI）=====
+function fileToBgImage(file) {
+  return new Promise(function (resolve) {
+    try {
+      const reader = new FileReader();
+      reader.onload = function () {
+        const raw = reader.result;
+        const img = new Image();
+        img.onload = function () {
+          try {
+            const maxW = 1600, maxH = 2400;
+            const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+            const scale = Math.min(1, maxW / w, maxH / h);
+            const cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = cw; canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';                 // 透明 PNG 转 JPEG 时铺白底，避免变黑
+            ctx.fillRect(0, 0, cw, ch);
+            ctx.drawImage(img, 0, 0, cw, ch);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          } catch (e) { resolve(raw); }
+        };
+        img.onerror = function () { resolve(raw); };
+        img.src = raw;
+      };
+      reader.onerror = function () { resolve(''); };
+      reader.readAsDataURL(file);
+    } catch (e) { resolve(''); }
+  });
+}
+function updateBgName() {
+  const el = document.getElementById('bgFileName');
+  if (el) el.textContent = settings.bgImage ? '已设置背景' : '未设置';
+}
+function sendBgPreview(image) {
+  const f = document.getElementById('cssPreviewFrame');
+  if (!f || !f.contentWindow) return;
+  try { f.contentWindow.postMessage({ type: 'offlinePreviewBg', image: String(image || '') }, '*'); } catch (e) {}
+}
+(function bindBgUpload() {
+  const pick = document.getElementById('bgPickBtn');
+  const input = document.getElementById('bgFileInput');
+  const clear = document.getElementById('bgClearBtn');
+  if (pick && input) {
+    pick.onclick = function () { input.click(); };
+    input.addEventListener('change', async function () {
+      const file = this.files && this.files[0];
+      this.value = '';
+      if (!file) return;
+      showToast('正在处理图片…');
+      const img = await fileToBgImage(file);
+      if (!img) { showToast('图片读取失败'); return; }
+      settings.bgImage = img;
+      await saveSettings();
+      updateBgName();
+      sendBgPreview(img);
+      showToast('背景已更新');
+    });
+  }
+  if (clear) {
+    clear.onclick = async function () {
+      settings.bgImage = '';
+      await saveSettings();
+      updateBgName();
+      sendBgPreview('');
+      showToast('背景已清除');
+    };
+  }
+  updateBgName();
+})();
 document.getElementById('cssExport').onclick = function() {
   const sel = document.getElementById('cssPreset');
   const val = sel ? sel.value : 'custom';
@@ -1275,6 +1327,7 @@ function fillSettings() {
   populateStylePresets();
   populateCotPresets();
   populateCssPresets();
+  updateBgName();
 }
 
 // ============================================================

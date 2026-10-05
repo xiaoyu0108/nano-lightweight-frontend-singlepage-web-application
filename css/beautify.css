@@ -19,7 +19,8 @@ button svg{pointer-events:none;vertical-align:middle;flex-shrink:0}
 .title{font-size:17px;font-weight:600;text-align:center;color:#1c1c1e;letter-spacing:-.2px}
 
 /* ===== Content ===== */
-.content{min-height:0;flex:1;overflow:auto;padding:10px 14px calc(20px + 0px);-webkit-overflow-scrolling:touch}
+.content{min-height:0;flex:1;overflow:auto;padding:10px 14px calc(20px + 0px);-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none}
+.content::-webkit-scrollbar{display:none;width:0;height:0}
 
 /* ===== Tabs（白底下划线样式，避免顶栏下方出现灰条）===== */
 .tabs{height:40px;padding:0;background:#ffffff;border-bottom:0.5px solid rgba(60,60,67,.10);border-radius:0;display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:0 0 12px}
@@ -75,6 +76,11 @@ button svg{pointer-events:none;vertical-align:middle;flex-shrink:0}
 /* ===== 头像调节（方�?/ 大小�?===== */
 .tune-card{background:#f7f7f8;border-radius:12px;padding:10px 14px;margin-bottom:12px;border:0.5px solid rgba(60,60,67,.06)}
 .tune-row{display:grid;grid-template-columns:40px minmax(0,1fr) 44px;align-items:center;gap:8px;padding:2px 0}
+/* 头像框预设：切换框 / 保存 / 删除 强制同一行，不换行 */
+.tune-row-4{display:flex;align-items:center;gap:6px}
+.tune-row-4 .tune-label{flex:none;white-space:nowrap}
+.tune-row-4 select{flex:1;min-width:0}
+.tune-row-4 .tool-sm{margin-left:0!important}
 .tune-label{font-size:12px;color:#3a3a3c;font-weight:500}
 .tune-val{font-size:12px;font-weight:600;color:#007aff;text-align:right}
 .tune-slider{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:2px;background:rgba(60,60,67,.15);outline:none;cursor:pointer}

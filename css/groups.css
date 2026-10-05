@@ -48,7 +48,8 @@ html.keyboard-open .chat-container {
     z-index: 30; flex-shrink: 0;
     padding: var(--chat-topbar-pad, max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 12px 6px;
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: transparent;
+    /* 默认不写 background（=透明）；美化里可直接写 .topbar{background:#fff}，
+       或用变量 --chat-topbar-mask 做渐变遮罩 */
     pointer-events: none;
 }
 .topbar > * { pointer-events: auto; }
@@ -423,7 +424,8 @@ html.keyboard-open .chat-container {
     z-index: 40; flex-shrink: 0;
     padding: 8px 12px 4px;
     display: flex; align-items: center; gap: 8px;
-    background: transparent;
+    /* 默认不写 background（=透明）；美化里可直接写 .bottom-bar{background:#fff}，
+       或用变量 --chat-bottom-mask 做渐变遮罩 */
     pointer-events: none;
 }
 .bottom-bar > * { pointer-events: auto; }

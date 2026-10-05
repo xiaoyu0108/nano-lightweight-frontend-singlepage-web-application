@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>其他</title>
-    <link rel="stylesheet" href="css/other.css?v=20261004d">
+    <link rel="stylesheet" href="css/other.css?v=20261005a">
     <script src="js/appearance.js"></script>
     <script src="js/nano-notify.js"></script>
 </head>
@@ -148,8 +148,15 @@
                         <button class="nudge-btn reset" data-target="top" data-dir="0">恢复</button>
                     </div>
                 </div>
-                <div class="list-item">
-                    <span class="item-title">灵动岛安全区<span class="item-desc" style="display:block;font-size:11px;color:#8e8e93;margin-top:2px;">顶栏按钮与灵动岛的距离，默认 48；太小会被遮挡，太大则离得远</span></span>
+                <div class="list-item switch-row">
+                    <div class="item-info">
+                        <span class="item-title">灵动岛安全区</span>
+                        <span class="item-desc">仅 iPhone 全面屏需要开启：给顶栏留出灵动岛高度。安卓或不需要的机型请关闭，否则顶栏会多出一块空白，线下美化也容易串位</span>
+                    </div>
+                    <label class="ios-switch"><input type="checkbox" id="insetToggle"><span class="ios-switch-track"></span></label>
+                </div>
+                <div class="list-item" id="insetNudgeRow" style="display:none;">
+                    <span class="item-title">安全区高度<span class="item-desc" style="display:block;font-size:11px;color:#8e8e93;margin-top:2px;">默认 48；太小会被灵动岛遮挡，太大则离得远</span></span>
                     <div class="nudge-controls">
                         <button class="nudge-btn" data-target="inset" data-dir="-1">上移</button>
                         <span class="nudge-value" id="insetShiftVal">48</span>
@@ -194,7 +201,7 @@
 
     <input type="file" accept="image/*" id="apiBallImageInput" hidden>
 
-    <script src="js/other.js"></script>
+    <script src="js/other.js?v=20261005a"></script>
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>
 </body>

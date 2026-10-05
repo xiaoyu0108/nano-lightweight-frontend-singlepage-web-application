@@ -345,6 +345,7 @@
     'use strict';
     var STEP = 4, MIN = -160, MAX = 200;
     var INSET_DEFAULT = 48;
+    var INSET_ENABLED_KEY = 'nano_top_inset_enabled';
     var KEYS = { top: 'nanoTopShift', bottom: 'nanoBottomShift', inset: 'nano_top_inset' };
     var VAL_ID = { top: 'topShiftVal', bottom: 'bottomShiftVal', inset: 'insetShiftVal' };
     function read(k) {
@@ -353,6 +354,19 @@
             if (v === null || v === '') return k === KEYS.inset ? INSET_DEFAULT : 0;
             return parseInt(v, 10) || 0;
         } catch (e) { return k === KEYS.inset ? INSET_DEFAULT : 0; }
+    }
+    function readInsetEnabled() {
+        try {
+            var v = localStorage.getItem(INSET_ENABLED_KEY);
+            if (v === '1') return true;
+            if (v === '0') return false;
+        } catch (e) {}
+        // 未设置过：iPhone 全面屏默认开启，其余（安卓等）默认关闭，避免顶栏多出空白
+        try { return /iPhone/.test(navigator.userAgent); } catch (e) { return false; }
+    }
+    function postInset(enabled, value) {
+        if (window.parent === window) return;
+        try { window.parent.postMessage({ type: 'nanoTopInset', enabled: enabled, value: value }, '*'); } catch (e) {}
     }
     function render(target, n) {
         var el = document.getElementById(VAL_ID[target]);
@@ -367,7 +381,7 @@
         render(target, n);
         if (target === 'inset') {
             // 顶部安全区：通知主框架重新测量并下发
-            if (window.parent !== window) { try { window.parent.postMessage({ type: 'nanoTopInset', value: n }, '*'); } catch (e) {} }
+            postInset(readInsetEnabled(), n);
             return;
         }
         var msg = { type: target === 'top' ? 'nanoTopShift' : 'nanoBottomShift', value: n };
@@ -380,10 +394,10 @@
             var dir = parseInt(this.getAttribute('data-dir'), 10) || 0;
             if (!target) return;
             if (target === 'inset') {
-                if (dir === 0) {   // 恢复默认：清掉自定义，回到 48 / env
+                if (dir === 0) {   // 恢复默认：清掉自定义，回到 48
                     try { localStorage.removeItem(KEYS.inset); } catch (e) {}
                     render('inset', INSET_DEFAULT);
-                    if (window.parent !== window) { try { window.parent.postMessage({ type: 'nanoTopInset', value: null }, '*'); } catch (e) {} }
+                    postInset(readInsetEnabled(), null);
                     return;
                 }
                 apply('inset', read(KEYS.inset) + dir * 2);
@@ -392,9 +406,27 @@
             apply(target, dir === 0 ? 0 : read(KEYS[target]) + dir * STEP);
         });
     });
+
+    // 灵动岛安全区开关：关闭后顶部安全区按 0 处理（安卓默认关闭，避免顶栏空白 / 线下美化串位）
+    var insetToggle = document.getElementById('insetToggle');
+    var insetNudgeRow = document.getElementById('insetNudgeRow');
+    function syncInsetUI() {
+        var on = readInsetEnabled();
+        if (insetToggle) insetToggle.checked = on;
+        if (insetNudgeRow) insetNudgeRow.style.display = on ? '' : 'none';
+    }
+    if (insetToggle) {
+        insetToggle.addEventListener('change', function () {
+            var on = this.checked;
+            try { localStorage.setItem(INSET_ENABLED_KEY, on ? '1' : '0'); } catch (e) {}
+            syncInsetUI();
+            postInset(on, on ? read(KEYS.inset) : null);
+        });
+    }
     render('top', read(KEYS.top));
     render('bottom', read(KEYS.bottom));
     render('inset', read(KEYS.inset));
+    syncInsetUI();
 })();
 
 // ===== 顶部分段导航：一次只显示一个面板 =====

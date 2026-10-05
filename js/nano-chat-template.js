@@ -19,6 +19,10 @@
    速查：
    - URL 图片覆盖图标：`.xxx i,.xxx svg{display:none} .xxx::before{content:url("图片")}`
    - 去透明外包裹/玻璃：background / backdrop-filter / border / box-shadow 清零
+   - 顶/底栏加底：直接写 .topbar{background:#fff} / .bottom-bar{background:#fff} 即可；
+     渐变遮罩用变量 --chat-topbar-mask / --chat-bottom-mask（见配方 K2）
+   - 底部 dock 图标重排 / 把功能挪到新图标位置：见「配方 N」
+     （真按钮换外衣+挪位，千万别删按钮；::before/::after 画的图标不能点）
    - 隐藏但保留功能：visibility:hidden（点击区还在；display:none 会移除点击区）
    - 移动：order / position / transform / margin
    ============================================================ */
@@ -51,6 +55,11 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
   --bubble-other: #dedede;
   --bubble-other-text: #111111;
   --chat-safe-top: var(--safe-top, 0px);
+  /* 悬浮顶栏 / 底栏的底色（默认透明，气泡从下方穿过仍可见）。
+     想加实色：直接写 .topbar{background:#fff} / .bottom-bar{background:#fff} 即可；
+     想要渐隐遮罩（交界更自然）就改这两个变量，详见「配方 K2」。 */
+  --chat-topbar-mask: transparent;
+  --chat-bottom-mask: transparent;
 }
 
 /* ============================================================
@@ -632,8 +641,9 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    .nano-chat-inner .topbar { display: none !important; }
    // ③ 只隐藏昵称，保留返回和设置：
    .nano-chat-inner .topbar-title { display: none !important; }
-   // ④ 顶栏改透明 / 悬浮玻璃 / 纯色：
-   .nano-chat-inner .topbar { background: rgba(255,255,255,.72) !important; backdrop-filter: blur(20px) !important; }
+   // ④ 顶栏底色：悬浮结构默认透明，直接写 .topbar{background:#fff} 即可盖住
+   //    （渐变遮罩用变量 --chat-topbar-mask，见配方 K2）；
+   //    下面演示去掉子按钮的玻璃外包裹：
    .nano-chat-inner .back-btn, .nano-chat-inner .topbar-title, .nano-chat-inner .topbar-avatar {
      background: transparent !important; box-shadow: none !important; border: none !important;
    }
@@ -644,6 +654,74 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    .nano-chat-inner .topbar-avatar { background: url("https://your.cdn/settings.png") center / cover no-repeat !important; }
    // 想把「头像」从设置按钮上剥离单独移动 → 配方 C；只移动消息头像 → 配方 L。
 */
+
+/* ============================================================
+   配方 K2：给悬浮的「顶栏 / 底栏」加底（实色 / 渐变 / 毛玻璃）★最常用
+   ------------------------------------------------------------
+   悬浮结构默认完全透明（气泡会从栏的下方穿过、看得见）。两种写法都支持：
+   // ① 直接写实色（推荐，和线下一样）：
+   .nano-chat-inner .topbar, .nano-groups .topbar { background: #fff; }
+   .nano-chat-inner .bottom-bar, .nano-groups .bottom-bar { background: #fff; }
+   // ② 用变量（适合渐变遮罩，栏与内容交界更自然）：
+   :root {
+     --chat-topbar-mask: linear-gradient(#fff 65%, transparent);
+     --chat-bottom-mask: linear-gradient(transparent, #fff 45%);
+     // 实色 / 半透明也行：
+     // --chat-topbar-mask: #fff;
+     // --chat-topbar-mask: rgba(255,255,255,.72);
+   }
+   // 想要毛玻璃：先给半透明色，再开 blur：
+   .nano-chat-inner .topbar, .nano-groups .topbar,
+   .nano-chat-inner .bottom-bar, .nano-groups .bottom-bar {
+     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+   }
+   深色就把 #fff 换成 #1c1c1e / #000。
+   ============================================================ */
+
+/* ============================================================
+   配方 N：底部 dock「位置重绑」——隐藏原图标，把功能放到新图标位置上
+   ------------------------------------------------------------
+   关键：CSS 用 ::before / ::after 画出来的图标【不能点】。
+   真正能响应点击的只有 4 个真实按钮：
+     #moreBtn(更多) · #emojiBtn(表情) · #voiceBtn(语音) · #sendBtn(发送)
+   所以「把麦克风/表情搬到别处、还保留功能」= 给按钮换外衣 + 挪位置，
+   按钮本身千万不要删，点击逻辑原样保留。想给「第 5、6 个」也接功能
+   需要新增真实按钮并绑 JS，纯 CSS 做不到（可让纳米加）。
+
+   // ① 隐藏输入框里的原图标（按钮还在，点击区保留）
+   .nano-chat-inner #emojiBtn > i, .nano-chat-inner #voiceBtn > i { display: none; }
+   // ② 换成你的 SVG（用背景图）
+   .nano-chat-inner #emojiBtn { background: url("https://.../emoji.svg") center/22px no-repeat; }
+   .nano-chat-inner #voiceBtn { background: url("https://.../mic.svg") center/22px no-repeat; }
+
+   // ③ 让输入胶囊不再当定位基准，图标就能以 .bottom-bar 为基准自由摆放
+   .nano-chat-inner .input-shell { position: static !important; margin: 0 56px; }   // 两侧给图标留位
+   .nano-chat-inner .above-input { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); }
+   .nano-chat-inner .more-btn, .nano-chat-inner .send-btn,
+   .nano-chat-inner #emojiBtn, .nano-chat-inner #voiceBtn { position: absolute;
+     bottom: calc(10px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px))); }
+
+   // ④ 从左到右排 6 格：4 个真按钮 + 2 个纯装饰占位（装饰不可点）
+   .nano-chat-inner #moreBtn  { left: 8px; }
+   .nano-chat-inner #emojiBtn { left: 60px; }
+   .nano-chat-inner #voiceBtn { left: 112px; }
+   .nano-chat-inner .bottom-bar::before {            // 装饰位 1（占位，不可点）
+     content: ""; position: absolute; left: 164px; pointer-events: none;
+     bottom: calc(16px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)));
+     width: 22px; height: 22px; background: url("https://.../decor1.svg") center/22px no-repeat;
+   }
+   .nano-chat-inner .bottom-bar::after {             // 装饰位 2（占位，不可点）
+     content: ""; position: absolute; left: 216px; pointer-events: none;
+     bottom: calc(16px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)));
+     width: 22px; height: 22px; background: url("https://.../decor2.svg") center/22px no-repeat;
+   }
+   .nano-chat-inner #sendBtn { right: 8px; }
+
+   注意：
+   - 坐标是写死的，窄屏可能挤；可用 @media (max-width:420px) 收窄 left 间距。
+   - 群聊同理，把前缀 .nano-chat-inner 换成 .nano-groups 即可。
+   - 想换 #moreBtn / #sendBtn 的图标也一样：隐藏其 svg/i，再给按钮设 background。
+   ============================================================ */
 
 /* 配方 L：只移动「消息头像」，顶栏「设置」按钮原地不动、逻辑不变
    消息头像 = .message-avatar；顶栏设置按钮 = .topbar-avatar，两者完全独立。
