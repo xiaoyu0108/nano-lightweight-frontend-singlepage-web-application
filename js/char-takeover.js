@@ -674,6 +674,8 @@
         info.id = String(info.id || info.charId || info.name || '');
         console.log('[TK] start called', info.id, info.name);
         if (!info.id) return;
+        // 纳米是助手，不允许它发起「反查 / 接管手机」
+        if (info.id === 'nano_ai' || info.nanoAssistant) { console.log('[TK] refuse nano'); return; }
         // 已在进行中 / 已有确认弹窗 / 已开始 → 忽略重复触发（避免二次 buildUi 把状态重置成"准备中"）
         if (TK.active || TK.begun || TK.confirmEl) { console.log('[TK] start ignored'); return; }
         confirmDialog(info, function () {
@@ -698,6 +700,7 @@
         try {
             var lc = JSON.parse(localStorage.getItem('nano_last_chat') || 'null');
             if (!lc || !lc.id) return false;
+            if (lc.id === 'nano_ai') return false;   // 纳米不参与反查
             start({ id: lc.id, name: lc.name || 'TA', avatar: lc.avatar || '' });
             return true;
         } catch (e) { return false; }
@@ -710,7 +713,7 @@
             // 主动「反查手机」的最小间隔：拉长一点，别太频繁（90 分钟）
             if (Date.now() - last < 90 * 60 * 1000) return;
             var lc = JSON.parse(localStorage.getItem('nano_last_chat') || 'null');
-            if (!lc || !lc.id) return;
+            if (!lc || !lc.id || lc.id === 'nano_ai') return;   // 纳米不参与反查
             localStorage.setItem('nano_takeover_proactive_at', String(Date.now()));
             if (Math.random() > 0.5) return;
             start({ id: lc.id, name: lc.name || 'TA', avatar: lc.avatar || '' });

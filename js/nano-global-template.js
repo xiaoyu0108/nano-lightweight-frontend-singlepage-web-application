@@ -1299,4 +1299,29 @@ html, body {
   margin-left: 8px; -webkit-text-fill-color: #8e8e93;
 }
 */
+
+/* 7.7 「隐藏原图标 → 把功能绑到新图标位置」（全站通用，和聊天配方 N 同一招）
+   关键：能点的图标必须是「真实按钮」；::before / ::after 画的图标不能点。
+   所以做法是给真实按钮换外衣 + 挪位置，按钮本身别删，功能照旧。三步：
+   // ① 隐藏按钮里的原图案（按钮和点击区保留）
+   .某按钮 > svg, .某按钮 > i { display: none; }
+   // ② 换上新图标
+   .某按钮 { background: url("https://your.cdn/icon.svg") center/22px no-repeat; }
+   // ③ 想挪到别处就改定位（相对最近的非 static 祖先），或直接 transform 平移
+   .某按钮 { position: absolute; right: 16px; bottom: 12px; }
+   // 纯装饰占位（不可点）：给一个稳定的父元素加伪元素
+   .某父元素::before {
+     content: ""; position: absolute; pointer-events: none;
+     width: 22px; height: 22px; background: url("https://your.cdn/decor.svg") center/22px no-repeat;
+   }
+
+   实例（把 More 页「钱包」行的图标换成你的图，功能仍走整行点击）：
+   .nano-more .list-item[data-page="wallet"] .item-icon svg { display: none; }
+   .nano-more .list-item[data-page="wallet"] .item-icon {
+     background: url("https://your.cdn/wallet.png") center/22px no-repeat;
+   }
+   其它页同理：先找到那一页真实的按钮/行元素选择器，再套上面三步。
+   想新增「第 N 个」纯属没有对应功能的图标：用伪元素做装饰即可（不可点）；
+   若要它也接功能，需要新增真实按钮并绑 JS（纯 CSS 做不到，可让纳米加）。
+*/
 `;

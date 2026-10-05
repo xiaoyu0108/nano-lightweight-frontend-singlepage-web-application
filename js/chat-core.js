@@ -3374,6 +3374,11 @@
         const screenRe = /\[(看屏幕|掌心窗|共享屏幕|看你屏幕)\]/i;
         const isScreen = screenRe.test(body);
         if (!phoneRe.test(body) && !isScreen) return { body: body, settled: 0 };
+        // 纳米是应用助手，不允许它申请「查看手机 / 屏幕共享」：只把标记去掉，不发起申请
+        if (String(chatId) === 'nano_ai' || !!(characterData && characterData.nanoAssistant)) {
+            body = body.replace(/\[(查看手机|看手机|查手机|接管手机|接管我的手机|看你手机|看屏幕|掌心窗|共享屏幕|看你屏幕)\]/gi, '').replace(/\n{3,}/g, '\n\n').trim();
+            return { body: body, settled: 0 };
+        }
         body = body.replace(/\[(查看手机|看手机|查手机|接管手机|接管我的手机|看你手机|看屏幕|掌心窗|共享屏幕|看你屏幕)\]/gi, '').replace(/\n{3,}/g, '\n\n').trim();
         setTimeout(function () {
             try {

@@ -34,6 +34,12 @@ JS 会写入文本/图片的挂点（请保留这些 id 或类名，只改样式
   5) 加文字/角标/水印：selector::after{content:"文案"}
   6) 换字体/颜色/尺寸/圆角/间距：font-family / font-size / color / background / border-radius 任意改
   7) 想“覆盖 HTML”：CSS 无法新增可交互 DOM，但可用 ::before/::after 的 content 加文字/贴图，并把原元素 display:none 后在其位置摆新内容
+  8) 换可交互图标的图 / 挪位置（功能不变）：能点的元素不能删（删了功能就没了）。做法是
+     「隐藏里面原来的图案 + 给这个按钮换背景图 + 挪位置」：
+       .某个按钮 > svg, .某个按钮 > i { display:none; }                 // 隐藏原图案，按钮和点击区保留
+       .某个按钮 { background:url("https://新图标.svg") center/22px no-repeat; }  // 换新图标
+       .某个按钮 { position:absolute; right:16px; top:12px; }            // 想挪到哪就改定位
+     ::before/::after 画的图案不能点，只能做纯装饰占位（加 pointer-events:none）。
 注意：不要写 <script>；.nano-voice-modal 是卡片本体；.iv-customize 是编辑面板（仅打开美化时出现，勿改其 display）。`;
 
   // 复制文本到剪贴板（带 execCommand 兜底，兼容 WebView）

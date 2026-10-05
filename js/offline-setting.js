@@ -280,6 +280,12 @@ const INITIAL_CSS = `/* ========================================================
    #rerollBtn{background:url("https://重roll.png") center/20px no-repeat}   // 换图标
    #sendBtn svg{opacity:0}
    #sendBtn{background:url("https://发送.png") center/20px no-repeat}
+   // 把按钮搬去别处 / 换成新图标（功能不变）：别删按钮，只隐藏原图案 + 换背景 + 改定位
+   .round-btn > svg{display:none}
+   .round-btn{background:url("https://新图标.png") center/20px no-repeat}
+   #rerollBtn{position:absolute;left:12px;bottom:14px}          // 想搬去哪就改 left/right/top/bottom
+   // 纯装饰占位（不可点）：给稳定父元素加 ::before/::after
+   .bottom::before{content:"";position:absolute;left:56px;bottom:16px;width:20px;height:20px;pointer-events:none;background:url("https://装饰.png") center/20px no-repeat}
    // 注意：底栏默认透明是为了滑动时不遮挡卡片；若给 .bottom 加了不透明底色，
    // 就相当于又盖住了卡片，可按需给 .chat 加大 padding-bottom 或只在中间留胶囊。
    // 加「装饰性」插件（纯 CSS 只能加不可点的装饰；真正的新功能需加 HTML/JS，可让纳米帮你加）：
