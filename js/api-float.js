@@ -935,6 +935,8 @@
             if (!found) { flash('预设不存在，请重新选择', beautyStatusEl); return; }
             var css = found.code || '';
             applyBeautify(beautyCat, css);
+            // 同步美化页草稿，避免返回美化 App 时显示旧内容/初始模板
+            try { localStorage.setItem('beautify_draft_' + beautyCat, JSON.stringify({ code: css, name: found.name || '', presetId: id })); } catch (e) {}
             bdbSet('settings', { key: 'applied_' + beautyCat, value: css }).then(function () {
                 flash('已切换：' + (found.name || ''), beautyStatusEl);
             });

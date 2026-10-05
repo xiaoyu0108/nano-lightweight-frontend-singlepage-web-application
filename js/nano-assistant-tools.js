@@ -610,12 +610,25 @@
       localStorage.setItem(pvKey(id), JSON.stringify(list));
     } catch (e) {}
   }
+  function clearAppliedKeysInIDB(keys) {
+    try {
+      var req = indexedDB.open('BeautifyAppDB', 1);
+      req.onsuccess = function (ev) {
+        try {
+          var db = ev.target.result;
+          var tx = db.transaction('settings', 'readwrite');
+          var st = tx.objectStore('settings');
+          (keys || []).forEach(function (k) { st.put({ key: k, value: '' }); });
+        } catch (e) {}
+      };
+    } catch (e) {}
+  }
   function clearBeautifyScope(scope) {
     scope = String(scope || '').trim();
-    if (scope === 'chat') { try { localStorage.removeItem('beautify_chat'); localStorage.removeItem('beautify_chat_v2'); } catch (e) {} broadcast('chat', ''); }
-    else if (scope === 'groups') { try { localStorage.removeItem('beautify_groups'); localStorage.removeItem('beautify_groups_v2'); } catch (e) {} broadcast('groups', ''); }
+    if (scope === 'chat') { try { localStorage.removeItem('beautify_chat'); localStorage.removeItem('beautify_chat_v2'); } catch (e) {} clearAppliedKeysInIDB(['applied_chat']); broadcast('chat', ''); }
+    else if (scope === 'groups') { try { localStorage.removeItem('beautify_groups'); localStorage.removeItem('beautify_groups_v2'); } catch (e) {} clearAppliedKeysInIDB(['applied_groups']); broadcast('groups', ''); }
     else if (scope === 'heart') { try { localStorage.removeItem('nano_voice_applied_css'); } catch (e) {} try { window.parent.postMessage({ type: 'nanoVoiceCss', css: '', name: '' }, '*'); } catch (e) {} }
-    else if (scope === 'global') { try { localStorage.removeItem('beautify_global'); localStorage.removeItem('beautify_global_v2'); } catch (e) {} broadcast('global', ''); }
+    else if (scope === 'global') { try { localStorage.removeItem('beautify_global'); localStorage.removeItem('beautify_global_v2'); } catch (e) {} clearAppliedKeysInIDB(['applied_global']); broadcast('global', ''); }
     else if (scope === 'offline') { return setOfflineCss('').then(function () { try { window.parent.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {} }); }
     else throw new Error('未知 scope：' + scope);
   }

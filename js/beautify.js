@@ -2068,15 +2068,23 @@ document.querySelectorAll("[data-delete]").forEach(btn => {
 document.querySelectorAll(".presetrow select").forEach(sel => {
   sel.onchange = async () => {
     const type = sel.id.replace("Preset", "");
+    // 字体预设由下方专门的 onchange 处理
+    if (type !== "global" && type !== "chat") return;
     const id = Number(sel.value);
+    if (!id) return;
     const items = await storeAll("presets");
     const found = items.find(x => x.id === id && x.category === type);
     if (found) {
       currentPreset[type] = id;
-      setCode(type, found.code || "");
+      const css = found.code || "";
+      setCode(type, css);
       setName(type, found.name || "");
       persistDraft(type);
-      toast("已加载预设");
+      // 切换预设即应用并持久化，返回/重进后不会再回到初始样式
+      try { await storePut("settings", { key: "applied_" + type, value: css }); } catch (e) {}
+      applyCSSToParent(type, css);
+      refreshPreview(type);
+      toast("已切换并应用预设");
     }
   };
 });

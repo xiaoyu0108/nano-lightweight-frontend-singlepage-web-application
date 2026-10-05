@@ -620,6 +620,53 @@
         });
     }
 
+    // 兜底：如果 localStorage 里的美化被清掉/写入失败，但 IndexedDB 里还存着「已应用」的 CSS，
+    // 就把它补回 localStorage 并重新应用，避免返回/重进后样式恢复初始。
+    function readBeautyAppliedFromIDB(key) {
+        return new Promise(function (resolve) {
+            try {
+                var req = indexedDB.open('BeautifyAppDB', 1);
+                req.onupgradeneeded = function (e) {
+                    try {
+                        var d = e.target.result;
+                        if (!d.objectStoreNames.contains('presets')) d.createObjectStore('presets', { keyPath: 'id', autoIncrement: true });
+                        if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'key' });
+                    } catch (e2) {}
+                };
+                req.onsuccess = function (e) {
+                    var db = e.target.result, get;
+                    try { get = db.transaction('settings', 'readonly').objectStore('settings').get(key); }
+                    catch (e2) { resolve(''); return; }
+                    get.onsuccess = function () { resolve(get.result && typeof get.result.value === 'string' ? get.result.value : ''); };
+                    get.onerror = function () { resolve(''); };
+                };
+                req.onerror = function () { resolve(''); };
+            } catch (e) { resolve(''); }
+        });
+    }
+    var _appliedSyncing = false;
+    function syncAppliedFromIDB() {
+        if (_appliedSyncing) return;
+        if (readCss('beautify_chat_v2') && readCss('beautify_global_v2')) return;
+        _appliedSyncing = true;
+        var jobs = [];
+        if (!readCss('beautify_chat_v2')) {
+            jobs.push(readBeautyAppliedFromIDB('applied_chat').then(function (v) {
+                if (!v) return;
+                try { localStorage.setItem('beautify_chat_v2', v); localStorage.setItem('beautify_chat', v); } catch (e) {}
+                try { applyChatCss(migrateChatCss(v)); } catch (e) {}
+            }));
+        }
+        if (!readCss('beautify_global_v2')) {
+            jobs.push(readBeautyAppliedFromIDB('applied_global').then(function (v) {
+                if (!v) return;
+                try { localStorage.setItem('beautify_global_v2', v); localStorage.setItem('beautify_global', v); } catch (e) {}
+                try { applyGlobalCss(unlockScrollCss(migrateGlobalCss(v))); } catch (e) {}
+            }));
+        }
+        Promise.all(jobs).catch(function () {}).then(function () { _appliedSyncing = false; });
+    }
+
     // ---- 启动时按已保存配置注入 ----
     // 只读取「用户显式点过 应用」的 v2 键，避免首次进入美化页时默认模板就覆盖全部 UI
     function applySaved() {
@@ -660,6 +707,8 @@
         } else {
             loadFontCfgFromIDB().then(function(c) { if (c) applyFontCfg(c); });
         }
+        // localStorage 缺失时，从美化 App 的 IndexedDB 兜底恢复「已应用」的美化
+        try { syncAppliedFromIDB(); } catch (e) {}
     }
 
     // ---- 全局底栏位置偏移（“其他”页的底栏位置滑杆，作用于所有页面的底栏） ----

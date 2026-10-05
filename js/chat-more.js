@@ -306,6 +306,19 @@
     // 单聊/群聊线上美化
     function clearLiveBeautify() {
         try { localStorage.removeItem('beautify_chat'); localStorage.removeItem('beautify_chat_v2'); localStorage.removeItem('beautify_groups'); localStorage.removeItem('beautify_groups_v2'); } catch (e) {}
+        // 同步清掉美化 App 里「已应用」的记录，避免兜底逻辑把已清空的样式又恢复回来
+        try {
+            var req = indexedDB.open('BeautifyAppDB', 1);
+            req.onsuccess = function (ev) {
+                try {
+                    var db = ev.target.result;
+                    var tx = db.transaction('settings', 'readwrite');
+                    var st = tx.objectStore('settings');
+                    st.put({ key: 'applied_chat', value: '' });
+                    st.put({ key: 'applied_groups', value: '' });
+                } catch (e2) {}
+            };
+        } catch (e) {}
         notifyCleared('已清空线上美化，恢复默认样式');
     }
     // 心声美化
