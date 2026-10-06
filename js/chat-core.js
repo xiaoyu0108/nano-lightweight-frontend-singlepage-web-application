@@ -227,6 +227,9 @@
     }
     loadWorldbooksFromDB();
 
+    // 小号（isAltProbe）对应的「大号」角色记录：用于读取大号的世界书绑定
+    var __originCharData = null;
+
     // 取最近聊天文本（用于关键词扫描）
     function getRecentChatText() {
         const parts = [];
@@ -275,11 +278,23 @@
         // 局部世界书的绑定可能写在角色身上（worldbookBindings），也可能写在世界书本体的 boundCharacters
         const idCandidates = [id, characterData && characterData.id, characterData && characterData.name, displayName, chatName]
             .filter(Boolean).map(String);
+        // 小号聊天：把大号的 id/名字也纳入候选，并读取大号身上的世界书绑定
+        if (__originCharData) {
+            try {
+                if (__originCharData.id != null) idCandidates.push(String(__originCharData.id));
+                if (__originCharData.name) idCandidates.push(String(__originCharData.name));
+            } catch (e) {}
+        }
         const bindIds = {};
         try {
             ((characterData && characterData.worldbookBindings) || []).forEach(function(b) {
                 if (b && b.id) bindIds[String(b.id)] = true;
             });
+            if (__originCharData && Array.isArray(__originCharData.worldbookBindings)) {
+                __originCharData.worldbookBindings.forEach(function(b) {
+                    if (b && b.id) bindIds[String(b.id)] = true;
+                });
+            }
         } catch (e) {}
         const front = [], middle = [], back = [];
         allWorldbooks.forEach(function(w) {
@@ -512,8 +527,11 @@
         const setting = characterData ? (characterData.setting || characterData.desc || characterData.persona || '') : '';
         const isForeign = isForeignChar();
 
+        // 小号聊天：读取大号（origin）的世界书，让马甲也遵守大号的硬设定
+        const __altOriginId = (characterData && characterData.isAltProbe && characterData.altOriginId) ? String(characterData.altOriginId) : '';
+
         // 世界书：常驻/关键词 + 全局/局部绑定读取
-        const wb = getWorldbookText(chatId);
+        const wb = getWorldbookText(__altOriginId || chatId);
         const wbFront = wb.front, wbMid = wb.middle, wbBack = wb.back;
 
         let prompt = '你是' + charName + '，一个活生生的人类，正在用手机和' + user + '聊天。你有自己的生活、情绪和日常，不是程序，也不是在扮演谁。\n\n';
@@ -591,6 +609,15 @@
             prompt += '以上长期记忆要当作你真正经历或被告知过的事，自然记住并沿用，不要当成新消息；不要否认，不要问“你什么时候告诉我的”。\n';
             prompt += '【长期记忆 · 主动调用】回复前先在记忆里扫一遍：本轮话题如果牵涉到某条记忆（某个地点、物品、约定、人物、称呼、习惯、说过的话），要主动提起或自然呼应（例如“上次你说的那个…”“你不是一直想…吗”），让记忆真正影响你的回应；但不要生硬地报流水账或复述整段记忆。\n';
         }
+        // 群聊总结卡片（带 groupId 的记忆）+ 群聊近况：单聊↔群聊互通
+        if (__groupMemHint) {
+            prompt += '\n【群聊记忆 · 你在群里经历/说过的事】\n' + __groupMemHint + '\n';
+            prompt += '以上是你参与群聊后留下的记忆，属于你真正经历过的事，单聊里被提到时要自然记得。\n';
+        }
+        const __grpBlock = buildGroupSingleBlock();
+        if (__grpBlock) prompt += '\n' + __grpBlock + '\n';
+        // 小号：注入大号最新的私聊近况（仅小号自己知道）
+        if (__originContext) prompt += '\n' + __originContext + '\n';
 
         prompt += '\n\n【人格核心——你是真人，活生生的人类，不是AI助手，不能用AI助手的语气对话】\n';
         prompt += '1. 你的情绪强度、语气、说话风格完全由你的【角色人设】决定：人设安静就安静、人设高冷就高冷、人设内敛就内敛。绝不主动加戏、不刻意活泼、不强行说土味情话；情绪跟着当下的情境自然流动，不预设、不拔高、不刻意煽情，也不给自己加设定外的固定腔调或口头禅。注意：除非人设本身就是毒舌/傲娇/腹黑，否则不要对用户冷嘲热讽、阴阳怪气、摆脸色、把每句话都怼回去。\n';
@@ -1187,20 +1214,137 @@
     let __autoSummaryBusy = false;
     // 共享长期记忆（线上/线下都写这里，发消息时注入给模型）
     let __memHints = '';
+    // 群聊总结卡片（带 groupId 的记忆）与群聊近况：单聊里也要读取，实现群聊↔单聊互通
+    let __groupMemHint = '';
+    // 小号专属：大号最新 2 轮私聊（供小号掌握 TA 的近况，但不暴露）
+    let __originContext = '';
     // 上下文读取条数（记忆页「上下文保留条数」）：每次回复读取多少条前文
     let __memContextLimit = 30;
+
+    // 取最近 N 轮对话（一轮 = 一条用户消息 + 其后的角色消息）
+    function __lastRounds(msgs, rounds) {
+        const arr = (Array.isArray(msgs) ? msgs : []).filter(function(m){ return m && !m.recalled && !m.isTip; });
+        const out = [];
+        let count = 0;
+        for (let i = arr.length - 1; i >= 0; i--) {
+            const m = arr[i];
+            out.unshift(m);
+            if (m.type === 'right') { count++; if (count >= (rounds || 2)) break; }
+        }
+        return out;
+    }
+    function __formatMsgs(msgs, charName) {
+        return (Array.isArray(msgs) ? msgs : []).map(function(m) {
+            let t = '';
+            if (m.isCard && m.cardData) {
+                const cd = m.cardData;
+                t = '[' + (cd.cardType || '卡片') + ']' + (cd.title || cd.text || cd.amount || '');
+            } else if (m.isVoice) {
+                t = m.transcript || m.text || '[语音]';
+            } else if (m.isImage) {
+                t = m.text || (m.imageData && m.imageData.desc) || '[图片]';
+            } else {
+                t = m.text || '';
+            }
+            t = String(t || '').trim();
+            if (!t) return '';
+            const who = (m.type === 'right') ? ((currentUser && currentUser.name) || '用户') : (charName || '角色');
+            return who + '：' + t;
+        }).filter(Boolean).join('\n');
+    }
+
+    // 单聊读取「该角色所在的群聊」最近消息 + 群聊记忆卡片，实现群聊↔单聊互通
+    function buildGroupSingleBlock() {
+        try {
+            const seen = {};
+            let groups = [];
+            const collect = function(cid, cname) {
+                let gs = [];
+                try { gs = getGroupsForChar(cid, cname) || []; } catch (e) { gs = []; }
+                gs.forEach(function(g){ if (g && g.id && !seen[g.id]) { seen[g.id] = 1; groups.push(g); } });
+            };
+            collect(null, null);
+            if (__originCharData && __originCharData.id) collect(__originCharData.id, __originCharData.name);
+            if (!groups.length) return '';
+            const blocks = [];
+            groups.forEach(function(g) {
+                let members = [];
+                try {
+                    const gd = JSON.parse(localStorage.getItem('group_data_' + g.id) || 'null');
+                    if (gd && Array.isArray(gd.members)) members = gd.members;
+                } catch (e) {}
+                const nameOf = function(sid) {
+                    if (sid === 'me' || sid == null) return (currentUser && (currentUser.nick || currentUser.name)) || '用户';
+                    const m = members.filter(function(x){ return x && x.id === sid; })[0];
+                    return (m && (m.nick || m.name)) || '群友';
+                };
+                let msgs = [];
+                try { msgs = JSON.parse(localStorage.getItem('group_msgs_' + g.id) || '[]') || []; } catch (e) { msgs = []; }
+                const lines = msgs.filter(function(m){ return m && !m.recalled; }).slice(-14).map(function(m) {
+                    if (m.isTip) return '（系统：' + String(m.text || '') + '）';
+                    if (m.isCard && m.cardData) {
+                        const cd = m.cardData;
+                        let t;
+                        if (cd.cardType === 'redpacket') t = '[红包 ' + (cd.amount || '') + '元] ' + (cd.title || '');
+                        else if (cd.cardType === 'chain') t = '[接龙] ' + (cd.title || '');
+                        else if (cd.cardType === 'notice') t = '[群公告] ' + (cd.text || '');
+                        else t = '[' + (cd.cardType || '卡片') + ']';
+                        return nameOf(m.senderId) + '：' + t;
+                    }
+                    let txt = m.transcript || m.text || (m.imageData && m.imageData.desc) || '';
+                    txt = String(txt || '').trim();
+                    if (!txt) return '';
+                    return nameOf(m.senderId) + '：' + txt;
+                }).filter(Boolean);
+                if (lines.length) blocks.push('【群聊「' + (g.name || '群聊') + '」最近的消息】\n' + lines.join('\n'));
+            });
+            if (!blocks.length) return '';
+            return '【你所在群聊的近况 · 群聊与单聊互通】\n' + blocks.join('\n\n')
+                + '\n（这些是你在这个群里最近看到/说过的话。单聊里如果对方聊到群里发生的事、群友或这些话题，你要记得并自然承接，不要当成没发生过。）';
+        } catch (e) { return ''; }
+    }
+
     function refreshMemoryHints() {
         if (typeof indexedDB === 'undefined' || !chatId) return Promise.resolve();
-        return __memGet('config', 'memlist_' + chatId).then(function(rec) {
-            const list = (rec && Array.isArray(rec.value)) ? rec.value : [];
-            // 群聊产生的记忆（按 groupId）不注入私聊，避免记忆串味。
+        __groupMemHint = '';
+        __originContext = '';
+        // 大号 / 小号共用同一记忆库：读取时合并「本人 + 名下所有小号」
+        const readP = (window.NanoMemLink && window.NanoMemLink.readList)
+            ? window.NanoMemLink.readList(chatId)
+            : __memGet('config', 'memlist_' + chatId).then(function(rec) {
+                return (rec && Array.isArray(rec.value)) ? rec.value : [];
+            });
+        return readP.then(function(rawList) {
+            const list = Array.isArray(rawList) ? rawList : [];
+            // 私聊记忆（无 groupId）：高重要程度（4★/5★）无论多旧都注入，其余按最近顺序补充
             const priv = list.filter(function(it){ return !(it && it.groupId); });
-            // 记忆宫殿里标了高重要程度（4★/5★）的记忆，等于「角色必须记住」，
-            // 无论多旧都要注入；其余按最近顺序补充。
             const must = priv.filter(function(it){ return Number(it && it.importance) >= 4; });
             const rest = priv.filter(function(it){ return !(Number(it && it.importance) >= 4); });
             const picked = must.concat(rest.slice(-40));
             __memHints = picked.length ? picked.map(function(it) { return '· ' + (it.content || it.text || ''); }).join('\n') : '';
+            // 群聊总结卡片（带 groupId 的记忆）：单聊里也读取，实现群聊↔单聊互通
+            const grp = list.filter(function(it){ return it && it.groupId; });
+            __groupMemHint = grp.length ? grp.slice(-16).map(function(it) { return '· ' + (it.content || it.text || ''); }).join('\n') : '';
+        }).then(function () {
+            // 小号：读取大号的最新 2 轮私聊，掌握 TA 的近况
+            const originId = (characterData && characterData.isAltProbe && characterData.altOriginId) ? String(characterData.altOriginId) : '';
+            if (!originId || !(window.NanoMemLink)) return null;
+            return Promise.all([
+                window.NanoMemLink.readMessages(originId).catch(function() { return []; }),
+                window.NanoMemLink.getChar(originId).catch(function() { return null; })
+            ]).then(function(res) {
+                const omsgs = res[0] || [];
+                __originCharData = res[1] || __originCharData;
+                const originName = (__originCharData && __originCharData.name) || '本人';
+                const rounds = __lastRounds(omsgs, 2);
+                const body = __formatMsgs(rounds, originName);
+                if (body) {
+                    __originContext = '【你本人（大号「' + originName + '」）最近的私聊 · 仅你知道】\n' + body
+                        + '\n（这是你本人用大号身份和 TA 刚聊的内容。你现在用小号身份接近 TA，可以据此判断 TA 的近况与情绪，但绝不能暴露你知道大号的事，也不要直接说破。）';
+                } else {
+                    __originContext = '';
+                }
+            }).catch(function() {});
         }).then(function () {
             return __memCfg('contextLimit');
         }).then(function (v) {
@@ -1356,6 +1500,11 @@
 
     function __memAppendMemory(item) {
         // 记忆卡片以 chatId 为 key 存在 config 存储（与记忆页读取一致）
+        // 小号聊天产生的记忆统一计入大号（origin）记忆库
+        if (!item || item.chatId == null) return Promise.resolve();
+        if (window.NanoMemLink && window.NanoMemLink.append) {
+            return window.NanoMemLink.append(item.chatId, [item]);
+        }
         return __memGet('config', 'memlist_' + item.chatId).then(function(rec) {
             const list = (rec && Array.isArray(rec.value)) ? rec.value : [];
             list.push(item);
@@ -3234,7 +3383,7 @@
             } catch (e) { resolve(false); }
         });
     }
-    function createAltCharacter(name, setting) {
+    function createAltCharacter(name, setting, originId) {
         return new Promise(function (resolve) {
             try {
                 var req = indexedDB.open('nano_characters_db', 1);
@@ -3243,7 +3392,7 @@
                     try {
                         var db = req.result;
                         var _bind = ''; try { _bind = getCurrentMaskId(); } catch (e) {}
-                        var rec = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: name, avatar: '', gender: '未知', nationality: '未知', setting: setting || '', isNpc: true, bindUser: _bind };
+                        var rec = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: name, avatar: '', gender: '未知', nationality: '未知', setting: setting || '', isNpc: true, isAltProbe: true, bindUser: _bind, altOriginId: originId || '' };
                         var tx = db.transaction('characters', 'readwrite');
                         tx.objectStore('characters').put(rec);
                         tx.oncomplete = function () { resolve(rec); };
@@ -3266,7 +3415,7 @@
             _fa.forEach(function (x) { if (x && x.status === 'pending' && x.source === 'alt' && x.name === (cd.altName || '小号')) { x.status = 'accepted'; _ch = true; } });
             if (_ch) localStorage.setItem('nano_friend_requests', JSON.stringify(_fa));
         } catch (e) {}
-        createAltCharacter(cd.altName || '小号', mask).then(function (rec) {
+        createAltCharacter(cd.altName || '小号', mask, (cd.altOrigin && cd.altOrigin.id) || '').then(function (rec) {
             addSystemNotice('你接受了「' + (cd.altName || '小号') + '」的好友申请，已加入聊天列表');
             try { window.parent.postMessage({ type: 'NANO_FRIEND_ADDED', chatId: rec && rec.id, name: cd.altName }, '*'); } catch (e) {}
             try { window.parent.postMessage({ type: 'contactsDataUpdated' }, '*'); } catch (e) {}
@@ -3327,7 +3476,7 @@
                     var _frAll = JSON.parse(localStorage.getItem('nano_friend_requests') || '[]') || [];
                     var _owner = ''; try { var _md = JSON.parse(localStorage.getItem('nano_mask_data') || 'null'); if (_md && _md.currentMaskId != null) _owner = String(_md.currentMaskId); } catch (e0) {}
                     if (!_frAll.some(function (x) { return x && x.status === 'pending' && x.source === 'alt' && x.originId === alt.id; })) {
-                        _frAll.push({ id: 'fr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6), owner: _owner, name: alt.name, avatar: '', source: 'alt', app: '', setting: buildAltMaskSetting(alt.name, alt.bio, alt.origin), originId: alt.id, requestNote: '想加你好友', ts: Date.now(), status: 'pending' });
+                        _frAll.push({ id: 'fr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6), owner: _owner, name: alt.name, avatar: '', source: 'alt', app: '', setting: buildAltMaskSetting(alt.name, alt.bio, alt.origin), originId: alt.id, altOriginId: (alt.origin && alt.origin.id) || '', requestNote: '想加你好友', ts: Date.now(), status: 'pending' });
                         try { localStorage.setItem('nano_friend_requests', JSON.stringify(_frAll.slice(-400))); } catch (e1) {}
                     }
                 } catch (e) {}
@@ -4879,12 +5028,12 @@
             return groups.find(function (g) { return g && g.name === name; }) || null;
         } catch (e) { return null; }
     }
-    function getGroupsForChar() {
+    function getGroupsForChar(optId, optName) {
         try {
             const reg = JSON.parse(localStorage.getItem('nano_groups_data') || '{}') || {};
             const groups = Array.isArray(reg.groups) ? reg.groups : [];
-            const cid = currentChatIdSafe();
-            const cname = displayName || '';
+            const cid = (optId != null && optId !== '') ? String(optId) : currentChatIdSafe();
+            const cname = (optName != null && optName !== '') ? String(optName) : (displayName || '');
             return groups.filter(function (g) {
                 if (!g) return false;
                 const names = [];

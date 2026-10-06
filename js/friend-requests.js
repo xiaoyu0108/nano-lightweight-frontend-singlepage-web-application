@@ -41,6 +41,7 @@
             app: req.app || '',
             setting: String(req.setting || '').slice(0, 4000),
             originId: req.originId || '',
+            altOriginId: req.altOriginId || '',
             requestNote: String(req.requestNote || '').slice(0, 200),
             ts: Date.now(), status: 'pending'
         };
@@ -79,6 +80,11 @@
                             name: rec.name, avatar: rec.avatar || '', gender: '未知', nationality: '未知',
                             setting: rec.setting || '', isNpc: true, bindUser: String(rec.owner || ownerNs())
                         };
+                        // 小号试探：标明是小号并记录大号 id，方便记忆库互通
+                        if (rec.source === 'alt') {
+                            charRec.isAltProbe = true;
+                            charRec.altOriginId = rec.altOriginId || '';
+                        }
                         var tx = db.transaction('characters', 'readwrite');
                         tx.objectStore('characters').put(charRec);
                         tx.oncomplete = function () { db.close(); resolve(charRec); };

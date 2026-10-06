@@ -3432,6 +3432,11 @@ const HaloData = (() => {
 
   function readMemory(chatId, limit = 16) {
     if (!chatId) return Promise.resolve([]);
+    if (window.NanoMemLink && window.NanoMemLink.readList) {
+      return window.NanoMemLink.readList(chatId)
+        .then((list) => (list || []).filter((it) => it && !it.groupId))
+        .catch(() => []);
+    }
     return memoryOpenDB().then((db) => new Promise((resolve) => {
       try {
         const r = db.transaction('config', 'readonly').objectStore('config').get('memlist_' + chatId);

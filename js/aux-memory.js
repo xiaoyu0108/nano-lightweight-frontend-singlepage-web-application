@@ -195,6 +195,10 @@
   }
 
   function appendMemories(charId, items) {
+    // 小号一起听/一起看产生的记忆，也计入大号记忆库
+    if (window.NanoMemLink && window.NanoMemLink.append) {
+      return window.NanoMemLink.append(charId, items);
+    }
     return getV('memlist_' + charId).then(function (rec) {
       var list = Array.isArray(rec) ? rec : [];
       items.forEach(function (it) { list.push(it); });

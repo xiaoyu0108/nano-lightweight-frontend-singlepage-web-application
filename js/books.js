@@ -163,6 +163,9 @@ async function loadRuntimeData(){
 /* ==================== 长期记忆（nano_vector_memory_db） ==================== */
 /* 记忆库以 config/memlist_<charId> 存放，聊天、朋友圈、手机等模块共用同一份。 */
 function readCharMemoryList(charId){
+  if (window.NanoMemLink && window.NanoMemLink.readList) {
+    return window.NanoMemLink.readList(charId).catch(() => []);
+  }
   return new Promise((resolve)=>{
     if(!charId || typeof indexedDB==='undefined'){ resolve([]); return; }
     try{

@@ -681,11 +681,30 @@ async function boot(){
     return String(a.name).localeCompare(String(b.name),'zh');
   });
   S.chars=[];
-  for(const c of list){
-    const rec=await dbGet(memDb,'config','memlist_'+c.id);
-    const rawList=(rec&&Array.isArray(rec.value))?rec.value:[];
+  // 大号 / 小号 记忆互通：小号不再是独立卡片，其记忆并入大号记忆库
+  const visible=list.filter(c=>!(c.isAltProbe&&c.altOriginId));
+  for(const c of visible){
+    let rawList=[];
+    if(window.NanoMemLink&&window.NanoMemLink.readList){
+      rawList=await window.NanoMemLink.readList(c.id);
+    }else{
+      const rec=await dbGet(memDb,'config','memlist_'+c.id);
+      rawList=(rec&&Array.isArray(rec.value))?rec.value:[];
+    }
+    if(!Array.isArray(rawList))rawList=[];
     const mems=rawList.filter(it=>it&&!it.groupId).map(mapItemToMem);
-    const hearts=await loadHearts(memDb,c.id,c.name);
+    let hearts=await loadHearts(memDb,c.id,c.name);
+    // 合并该角色名下所有小号的历史心声
+    try{
+      if(window.NanoMemLink&&window.NanoMemLink.familyIds){
+        const fids=(await window.NanoMemLink.familyIds(c.id))||[];
+        for(const aid of fids){
+          if(String(aid)===String(c.id))continue;
+          const hs=await loadHearts(memDb,aid,c.name);
+          if(hs.length)hearts=hearts.concat(hs);
+        }
+      }
+    }catch(e){}
     S.chars.push({
       id:c.id,name:c.name,avatar:c.avatar||'',
       desc:String(c.setting||c.desc||c.persona||'').replace(/\s+/g,' ').slice(0,42),

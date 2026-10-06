@@ -511,8 +511,12 @@ function openMemoryDB(){
 async function readMemoryForChar(char){
   const id = char && char.id;
   if(!id) return [];
+  let mergedList = null;
+  if (window.NanoMemLink && window.NanoMemLink.readList) {
+    try { mergedList = await window.NanoMemLink.readList(id); } catch(e) { mergedList = null; }
+  }
   const db = await openMemoryDB();
-  if(!db) return [];
+  if(!db) return (mergedList||[]).map(it => String(it&&(it.content||it.text)||'').trim()).filter(Boolean).slice(-16);
   return new Promise(resolve => {
     const out = [];
     const push = t => { t = String(t || "").trim(); if(t && out.indexOf(t) < 0) out.push(t); };
@@ -520,7 +524,7 @@ async function readMemoryForChar(char){
       const tx = db.transaction(["config","memories"], "readonly");
       const rc = tx.objectStore("config").get("memlist_" + id);
       rc.onsuccess = () => {
-        const list = (rc.result && Array.isArray(rc.result.value)) ? rc.result.value : [];
+        const list = (mergedList != null) ? mergedList : ((rc.result && Array.isArray(rc.result.value)) ? rc.result.value : []);
         list.forEach(it => push(it && (it.content || it.text)));
       };
       try{

@@ -480,8 +480,14 @@ async function callApi(history, opts, meta) {
 /* ---------------- 记忆（与线上共享） ---------------- */
 async function loadMemHints(charId) {
   const db = await openVectorDB();
-  const rec = await dbGet(db, 'config', 'memlist_' + charId);
-  const list = (rec && Array.isArray(rec.value)) ? rec.value : [];
+  let rawList;
+  if (window.NanoMemLink && window.NanoMemLink.readList) {
+    rawList = await window.NanoMemLink.readList(charId);   // 大号 + 小号 合并
+  } else {
+    const rec = await dbGet(db, 'config', 'memlist_' + charId);
+    rawList = (rec && Array.isArray(rec.value)) ? rec.value : [];
+  }
+  const list = Array.isArray(rawList) ? rawList : [];
   const priv = list.filter(it => it && !it.groupId);
   const must = priv.filter(it => Number(it.importance) >= 4);
   const rest = priv.filter(it => !(Number(it.importance) >= 4));
@@ -519,9 +525,13 @@ async function maybeSummarize(charId, charName, history) {
       });
     });
     if (!items.length) return;
-    const memRec = await dbGet(db, 'config', 'memlist_' + charId);
-    const list = (memRec && Array.isArray(memRec.value)) ? memRec.value : [];
-    await dbPut(db, 'config', { key: 'memlist_' + charId, value: list.concat(items) });
+    if (window.NanoMemLink && window.NanoMemLink.append) {
+      await window.NanoMemLink.append(charId, items);   // 小号记忆计入大号记忆库
+    } else {
+      const memRec = await dbGet(db, 'config', 'memlist_' + charId);
+      const list = (memRec && Array.isArray(memRec.value)) ? memRec.value : [];
+      await dbPut(db, 'config', { key: 'memlist_' + charId, value: list.concat(items) });
+    }
     await dbPut(db, 'chat_state', { chatId: charId, summarizedCount: history.length });
     notifyMemoryUpdated(charId);
   } catch (e) {}

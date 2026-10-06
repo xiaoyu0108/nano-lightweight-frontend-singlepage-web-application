@@ -159,6 +159,10 @@
         if (!chatId) return Promise.resolve([]);
         // 群聊模式：聚合群里每个角色的 memlist_<charId>
         if (IS_GROUP && chatId === getChatId()) return getGroupAllMemories();
+        // 单聊：大号 / 小号 互通，合并本人 + 名下所有小号的记忆
+        if (window.NanoMemLink && window.NanoMemLink.readList) {
+            return window.NanoMemLink.readList(chatId).catch(function() { return []; });
+        }
         // 直接用 key 读取（与 config 的设置读取一样可靠），不再依赖 getAll+过滤
         return dbGet(STORES.CONFIG, memListKey(chatId)).then(function(r) {
             return (r && Array.isArray(r.value)) ? r.value : [];
@@ -173,6 +177,17 @@
 
     function storeMemory(item) {
         // 读当前列表 -> 追加/替换 -> 写回（群聊模式下 item.chatId 是角色 id）
+        // 单聊：小号记忆统一写进大号记忆库
+        if (!IS_GROUP && item && item.chatId && window.NanoMemLink && window.NanoMemLink.originIdOf) {
+            return window.NanoMemLink.originIdOf(item.chatId).then(function(origin) {
+                return dbGet(STORES.CONFIG, memListKey(origin)).then(function(r) {
+                    var list = (r && Array.isArray(r.value)) ? r.value : [];
+                    const idx = list.findIndex(function(m) { return m && m.id === item.id; });
+                    if (idx >= 0) list[idx] = item; else list.push(item);
+                    return dbPut(STORES.CONFIG, { key: memListKey(origin), value: list });
+                });
+            });
+        }
         return getAllMemories(item.chatId).then(function(list) {
             if (!Array.isArray(list)) list = [];
             const idx = list.findIndex(function(m) { return m && m.id === item.id; });
@@ -193,6 +208,18 @@
             });
         }
         const chatId = getChatId();
+        if (window.NanoMemLink && window.NanoMemLink.originIdOf) {
+            return window.NanoMemLink.originIdOf(chatId).then(function(origin) {
+                const keys = (String(origin) === String(chatId)) ? [origin] : [origin, String(chatId)];
+                return Promise.all(keys.map(function(k) {
+                    return dbGet(STORES.CONFIG, memListKey(k)).then(function(r) {
+                        const list = (r && Array.isArray(r.value)) ? r.value : [];
+                        const newList = list.filter(function(m) { return !(m && m.id === id); });
+                        return dbPut(STORES.CONFIG, { key: memListKey(k), value: newList });
+                    });
+                }));
+            });
+        }
         return getAllMemories(chatId).then(function(list) {
             const newList = (list || []).filter(function(m) { return !(m && m.id === id); });
             return dbPut(STORES.CONFIG, { key: memListKey(chatId), value: newList });

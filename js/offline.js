@@ -1375,8 +1375,14 @@ async function callMainAPI(history) {
     // 进入线下时自动读取：本角色记忆库 + 线上最近 20 条对话（线上线下互通）
     let memBlock = '';
     try {
-      const mem = await offMemGet('config', 'memlist_' + offlineChatId);
-      const list = (mem && Array.isArray(mem.value)) ? mem.value : [];
+      let list;
+      if (window.NanoMemLink && window.NanoMemLink.readList) {
+        list = await window.NanoMemLink.readList(offlineChatId);   // 大号 + 小号 合并
+      } else {
+        const mem = await offMemGet('config', 'memlist_' + offlineChatId);
+        list = (mem && Array.isArray(mem.value)) ? mem.value : [];
+      }
+      list = Array.isArray(list) ? list : [];
       const lines = list.slice(-12).map(function (it) { return '· ' + String((it && it.content) || '').trim(); }).filter(function (s) { return s.length > 2; });
       if (lines.length) memBlock = '【长期记忆 · 务必当作已知事实】\n' + lines.join('\n') + '\n\n';
     } catch (e) {}
@@ -1826,12 +1832,15 @@ async function summarizeOfflineMemories(force) {
     if (!summary) return;
     const items = summary.split('\n').map(l => l.trim()).map(l => l.replace(/^[-*\d.\s、)]+/, '')).filter(l => l && l.length >= 6);
     if (!items.length) return;
-    const mem = await offMemGet('config', 'memlist_' + offlineChatId);
-    const list = (mem && Array.isArray(mem.value)) ? mem.value : [];
-    items.forEach(t => {
-      list.push({ id: 'om' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), time: new Date().toLocaleString('zh-CN'), type: '长期记忆', chatId: offlineChatId, content: t });
-    });
-    await offMemPut('config', { key: 'memlist_' + offlineChatId, value: list });
+    const entries = items.map(t => ({ id: 'om' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), time: new Date().toLocaleString('zh-CN'), type: '长期记忆', chatId: offlineChatId, content: t }));
+    if (window.NanoMemLink && window.NanoMemLink.append) {
+      await window.NanoMemLink.append(offlineChatId, entries);   // 小号记忆计入大号记忆库
+    } else {
+      const mem = await offMemGet('config', 'memlist_' + offlineChatId);
+      const list = (mem && Array.isArray(mem.value)) ? mem.value : [];
+      entries.forEach(e => list.push(e));
+      await offMemPut('config', { key: 'memlist_' + offlineChatId, value: list });
+    }
     const lastIdx = rel.indexOf(take[take.length - 1]);
     localStorage.setItem(offMemCountKey(), String(Math.max(count, lastIdx + 1)));
     try { window.parent.postMessage({ type: 'NANO_MEMORY_UPDATED', chatId: offlineChatId }, '*'); } catch (e) {}
