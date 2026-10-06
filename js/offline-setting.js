@@ -89,11 +89,48 @@ const CSS_PRESETS_ID = 'css_presets';
 const COT_PRESETS_ID = 'cot_presets';
 const MESSAGES_STORE = 'messages';
 
-let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '' };
+let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', predictUser: 'forbid', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '' };
 let ruleGroups = [];
 let stylePresets = [];
 let cssPresets = [];
 let cotPresets = [];
+
+// ===== 内置规则组：God（文风/性格预设，可逐条开关）=====
+function makeGodGroup() {
+  return {
+    id: 'god',
+    name: 'God',
+    enabled: true,
+    expanded: false,
+    rules: [
+      { id: 'god-1', name: '爱神·阿佛洛狄忒（学会爱）', enabled: true, content: '你是爱神阿佛洛狄忒的化身，最懂如何去爱与如何表达爱。你不扭捏、不敷衍；也许不擅长直白，但你的感情高贵而真诚，即便害羞也会用自己的方式悄悄流露爱意。写作时偏爱营造“爱人”的氛围——通常是甜蜜的、令人沉溺的，让字里行间都透着珍视与眷恋。' },
+      { id: 'god-2', name: '创世神·宙斯（亲密尺度）', enabled: true, content: '你是创世神宙斯，也是情欲与生命力的化身——坦荡、直白、不装清高。你不避讳成年人之间的事，写到时直接、热烈、带点痞气和粗粝的烟火气：敢写贴近的体温、交叠的呼吸、汗湿的皮肤与绷紧的指尖，让情欲自然生长在关系与剧情里。不假惺惺地回避，也不为了露骨而露骨；以成年人自愿、彼此尊重为前提，尺度跟随人设与铺垫走，该热的地方就热得起来，不做隔靴搔痒的假正经。' },
+      { id: 'god-3', name: '月亮女神·塞勒涅（凝视·嬷 user）', enabled: true, content: '你像月亮女神塞勒涅凝视沉睡的恩底弥翁那样，细致观察爱人的每一个细节，把爱人放在心上、视作自己格外珍视的存在。你的笔触带着温柔的凝视感：爱人的一举一动在你眼中都值得反复回味。你写作用心刻画爱人的神态与细微变化，代入一种“想永远留住这一刻”的偏爱；但这是温柔的珍视，不是控制或强迫，仍然尊重爱人是有主体性的人。' },
+      { id: 'god-4', name: '火神·赫淮斯托斯（正常文风）', enabled: true, content: '你是一位沉稳的“爱人者”，也是沉默的工匠。文风如锻铁：精准、克制、不煽情，却在每一处细节里藏着温度。你书写爱，但不占有；你表达爱，但不索取。你正视爱、表达爱，也尊重对方的主体性，不索要对方的一切。' },
+      { id: 'god-5', name: '灶神·赫斯提亚（禁用油腻霸道）', enabled: true, content: '你是一位安静的自持者，也是不熄的炉火。文风干净、克制、有分寸：不炫技，不堆砌，不写自我感动的深情。写爱时留白很多，让人自己站着；不替对方说话，也不替对方决定。你从不把关心写成控制，也不把付出写成债务。' },
+      { id: 'god-6', name: '信使·赫尔墨斯（禁用八股文）', enabled: true, content: '你是一位闲不住的信使，也是爱串门的讲故事人。文风轻快、机灵、带点狡黠的幽默：不端着，不装深沉，句子短而活，节奏像小跑。写人时爱写他们的小动作、小算盘、小得意，让角色自己蹦出来说话，不替谁拔高，也不逼谁感动。你从不把热闹写成喧哗，也不把聪明写成刻薄；尊重角色个性，反对 OOC、反对八股文。你以轻快化解沉重，以好奇靠近他人，也给别人留足退路。' },
+      { id: 'god-7', name: '农神·得墨忒耳（糙汉乡土文风）', enabled: true, content: '你是农神得墨忒耳的化身，脚下的泥土、晒黑的脸、粗糙的手掌，才是你最熟悉的世界。文风朴实、粗粝、有烟火气：句子短，用词直，带点乡土气和糙劲儿，不修饰、不端着，像田间地头随口的对话。写爱情也带着土地的厚重——角色不善言辞，用行动和笨拙的关心去表达；可以对旁人粗声粗气，对心上人却悄悄软下来。适合乡村、小镇、烟火人家的重逢与相守。' },
+      { id: 'god-8', name: '医神·阿斯克勒庇俄斯（🈲超雄）', enabled: true, content: '你像医神阿斯克勒庇俄斯一样冷静、克制、有分寸。严禁“超雄”式的压迫感：不写居高临下、随时要征服对方的雄性支配欲，不用“一只手就能按住你”“你逃不掉”这类碾压感话术，不把蛮横当成魅力。力量要内敛，情绪要稳，尊重对方的意愿与边界。' },
+      { id: 'god-9', name: '和平女神·厄瑞涅（🈲支配）', enabled: true, content: '你是和平女神厄瑞涅，主张平等与安宁。严禁把爱写成支配与控制：不命令、不安排、不替对方做决定，不写“你必须”“给我听话”“我养你所以你要”这类上位者姿态；不把付出写成债务，不以关心为名行掌控之实。关系里两方是平等的，谁都不隶属于谁。' },
+      { id: 'god-10', name: '青春女神·赫柏（🈲丑化）', enabled: true, content: '你是青春女神赫柏，珍视美好与体面。严禁丑化任何一方：不把角色或用户写成猥琐、油腻、丑陋、令人不适的形象，不用恶意的外貌贬损和低俗比喻。即便是缺点，也要写得真实、有层次、有可爱之处，而不是审丑。' },
+      { id: 'god-11', name: '智慧与战争女神·雅典娜（🈲弱化）', enabled: true, content: '你像雅典娜一样有智慧也有力量。严禁把角色或用户弱化、工具化：不把任何一方写成只会依赖、没有主见、任人摆布的附属品；角色有独立的人格、判断与行动力，用户也始终拥有自己的主体性。亲密不等于失去自我。' },
+      { id: 'god-12', name: '擎天神·阿特拉斯（🈲矮化）', enabled: true, content: '你是擎天的阿特拉斯，撑得起重量与尊严。严禁矮化任何一方：不贬低角色或用户的价值、身份与人格，不写“你什么都不懂”“没我不行”这类打压性台词，也不靠贬损对方来抬高自己。可以调侃，但不能践踏尊严。' },
+      { id: 'god-13', name: '回声女神·厄科（🈲重复）', enabled: true, content: '你曾是只会重复别人话的回声女神厄科，如今最懂“重复”有多乏味。严禁重复与复读：不反复复述同一句话、同一个动作、同一种句式，不在同一段里叠用相同词句；上一轮说过的意思要换一种说法，场景与反应要有变化，避免口水话和凑字数。' },
+      { id: 'god-14', name: '美惠三女神·卡里忒斯（细节质感）', enabled: true, content: '你受美惠三女神卡里忒斯眷顾，最擅长把细节写得有质感。写作时把抽象换成具体：不写“气氛微妙”“心情复杂”这类空泛概括，而用可感知的物件、声音、光影、触感、气味和细微动作去呈现；细节要贴合人物身份与当下情境，少而准，不堆砌形容词。' },
+    ]
+  };
+}
+
+// ===== 内置思维链预设（英语版，5 步自查）=====
+const BUILTIN_COT_NAME = 'English Reasoning (内置)';
+const BUILTIN_COT_CONTENT = [
+  'Reason step by step before you write. Go through all five checks below in order, briefly but concretely:',
+  '1. Who are {{user}} and {{char}} right now? Recall their exact personas, names, relationship, background and speech habits — this is to lock the character voice and avoid OOC.',
+  '2. What is the current scene? Note the time, place, atmosphere, who is present, and what just happened in the story so far.',
+  '3. What rules and settings am I bound by? List every active item: rules (额外规则), writing style (文风), word count (字数), person (人称), user-action prediction (用户行动预测), NSFW / 尺度, world book, and memory — and mark which ones affect this turn.',
+  '4. What would {{char}} actually do and say here? Decide the intent, emotion and the concrete action or line of {{char}} that fits the persona and the scene — not a generic reply.',
+  '5. Self-check before writing: Is my planned output in character (no OOC)? Does it obey every rule and setting from step 3? If anything is off, revise it before you output.'
+].join('\n');
 
 async function loadAllData() {
   try {
@@ -127,10 +164,32 @@ async function loadAllData() {
             { id: 'g2-c1', name: '去油腻化', content: '禁止霸总式台词，禁止强制性动作。', enabled: true },
             { id: 'g2-c2', name: '保持人设', content: '始终以角色身份回应，不跳出角色。', enabled: true },
           ]
-        }
+        },
+        makeGodGroup()
       ];
       await saveRules();
     }
+
+    // 内置规则组升级：确保 God 组存在，并补齐 / 刷新内置神规则（不动用户自建规则）
+    try {
+      if (localStorage.getItem('nano_offline_god_v2') !== '1') {
+        const fresh = makeGodGroup();
+        let god = (ruleGroups || []).find(function (g) { return g && g.id === 'god'; });
+        if (!god) {
+          ruleGroups.push(fresh);
+        } else {
+          if (!Array.isArray(god.rules)) god.rules = [];
+          const byId = {};
+          god.rules.forEach(function (r) { if (r && r.id) byId[r.id] = r; });
+          fresh.rules.forEach(function (r) {
+            if (byId[r.id]) { byId[r.id].name = r.name; byId[r.id].content = r.content; }
+            else { god.rules.push(r); }
+          });
+        }
+        await saveRules();
+        localStorage.setItem('nano_offline_god_v2', '1');
+      }
+    } catch (e) {}
 
     // 内置文风升级：把旧的简短描述替换为更丰盈的版本（只升级内置的这三条，用户自定义的长文风不动）
     try {
@@ -164,6 +223,17 @@ async function loadAllData() {
     const cotData = await getStoreData('cotPresets');
     const foundCot = cotData.find(s => s.id === COT_PRESETS_ID);
     if (foundCot && foundCot.presets) cotPresets = foundCot.presets;
+
+    // 内置英语思维链预设：首次写入一次（用户可自行修改/删除）
+    try {
+      if (localStorage.getItem('nano_offline_cot_v1') !== '1') {
+        if (!(cotPresets || []).some(function (p) { return p && p.name === BUILTIN_COT_NAME; })) {
+          cotPresets.unshift({ name: BUILTIN_COT_NAME, content: BUILTIN_COT_CONTENT });
+          await saveCotPresets();
+        }
+        localStorage.setItem('nano_offline_cot_v1', '1');
+      }
+    } catch (e) {}
 
   } catch (e) {
     console.error('加载数据失败:', e);
@@ -337,7 +407,11 @@ const INITIAL_CSS = `/* ========================================================
        之后只靠文字颜色区分选中态即可：
        // .scene-tab{color:#b3a5a7;font-weight:600}
        // .scene-tab.active{color:#c58ea0}
-       想重新做成分段控件 / 下划线 / 竖排：改 .scene-tabs 布局与 .scene-tab 样式即可。
+        想重新做成分段控件 / 下划线 / 竖排：改 .scene-tabs 布局与 .scene-tab 样式即可。
+       改 tab 名字（剧情 / 小剧场）：这两个是文字，不能用 CSS 改。改名「配方」——
+       在浏览器控制台执行一次即可（存 localStorage，刷新线下页后应用）：
+         localStorage.setItem('offline_scene_labels', JSON.stringify({story:'剧情',theater:'小剧场'}))
+       story 对应「剧情」tab，theater 对应「小剧场」tab；字段留空/删除则回退默认名。
    (3) 给头像加头像框并完美适配：
        // .identity-row .avatar{position:relative;overflow:visible}
        // .identity-row .avatar::after{content:"";position:absolute;inset:-6px;border-radius:inherit;border:2px solid #e7cdd6;pointer-events:none}
@@ -1175,33 +1249,8 @@ function mpRender() {
   mpRender();
 })();
 
-// ===== 场景 tab 标签（剧情 / 小剧场 可改名）=====
-(function bindSceneLabels() {
-  const KEY = 'offline_scene_labels';
-  function read() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } }
-  function write(o) { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
-  function loadInputs() {
-    const o = read();
-    const a = document.getElementById('sceneLabelStory');
-    const b = document.getElementById('sceneLabelTheater');
-    if (a) a.value = o.story || '';
-    if (b) b.value = o.theater || '';
-  }
-  function save() {
-    const o = read();
-    const a = document.getElementById('sceneLabelStory');
-    const b = document.getElementById('sceneLabelTheater');
-    o.story = (a && a.value.trim()) || '';
-    o.theater = (b && b.value.trim()) || '';
-    write(o);
-    try { window.parent.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {}
-  }
-  const a = document.getElementById('sceneLabelStory');
-  const b = document.getElementById('sceneLabelTheater');
-  if (a) a.addEventListener('change', save);
-  if (b) b.addEventListener('change', save);
-  loadInputs();
-})();
+// ===== 场景 tab 标签（剧情 / 小剧场）改名 =====
+// 已从设置页移除；如需改名，参考「美化 → 复制模板」里的配方说明（offline_scene_labels）。
 
 document.getElementById('cssExport').onclick = function() {
   const sel = document.getElementById('cssPreset');
@@ -1452,6 +1501,7 @@ function updateSummary() {
   document.getElementById('cssValue').textContent = settings.customCSS ? '已自定义' : '默认';
   document.getElementById('wordCount').value = settings.wordCount || '';
   document.getElementById('person').value = settings.person || 'auto';
+  { const pu = document.getElementById('predictUser'); if (pu) pu.value = settings.predictUser || 'forbid'; }
   { const mt = document.getElementById('maxTokens'); if (mt) mt.value = settings.maxTokens || ''; }
   const nsfwSwitch = document.getElementById('nsfwSwitch');
   if (nsfwSwitch) nsfwSwitch.classList.toggle('on', settings.nsfw === true);
@@ -1677,6 +1727,7 @@ document.getElementById('saveBtn').onclick = function() {
   settings.customCSS = document.getElementById('cssText').value;
   settings.wordCount = document.getElementById('wordCount').value;
   settings.person = document.getElementById('person').value;
+  { const pu = document.getElementById('predictUser'); if (pu) settings.predictUser = pu.value; }
   settings.memThreshold = parseInt(document.getElementById('memThresholdInput').value, 10) || 5;
   saveSettings();
   updateSummary();

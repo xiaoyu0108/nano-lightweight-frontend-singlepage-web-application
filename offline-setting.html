@@ -67,19 +67,11 @@
 <div class="row-label">输出上限<span class="row-desc">线下单次最多生成的 token，越大越不容易被截断；留空则按字数自动估算</span></div>
 <div style="width:45%"><input class="search-input" id="maxTokens" type="number" min="1024" max="32768" step="512" placeholder="自动" style="text-align:right"></div>
 </div>
-</div>
-</section>
-
-<!-- 场景标签 -->
-<section class="section">
-<div class="group">
 <div class="row">
-<div class="row-label">剧情标签<span class="row-desc">底部「剧情」tab 的显示名，可改成 plot 等</span></div>
-<div style="width:45%"><input class="search-input" id="sceneLabelStory" style="text-align:right" placeholder="剧情"></div>
-</div>
-<div class="row">
-<div class="row-label">小剧场标签<span class="row-desc">底部「小剧场」tab 的显示名，可改成 theater 等</span></div>
-<div style="width:45%"><input class="search-input" id="sceneLabelTheater" style="text-align:right" placeholder="小剧场"></div>
+<div class="row-label">用户行动预测<span class="row-desc">是否允许描写用户的行动：禁止＝只写 char；中度＝可少量带出 user 的言行以推进剧情；高度＝可像写小说一样同时描写 char 与 user</span></div>
+<select class="search-input" id="predictUser" style="width:45%;text-align:right">
+<option value="forbid">禁止</option><option value="medium">中度</option><option value="high">高度</option>
+</select>
 </div>
 </div>
 </section>
