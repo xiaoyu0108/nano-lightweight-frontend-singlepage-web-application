@@ -46,6 +46,26 @@
     let unsummedCount = 0;
     let memoryListExpanded = false;
 
+    // 后台生成：通知主框架本次总结仍在进行，返回时保活该页面（不中断生成）
+    try { if (window.NanoRefresh) window.NanoRefresh.define({ id: 'memory', name: '记忆', url: 'memory.html', title: '记忆' }); } catch (e) {}
+    function notifyRefresh(phase, body) {
+        try {
+            if (!window.NanoRefresh) return;
+            if (phase === 'start') window.NanoRefresh.start({ key: 'summary', label: '总结记忆' });
+            else if (phase === 'success') window.NanoRefresh.success(body || '', { key: 'summary' });
+            else window.NanoRefresh.fail(body || '总结失败', { key: 'summary' });
+        } catch (e) {}
+    }
+    // 页面是否正在前台显示（后台生成时不弹阻塞式 alert，交给主框架通知）
+    function isPageVisible() {
+        try {
+            if (document.hidden) return false;
+            const fe = window.frameElement;
+            if (fe && (fe.style.display === 'none' || fe.offsetParent === null)) return false;
+        } catch (e) {}
+        return true;
+    }
+
     // ============================================================
     // IndexedDB
     // ============================================================
@@ -627,7 +647,7 @@
         }
 
         isProcessing = true;
-        if (!isAuto) { manualSummaryBtn.classList.add('loading'); manualSummaryBtn.disabled = true; }
+        if (!isAuto) { manualSummaryBtn.classList.add('loading'); manualSummaryBtn.disabled = true; notifyRefresh('start'); }
         showToast('分析聊天记录...', 10);
 
         try {
@@ -649,7 +669,7 @@
 
             if (!chatText.trim()) {
                 hideToast();
-                if (!isAuto) { manualSummaryBtn.classList.remove('loading'); manualSummaryBtn.disabled = false; }
+                if (!isAuto) { manualSummaryBtn.classList.remove('loading'); manualSummaryBtn.disabled = false; notifyRefresh('fail', '没有可总结的内容'); }
                 isProcessing = false;
                 return;
             }
@@ -731,7 +751,8 @@
                 if (!isAuto) {
                     manualSummaryBtn.classList.remove('loading');
                     manualSummaryBtn.disabled = false;
-                    alert('本次没有提取到有效记忆，请检查总结 API 配置后重试');
+                    notifyRefresh('fail', '未提取到有效记忆');
+                    if (isPageVisible()) alert('本次没有提取到有效记忆，请检查总结 API 配置后重试');
                 } else {
                     showToast('未提取到记忆，稍后自动重试');
                     setTimeout(hideToast, 2000);
@@ -754,7 +775,8 @@
                 manualSummaryBtn.classList.remove('loading');
                 manualSummaryBtn.disabled = false;
                 const vectorStatus = hasVector ? '（已向量化）' : '（纯文本）';
-                alert('总结完成，生成 ' + items.length + ' 条记忆 ' + vectorStatus);
+                notifyRefresh('success', '已生成 ' + items.length + ' 条记忆');
+                if (isPageVisible()) alert('总结完成，生成 ' + items.length + ' 条记忆 ' + vectorStatus);
             }
             console.log('[Memory] 总结完成 chatId=', chatId, '生成', items.length, '条记忆');
             await renderMemoryList();
@@ -767,7 +789,8 @@
             if (!isAuto) {
                 manualSummaryBtn.classList.remove('loading');
                 manualSummaryBtn.disabled = false;
-                alert('总结失败: ' + err.message);
+                notifyRefresh('fail', err);
+                if (isPageVisible()) alert('总结失败: ' + err.message);
             }
             isProcessing = false;
         }
@@ -841,7 +864,7 @@
         }
 
         isProcessing = true;
-        if (!isAuto) { manualSummaryBtn.classList.add('loading'); manualSummaryBtn.disabled = true; }
+        if (!isAuto) { manualSummaryBtn.classList.add('loading'); manualSummaryBtn.disabled = true; notifyRefresh('start'); }
         showToast('分析群聊记录...', 8);
 
         try {
@@ -849,7 +872,7 @@
             const chatText = buildGroupChatText(messages, info, currentUser);
             if (!chatText.trim()) {
                 hideToast();
-                if (!isAuto) { manualSummaryBtn.classList.remove('loading'); manualSummaryBtn.disabled = false; }
+                if (!isAuto) { manualSummaryBtn.classList.remove('loading'); manualSummaryBtn.disabled = false; notifyRefresh('fail', '没有可总结的内容'); }
                 isProcessing = false;
                 return;
             }
@@ -906,7 +929,8 @@
                 if (!isAuto) {
                     manualSummaryBtn.classList.remove('loading');
                     manualSummaryBtn.disabled = false;
-                    alert('本次没有提取到有效记忆，请检查总结 API 配置后重试');
+                    notifyRefresh('fail', '未提取到有效记忆');
+                    if (isPageVisible()) alert('本次没有提取到有效记忆，请检查总结 API 配置后重试');
                 } else {
                     showToast('未提取到记忆，稍后自动重试');
                     setTimeout(hideToast, 2000);
@@ -929,7 +953,8 @@
                 manualSummaryBtn.classList.remove('loading');
                 manualSummaryBtn.disabled = false;
                 const vectorStatus = hasVector ? '（已向量化）' : '（纯文本）';
-                alert('群聊总结完成，为 ' + info.members.length + ' 位成员共生成 ' + total + ' 条记忆 ' + vectorStatus);
+                notifyRefresh('success', '为 ' + info.members.length + ' 位成员共生成 ' + total + ' 条记忆');
+                if (isPageVisible()) alert('群聊总结完成，为 ' + info.members.length + ' 位成员共生成 ' + total + ' 条记忆 ' + vectorStatus);
             }
             console.log('[Memory] 群聊总结完成 chatId=', chatId, '生成', total, '条记忆');
             try { if (window.parent !== window) window.parent.postMessage({ type: 'NANO_MEMORY_UPDATED', chatId: chatId }, '*'); } catch (e) {}
@@ -942,7 +967,8 @@
             if (!isAuto) {
                 manualSummaryBtn.classList.remove('loading');
                 manualSummaryBtn.disabled = false;
-                alert('总结失败: ' + err.message);
+                notifyRefresh('fail', err);
+                if (isPageVisible()) alert('总结失败: ' + err.message);
             }
             isProcessing = false;
         }

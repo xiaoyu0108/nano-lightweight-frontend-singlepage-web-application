@@ -457,25 +457,31 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 .sheet-delete-btn:active { background: #e5e5ea; }
 
-/* Toast */
+/* Toast：非阻塞进度提示，固定在底部，不遮挡顶部返回按钮，也不拦截点击 */
 .toast-overlay {
     position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.3);
-    backdrop-filter: blur(4px);
+    left: 0; right: 0; bottom: 0;
+    top: auto;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     display: none;
     justify-content: center;
-    align-items: center;
+    align-items: flex-end;
+    padding: 0 16px calc(24px + env(safe-area-inset-bottom, 0px));
     z-index: 2000;
+    pointer-events: none;
 }
 .toast-overlay.active { display: flex; }
 .toast-box {
     background: #ffffff;
     border-radius: 16px;
-    padding: 32px 40px 28px;
+    padding: 18px 22px 16px;
     max-width: 320px;
-    width: 90%;
+    width: 100%;
     text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    pointer-events: auto;
 }
 .toast-spinner {
     width: 36px;
