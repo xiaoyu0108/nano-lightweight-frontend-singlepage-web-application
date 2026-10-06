@@ -316,3 +316,32 @@ html, body {
     z-index: 200;
 }
 .fc-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* 开卡银行选择 */
+.fc-banks-label { font-size: 12px; color: #8e8e93; margin-top: 14px; text-align: left; }
+.fc-banks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; max-height: 172px; overflow: auto; }
+.fc-bank { border: 2px solid transparent; border-radius: 12px; padding: 6px 4px; background: none; cursor: pointer; box-sizing: border-box; }
+.fc-bank.sel { border-color: #AF52DE; }
+.fc-bank .sw { display: block; height: 34px; border-radius: 8px; margin-bottom: 5px; }
+.fc-bank .nm { font-size: 11px; color: #333; }
+/* 亲属卡上的归属银行 */
+.fc-card .fc-bank-name { font-size: 12px; font-weight: 600; color: #b4799a; margin-top: 6px; }
+
+/* 亲属卡 = 很淡很淡的粉色，简单干净 */
+.fc-card,
+.fc-card.received,
+.fc-card.pending,
+.fc-card.rejected {
+    background: linear-gradient(150deg, #fff6fa, #ffedf4) !important;
+    color: #b4799a;
+    box-shadow: 0 6px 16px rgba(255, 175, 205, 0.16) !important;
+}
+.fc-card.rejected { opacity: 0.82; }
+.fc-card-type { color: #c98caa; opacity: 1; }
+.fc-badge { background: rgba(255, 255, 255, 0.85); color: #c98caa; }
+.fc-card-limit { color: #a86b8a; }
+.fc-card-meta { color: #b98aa4; opacity: 1; }
+.fc-card-btn { background: rgba(255, 255, 255, 0.9); color: #a86b8a; }
+.fc-card-btn.solid,
+.fc-card.received .fc-card-btn.solid { background: #ffa9c8; color: #fff; }
+.fc-card-btn.danger { background: rgba(255, 255, 255, 0.9); color: #e08585; }

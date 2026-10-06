@@ -289,10 +289,15 @@
         }
         var reader = new FileReader();
         reader.onload = function(evt) {
-            pendingAvatarDataUrl = evt.target.result;
+            var raw = evt.target.result;
+            pendingAvatarDataUrl = raw;
             thumbPreview.onerror = null;
-            thumbPreview.src = evt.target.result;
+            thumbPreview.src = raw;
             avatarUrlInput.value = '';
+            // 压缩到 512：手机拍的原图/HEIC 体积很大，直接存会导致显示不出来（“换了没反应”）
+            compressImage(raw, 512, 512, 0.85, function(out) {
+                if (out) { pendingAvatarDataUrl = out; thumbPreview.src = out; }
+            });
             showToast('已选择照片，点“保存”即可换头像');
         };
         reader.onerror = function() {

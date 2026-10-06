@@ -8,7 +8,17 @@
 (function () {
     'use strict';
 
-    function key(chatId) { return 'nano_family_cards_' + (chatId || 'default'); }
+    // 按当前用户（人设/马甲）隔离：一个 user 一套亲属卡与钱包
+    function nanoUid() {
+        try {
+            var d = JSON.parse(localStorage.getItem('nano_mask_data') || 'null');
+            if (d && d.currentMaskId != null && d.currentMaskId !== '') return String(d.currentMaskId);
+        } catch (e) {}
+        return 'default';
+    }
+    function walletKey() { return 'wallet_data__' + nanoUid(); }
+
+    function key(chatId) { return 'nano_family_cards__' + nanoUid() + '_' + (chatId || 'default'); }
 
     function read(chatId) {
         try {
@@ -92,10 +102,25 @@
                 if (!db) { resolve(defaultWallet()); return; }
                 try {
                     var tx = db.transaction('wallet_data', 'readonly');
-                    var r = tx.objectStore('wallet_data').get('wallet_data');
+                    var store = tx.objectStore('wallet_data');
+                    var r = store.get(walletKey());
                     r.onsuccess = function () {
                         var v = r.result && r.result.value;
-                        if (!v || typeof v !== 'object') { resolve(defaultWallet()); return; }
+                        if (!v || typeof v !== 'object') {
+                            // 兼容旧版全局钱包
+                            try {
+                                var r2 = store.get('wallet_data');
+                                r2.onsuccess = function () {
+                                    var v2 = r2.result && r2.result.value;
+                                    if (!v2 || typeof v2 !== 'object') { resolve(defaultWallet()); return; }
+                                    if (typeof v2.balance !== 'number') v2.balance = 0;
+                                    if (!Array.isArray(v2.transactions)) v2.transactions = [];
+                                    resolve(v2);
+                                };
+                                r2.onerror = function () { resolve(defaultWallet()); };
+                            } catch (e2) { resolve(defaultWallet()); }
+                            return;
+                        }
                         if (typeof v.balance !== 'number') v.balance = 0;
                         if (!Array.isArray(v.transactions)) v.transactions = [];
                         resolve(v);
@@ -125,7 +150,7 @@
                 return new Promise(function (resolve) {
                     try {
                         var tx = db.transaction('wallet_data', 'readwrite');
-                        tx.objectStore('wallet_data').put({ key: 'wallet_data', value: wd });
+                        tx.objectStore('wallet_data').put({ key: walletKey(), value: wd });
                     } catch (e) {}
                     try { window.parent.postMessage({ type: 'walletUpdated', data: { balance: wd.balance, transactions: wd.transactions } }, '*'); } catch (e) {}
                     resolve(wd);

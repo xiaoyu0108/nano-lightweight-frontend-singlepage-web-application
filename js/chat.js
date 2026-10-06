@@ -1172,8 +1172,20 @@
         writeAvatarBar(arr);
         renderAvatarSlot(document.querySelector('.avatar-item[data-index="' + index + '"]'), value);
     }
-    // 文件 → 居中裁成正方形的小图（同时解决体积过大存不进 localStorage）
-    function cropToSquareDataURL(file, size) {
+    // 文件 → 居中裁成正方形的小图（优先 createImageBitmap 校正方向 / 兼容 HEIC）
+    async function cropToSquareDataURL(file, size) {
+        if (window.createImageBitmap) {
+            try {
+                const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+                const side = Math.min(bmp.width, bmp.height);
+                const sx = (bmp.width - side) / 2, sy = (bmp.height - side) / 2;
+                const canvas = document.createElement('canvas');
+                canvas.width = size; canvas.height = size;
+                canvas.getContext('2d').drawImage(bmp, sx, sy, side, side, 0, 0, size, size);
+                try { bmp.close && bmp.close(); } catch (e) {}
+                return canvas.toDataURL('image/jpeg', 0.88);
+            } catch (e) { /* 回退到 <img> 方案 */ }
+        }
         return new Promise(function (resolve) {
             const reader = new FileReader();
             reader.onload = function (ev) {
@@ -1207,10 +1219,23 @@
         });
     })();
 
+    // 点击照片墙 → 直接打开相册（不再弹窗）
+    function pickForItem(target) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async function (e) {
+            const file = e.target.files[0];
+            if (!file || !target) return;
+            const dataUrl = await cropToSquareDataURL(file, 240);
+            if (dataUrl) setAvatarSlot(parseInt(target.dataset.index, 10), dataUrl);
+        };
+        input.click();
+    }
     avatarItems.forEach(item => {
         item.addEventListener('click', function(e) {
             e.stopPropagation();
-            openModal(this);
+            pickForItem(this);
         });
     });
 
@@ -1399,6 +1424,29 @@
         // 从会话内页返回：立即刷新，清掉已读的红点
         if (data && (data.type === 'nanoOverlayClosed' || data.type === 'nanoOverlayOpen')) {
             renderAll();
+        }
+        // 角色头像/昵称实时更新：直接换掉好友区卡片的头像，无需重开页面
+        if (data && data.type === 'nanoCharUpdated' && data.chatId) {
+            try {
+                var sel = '[data-chat="' + (window.CSS && CSS.escape ? CSS.escape(data.chatId) : data.chatId) + '"]';
+                var item = document.querySelector(sel);
+                if (item) {
+                    if (typeof data.avatar === 'string') item.dataset.avatar = data.avatar;
+                    if (data.name) item.dataset.name = data.name;
+                    var av = item.querySelector('.chat-avatar');
+                    if (av) {
+                        av.innerHTML = '';
+                        if (data.avatar) {
+                            var img = document.createElement('img');
+                            img.src = data.avatar;
+                            av.appendChild(img);
+                        } else if (typeof data.avatar === 'string') {
+                            av.textContent = ((data.name || item.dataset.name || '?')).charAt(0).toUpperCase();
+                        }
+                    }
+                }
+            } catch (e) {}
+            try { renderAll(); } catch (e) {}
         }
     });
 

@@ -5,7 +5,16 @@
     const DB_NAME = 'nano_api_db';
     const DB_VERSION = 2;
     const FAVORITE_STORE = 'favorite_data';
-    const FAVORITE_KEY = 'nano_favorite';
+    // 收藏按当前用户（人设/马甲）隔离：一个 user 一套收藏
+    function nanoUid() {
+        try {
+            var d = JSON.parse(localStorage.getItem('nano_mask_data') || 'null');
+            if (d && d.currentMaskId != null && d.currentMaskId !== '') return String(d.currentMaskId);
+        } catch (e) {}
+        return 'default';
+    }
+    const FAVORITE_LEGACY_KEY = 'nano_favorite';
+    const FAVORITE_KEY = 'nano_favorite__' + nanoUid();
 
     // ============================================================
     // 1. IndexedDB 操作
@@ -72,24 +81,60 @@
     // ============================================================
     // 2. 数据操作（IndexedDB + localStorage 双写降级）
     // ============================================================
+    function loadLocalNs() {
+        try {
+            var raw = localStorage.getItem(FAVORITE_KEY);
+            if (raw) { var d = JSON.parse(raw); if (d && Array.isArray(d.favorites)) return d; }
+        } catch (e) {}
+        return null;
+    }
+    // 合并两份收藏（按 id / 内容去重），保证不会丢
+    function favMerge(a, b) {
+        var out = [], seen = {};
+        (a || []).concat(b || []).forEach(function (f) {
+            if (!f) return;
+            var k = f.id || ((f.content || '') + '|' + (f.chatId || ''));
+            if (seen[k]) return;
+            seen[k] = 1; out.push(f);
+        });
+        return out;
+    }
+
     function loadData() {
-        return idbGet(FAVORITE_STORE, FAVORITE_KEY).then(function(data) {
-            if (data) {
-                if (!data.favorites) data.favorites = [];
-                console.log('📦 从 IndexedDB 加载收藏数据，共', data.favorites.length, '条');
-                return data;
+        return idbGet(FAVORITE_STORE, FAVORITE_KEY).catch(function () { return null; }).then(function (idbVal) {
+            var list = (idbVal && Array.isArray(idbVal.favorites)) ? idbVal.favorites.slice() : [];
+            var local = loadLocalNs();
+            if (local) list = favMerge(list, local.favorites);
+            if (list.length) {
+                var merged = { favorites: list };
+                console.log('📦 收藏数据（合并 IDB + 本地）：', list.length, '条');
+                idbSet(FAVORITE_STORE, FAVORITE_KEY, merged).catch(function () {});
+                try { localStorage.setItem(FAVORITE_KEY, JSON.stringify(merged)); } catch (e) {}
+                return merged;
             }
-            // 降级到 localStorage
-            return loadFromLocalStorage();
-        }).catch(function(err) {
-            console.warn('⚠️ IndexedDB 读取失败，尝试 localStorage:', err);
+            // 旧版全局收藏只迁移给「第一个打开的用户」，其他 user 从空收藏开始，绝不再共享
+            var uid = nanoUid();
+            var owner = '';
+            try { owner = localStorage.getItem('nano_favorite_legacy_owner') || ''; } catch (e) {}
+            if (owner && owner !== uid) return { favorites: [] };
+            return idbGet(FAVORITE_STORE, FAVORITE_LEGACY_KEY).catch(function () { return null; }).then(function (legacy) {
+                try { localStorage.setItem('nano_favorite_legacy_owner', uid); } catch (e) {}
+                if (legacy && Array.isArray(legacy.favorites) && legacy.favorites.length) {
+                    idbSet(FAVORITE_STORE, FAVORITE_KEY, legacy).catch(function () {});
+                    try { localStorage.setItem(FAVORITE_KEY, JSON.stringify(legacy)); } catch (e) {}
+                    return legacy;
+                }
+                return loadFromLocalStorage();
+            });
+        }).catch(function (err) {
+            console.warn('⚠️ 读取收藏失败，尝试 localStorage:', err);
             return loadFromLocalStorage();
         });
     }
 
     function loadFromLocalStorage() {
         try {
-            var raw = localStorage.getItem(FAVORITE_KEY);
+            var raw = localStorage.getItem(FAVORITE_KEY) || localStorage.getItem(FAVORITE_LEGACY_KEY);
             if (raw) {
                 var data = JSON.parse(raw);
                 if (!data.favorites) data.favorites = [];
@@ -144,6 +189,8 @@
     // 4. 全局变量
     // ============================================================
     var data = null;
+    var favExpanded = false;
+    var FAV_PAGE = 20;
 
     // ============================================================
     // 5. DOM 引用
@@ -203,8 +250,10 @@
         }
 
         var sorted = [...data.favorites].reverse();
+        var total = sorted.length;
+        var shown = favExpanded ? sorted : sorted.slice(0, FAV_PAGE);
 
-        sorted.forEach(function(item) {
+        shown.forEach(function(item) {
             var wrapper = document.createElement('div');
             wrapper.className = 'favorite-wrapper';
             wrapper.dataset.id = item.id;
@@ -328,6 +377,18 @@
                 document.removeEventListener('mouseup', onEnd);
             };
         });
+
+        // 超过 20 条折叠，点一下展开/收起
+        if (total > FAV_PAGE) {
+            var toggle = document.createElement('button');
+            toggle.className = 'fav-toggle';
+            toggle.textContent = favExpanded ? '收起' : ('展开全部（共 ' + total + ' 条）');
+            toggle.addEventListener('click', function () {
+                favExpanded = !favExpanded;
+                renderFavorites();
+            });
+            favoritesList.appendChild(toggle);
+        }
     }
 
     // ============================================================

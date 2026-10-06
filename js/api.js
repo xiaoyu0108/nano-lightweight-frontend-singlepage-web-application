@@ -989,6 +989,57 @@
             showModal('提示词预设 "' + name + '" 已保存');
         });
 
+        // 删除提示词预设
+        var promptDelBtn = document.getElementById('promptDeletePreset');
+        if (promptDelBtn) {
+            promptDelBtn.addEventListener('click', function () {
+                var name = document.getElementById('promptPresetSelect').value;
+                if (!name) { showModal('请先选择一个要删除的预设'); return; }
+                if (!confirm('确定要删除提示词预设 "' + name + '" 吗？')) return;
+                deletePresetConfig('prompt_', name).then(function () {
+                    var select = document.getElementById('promptPresetSelect');
+                    for (var i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value === name) { select.remove(i); break; }
+                    }
+                    select.value = '';
+                    savePresetListToStorage();
+                    showModal('提示词预设 "' + name + '" 已删除');
+                });
+            });
+        }
+
+        // 修改 / 更新提示词预设
+        var promptEditBtn = document.getElementById('editPromptPreset');
+        if (promptEditBtn) {
+            promptEditBtn.addEventListener('click', function () {
+                var select = document.getElementById('promptPresetSelect');
+                var oldName = select.value;
+                if (!oldName) { showModal('请先选择一个要修改的预设'); return; }
+                var newName = document.getElementById('promptPresetName').value.trim();
+                if (newName && newName !== oldName) {
+                    var dup = Array.from(select.options).some(function (o) { return o.value === newName; });
+                    if (dup) { showModal('预设 "' + newName + '" 已存在'); return; }
+                    deletePresetConfig('prompt_', oldName).then(function () {
+                        return savePresetConfig('prompt_', newName, { positive: positivePrompts, negative: negativePrompts });
+                    }).then(function () {
+                        for (var i = 0; i < select.options.length; i++) {
+                            if (select.options[i].value === oldName) { select.options[i].value = newName; select.options[i].textContent = newName; break; }
+                        }
+                        select.value = newName;
+                        document.getElementById('promptPresetName').value = '';
+                        savePresetListToStorage();
+                        showModal('预设已修改为 "' + newName + '"');
+                    });
+                } else {
+                    savePresetConfig('prompt_', oldName, { positive: positivePrompts, negative: negativePrompts }).then(function () {
+                        document.getElementById('promptPresetName').value = '';
+                        savePresetListToStorage();
+                        showModal('预设 "' + oldName + '" 已更新');
+                    });
+                }
+            });
+        }
+
         document.getElementById('promptPresetSelect').addEventListener('change', function () {
             var name = this.value;
             if (!name) return;

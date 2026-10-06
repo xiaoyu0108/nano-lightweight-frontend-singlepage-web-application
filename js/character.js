@@ -1097,6 +1097,10 @@
                 type: 'contactsDataUpdated', 
                 data: { chars: data.chars } 
             }, '*');
+            // 角色头像/昵称实时同步：聊天列表卡片 + 聊天内页头像
+            try {
+                window.parent.postMessage({ type: 'nanoCharUpdated', chatId: newItem.id, name: newItem.name, avatar: newItem.avatar }, '*');
+            } catch (e) {}
         } catch(e) {
             console.error('保存失败:', e);
             showInfo('保存失败', e.message || '未知错误');

@@ -42,9 +42,19 @@
                 req.onsuccess = function(e) {
                     var db = e.target.result;
                     try {
+                        var uid = 'default';
+                        try { var md = JSON.parse(localStorage.getItem('nano_mask_data') || 'null'); if (md && md.currentMaskId != null && md.currentMaskId !== '') uid = String(md.currentMaskId); } catch (e2) {}
                         var tx = db.transaction('wallet_data', 'readonly');
-                        var r = tx.objectStore('wallet_data').get('wallet_data');
-                        r.onsuccess = function() { resolve(r.result && typeof r.result.value.balance === 'number' ? r.result.value.balance : 5000); };
+                        var store = tx.objectStore('wallet_data');
+                        var r = store.get('wallet_data__' + uid);
+                        r.onsuccess = function() {
+                            if (r.result && typeof r.result.value.balance === 'number') { resolve(r.result.value.balance); return; }
+                            try {
+                                var r2 = store.get('wallet_data');
+                                r2.onsuccess = function() { resolve(r2.result && typeof r2.result.value.balance === 'number' ? r2.result.value.balance : 5000); };
+                                r2.onerror = function() { resolve(5000); };
+                            } catch (e3) { resolve(5000); }
+                        };
                         r.onerror = function() { resolve(5000); };
                     } catch (err) { resolve(5000); }
                 };

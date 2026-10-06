@@ -1330,9 +1330,10 @@
         }
         // 通用全屏帧：这些页面已加载同一 URL 时直接复用（不重载），切换更快；
         // 未列出的页面仍按原逻辑加载，避免停留在旧子页面。
+        // 注意：与 user（人设/马甲）强相关的页面不能复用缓存帧，否则切换 user 后仍显示上一个 user 的数据
         const REUSE_SAFE_PAGES = ['other.html', 'emoji.html', 'inner-setting.html', 'nano-setting.html',
             'groups.html', 'group-setting.html', 'imessage.html', 'storage.html', 'backup.html',
-            'wallet.html', 'appstore.html', 'family-card.html', 'favorite.html', 'books.html', 'meet.html'];
+            'wallet.html', 'appstore.html', 'family-card.html'];
         function reuseOrLoadOverlayFrame(url) {
             const base = baseName(url);
             const loadedExact = overlayFrame.getAttribute('data-loaded-url') === url;
@@ -1474,7 +1475,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-06-03';
+        var BUILD = 'nano-2026-10-06-06';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -2648,12 +2649,29 @@
                 }
             }
 
+            // 收藏变动：广播给收藏页，实时刷新（如果它正开着）
+            if (data.type === 'refreshFavorites') {
+                try {
+                    const frames = document.querySelectorAll('iframe');
+                    for (let i = 0; i < frames.length; i++) {
+                        try { frames[i].contentWindow.postMessage(data, '*'); } catch (e) {}
+                    }
+                } catch (e) {}
+            }
+
             if (data.type === 'nanoCharUpdated') {
-                // 纳米资料（头像/昵称）改动：同步给正在打开的单聊页
+                // 角色资料（头像/昵称）改动：同步给单聊页 + 聊天列表，实时换头像
                 const c = document.getElementById('chatInnerFrame');
                 if (c && frameBase(c) === 'chat_inner.html') {
                     try { c.contentWindow.postMessage(data, '*'); } catch (e) {}
                 }
+                try {
+                    const frames = document.querySelectorAll('iframe');
+                    for (let i = 0; i < frames.length; i++) {
+                        if (frames[i] === c) continue;
+                        try { frames[i].contentWindow.postMessage(data, '*'); } catch (e) {}
+                    }
+                } catch (e) {}
             }
 
             const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'autoSocialChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared', 'nanoTransMode', 'nanoBlockChanged', 'nanoCharUnblocked'];
@@ -3400,10 +3418,10 @@
 </script>
 <script src="js/api-float.js?v=20261005a"></script>
 <script src="js/aux-memory.js"></script>
-<script src="js/nano-notify.js"></script>
+<script src="js/nano-notify.js?v=20261006a"></script>
 <script src="js/nano-push.js"></script>
 <script src="swipe-back.js"></script>
-<script src="js/keep-alive.js"></script>
+<script src="js/keep-alive.js?v=20261006a"></script>
 <script src="js/char-takeover.js?v=20261005e"></script>
 <script src="js/screen-share.js?v=20261003p"></script>
 </div>

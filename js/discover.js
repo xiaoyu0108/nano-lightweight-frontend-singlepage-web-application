@@ -56,15 +56,28 @@
     var card = cards.filter(function (c) { return Number(c.dataset.index) === Number(index); })[0];
     return card ? card.querySelector('img') : null;
   }
-  // 压缩到最长边 1600 的 JPEG，避免 5 张大图撑爆存储
-  function compressImage(file) {
+  // 压缩到最长边 1400 的 JPEG；优先 createImageBitmap（自动校正方向、兼容 HEIC 等）
+  async function compressImage(file) {
+    if (window.createImageBitmap) {
+      try {
+        const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        var max = 1400, w = bmp.width, h = bmp.height;
+        if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+        else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+        try { bmp.close && bmp.close(); } catch (e) {}
+        return cv.toDataURL('image/jpeg', 0.85);
+      } catch (e) { /* 回退到 <img> 方案 */ }
+    }
     return new Promise(function (resolve) {
       var reader = new FileReader();
       reader.onload = function () {
         var img = new Image();
         img.onload = function () {
           try {
-            var max = 1600, w = img.width, h = img.height;
+            var max = 1400, w = img.width, h = img.height;
             if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
             else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
             var cv = document.createElement('canvas');
@@ -124,7 +137,9 @@
       card.addEventListener('click', function () {
         var i = Number(card.dataset.index);
         if (i === current) {
-          openSheet(i);
+          // 直接打开相册换图，不再弹选择框
+          targetPhoto = i;
+          if (fileInput) { fileInput.value = ''; fileInput.click(); }
         } else {
           current = i;
           positionCards();
@@ -149,9 +164,7 @@
     }
   }
 
-  /* ---------------- 2. 换图弹层 ---------------- */
-  var sheet = document.getElementById('sheet');
-  var mask = document.getElementById('mask');
+  /* ---------------- 2. 换图（点击照片直接选图） ---------------- */
   var fileInput = document.getElementById('fileInput');
   var toast = document.getElementById('toast');
 
@@ -164,27 +177,6 @@
       toast.classList.remove('show');
     }, 1100);
   }
-
-  function openSheet(index) {
-    targetPhoto = index;
-    if (sheet) sheet.classList.add('open');
-    if (mask) mask.classList.add('open');
-  }
-  function closeSheet() {
-    if (sheet) sheet.classList.remove('open');
-    if (mask) mask.classList.remove('open');
-  }
-
-  var chooseBtn = document.getElementById('choose');
-  if (chooseBtn) {
-    chooseBtn.addEventListener('click', function () {
-      closeSheet();
-      if (fileInput) { fileInput.value = ''; fileInput.click(); }
-    });
-  }
-  var cancelBtn = document.getElementById('cancel');
-  if (cancelBtn) cancelBtn.addEventListener('click', closeSheet);
-  if (mask) mask.addEventListener('click', closeSheet);
 
   if (fileInput) {
     fileInput.addEventListener('change', async function (e) {

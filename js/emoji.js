@@ -776,10 +776,6 @@
             var lower = (file.name || '').toLowerCase();
             var isDoc = lower.indexOf('.docx') !== -1 || lower.indexOf('.doc') !== -1;
 
-            // ===== 图片：PNG 卡片尝试提取内嵌表情包，其余图片直接作为 1 个表情包 =====
-            var isImg = (file.type || '').indexOf('image/') === 0 || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(lower);
-            if (isImg) { handleImageFile(file); return; }
-
             function onLoaded(content) {
                 pendingFileContent = content || '';
                 fileStatus.textContent = '已加载: ' + file.name + '，点击「AI 识别」解析';
@@ -1230,108 +1226,6 @@
         editEmojiModal.addEventListener('click', function(e) {
             if (e.target === editEmojiModal) closeEditEmojiModal();
         });
-    }
-
-    // ============================================================
-    // 20.5 PNG 卡片：提取内嵌表情包数据
-    // ============================================================
-    function b64DecodeEmoji(str) {
-        try {
-            var clean = String(str).replace(/[\r\n\s]+/g, '').replace(/-/g, '+').replace(/_/g, '/');
-            var pad = clean.length % 4;
-            if (pad) clean += '='.repeat(4 - pad);
-            var bytes = Uint8Array.from(atob(clean), function(c) { return c.charCodeAt(0); });
-            try { return new TextDecoder('utf-8', { fatal: false }).decode(bytes); } catch(e) { return atob(clean); }
-        } catch (e) { return ''; }
-    }
-
-    function readPngTextValues(arrayBuffer) {
-        var out = [];
-        try {
-            var view = new DataView(arrayBuffer);
-            if (view.byteLength < 8 || view.getUint32(0) !== 0x89504E47 || view.getUint32(4) !== 0x0D0A1A0A) return out;
-            var td = new TextDecoder('latin1');
-            var tdu = new TextDecoder('utf-8');
-            var offset = 8;
-            while (offset + 8 <= view.byteLength) {
-                var length = view.getUint32(offset);
-                var type = '';
-                for (var i = 0; i < 4; i++) type += String.fromCharCode(view.getUint8(offset + 4 + i));
-                var dataStart = offset + 8;
-                if (dataStart + length > view.byteLength) break;
-                try {
-                    if (type === 'tEXt') {
-                        var sep = -1;
-                        for (var j = 0; j < length; j++) { if (view.getUint8(dataStart + j) === 0) { sep = j; break; } }
-                        if (sep !== -1) out.push(td.decode(new Uint8Array(arrayBuffer, dataStart + sep + 1, length - sep - 1)));
-                    } else if (type === 'iTXt') {
-                        var u8 = new Uint8Array(arrayBuffer, dataStart, length);
-                        var pos = 0;
-                        while (pos < length && u8[pos] !== 0) pos++; pos++;
-                        var compFlag = u8[pos++]; pos++;
-                        while (pos < length && u8[pos] !== 0) pos++; pos++;
-                        while (pos < length && u8[pos] !== 0) pos++; pos++;
-                        if (compFlag === 0) out.push(tdu.decode(u8.subarray(pos)));
-                    }
-                } catch (chunkErr) {}
-                offset += 12 + length;
-            }
-        } catch (e) {}
-        return out;
-    }
-
-    function emojisFromPngValues(values) {
-        var found = [];
-        (values || []).forEach(function(v) {
-            if (!v) return;
-            var candidates = [v];
-            var decoded = b64DecodeEmoji(v);
-            if (decoded && decoded !== v) candidates.push(decoded);
-            candidates.forEach(function(c) {
-                if (!c) return;
-                var s = String(c).trim();
-                if (!s) return;
-                var list = parseEmojiText(s);
-                if (list.length) found = found.concat(list);
-            });
-        });
-        return found;
-    }
-
-    function addImageAsEmoji(file) {
-        var fr = new FileReader();
-        fr.onload = function(e) {
-            var nm = (file.name || '表情包').replace(/\.[^.]+$/, '') || '表情包';
-            parsedBatchEmojis = parsedBatchEmojis.concat([{ name: nm, url: e.target.result }]);
-            fileStatus.textContent = '已加入 1 张图片作为表情包，点击「添加」保存';
-            fileStatus.style.color = '#34c759';
-            fileInput.value = '';
-            showToast('已加入 1 个表情包');
-        };
-        fr.onerror = function() { fileStatus.textContent = '读取图片失败'; fileStatus.style.color = '#ff3b30'; fileInput.value = ''; };
-        fr.readAsDataURL(file);
-    }
-
-    function handleImageFile(file) {
-        var lower = (file.name || '').toLowerCase();
-        var isPng = lower.indexOf('.png') !== -1 || file.type === 'image/png';
-        if (!isPng) { addImageAsEmoji(file); return; }
-        var reader = new FileReader();
-        reader.onload = function(ev) {
-            var emojis = [];
-            try { emojis = emojisFromPngValues(readPngTextValues(ev.target.result)); } catch (e) {}
-            if (emojis.length) {
-                parsedBatchEmojis = parsedBatchEmojis.concat(emojis);
-                fileStatus.textContent = '已从 PNG 卡片解析出 ' + emojis.length + ' 个表情包，点击「添加」保存';
-                fileStatus.style.color = '#34c759';
-                fileInput.value = '';
-                showToast('已解析 ' + emojis.length + ' 个表情包');
-            } else {
-                addImageAsEmoji(file);
-            }
-        };
-        reader.onerror = function() { fileStatus.textContent = '读取图片失败'; fileStatus.style.color = '#ff3b30'; fileInput.value = ''; };
-        reader.readAsArrayBuffer(file);
     }
 
     // ============================================================

@@ -106,6 +106,71 @@
     var avatarPlaceholder = document.getElementById('avatarPlaceholder');
     var avatarImage = document.getElementById('avatarImage');
 
+    // ===== 点击信息栏头像 → 从相册换头像，并同步到聊天列表 / 聊天内页 =====
+    (function setupAvatarChange() {
+        var avatarEl = document.getElementById('profileAvatar');
+        if (!avatarEl) return;
+        var picker = document.createElement('input');
+        picker.type = 'file';
+        picker.accept = 'image/*';
+        picker.style.display = 'none';
+        document.body.appendChild(picker);
+        avatarEl.style.cursor = 'pointer';
+        avatarEl.addEventListener('click', function () { picker.value = ''; picker.click(); });
+        picker.addEventListener('change', function () {
+            var file = this.files && this.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                compressTo(ev.target.result, 512, 0.85, function (dataUrl) { saveCharacterAvatar(dataUrl); });
+            };
+            reader.readAsDataURL(file);
+        });
+        function compressTo(dataUrl, max, q, cb) {
+            var img = new Image();
+            img.onload = function () {
+                try {
+                    var w = img.width, h = img.height;
+                    if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+                    else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+                    var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+                    cv.getContext('2d').drawImage(img, 0, 0, w, h);
+                    cb(cv.toDataURL('image/jpeg', q));
+                } catch (e) { cb(dataUrl); }
+            };
+            img.onerror = function () { cb(dataUrl); };
+            img.src = dataUrl;
+        }
+        function saveCharacterAvatar(dataUrl) {
+            // 同步当前 UI
+            chatAvatar = dataUrl;
+            avatarImage.src = dataUrl;
+            avatarImage.style.display = 'block';
+            avatarPlaceholder.style.display = 'none';
+            // 写入角色库
+            try {
+                var req = indexedDB.open('nano_characters_db', 1);
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {} };
+                req.onsuccess = function (e) {
+                    var db = e.target.result;
+                    try {
+                        var tx = db.transaction('characters', 'readwrite');
+                        var st = tx.objectStore('characters');
+                        var g = st.get(chatId);
+                        g.onsuccess = function () {
+                            var c = g.result || { id: chatId, name: chatName || '角色' };
+                            c.avatar = dataUrl;
+                            st.put(c);
+                        };
+                        tx.oncomplete = function () { try { db.close(); } catch (e2) {} };
+                    } catch (err) { try { db.close(); } catch (e2) {} }
+                };
+            } catch (e) {}
+            // 通知外壳：聊天列表与聊天内页实时换头像
+            try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'nanoCharUpdated', chatId: chatId, name: chatName, avatar: dataUrl }, '*'); } catch (e) {}
+        }
+    })();
+
     var remarkPreview = document.getElementById('remarkPreview');
     var remarkInput = document.getElementById('remarkInput');
     var remarkModal = document.getElementById('remarkModal');

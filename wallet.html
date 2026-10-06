@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>钱包 · 记账</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="css/wallet.css">
+    <link rel="stylesheet" href="css/wallet.css?v=20261006c">
     <script src="js/appearance.js"></script>
 </head>
 <body>
@@ -36,27 +36,19 @@
 
             <!-- ===== 钱包页（与 chat-inner 转账互通） ===== -->
             <div class="page active" id="pageWallet">
-                <!-- 银行卡 -->
-                <div class="bank-card" id="bankCard">
-                    <div class="card-top">
-                        <span class="card-bank-name" id="bankName">我的银行卡</span>
-                        <div class="card-chip"></div>
-                    </div>
-                    <div class="card-balance">
-                        <span class="balance-label">余额</span>
-                        <span class="balance-amount" id="balanceAmount"><span class="currency">¥</span>0.00</span>
-                    </div>
-                    <div class="card-bottom">
-                        <span class="card-number" id="cardNumber">**** **** **** ****</span>
-                        <span class="card-holder">储蓄卡</span>
-                    </div>
-                </div>
+                <!-- 银行卡（上下折叠堆叠：选中的展开，未选中的只露一半） -->
+                <div class="bank-stack" id="bankStack"></div>
+                <div class="card-swipe-hint">上下滑动切换银行卡 / 亲密卡</div>
 
                 <!-- 操作按钮 -->
                 <div class="balance-actions">
                     <button class="action-btn recharge" id="rechargeBtn">
-                        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 11h-6V5h-2v6H5v2h6v6h2v-6h6z"/></svg>
                         充值
+                    </button>
+                    <button class="action-btn" id="editCardBtn">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                        更换银行卡
                     </button>
                 </div>
 
@@ -200,7 +192,8 @@
     <!-- ===== Toast ===== -->
     <div class="toast" id="toast"></div>
 
-    <script src="js/wallet.js"></script>
+    <script src="js/bank-theme.js?v=20261006a"></script>
+    <script src="js/wallet.js?v=20261006e"></script>
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>
 </body>

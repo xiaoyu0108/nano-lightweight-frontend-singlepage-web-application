@@ -215,6 +215,75 @@ body {
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.03);
 }
+/* 银行卡堆叠（Apple 钱包风格）：选中的整张在顶部，其余只露一条边叠在下面 */
+.bank-stack { position: relative; margin-bottom: 14px; }
+.bank-stack .bank-card {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 200px;
+    min-height: 0;
+    margin: 0;
+    padding: 22px;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transform-origin: top center;
+    transition: top 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+}
+.bank-stack .bank-card.top { box-shadow: 0 12px 26px rgba(0, 0, 0, 0.24); animation: cardPop 0.42s ease; }
+.bank-stack .bank-card.peek { box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14); }
+/* 选中卡片：放大 → 停顿 → 回位 */
+@keyframes cardPop {
+    0%   { transform: scale(0.96); }
+    40%  { transform: scale(1.06); }
+    72%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+/* 金卡用深色文字保证对比度 */
+.bank-card.on-gold .card-bank-name,
+.bank-card.on-gold .balance-label,
+.bank-card.on-gold .balance-amount,
+.bank-card.on-gold .card-number,
+.bank-card.on-gold .card-holder,
+.bank-card.on-gold .fc-bound,
+.bank-card.on-gold .currency { color: #3a2f10; }
+.bank-card.on-gold .fc-badge { background: rgba(58, 47, 16, 0.18); color: #3a2f10; }
+/* 亲属卡淡粉底 → 浅粉文字 */
+.bank-card.on-light .card-bank-name,
+.bank-card.on-light .balance-label,
+.bank-card.on-light .balance-amount,
+.bank-card.on-light .card-number,
+.bank-card.on-light .card-holder,
+.bank-card.on-light .fc-bound,
+.bank-card.on-light .currency { color: #b4799a; }
+.bank-card.on-light .fc-badge { background: rgba(255, 255, 255, 0.85); color: #c98caa; }
+/* 自己的卡：灰色 */
+.bank-card.own {
+    background: linear-gradient(145deg, #3d434a, #22262b);
+    box-shadow: 0 8px 32px rgba(20, 24, 28, 0.22), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+/* 亲属卡 / 亲密卡：粉色 */
+.bank-card.family {
+    background: linear-gradient(145deg, #ff9ec4, #ff5fa2);
+    box-shadow: 0 8px 32px rgba(255, 95, 162, 0.28), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.bank-card.family .card-chip {
+    background: linear-gradient(135deg, #ffe1ee, #ffb6d3);
+    opacity: 0.85;
+}
+/* 亲属卡行：徽标 → 连接线 → 绑定人 */
+.card-bank-name .fc-badge {
+    display: inline-block; padding: 1px 7px; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.35); font-size: 11px; font-weight: 700;
+    color: #fff; letter-spacing: 0.5px; margin-right: 2px;
+}
+.card-bank-name .fc-link { display: inline-flex; vertical-align: middle; margin: 0 4px; opacity: 0.9; }
+.card-bank-name .fc-bound { font-weight: 600; color: #fff; }
+.card-swipe-hint { text-align: center; font-size: 11px; color: rgba(120, 120, 130, 0.6); margin-bottom: 14px; }
 .bank-card .card-top {
     display: flex;
     justify-content: space-between;
@@ -316,12 +385,12 @@ body {
 .balance-actions .action-btn svg {
     width: 18px;
     height: 18px;
-    stroke: #007aff;
-    stroke-width: 2;
-    fill: none;
+    color: #007aff;
+    fill: currentColor;
+    stroke: none;
 }
 .balance-actions .action-btn.recharge svg {
-    stroke: #34c759;
+    color: #34c759;
 }
 
 /* ===== 统计卡片（记账页�?===== */

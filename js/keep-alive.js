@@ -97,7 +97,7 @@
         return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     }
 
-    // 生成一段极短、听不见但非静音的 WAV（20Hz、8bit），避免被判定为静音而掐断会话
+    // 生成一段完全静音的 WAV：占住音频会话但不发出任何声音（避免 20Hz 低音被听成嗡嗡/震动声）
     function wavUrl() {
         if (audioUrl) return audioUrl;
         try {
@@ -109,10 +109,8 @@
             put(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
             dv.setUint32(24, rate, true); dv.setUint32(28, rate, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
             put(36, 'data'); dv.setUint32(40, n, true);
-            for (var j = 0; j < n; j++) {
-                var v = 128 + Math.round(Math.sin(2 * Math.PI * 20 * j / rate));
-                dv.setUint8(44 + j, Math.max(0, Math.min(255, v)));
-            }
+            // 8bit PCM 静音 = 128；整段恒定 128，完全没有声音与振动
+            for (var j = 0; j < n; j++) dv.setUint8(44 + j, 128);
             audioUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
         } catch (e) { audioUrl = ''; }
         return audioUrl;
@@ -127,7 +125,7 @@
             audioEl.setAttribute('aria-hidden', 'true');
             audioEl.loop = true;
             audioEl.preload = 'auto';
-            audioEl.volume = 0.04;              // 几乎听不见，但不能是 0
+            audioEl.volume = 1;                 // 内容本身是静音，音量大小无所谓，也不会出现嗡嗡声
             audioEl.src = wavUrl();
             audioEl.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
             (document.body || document.documentElement).appendChild(audioEl);

@@ -57,7 +57,12 @@
             try { localStorage.setItem('nano_storage_swept_v3', '1'); } catch (e) {}
         } catch (e) {}
     }
-    sweepBigStorage();
+    // 只在顶层窗口执行一次清理，且延后到首屏渲染之后再跑，避免打开/切换页面时长时间空白
+    try {
+        if (window.parent === window) {
+            try { setTimeout(sweepBigStorage, 900); } catch (e) { sweepBigStorage(); }
+        }
+    } catch (e) {}
 
     var ENABLE_KEY = 'nano_notify_enabled';
     var SOUND_KEY = 'nano_notify_sound';
@@ -140,26 +145,60 @@
         if (name === 'none') return;
         var ctx = getCtx();
         if (!ctx) return;
+        var doPlay = function () {
+            try {
+                if (name === 'drop') {
+                    tone(ctx, 880, 0, 0.16, 'sine', 0.25);
+                    tone(ctx, 1420, 0.05, 0.18, 'sine', 0.18);
+                } else if (name === 'pop') {
+                    tone(ctx, 420, 0, 0.09, 'triangle', 0.3);
+                    tone(ctx, 780, 0.05, 0.12, 'triangle', 0.22);
+                } else if (name === 'chime') {
+                    tone(ctx, 660, 0, 0.3, 'sine', 0.2);
+                    tone(ctx, 990, 0.06, 0.34, 'sine', 0.17);
+                    tone(ctx, 1320, 0.12, 0.36, 'sine', 0.14);
+                } else if (name === 'tri') {
+                    tone(ctx, 1046, 0, 0.18, 'sine', 0.24);
+                    tone(ctx, 784, 0.16, 0.26, 'sine', 0.2);
+                } else {
+                    tone(ctx, 1174, 0, 0.16, 'sine', 0.28);
+                    tone(ctx, 1568, 0.06, 0.2, 'sine', 0.2);
+                }
+            } catch (e) {}
+        };
+        // iOS 上 AudioContext 需在用户手势里 resume 才会出声；若被挂起，先恢复再播放
+        if (ctx.state === 'suspended') {
+            try {
+                var p = ctx.resume();
+                if (p && typeof p.then === 'function') { p.then(doPlay).catch(function () {}); return; }
+            } catch (e) {}
+        }
+        doPlay();
+    }
+
+    // 首次用户手势时解锁音频：播放一个 0 长度 buffer，之后通知提示音才出得来
+    function unlockAudio() {
+        var ctx = getCtx();
+        if (!ctx) return;
         try {
-            if (name === 'drop') {
-                tone(ctx, 880, 0, 0.16, 'sine', 0.25);
-                tone(ctx, 1420, 0.05, 0.18, 'sine', 0.18);
-            } else if (name === 'pop') {
-                tone(ctx, 420, 0, 0.09, 'triangle', 0.3);
-                tone(ctx, 780, 0.05, 0.12, 'triangle', 0.22);
-            } else if (name === 'chime') {
-                tone(ctx, 660, 0, 0.3, 'sine', 0.2);
-                tone(ctx, 990, 0.06, 0.34, 'sine', 0.17);
-                tone(ctx, 1320, 0.12, 0.36, 'sine', 0.14);
-            } else if (name === 'tri') {
-                tone(ctx, 1046, 0, 0.18, 'sine', 0.24);
-                tone(ctx, 784, 0.16, 0.26, 'sine', 0.2);
-            } else {
-                tone(ctx, 1174, 0, 0.16, 'sine', 0.28);
-                tone(ctx, 1568, 0.06, 0.2, 'sine', 0.2);
-            }
+            if (ctx.state === 'suspended') { var p = ctx.resume(); if (p && p.catch) p.catch(function () {}); }
+            var b = ctx.createBuffer(1, 1, 22050);
+            var s = ctx.createBufferSource();
+            s.buffer = b; s.connect(ctx.destination);
+            try { s.start(0); } catch (e) {}
         } catch (e) {}
     }
+    try {
+        var _unlockOnce = function () {
+            unlockAudio();
+            try {
+                document.removeEventListener('touchend', _unlockOnce, true);
+                document.removeEventListener('click', _unlockOnce, true);
+            } catch (e) {}
+        };
+        document.addEventListener('touchend', _unlockOnce, true);
+        document.addEventListener('click', _unlockOnce, true);
+    } catch (e) {}
 
     function ensurePermission() {
         try {
@@ -355,6 +394,7 @@
     window.NanoNotify = {
         notify: notify,
         playSound: playSound,
+        unlockAudio: unlockAudio,
         ensurePermission: ensurePermission,
         enabled: enabled,
         currentSound: currentSound,

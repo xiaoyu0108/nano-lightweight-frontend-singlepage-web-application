@@ -2848,13 +2848,33 @@
         });
     }
 
+    // 钱包按当前用户（人设/马甲）隔离
+    function nanoWalletUid() {
+        try {
+            const d = JSON.parse(localStorage.getItem('nano_mask_data') || 'null');
+            if (d && d.currentMaskId != null && d.currentMaskId !== '') return String(d.currentMaskId);
+        } catch (e) {}
+        return 'default';
+    }
+    function nanoWalletKey() { return 'wallet_data__' + nanoWalletUid(); }
+
     function readWalletRecord() {
         return openWalletDB().then(function(db) {
             return new Promise(function(resolve, reject) {
                 try {
                     const tx = db.transaction('wallet_data', 'readonly');
-                    const r = tx.objectStore('wallet_data').get('wallet_data');
-                    r.onsuccess = function() { resolve(r.result ? r.result.value : null); };
+                    const store = tx.objectStore('wallet_data');
+                    const key = nanoWalletKey();
+                    const r = store.get(key);
+                    r.onsuccess = function() {
+                        if (r.result) { resolve(r.result.value); return; }
+                        // 兼容旧版全局钱包（该用户尚未迁移时）
+                        try {
+                            const r2 = store.get('wallet_data');
+                            r2.onsuccess = function() { resolve(r2.result ? r2.result.value : null); };
+                            r2.onerror = function() { resolve(null); };
+                        } catch (e) { resolve(null); }
+                    };
                     r.onerror = function() { reject(r.error); };
                     tx.oncomplete = function() { db.close(); };
                 } catch (e) { reject(e); }
@@ -2867,7 +2887,7 @@
             return new Promise(function(resolve, reject) {
                 try {
                     const tx = db.transaction('wallet_data', 'readwrite');
-                    tx.objectStore('wallet_data').put({ key: 'wallet_data', value: rec });
+                    tx.objectStore('wallet_data').put({ key: nanoWalletKey(), value: rec });
                     tx.oncomplete = function() { db.close(); resolve(rec); };
                     tx.onerror = function() { reject(tx.error); };
                 } catch (e) { reject(e); }
@@ -6257,6 +6277,16 @@ if (callCard) {
     // ============================================================
     // 收藏：写入 nano_api_db / favorite_data（与 more 页收藏页共用）
     // ============================================================
+    // 收藏按当前用户（人设/马甲）隔离：一个 user 一套收藏
+    function favoriteUid() {
+        try {
+            const d = JSON.parse(localStorage.getItem('nano_mask_data') || 'null');
+            if (d && d.currentMaskId != null && d.currentMaskId !== '') return String(d.currentMaskId);
+        } catch (e) {}
+        return 'default';
+    }
+    function favoriteKey() { return 'nano_favorite__' + favoriteUid(); }
+
     function favoriteOpenDb() {
         return new Promise(function(resolve, reject) {
             try {
@@ -6273,23 +6303,64 @@ if (callCard) {
         });
     }
 
+    function favoriteReadLocal() {
+        try {
+            const raw = localStorage.getItem(favoriteKey());
+            if (raw) { const o = JSON.parse(raw); if (o && Array.isArray(o.favorites)) return o; }
+        } catch (e) {}
+        return null;
+    }
+    // 合并两份收藏（按 id / 内容去重），保证任何一份都不会被覆盖丢失
+    function favMerge(a, b) {
+        const out = [], seen = {};
+        (a || []).concat(b || []).forEach(function (f) {
+            if (!f) return;
+            const k = f.id || ((f.content || '') + '|' + (f.chatId || ''));
+            if (seen[k]) return;
+            seen[k] = 1; out.push(f);
+        });
+        return out;
+    }
     function favoriteRead() {
         return favoriteOpenDb().then(function(db) {
             return new Promise(function(resolve) {
                 try {
-                    const r = db.transaction('favorite_data', 'readonly').objectStore('favorite_data').get('nano_favorite');
-                    r.onsuccess = function() { resolve(r.result ? r.result.value : null); };
+                    const store = db.transaction('favorite_data', 'readonly').objectStore('favorite_data');
+                    const r = store.get(favoriteKey());
+                    r.onsuccess = function() {
+                        if (r.result) { resolve(r.result.value); return; }
+                        // 旧版全局收藏只对「第一个用户」可见，避免串号
+                        const uid = favoriteUid();
+                        let owner = '';
+                        try { owner = localStorage.getItem('nano_favorite_legacy_owner') || ''; } catch (e) {}
+                        if (!owner) { try { localStorage.setItem('nano_favorite_legacy_owner', uid); } catch (e) {} }
+                        if (owner && owner !== uid) { resolve(null); return; }
+                        try {
+                            const r2 = store.get('nano_favorite');
+                            r2.onsuccess = function() { resolve(r2.result ? r2.result.value : null); };
+                            r2.onerror = function() { resolve(null); };
+                        } catch (e2) { resolve(null); }
+                    };
                     r.onerror = function() { resolve(null); };
                 } catch (e) { resolve(null); }
             });
-        }).catch(function() { return null; });
+        }).then(function (v) {
+            // IndexedDB 与 localStorage 取并集，避免任一份为空/偏旧时丢收藏
+            const local = favoriteReadLocal();
+            const a = (v && Array.isArray(v.favorites)) ? v.favorites : [];
+            const b = (local && Array.isArray(local.favorites)) ? local.favorites : [];
+            if (!a.length && !b.length) return v || local;
+            return { favorites: favMerge(a, b) };
+        }).catch(function () { return favoriteReadLocal(); });
     }
 
     function favoriteWrite(obj) {
+        // 同时镜像到 localStorage，IndexedDB 异常时也不会丢
+        try { localStorage.setItem(favoriteKey(), JSON.stringify(obj)); } catch (e) {}
         return favoriteOpenDb().then(function(db) {
             return new Promise(function(resolve) {
                 try {
-                    db.transaction('favorite_data', 'readwrite').objectStore('favorite_data').put({ key: 'nano_favorite', value: obj });
+                    db.transaction('favorite_data', 'readwrite').objectStore('favorite_data').put({ key: favoriteKey(), value: obj });
                 } catch (e) {}
                 resolve();
             });
@@ -6321,13 +6392,16 @@ if (callCard) {
         const sender = favoriteSenderName(msg);
         const senderType = msg.type === 'left' ? 'char' : 'user';
         const isUser = msg.type !== 'left';
+        const favText = favoriteContentText(msg);
+        const favId = msg.id || ('f' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
         favoriteRead().then(function(cur) {
             const list = (cur && Array.isArray(cur.favorites)) ? cur.favorites : [];
-            if (list.some(function(f) { return f.id === msg.id; })) return;
+            // 同一角色 + 相同内容，或同一 id → 视为已收藏（可收藏任意多条不同消息）
+            if (list.some(function(f) { return f.id === favId || (favText && f.content === favText && f.chatId === (chatId || '')); })) return;
             const takeAvatar = function(avatar) {
                 list.unshift({
-                    id: msg.id,
-                    content: favoriteContentText(msg),
+                    id: favId,
+                    content: favText,
                     sender: sender,
                     senderType: senderType,
                     time: msg.time || '',
@@ -6336,7 +6410,7 @@ if (callCard) {
                     kind: msg.isImage ? 'image' : (msg.isVoice ? 'voice' : (msg.isCard ? 'card' : 'text'))
                 });
                 const payload = { favorites: list };
-                try { localStorage.setItem('nano_favorite', JSON.stringify(payload)); } catch (e) {}
+                try { localStorage.setItem(favoriteKey(), JSON.stringify(payload)); } catch (e) {}
                 favoriteWrite(payload).catch(function() {});
                 try {
                     window.parent.postMessage({ type: 'refreshFavorites' }, '*');
@@ -6360,7 +6434,7 @@ if (callCard) {
         favoriteRead().then(function(cur) {
             const list = (cur && Array.isArray(cur.favorites)) ? cur.favorites : [];
             const payload = { favorites: list.filter(function(f) { return f.id !== msgId; }) };
-            try { localStorage.setItem('nano_favorite', JSON.stringify(payload)); } catch (e) {}
+            try { localStorage.setItem(favoriteKey(), JSON.stringify(payload)); } catch (e) {}
             favoriteWrite(payload).catch(function() {});
             try {
                 window.parent.postMessage({ type: 'refreshFavorites' }, '*');
@@ -6421,20 +6495,56 @@ if (callCard) {
         exitMultiSelect();
     });
 
-    // 把双击气泡菜单完整限制在屏幕内（左右上下都不越界）
-    function placeLongpressMenu(x, y) {
+    // 读取屏幕安全区（灵动岛/刘海、底部 home 条），只探测一次
+    let _safeTop = null, _safeBottom = null;
+    function safeInset() {
+        if (_safeTop !== null && _safeBottom !== null) return { top: _safeTop, bottom: _safeBottom };
+        let top = 0, bottom = 0;
+        try {
+            const probe = document.createElement('div');
+            probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;' +
+                'padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);';
+            document.body.appendChild(probe);
+            const cs = getComputedStyle(probe);
+            top = parseFloat(cs.paddingTop) || 0;
+            bottom = parseFloat(cs.paddingBottom) || 0;
+            probe.remove();
+        } catch (e) {}
+        _safeTop = top; _safeBottom = bottom;
+        return { top: top, bottom: bottom };
+    }
+
+    // 双击气泡菜单：始终贴在选中的气泡上/下方，绝不跑出屏幕，也避开灵动岛/安全区
+    function placeLongpressMenu(row) {
         const menu = longpressMenu;
         if (!menu) return;
         menu.classList.add('active');
-        const pad = 10;
         const vw = window.innerWidth || 1, vh = window.innerHeight || 1;
+        const safe = safeInset();
+        const pad = 8;
+        const minTop = safe.top + pad;
+        const maxBottom = vh - safe.bottom - pad;
         const mw = menu.offsetWidth || 170;
         const mh = menu.offsetHeight || 300;
-        let left = x - mw / 2;
+
+        // 以被选中的气泡为锚点
+        let rect = null;
+        try {
+            const bubble = row && (row.querySelector('.bubble') || row.querySelector('.message-bubble') || row.querySelector('.bubble-card') || row);
+            if (bubble && bubble.getBoundingClientRect) rect = bubble.getBoundingClientRect();
+        } catch (e) {}
+        if (!rect) rect = { left: vw / 2, right: vw / 2, width: 0, top: vh / 2, bottom: vh / 2 };
+
+        // 水平：对齐气泡中心，再夹在屏幕内
+        let left = Math.round(rect.left + (rect.width || 0) / 2 - mw / 2);
         left = Math.max(pad, Math.min(vw - mw - pad, left));
-        let top = y - 20;
-        top = Math.max(pad, Math.min(vh - mh - pad, top));
-        if (top < pad) top = pad;
+
+        // 垂直：优先气泡下方；下方放不下则放到气泡上方（只在上/下，不跑走）
+        const gap = 8;
+        let top = rect.bottom + gap;
+        if (top + mh > maxBottom) top = rect.top - mh - gap;
+        top = Math.max(minTop, Math.min(maxBottom - mh, top));
+
         menu.style.left = left + 'px';
         menu.style.top = top + 'px';
     }
@@ -6459,9 +6569,7 @@ if (callCard) {
     
     // 设置为长按目标，复用现有的长按菜单
     longpressTarget = row;
-    const x = e.clientX || e.pageX || 0;
-    const y = e.clientY || e.pageY || 0;
-    placeLongpressMenu(x, y);
+    placeLongpressMenu(row);
     e.preventDefault();
     return;
 }
@@ -6473,9 +6581,7 @@ if (callCard) {
     e.preventDefault();
     e.stopPropagation();
     longpressTarget = targetRow;
-    const x = e.clientX || e.pageX || 0;
-    const y = e.clientY || e.pageY || 0;
-    placeLongpressMenu(x, y);
+    placeLongpressMenu(targetRow);
 });
 
     document.addEventListener('click', function(e) {

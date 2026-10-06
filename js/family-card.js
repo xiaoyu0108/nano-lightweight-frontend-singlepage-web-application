@@ -63,6 +63,23 @@
     var limitInput = $('limitInput');
     var editingId = null;
 
+    // 开卡银行选择（决定亲属卡颜色）
+    var inviteBanks = $('inviteBanks');
+    var _bankId = (window.NanoBank && NanoBank.DEFAULT) || 'gray';
+    (function renderBankPicker() {
+        if (!inviteBanks || !window.NanoBank) return;
+        inviteBanks.innerHTML = NanoBank.list.map(function (b) {
+            return '<button type="button" class="fc-bank' + (b.id === _bankId ? ' sel' : '') + '" data-bank="' + b.id + '">' +
+                '<span class="sw" style="background:' + b.bg + '"></span><span class="nm">' + b.name + '</span></button>';
+        }).join('');
+        Array.prototype.forEach.call(inviteBanks.querySelectorAll('.fc-bank'), function (btn) {
+            btn.addEventListener('click', function () {
+                _bankId = btn.getAttribute('data-bank');
+                Array.prototype.forEach.call(inviteBanks.querySelectorAll('.fc-bank'), function (b) { b.classList.toggle('sel', b === btn); });
+            });
+        });
+    })();
+
     function money(n) {
         n = Number(n) || 0;
         return '¥' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -136,9 +153,12 @@
                     '<button class="fc-card-btn danger" data-act="remove" data-id="' + esc(c.id) + '">删除</button>' +
                     '</div>';
             }
+            var bank = (window.NanoBank && NanoBank.get(c.bankId)) || null;
+            var bankName = c.bankName || (bank ? bank.name : '');
             return '<div class="' + cls + '">' +
                 '<div class="fc-card-top"><span class="fc-card-type">' + esc(typeLabel) + '</span>' +
                 '<span class="fc-badge">' + badge + '</span></div>' +
+                (bankName ? '<div class="fc-bank-name">' + esc(bankName) + '</div>' : '') +
                 '<div class="fc-card-limit">' + moneyCompact(c.limit) + '</div>' +
                 '<div class="fc-card-meta">已用 ' + moneyCompact(used) + ' · 剩余 ' + moneyCompact(remain) + '</div>' +
                 actions +
@@ -151,7 +171,7 @@
             fcFlow.innerHTML = '<div class="fc-flow-empty">暂无流水</div>';
             return;
         }
-        var icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>';
+        var icon = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h18a1 1 0 0 1 1 1v3H2V6a1 1 0 0 1 1-1zM2 11h20v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-7zm3 3v2h6v-2H5z"/></svg>';
         fcFlow.innerHTML = txs.slice(0, 100).map(function (t) {
             var expense = t.type === 'expense';
             return '<div class="fc-flow-item">' +
@@ -197,8 +217,9 @@
         var lim = Math.max(0, Math.round((parseFloat(limit) || 0) * 100) / 100);
         if (lim > 1e9) lim = 1e9; // 上限十亿（以亿为单位）
         if (lim <= 0) { toast('请输入正确的额度'); return; }
-        S.add(chatId, { issuer: 'user', holder: 'char', limit: lim, spent: 0, status: 'pending', note: '' });
-        postToParent({ type: 'NANO_FAMILY_CARD_SUBMIT', chatId: chatId, name: contactName, limit: lim });
+        var bank = (window.NanoBank && NanoBank.get(_bankId)) || { id: 'gray', name: '储蓄卡' };
+        S.add(chatId, { issuer: 'user', holder: 'char', limit: lim, spent: 0, status: 'pending', note: '', bankId: bank.id, bankName: bank.name });
+        postToParent({ type: 'NANO_FAMILY_CARD_SUBMIT', chatId: chatId, name: contactName, limit: lim, bankId: bank.id, bankName: bank.name });
         toast('邀请已发出，等待对方回应');
         refresh();
     }
