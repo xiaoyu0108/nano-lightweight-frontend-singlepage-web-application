@@ -574,6 +574,14 @@ body {
 .form-btn.primary:hover {
     background: rgba(28,28,30,0.8);
 }
+.form-btn.danger {
+    background: #ff3b30;
+    color: #fff;
+    border: 1px solid #ff3b30;
+}
+.form-btn.danger:hover {
+    background: #e63329;
+}
 .form-btn.secondary {
     background: rgba(255,255,255,0.3);
     color: #1c1c1e;

@@ -1328,6 +1328,22 @@
             insFrame.style.display = 'none';
             isMusicFrameActive = false;
         }
+        // 通用全屏帧：这些页面已加载同一 URL 时直接复用（不重载），切换更快；
+        // 未列出的页面仍按原逻辑加载，避免停留在旧子页面。
+        const REUSE_SAFE_PAGES = ['other.html', 'emoji.html', 'inner-setting.html', 'nano-setting.html',
+            'groups.html', 'group-setting.html', 'imessage.html', 'storage.html', 'backup.html',
+            'wallet.html', 'appstore.html', 'family-card.html', 'favorite.html', 'books.html', 'meet.html'];
+        function reuseOrLoadOverlayFrame(url) {
+            const base = baseName(url);
+            const loadedExact = overlayFrame.getAttribute('data-loaded-url') === url;
+            if (loadedExact && REUSE_SAFE_PAGES.indexOf(base) !== -1) {
+                try { overlayFrame.contentWindow.postMessage({ type: 'nanoOverlayReopen' }, '*'); } catch (e) {}
+                return;
+            }
+            if (frameBase(overlayFrame) === base && hasActiveRefreshForFrame(overlayFrame)) return;
+            overlayFrame.setAttribute('data-loaded-url', url);
+            overlayFrame.src = url;
+        }
         function showVoiceFrame() {
             voiceCallFrame.style.display = 'block';
             overlayFrame.style.display = 'none';
@@ -1458,7 +1474,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-05-02';
+        var BUILD = 'nano-2026-10-06-03';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -1500,9 +1516,7 @@
             } else if (url.includes('memory.html')) {
                 pickOverlayFrame(url);
                 showOverlayFrame();
-                if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
-                    overlayFrame.src = url;
-                }
+                reuseOrLoadOverlayFrame(url);
                 overlay.classList.add('no-header');
                 overlayTitle.textContent = '';
                 overlayBack.classList.add('hidden');
@@ -1529,10 +1543,8 @@
             } else {
                 pickOverlayFrame(url);
                 showOverlayFrame();
-                // 若该应用正在后台生成，直接复用不重载（否则会中断生成）
-                if (!(frameBase(overlayFrame) === baseName(url) && hasActiveRefreshForFrame(overlayFrame))) {
-                    overlayFrame.src = url;
-                }
+                // 同一个页面且已加载过 → 直接复用（切换更快）；正在后台生成 → 也必须复用（否则中断生成）
+                reuseOrLoadOverlayFrame(url);
                 const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html', 'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
@@ -2218,6 +2230,8 @@
             }
             if (target.indexOf('offline:') === 0) {
                 const oid = target.slice(8);
+                // 线上 → 线下：系统提示「已进入线下」
+                try { if (window.__nanoShell) window.__nanoShell.postToChat({ type: 'NANO_SYS_NOTICE', text: '已进入线下' }); } catch (e) {}
                 openFullscreen('offline.html?chat=' + encodeURIComponent(oid), '线下聊天', false, 'main');
                 return;
             }
@@ -2892,6 +2906,54 @@
                 }
             }
 
+            // 线下 → 直接退出：回到聊天列表，并记住该角色「下次直接进线下」
+            if (data.type === 'nanoOfflineExitToChat') {
+                try { localStorage.setItem('nano_chat_mode_' + (data.chatId || 'default'), 'offline'); } catch (e) {}
+                try { currentOverlaySource = 'main'; } catch (e) {}
+                try { closeFullscreen(); } catch (e) {}
+                return;
+            }
+
+            // 线下 → 返回线上：提示「已结束线下」并把线下最新一轮带回线上作衔接
+            if (data.type === 'nanoOfflineReturnOnline') {
+                const chatId = data.chatId || '';
+                try { localStorage.setItem('nano_chat_mode_' + (chatId || 'default'), 'online'); } catch (e) {}
+                const lu = String(data.lastUser || '').trim();
+                const lc = String(data.lastChar || '').trim();
+                const deliver = function (win) {
+                    if (!win) return;
+                    try {
+                        win.postMessage({ type: 'NANO_SYS_NOTICE', text: '已结束线下' }, '*');
+                        if (chatId && (lu || lc)) win.postMessage({ type: 'NANO_OFFLINE_ROUND', chatId: chatId, lastUser: lu, lastChar: lc }, '*');
+                    } catch (e) {}
+                };
+                const cf2 = document.getElementById('chatInnerFrame');
+                const expected = chatId ? ('chat=' + encodeURIComponent(chatId)) : '';
+                const loadedUrl = cf2 ? (cf2.getAttribute('data-loaded-url') || '') : '';
+                const aliveForChat = cf2 && frameBase(cf2) === 'chat_inner.html' && (!expected || loadedUrl.indexOf(expected) !== -1);
+                if (aliveForChat) {
+                    currentOverlaySource = 'chat_inner';
+                    closeFullscreen();
+                    setTimeout(function () { deliver(cf2.contentWindow); }, 60);
+                } else {
+                    let chatInfo = null;
+                    try { chatInfo = JSON.parse(sessionStorage.getItem('last_chat_info') || 'null'); } catch (e) {}
+                    const name = (chatInfo && chatInfo.chatId === chatId && chatInfo.chatName) || data.name || '聊天';
+                    const url = 'chat_inner.html?chat=' + encodeURIComponent(chatId || 'default') + '&name=' + encodeURIComponent(name);
+                    openFullscreen(url, '', false, 'main');
+                    let tries = 0;
+                    (function waitReady() {
+                        tries++;
+                        const f = document.getElementById('chatInnerFrame');
+                        let ready = false;
+                        try { ready = !!(f && f.contentWindow && f.contentWindow.document && f.contentWindow.document.readyState === 'complete'); } catch (e) {}
+                        if (ready || tries > 12) { deliver(f && f.contentWindow); return; }
+                        setTimeout(waitReady, 250);
+                    })();
+                }
+                return;
+            }
+
             if (data.type === 'jumpToMessage') {
                 pendingJumpMsgId = data.msgId || null;
                 currentOverlaySource = 'chat_inner';
@@ -2937,6 +2999,15 @@
                 try {
                     sessionStorage.setItem('last_chat_info', JSON.stringify({ chatId, chatName, chatAvatar }));
                 } catch(e) {}
+                // 上次从线下「直接退出」的角色：再点开直接进线下，不进线上
+                let chatMode = 'online';
+                try { chatMode = localStorage.getItem('nano_chat_mode_' + (chatId || 'default')) || 'online'; } catch (e) {}
+                if (chatMode === 'offline') {
+                    isChatInnerActive = false;
+                    currentOverlaySource = 'main';
+                    openFullscreen('offline.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(chatName), '线下聊天', false, 'main');
+                    return;
+                }
                 const url = 'chat_inner.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent(chatName);
                 isChatInnerActive = true;
                 currentOverlaySource = 'main';

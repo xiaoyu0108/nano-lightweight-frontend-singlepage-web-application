@@ -772,10 +772,63 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    // 想完全上下堆叠：grid-template-columns: 1fr; 再让图标 grid-column: 1 / -1; justify-self: start;
 
    注意：
+   - 选择器一定要带 .nano-chat-inner 前缀！模板自带的卡片样式是
+     .nano-chat-inner .bubble-card .card-main{...}（优先级 0,3,0）。
+     只写 .card-main{...}（0,1,0）会被它压掉、看起来「根本不生效」。同前缀 + 写在后面才生效。
    - 文字组没类名，用 .card-main > div:not(.icon-wrap) 命中；只改某变体就再加 .transfer / .gift…
+   - 想让「金额」和「备注」拆成两行，必须给文字组 display:contents（见配方 O2），
+     否则 .card-title / .card-sub 会作为一个整体，无法各自成行。
    - 通话卡/一起听卡的部分文字带行内样式，改不动时用 !important（例如 .card-sub{... !important}）。
    - 换行/重排是纯 CSS，接收/退回按钮与点击事件照旧；但别删 .card-btn 等元素，删了功能会丢。
    ============================================================ */
+
+/* ============================================================
+   配方 O2：把卡片做成「方形四行」版式（可玩性配方 · 默认不启用）
+   初始卡片仍然是长方形；这里只是「想改成方形」时的示例，照抄即可。
+   目标：第1行 图标+英文 / 第2行 大号主体 / 第3行 小字备注 / 第4行 1:1 接收·退还
+   要点（也是以前「不生效」的原因）：
+     ① 卡片样式必须带 .nano-chat-inner 前缀；模板自带的是
+        .nano-chat-inner .bubble-card …（优先级 0,3,0），
+        只写 .card-main{…}（0,1,0）会被它压掉、看起来完全没反应；
+     ② .card-title / .card-sub 被包在一个匿名 div 里，必须给该 div display:contents，
+        它俩才能各自成为独立的一行。
+   只作用于转账/红包；要让别的卡片（一起听/文件/情侣卡…）也变方形，
+   把选择器里的 .transfer,.gift 换成对应变体类名即可；想要更小就调小 width/height。
+   用法：把下面注释里的整段 CSS 复制到你的「聊天美化」CSS 末尾即可生效。
+   ============================================================ */
+/* 方形卡片 CSS：
+.nano-chat-inner .bubble-card.transfer,
+.nano-chat-inner .bubble-card.gift {
+  display: flex; flex-direction: column;
+  width: 200px; height: 200px; box-sizing: border-box;
+  border-radius: 20px; padding: 0; overflow: hidden;
+}
+.nano-chat-inner .bubble-card.transfer .card-main,
+.nano-chat-inner .bubble-card.gift .card-main {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: auto 1fr;
+  grid-template-rows: auto 1fr auto; gap: 2px 10px;
+  padding: 14px 14px 6px; align-items: center;
+}
+.nano-chat-inner .bubble-card.transfer .card-main > div:not(.icon-wrap),
+.nano-chat-inner .bubble-card.gift .card-main > div:not(.icon-wrap) { display: contents; }
+.nano-chat-inner .bubble-card.transfer .card-main .icon-wrap,
+.nano-chat-inner .bubble-card.gift .card-main .icon-wrap { grid-column: 1; grid-row: 1; width: 34px; height: 34px; border-radius: 50%; }
+.nano-chat-inner .bubble-card.transfer .card-main::before { content: "transfer"; grid-column: 2; grid-row: 1; align-self: center; font-size: 17px; font-weight: 700; }
+.nano-chat-inner .bubble-card.gift .card-main::before { content: "gift"; grid-column: 2; grid-row: 1; align-self: center; font-size: 17px; font-weight: 700; }
+.nano-chat-inner .bubble-card.transfer .card-main .card-title,
+.nano-chat-inner .bubble-card.gift .card-main .card-title { grid-column: 1 / -1; grid-row: 2; align-self: center; font-size: 30px; font-weight: 700; line-height: 1.1; }
+.nano-chat-inner .bubble-card.transfer .card-main .card-sub,
+.nano-chat-inner .bubble-card.gift .card-main .card-sub { grid-column: 1 / -1; grid-row: 3; align-self: end; font-size: 12px; opacity: .85; }
+.nano-chat-inner .bubble-card.transfer .card-footer,
+.nano-chat-inner .bubble-card.gift .card-footer { flex: none; display: block; padding: 0 12px 12px; }
+.nano-chat-inner .bubble-card.transfer .card-footer .card-footer-text,
+.nano-chat-inner .bubble-card.gift .card-footer .card-footer-text { display: none; }
+.nano-chat-inner .bubble-card.transfer .card-footer .card-actions,
+.nano-chat-inner .bubble-card.gift .card-footer .card-actions { display: flex; gap: 10px; }
+.nano-chat-inner .bubble-card.transfer .card-footer .card-btn,
+.nano-chat-inner .bubble-card.gift .card-footer .card-btn { flex: 1 1 0; text-align: center; padding: 8px 0; font-size: 14px; border-radius: 12px; }
+*/
 
 /* 配方 L：只移动「消息头像」，顶栏「设置」按钮原地不动、逻辑不变
    消息头像 = .message-avatar；顶栏设置按钮 = .topbar-avatar，两者完全独立。

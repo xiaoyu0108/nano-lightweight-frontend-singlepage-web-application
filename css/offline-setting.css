@@ -4,23 +4,24 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none !import
 input[type=number] { -moz-appearance: textfield !important; appearance: textfield !important; }
 *{box-sizing:border-box}
 :root{
-  --bg:#f5f0f0;
-  --paper:#f5f0f0;
-  --paper2:#f8f3f3;
-  --line:#e5ddde;
-  --line2:#d9cfd0;
-  --ink:#3d3536;
-  --sub:#b0a2a4;
-  --soft:#f5edee;
-  --accent:#bca8ab;
-  --danger:#c28388;
+  --bg:#f3edf0;
+  --paper:#fffdfe;
+  --paper2:#fbf6f7;
+  --line:#f0e4e7;
+  --line2:#ead9dc;
+  --ink:#433a3b;
+  --sub:#b6a9ab;
+  --soft:#f6eef0;
+  --accent:#dca7b1;
+  --accent-deep:#c98f9b;
+  --danger:#cf8b92;
 }
 html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--ink);
 font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Helvetica Neue",sans-serif}
 body{overflow:hidden}button,input,textarea,select{font:inherit}button{border:0;background:none;color:inherit;cursor:pointer}
 button:active{opacity:.55}.app{height:100%;display:flex;flex-direction:column}
 .topbar{height:calc(64px + var(--safe-top, env(safe-area-inset-top, 0px)));flex:none;padding-top:var(--safe-top, env(safe-area-inset-top, 0px));display:flex;align-items:center;justify-content:space-between;
-background:rgba(248,243,244,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--line);z-index:20;position:relative}
+background:linear-gradient(180deg,rgba(251,246,247,.96),rgba(246,238,240,.92));backdrop-filter:blur(20px);border-bottom:1px solid var(--line);z-index:20;position:relative;box-shadow:0 1px 0 rgba(255,255,255,.6) inset}
 .top-title{flex:1;min-width:0;text-align:center;font-size:17px;font-weight:650;color:#5a4e50;pointer-events:none;position:relative;z-index:1}.top-btn{flex:none;height:50px;width:50px;display:grid;place-items:center;color:#b8aaac;position:relative;z-index:2}
 .save-btn{font-size:13px;font-weight:600;width:64px;color:#b8aaac}.back-icon{width:22px;height:22px}
 .content{flex:1;overflow-y:auto;padding:16px 14px 38px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -57,7 +58,7 @@ box-shadow:0 -12px 45px rgba(60,45,48,.12);padding-bottom:calc(10px + 0px);displ
 font-size:11px;background:#fff;cursor:pointer;color:#4d4345}.import-label input{display:none}
 .sheet-toolbar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px}
 .sheet-btn{height:34px;padding:0 12px;border:1px solid var(--line2);border-radius:10px;font-size:11px;background:#fff;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;color:#4d4345}
-.sheet-btn.primary{background:#bca8ab;color:#fff;border-color:#bca8ab}
+.sheet-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .sheet-btn.danger{color:var(--danger)}
 .textarea{width:100%;min-height:150px;max-height:36vh;resize:vertical;border:1px solid var(--line2);border-radius:13px;
 background:#fff;outline:none;padding:11px 12px;font-size:12px;line-height:1.65;color:#3d3536}
@@ -69,7 +70,7 @@ background:#fff;outline:none;padding:11px 12px;font-size:12px;line-height:1.65;c
 .icon-export svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .switch{width:40px;height:24px;border-radius:14px;background:#d1cfd6;padding:3px;position:relative;flex:none;cursor:pointer;transition:background .2s;border:1px solid #c5c3ca}
 .switch i{display:block;width:18px;height:18px;background:#fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:transform .2s cubic-bezier(.34,1.56,.64,1);border:1px solid #e8e7ec}
-.switch.on{background:#bca8ab;border-color:#a89497}
+.switch.on{background:var(--accent);border-color:var(--accent-deep)}
 .switch.on i{transform:translateX(16px)}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(60,45,48,.25);backdrop-filter:blur(5px);z-index:100;align-items:center;justify-content:center;padding:24px}
 .modal-bg.open{display:flex}.modal{width:min(330px,100%);background:#faf5f5;border-radius:20px;overflow:hidden;box-shadow:0 18px 55px rgba(60,45,48,.15)}
@@ -77,7 +78,7 @@ background:#fff;outline:none;padding:11px 12px;font-size:12px;line-height:1.65;c
 .modal-buttons{border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;background:#faf5f5}
 .modal-buttons button{height:46px;font-size:13px;font-weight:600;color:#4d4345}
 .modal-buttons button+button{border-left:1px solid var(--line)}.modal-delete{color:var(--danger);font-weight:600}
-.toast{position:fixed;left:50%;bottom:28px;z-index:120;transform:translate(-50%,8px);background:#bca8ab;color:#fff;padding:8px 13px;border-radius:16px;font-size:12px;opacity:0;pointer-events:none;transition:.2s}
+.toast{position:fixed;left:50%;bottom:28px;z-index:120;transform:translate(-50%,8px);background:var(--accent-deep);color:#fff;padding:8px 13px;border-radius:16px;font-size:12px;opacity:0;pointer-events:none;transition:.2s;box-shadow:0 8px 22px rgba(180,120,135,.28)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
 /* 规则管理专用样式 */
@@ -120,7 +121,7 @@ background:#fff;outline:none;padding:11px 12px;font-size:12px;line-height:1.65;c
 .edit-panel .field input:focus,.edit-panel .field textarea:focus{border-color:#dcc8cb}
 .edit-panel .edit-actions{display:flex;gap:6px;margin-top:8px}
 .edit-panel .edit-actions button{flex:1;height:32px;border-radius:9px;font-size:11px;font-weight:550}
-.edit-panel .edit-actions .save{background:#bca8ab;color:#fff;border-color:#bca8ab}
+.edit-panel .edit-actions .save{background:var(--accent);color:#fff;border-color:var(--accent)}
 .edit-panel .edit-actions .cancel{background:#fff;border:1px solid var(--line2);color:#4d4345}
 
 .group-edit-panel{background:#f8f3f3;border-radius:12px;padding:12px;margin:8px 12px 12px 12px;display:none;border:1px solid var(--line)}
@@ -130,13 +131,13 @@ background:#fff;outline:none;padding:11px 12px;font-size:12px;line-height:1.65;c
 .group-edit-panel .field input{width:100%;border:1px solid var(--line2);border-radius:9px;padding:7px 10px;font-size:12px;background:#fff;outline:none;color:#3d3536}
 .group-edit-panel .edit-actions{display:flex;gap:6px;margin-top:8px}
 .group-edit-panel .edit-actions button{flex:1;height:32px;border-radius:9px;font-size:11px;font-weight:550}
-.group-edit-panel .edit-actions .save{background:#bca8ab;color:#fff;border-color:#bca8ab}
+.group-edit-panel .edit-actions .save{background:var(--accent);color:#fff;border-color:var(--accent)}
 .group-edit-panel .edit-actions .cancel{background:#fff;border:1px solid var(--line2);color:#4d4345}
 
 .group-empty{color:var(--sub);font-size:11px;padding:12px 0;text-align:center}
 .top-toolbar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
 .top-toolbar .sheet-btn{height:34px;padding:0 14px}
-.top-toolbar .sheet-btn.primary{background:#bca8ab;color:#fff;border-color:#bca8ab}
+.top-toolbar .sheet-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 /* 美化区域 */
 .beautify-preset-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
@@ -144,18 +145,22 @@ background:#fff;outline:none;padding:11px 12px;font-size:12px;line-height:1.65;c
 .preset-name-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
 .preset-name-row input{flex:1;height:34px}
 .toolbar-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-top:6px}
-.toolbar-grid .sheet-btn{justify-content:center}
+.toolbar-grid .sheet-btn{justify-content:center;width:100%}
+/* 头像框 / 背景图 / 清空背景图：三等分等宽 */
+.bg-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px}
+.bg-actions .sheet-btn{justify-content:center;width:100%;padding:0 6px}
 
 /* ===== 让离线页面主�? --page/--card/--ink/--pink-deep �?)也作用到设置�?===== */
 :root{
-  --bg: var(--page, #f5f0f0);
-  --paper: var(--card, #f8f3f3);
-  --paper2: var(--header, #f0eaea);
-  --soft: var(--gray-pink, #f5edee);
-  --accent: var(--pink-deep, #bca8ab);
-  --sub: var(--muted, #b0a2a4);
-  --line2: var(--line-strong, #d9cfd0);
-  --ink: var(--ink, #3d3536);
+  --bg: var(--page, #f3edf0);
+  --paper: var(--card, #fffdfe);
+  --paper2: var(--header, #fbf6f7);
+  --soft: var(--gray-pink, #f6eef0);
+  --accent: var(--pink-deep, #dca7b1);
+  --accent-deep: var(--pink-deep, #c98f9b);
+  --sub: var(--muted, #b6a9ab);
+  --line2: var(--line-strong, #ead9dc);
+  --ink: #433a3b;
 }
 .group, .rule-group-card{background:var(--paper);border-color:var(--line)}
 .row{background:var(--paper)}

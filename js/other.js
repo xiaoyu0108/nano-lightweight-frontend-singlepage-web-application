@@ -54,7 +54,15 @@
     if (keepToggle) {
         keepToggle.checked = (localStorage.getItem(KEEP_KEY) === '1');
         if (keepToggle.checked) applyKeepAlive(true);
-        keepToggle.addEventListener('change', function () { applyKeepAlive(this.checked); });
+        keepToggle.addEventListener('change', function () {
+            applyKeepAlive(this.checked);
+            // 保活与 Bark 都是后台推送方案，二选一即可
+            if (this.checked && barkToggle && window.NanoNotify) {
+                try { NanoNotify.setBarkEnabled(false); } catch (e) {}
+                barkToggle.checked = false;
+                setBarkStatus('已切换为音频保活，Bark 推送已关闭');
+            }
+        });
     }
 
     if (notifyToggle) {
@@ -82,6 +90,12 @@
         barkToggle.addEventListener('change', function () {
             NanoNotify.setBarkEnabled(this.checked);
             setBarkStatus(this.checked ? 'Bark 推送已开启' : 'Bark 推送已关闭，不会再向 Bark 推送');
+            // 保活与 Bark 都是后台推送方案，二选一即可
+            if (this.checked && keepToggle) {
+                applyKeepAlive(false);
+                keepToggle.checked = false;
+                setBarkStatus('Bark 推送已开启（已自动关闭音频保活）');
+            }
         });
     }
     if (barkKeyInput && window.NanoNotify) {
@@ -442,6 +456,8 @@
         Array.prototype.forEach.call(panels, function (p) {
             p.classList.toggle('active', p.getAttribute('data-seg') === seg);
         });
+        // 切换 tab 时回到顶部，避免停留在上一屏的滚动位置
+        try { var c = document.querySelector('.container'); if (c) c.scrollTop = 0; } catch (e) {}
     }
     Array.prototype.forEach.call(bar.querySelectorAll('.seg-btn'), function (b) {
         b.addEventListener('click', function () { show(this.getAttribute('data-seg')); });

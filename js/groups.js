@@ -1106,11 +1106,20 @@
                 method:'POST',
                 headers:{ 'Authorization':'Bearer ' + imgKey, 'Content-Type':'application/json' },
                 body: JSON.stringify({ model:imgModel, prompt:desc, n:1, size:'1024x1024' })
-            }).then(function(r){ if (!r.ok) throw new Error('image'); return r.json(); }).then(function(d){
+            }).then(function(r){
+                if (!r.ok) {
+                    return r.text().then(function(t){
+                        var apiMsg = '';
+                        try { var d = JSON.parse(t || '{}'); apiMsg = (d && d.error && d.error.message) || (d && d.message) || ''; } catch(e) {}
+                        throw new Error(describeGroupHttpError(r.status) + (apiMsg ? '\n服务端信息：' + apiMsg : ''));
+                    });
+                }
+                return r.json();
+            }).then(function(d){
                 var item = d && d.data && d.data[0];
                 var url = item && item.url;
                 if (!url && item && item.b64_json) url = 'data:image/png;base64,' + item.b64_json;
-                if (!url) throw new Error('no result');
+                if (!url) throw new Error('生图接口未返回图片');
                 if (opts.replaceMsgId) {
                     var msg = messages.find(function(x){ return x.id === opts.replaceMsgId; });
                     if (msg) {
@@ -1121,7 +1130,12 @@
                     }
                 }
                 pushMsg({ type:'left', senderId:member.id, isImage:true, imageData:{ url:url, desc:desc, genPrompt:desc } });
-            }).catch(function(){ fallback(); });
+            }).catch(function(err){
+                if (!opts.replaceMsgId) {
+                    try { showAlert('生图失败', String((err && err.message) || err || '生图请求失败')); } catch(e) {}
+                }
+                fallback();
+            });
         });
     }
 

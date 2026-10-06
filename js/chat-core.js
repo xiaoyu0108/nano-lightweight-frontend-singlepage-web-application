@@ -920,6 +920,8 @@
 
     // ===== 状态 =====
     let messages = [];
+    // 从线下返回时带回来的「最新一轮」，下次线上回复时作为衔接上下文注入
+    let offlineRoundHint = null;
     let isWaitingForReply = false;
     let isMultiSelect = false;
     let selectedMessages = new Set();
@@ -2523,8 +2525,12 @@
             btn.textContent = '展开「' + reveal + '」';
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
+                // 展开更早消息：保持在当前视野（不跳回底部）
+                const beforeH = messageScroll.scrollHeight;
+                const beforeT = messageScroll.scrollTop;
                 collapseExpanded += reveal;
-                renderMessages();
+                renderMessages('keep');
+                requestAnimationFrame(function () { messageScroll.scrollTop = beforeT + (messageScroll.scrollHeight - beforeH); });
             });
             messageContainer.appendChild(btn);
         }
@@ -2579,7 +2585,7 @@
         }
         if (scrollMode === 'top') {
             messageScroll.scrollTop = 0;
-        } else {
+        } else if (scrollMode !== 'keep') {
             scrollToBottom();
         }
     }
@@ -4670,7 +4676,15 @@
             __imgIdxs.slice(-4).forEach(function (i) { __keepImg[i] = true; });
 
             const history = [];
-            history.push({ role: 'system', content: buildSystemPrompt() });
+            let __sys = buildSystemPrompt();
+            if (offlineRoundHint && (offlineRoundHint.user || offlineRoundHint.char)) {
+                __sys += '\n\n【刚从线下模式返回线上】你们刚刚在线下见过面（线下长文相处），线下最新一轮如下：\n'
+                    + (currentUserName || '用户') + '：' + (offlineRoundHint.user || '') + '\n'
+                    + (displayName || '角色') + '：' + (offlineRoundHint.char || '')
+                    + '\n请自然衔接这段线下的进展，继续线上聊天。';
+                offlineRoundHint = null;
+            }
+            history.push({ role: 'system', content: __sys });
 
             let previousMessages = [];
             let foundAI = false;
@@ -7108,6 +7122,19 @@ if (callCard) {
         // 角色接管手机：角色亲自发的一条消息，须在 chatId 过滤之前处理
         if (data.type === 'NANO_CHAR_SAY') {
             handleCharSay(data);
+            return;
+        }
+
+        // 线下返回线上：系统提示「已退出线下」+ 带回线下最新一轮作为衔接上下文
+        if (data.type === 'NANO_SYS_NOTICE') {
+            try { addSystemNotice(String(data.text || '')); } catch (e) {}
+            return;
+        }
+        if (data.type === 'NANO_OFFLINE_ROUND') {
+            try {
+                offlineRoundHint = { user: String(data.lastUser || ''), char: String(data.lastChar || '') };
+                if ((offlineRoundHint.user || offlineRoundHint.char) && typeof renderMessages === 'function') renderMessages();
+            } catch (e) {}
             return;
         }
 

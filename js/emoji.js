@@ -360,79 +360,53 @@
     // ============================================================
     // 8. iOS 风格弹窗
     // ============================================================
+    var infoActionsEl = document.getElementById('infoActions');
+    var confirmActionsEl = document.getElementById('confirmActions');
+    var confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    var confirmOkBtn = document.getElementById('confirmOkBtn');
+    var _confirmCb = null;
+
+    function closeInfoModal() {
+        infoModal.classList.remove('show');
+        _confirmCb = null;
+    }
+
     function showInfo(title, body) {
         infoTitle.textContent = title || '提示';
         infoBody.textContent = body || '';
-        infoOk.style.display = 'block';
-        var actionsDiv = document.getElementById('confirmActions');
-        if (actionsDiv) actionsDiv.style.display = 'none';
+        if (infoActionsEl) infoActionsEl.style.display = 'flex';
+        if (confirmActionsEl) confirmActionsEl.style.display = 'none';
+        _confirmCb = null;
         infoModal.classList.add('show');
     }
 
-    function showConfirm(title, message, onConfirm) {
+    // opts: { okText, cancelText, danger }
+    function showConfirm(title, message, onConfirm, opts) {
+        opts = opts || {};
         infoTitle.textContent = title || '提示';
         infoBody.textContent = message || '';
-        
-        infoOk.style.display = 'none';
-        
-        var actionsDiv = document.getElementById('confirmActions');
-        if (!actionsDiv) {
-            actionsDiv = document.createElement('div');
-            actionsDiv.id = 'confirmActions';
-            actionsDiv.style.cssText = 
-                'display:flex;border-top:0.5px solid rgba(60,60,67,0.15);margin-top:12px;';
-            infoModal.querySelector('.modal-card').appendChild(actionsDiv);
+        if (confirmOkBtn) {
+            confirmOkBtn.textContent = opts.okText || '确定';
+            confirmOkBtn.className = 'form-btn' + (opts.danger === false ? '' : ' danger');
         }
-        
-        actionsDiv.innerHTML = `
-            <button class="ios-confirm-btn cancel-btn" id="confirmCancelBtn" style="flex:1;padding:12px 0;font-size:17px;background:none;border:none;cursor:pointer;color:#007aff;font-weight:400;border-right:0.5px solid rgba(60,60,67,0.15);">取消</button>
-            <button class="ios-confirm-btn confirm-btn" id="confirmOkBtn" style="flex:1;padding:12px 0;font-size:17px;background:none;border:none;cursor:pointer;color:#ff3b30;font-weight:600;">确定</button>
-        `;
-        actionsDiv.style.display = 'flex';
-        
-        var cancelBtn = document.getElementById('confirmCancelBtn');
-        var okBtn = document.getElementById('confirmOkBtn');
-        
-        var closeConfirm = function() {
-            actionsDiv.style.display = 'none';
-            infoOk.style.display = 'block';
-            infoModal.classList.remove('show');
-        };
-        
-        var newCancel = cancelBtn.cloneNode(true);
-        var newOk = okBtn.cloneNode(true);
-        cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-        okBtn.parentNode.replaceChild(newOk, okBtn);
-        
-        newCancel.addEventListener('click', function(e) {
-            e.stopPropagation();
-            closeConfirm();
-            if (onConfirm) onConfirm(false);
-        });
-        
-        newOk.addEventListener('click', function(e) {
-            e.stopPropagation();
-            closeConfirm();
-            if (onConfirm) onConfirm(true);
-        });
-        
+        if (confirmCancelBtn) confirmCancelBtn.textContent = opts.cancelText || '取消';
+        if (infoActionsEl) infoActionsEl.style.display = 'none';
+        if (confirmActionsEl) confirmActionsEl.style.display = 'flex';
+        _confirmCb = onConfirm || null;
         infoModal.classList.add('show');
     }
 
-    infoOk.addEventListener('click', function() {
-        infoModal.classList.remove('show');
-        var actionsDiv = document.getElementById('confirmActions');
-        if (actionsDiv) actionsDiv.style.display = 'none';
-        infoOk.style.display = 'block';
+    if (confirmCancelBtn) confirmCancelBtn.addEventListener('click', function() {
+        var cb = _confirmCb; closeInfoModal();
+        if (cb) cb(false);
     });
-
+    if (confirmOkBtn) confirmOkBtn.addEventListener('click', function() {
+        var cb = _confirmCb; closeInfoModal();
+        if (cb) cb(true);
+    });
+    infoOk.addEventListener('click', closeInfoModal);
     infoModal.addEventListener('click', function(e) {
-        if (e.target === infoModal) {
-            infoModal.classList.remove('show');
-            var actionsDiv = document.getElementById('confirmActions');
-            if (actionsDiv) actionsDiv.style.display = 'none';
-            infoOk.style.display = 'block';
-        }
+        if (e.target === infoModal) closeInfoModal();
     });
 
     // ============================================================
@@ -801,6 +775,10 @@
             if (!file) return;
             var lower = (file.name || '').toLowerCase();
             var isDoc = lower.indexOf('.docx') !== -1 || lower.indexOf('.doc') !== -1;
+
+            // ===== 图片：PNG 卡片尝试提取内嵌表情包，其余图片直接作为 1 个表情包 =====
+            var isImg = (file.type || '').indexOf('image/') === 0 || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(lower);
+            if (isImg) { handleImageFile(file); return; }
 
             function onLoaded(content) {
                 pendingFileContent = content || '';
@@ -1255,6 +1233,108 @@
     }
 
     // ============================================================
+    // 20.5 PNG 卡片：提取内嵌表情包数据
+    // ============================================================
+    function b64DecodeEmoji(str) {
+        try {
+            var clean = String(str).replace(/[\r\n\s]+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+            var pad = clean.length % 4;
+            if (pad) clean += '='.repeat(4 - pad);
+            var bytes = Uint8Array.from(atob(clean), function(c) { return c.charCodeAt(0); });
+            try { return new TextDecoder('utf-8', { fatal: false }).decode(bytes); } catch(e) { return atob(clean); }
+        } catch (e) { return ''; }
+    }
+
+    function readPngTextValues(arrayBuffer) {
+        var out = [];
+        try {
+            var view = new DataView(arrayBuffer);
+            if (view.byteLength < 8 || view.getUint32(0) !== 0x89504E47 || view.getUint32(4) !== 0x0D0A1A0A) return out;
+            var td = new TextDecoder('latin1');
+            var tdu = new TextDecoder('utf-8');
+            var offset = 8;
+            while (offset + 8 <= view.byteLength) {
+                var length = view.getUint32(offset);
+                var type = '';
+                for (var i = 0; i < 4; i++) type += String.fromCharCode(view.getUint8(offset + 4 + i));
+                var dataStart = offset + 8;
+                if (dataStart + length > view.byteLength) break;
+                try {
+                    if (type === 'tEXt') {
+                        var sep = -1;
+                        for (var j = 0; j < length; j++) { if (view.getUint8(dataStart + j) === 0) { sep = j; break; } }
+                        if (sep !== -1) out.push(td.decode(new Uint8Array(arrayBuffer, dataStart + sep + 1, length - sep - 1)));
+                    } else if (type === 'iTXt') {
+                        var u8 = new Uint8Array(arrayBuffer, dataStart, length);
+                        var pos = 0;
+                        while (pos < length && u8[pos] !== 0) pos++; pos++;
+                        var compFlag = u8[pos++]; pos++;
+                        while (pos < length && u8[pos] !== 0) pos++; pos++;
+                        while (pos < length && u8[pos] !== 0) pos++; pos++;
+                        if (compFlag === 0) out.push(tdu.decode(u8.subarray(pos)));
+                    }
+                } catch (chunkErr) {}
+                offset += 12 + length;
+            }
+        } catch (e) {}
+        return out;
+    }
+
+    function emojisFromPngValues(values) {
+        var found = [];
+        (values || []).forEach(function(v) {
+            if (!v) return;
+            var candidates = [v];
+            var decoded = b64DecodeEmoji(v);
+            if (decoded && decoded !== v) candidates.push(decoded);
+            candidates.forEach(function(c) {
+                if (!c) return;
+                var s = String(c).trim();
+                if (!s) return;
+                var list = parseEmojiText(s);
+                if (list.length) found = found.concat(list);
+            });
+        });
+        return found;
+    }
+
+    function addImageAsEmoji(file) {
+        var fr = new FileReader();
+        fr.onload = function(e) {
+            var nm = (file.name || '表情包').replace(/\.[^.]+$/, '') || '表情包';
+            parsedBatchEmojis = parsedBatchEmojis.concat([{ name: nm, url: e.target.result }]);
+            fileStatus.textContent = '已加入 1 张图片作为表情包，点击「添加」保存';
+            fileStatus.style.color = '#34c759';
+            fileInput.value = '';
+            showToast('已加入 1 个表情包');
+        };
+        fr.onerror = function() { fileStatus.textContent = '读取图片失败'; fileStatus.style.color = '#ff3b30'; fileInput.value = ''; };
+        fr.readAsDataURL(file);
+    }
+
+    function handleImageFile(file) {
+        var lower = (file.name || '').toLowerCase();
+        var isPng = lower.indexOf('.png') !== -1 || file.type === 'image/png';
+        if (!isPng) { addImageAsEmoji(file); return; }
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            var emojis = [];
+            try { emojis = emojisFromPngValues(readPngTextValues(ev.target.result)); } catch (e) {}
+            if (emojis.length) {
+                parsedBatchEmojis = parsedBatchEmojis.concat(emojis);
+                fileStatus.textContent = '已从 PNG 卡片解析出 ' + emojis.length + ' 个表情包，点击「添加」保存';
+                fileStatus.style.color = '#34c759';
+                fileInput.value = '';
+                showToast('已解析 ' + emojis.length + ' 个表情包');
+            } else {
+                addImageAsEmoji(file);
+            }
+        };
+        reader.onerror = function() { fileStatus.textContent = '读取图片失败'; fileStatus.style.color = '#ff3b30'; fileInput.value = ''; };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // ============================================================
     // 21. 本地解析（支持多种格式）
     // ============================================================
     function parseEmojiText(text) {
@@ -1270,21 +1350,27 @@
         if (firstChar === '{' || firstChar === '[') {
             try {
                 var parsed = JSON.parse(trimmed);
-                var arr = Array.isArray(parsed) ? parsed : (parsed.emojis || parsed.items || parsed.list || parsed.data || parsed.results || []);
-                if (Array.isArray(arr)) {
-                    arr.forEach(function(item) {
-                        if (item && (item.url || item.src || item.image || item.img || item.link)) {
-                            var u = item.url || item.src || item.image || item.img || item.link;
-                            var nm = item.name || item.title || item.label || item.desc || item.meaning || item.text || item.key || '表情包';
-                            result.push({ name: String(nm), url: String(u) });
-                        }
+                var rawArr = Array.isArray(parsed) ? parsed : (parsed.emojis || parsed.stickers || parsed.items || parsed.list || parsed.data || parsed.results || parsed.images || parsed.pack || []);
+                var flat = [];
+                (function flatten(list) {
+                    (list || []).forEach(function(it) {
+                        if (it && typeof it === 'object' && Array.isArray(it.emojis)) flatten(it.emojis);
+                        else flat.push(it);
                     });
-                }
+                })(rawArr);
+                flat.forEach(function(item) {
+                    if (!item || typeof item !== 'object') return;
+                    var u = item.url || item.src || item.image || item.img || item.link || item.file || item.href || item.path;
+                    if (u) {
+                        var nm = item.name || item.title || item.label || item.desc || item.meaning || item.text || item.key || item.keyword || item.tag || '表情包';
+                        result.push({ name: String(nm), url: String(u) });
+                    }
+                });
                 var obj = parsed;
                 if (obj && !Array.isArray(obj)) {
                     Object.keys(obj).forEach(function(k) {
                         var v = obj[k];
-                        if (typeof v === 'string' && /^https?:\/\//.test(v)) {
+                        if (typeof v === 'string' && /^(https?:\/\/|data:image\/)/.test(v)) {
                             result.push({ name: k, url: v });
                         }
                     });
@@ -1292,8 +1378,23 @@
             } catch (e) {}
         }
 
+        // ===== Markdown 图片 ![名称](链接) =====
+        var mdRe = /!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)/g;
+        var mdm;
+        while ((mdm = mdRe.exec(text)) !== null) {
+            if (/^(https?:\/\/|data:image\/)/i.test(mdm[2])) result.push({ name: (mdm[1] || '').trim() || '表情包', url: cleanUrl(mdm[2].trim()) });
+        }
+
+        // ===== HTML <img src="..."> =====
+        var imgRe = /<img[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+        var im;
+        while ((im = imgRe.exec(text)) !== null) {
+            var altM = im[0].match(/\balt=["']([^"']*)["']/i);
+            result.push({ name: (altM && altM[1] ? altM[1] : '表情包'), url: cleanUrl(im[1].trim()) });
+        }
+
         // ===== 行内多组 "描述:链接" =====
-        var pairRe = /([^\s，,；;:：]{1,20})\s*[:：\-\t]\s*(https?:\/\/[^\s，,；;<>"'）)]+)/g;
+        var pairRe = /([^\s，,；;:：]{1,20})\s*[:：\-\t]\s*((?:https?:\/\/|data:image\/)[^\s，,；;<>"'）)]+)/g;
         var mm;
         while ((mm = pairRe.exec(text)) !== null) {
             result.push({ name: String(mm[1]).trim(), url: cleanUrl(mm[2].trim()) });
@@ -1310,13 +1411,19 @@
 
             var nameOnly = line.match(/^(.+?)[:：]\s*$/);
             if (nameOnly) { pendingName = nameOnly[1].trim(); continue; }
-            var match = line.match(/^(.+?)[:：\-\t]\s*(https?:\/\/[^\s]+)/);
+            var match = line.match(/^(.+?)[:：\-\t]\s*((?:https?:\/\/|data:image\/)[^\s]+)/);
             if (match) {
                 result.push({ name: match[1].trim(), url: cleanUrl(match[2].trim()) });
                 pendingName = null;
                 continue;
             }
-            var urlMatch = line.match(/^(https?:\/\/[^\s]+)$/);
+            var nameSpace = line.match(/^(.{1,20}?)\s+((?:https?:\/\/|data:image\/)[^\s]+)$/);
+            if (nameSpace) {
+                result.push({ name: nameSpace[1].trim(), url: cleanUrl(nameSpace[2].trim()) });
+                pendingName = null;
+                continue;
+            }
+            var urlMatch = line.match(/^((?:https?:\/\/|data:image\/)[^\s]+)$/);
             if (urlMatch) {
                 var u2 = cleanUrl(urlMatch[1].trim());
                 var fn2 = u2.split('/').pop() || '';
@@ -1324,7 +1431,7 @@
                 pendingName = null;
                 continue;
             }
-            var reverseMatch = line.match(/^(https?:\/\/[^\s]+)\s+(.+)$/);
+            var reverseMatch = line.match(/^((?:https?:\/\/|data:image\/)[^\s]+)\s+(.+)$/);
             if (reverseMatch) {
                 result.push({ name: reverseMatch[2].trim(), url: cleanUrl(reverseMatch[1].trim()) });
                 pendingName = null;
@@ -1333,7 +1440,7 @@
         }
 
         // ===== 兜底：全局扫描链接 =====
-        var urlRe = /(https?:\/\/[^\s，,；;）)<>"'，。]+)/g;
+        var urlRe = /((?:https?:\/\/|data:image\/)[^\s，,；;）)<>"'，。]+)/g;
         var m;
         while ((m = urlRe.exec(text)) !== null) {
             var u = cleanUrl(m[1]);
@@ -1364,6 +1471,21 @@
         });
         return unique;
     }
+
+    // ============================================================
+    // 21.5 复用时重置界面（index 不重载直接切回本页时触发，切换更快）
+    // ============================================================
+    window.addEventListener('message', function(e) {
+        var d = e.data;
+        if (!d || d.type !== 'nanoOverlayReopen') return;
+        ['addModal', 'moveModal', 'editEmojiModal', 'renameModal', 'infoModal'].forEach(function(id) {
+            try { var el = document.getElementById(id); if (el) el.classList.remove('show'); } catch (err) {}
+        });
+        try { if (infoActionsEl) infoActionsEl.style.display = 'flex'; } catch (err) {}
+        try { if (confirmActionsEl) confirmActionsEl.style.display = 'none'; } catch (err) {}
+        try { if (typeof currentGroupId !== 'undefined' && currentGroupId) closeDetail(); } catch (err) {}
+        try { renderHome(); } catch (err) {}
+    });
 
     // ============================================================
     // 22. 页面关闭自动保存

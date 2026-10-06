@@ -4,7 +4,7 @@
 * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
 
 body {
-    background-color: #F2F2F7;
+    background-color: #FFFFFF;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
     color: #000000;
     min-height: 100vh;
@@ -21,7 +21,7 @@ body {
     justify-content: center;
     padding: 12px 52px 8px;
     border-top: var(--safe-top, env(safe-area-inset-top, 0px)) solid transparent;
-    background: rgba(242, 242, 247, 0.86);
+    background: rgba(255, 255, 255, 0.86);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     border-bottom: 0.5px solid rgba(60, 60, 67, 0.08);
@@ -68,9 +68,15 @@ body {
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    padding: 2px 2px 12px;
+    padding: 8px 2px 12px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: rgba(255, 255, 255, 0.94);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
 }
 .seg-bar::-webkit-scrollbar { display: none; }
 .seg-btn {

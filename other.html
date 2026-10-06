@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>其他</title>
-    <link rel="stylesheet" href="css/other.css?v=20261005a">
+    <link rel="stylesheet" href="css/other.css?v=20261006a">
     <script src="js/appearance.js"></script>
     <script src="js/nano-notify.js"></script>
 </head>
@@ -33,7 +33,7 @@
                 <div class="list-item switch-row">
                     <div class="item-info">
                         <span class="item-title">保活</span>
-                        <span class="item-desc">开启后切到后台也能继续生成与回复。靠音频占住会话实现，较耗电、可能发热；只想要后台通知可改用下方 Bark 推送，更省电</span>
+                        <span class="item-desc">切到后台也能继续生成与回复；较耗电发热，想要省电通知可改用 Bark</span>
                     </div>
                     <label class="ios-switch"><input type="checkbox" id="keepAliveToggle"><span class="ios-switch-track"></span></label>
                 </div>
@@ -76,14 +76,14 @@
                 <div class="list-item switch-row">
                     <div class="item-info">
                         <span class="item-title">Bark 推送</span>
-                        <span class="item-desc">退到后台/锁屏也能收到系统通知（国内直连）。相比音频保活更省电、不发烫，相当于另一种后台保活；关闭后不再通过 Bark 发系统推送（应用内提示音/红点不受影响）</span>
+                        <span class="item-desc">后台/锁屏也能收到系统通知（国内直连），比保活省电；与保活二选一</span>
                     </div>
                     <label class="ios-switch"><input type="checkbox" id="barkToggle"><span class="ios-switch-track"></span></label>
                 </div>
                 <div class="list-item">
                     <div class="item-info">
                         <span class="item-title">Bark 密钥</span>
-                        <span class="item-desc">在 App Store 安装 Bark，复制首页的密钥填到这里。退到后台或锁屏也能收到系统通知（国内直连，无需梯子）</span>
+                        <span class="item-desc">安装 Bark App，复制首页密钥填到这里</span>
                     </div>
                 </div>
                 <div class="list-item" style="gap:8px;">
@@ -151,7 +151,7 @@
                 <div class="list-item switch-row">
                     <div class="item-info">
                         <span class="item-title">灵动岛安全区</span>
-                        <span class="item-desc">仅 iPhone 全面屏需要开启：给顶栏留出灵动岛高度。安卓或不需要的机型请关闭，否则顶栏会多出一块空白，线下美化也容易串位</span>
+                        <span class="item-desc">仅 iPhone 全面屏开启；其它机型请关闭，否则顶栏会多出空白</span>
                     </div>
                     <label class="ios-switch"><input type="checkbox" id="insetToggle"><span class="ios-switch-track"></span></label>
                 </div>
@@ -174,7 +174,7 @@
                     </div>
                 </div>
             </div>
-            <div class="hint">提示：通知需要浏览器授权；保活会尝试保持屏幕常亮，尽量让后台回复不中断。</div>
+
         </section>
 
         <!-- 助手 -->
@@ -201,7 +201,7 @@
 
     <input type="file" accept="image/*" id="apiBallImageInput" hidden>
 
-    <script src="js/other.js?v=20261005a"></script>
+    <script src="js/other.js?v=20261006a"></script>
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>
 </body>

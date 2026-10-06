@@ -440,32 +440,92 @@
     }
 
     function utf8Base64Decode(str) {
-        const clean = String(str).replace(/[\r\n\s]+/g, '');
-        const bytes = Uint8Array.from(atob(clean), c => c.charCodeAt(0));
+        let clean = String(str).replace(/[\r\n\s]+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+        const pad = clean.length % 4;
+        if (pad) clean += '='.repeat(4 - pad);
+        let bytes;
+        try {
+            bytes = Uint8Array.from(atob(clean), c => c.charCodeAt(0));
+        } catch(e) {
+            return '';
+        }
         try {
             return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
         } catch(e) {
-            return atob(clean);
+            try { return atob(clean); } catch(e2) { return ''; }
         }
     }
 
+    // 判断一个对象是否像角色卡（尽量覆盖各家字段命名）
+    function looksLikeCard(o) {
+        if (!o || typeof o !== 'object' || Array.isArray(o)) return false;
+        return !!(o.name || o.nickname || o.char_name || o.character_name || o.characterName ||
+            o.description || o.desc || o.personality || o.first_mes || o.firstMessage || o.first_message ||
+            o.scenario || o.mes_example || o.mesExample || o.data || o.entries || o.spec);
+    }
+
+    // 把各种外层结构（V2/V3 的 {spec,data}、数组、characters[]）拆成真正的角色卡对象
+    function unwrapCard(o) {
+        if (!o || typeof o !== 'object') return null;
+        if (Array.isArray(o)) {
+            for (const it of o) { const r = unwrapCard(it); if (r) return r; }
+            return null;
+        }
+        if (o.data && typeof o.data === 'object' && looksLikeCard(o.data)) {
+            if (!o.data.name && o.name) o.data.name = o.name;
+            if (!o.data.tags && o.tags) o.data.tags = o.tags;
+            return o.data;
+        }
+        if (Array.isArray(o.characters)) return unwrapCard(o.characters[0]);
+        if (looksLikeCard(o)) return o;
+        return null;
+    }
+
+    // 宽松解析：直接 JSON / base64 / base64url / data-uri / URL 编码 / 双层 base64 都试一遍
+    function parseLooseJson(rawStr) {
+        if (!rawStr) return null;
+        let s = String(rawStr).replace(/^\uFEFF/, '').replace(/\u0000/g, '').trim();
+        if (!s) return null;
+        const attempts = [s];
+        const di = s.match(/^data:[^,]*;base64,([\s\S]*)$/);
+        if (di) attempts.push(di[1]);
+        const compact = s.replace(/[\r\n\s]+/g, '');
+        if (/^[A-Za-z0-9+/=_-]{16,}$/.test(compact)) attempts.push(compact);
+        if (/%22|%7B|%5B|%7D|%3A/.test(s)) { try { attempts.push(decodeURIComponent(s)); } catch(e) {} }
+        for (const a of attempts) {
+            try {
+                const o = JSON.parse(String(a).trim());
+                if (o && typeof o === 'object') {
+                    const u = unwrapCard(o);
+                    if (u) return u;
+                    if (o.data) return o;
+                }
+            } catch(e) {}
+            try {
+                const d = utf8Base64Decode(a);
+                if (d) {
+                    const o = JSON.parse(d.trim());
+                    if (o && typeof o === 'object') {
+                        const u = unwrapCard(o);
+                        if (u) return u;
+                        if (o.data) return o;
+                    }
+                }
+            } catch(e) {}
+        }
+        return null;
+    }
+
     function parseCardDataFromChunks(chunks) {
-        const priorityKeys = ['chara', 'character', 'ccv3', 'card', 'data', 'json'];
+        const priorityKeys = ['chara', 'character', 'ccv3', 'card', 'data', 'json', 'chub', 'character_card', 'character_card_v3'];
         const candidates = [];
         priorityKeys.forEach(k => { if (chunks[k]) candidates.push(chunks[k]); });
         Object.keys(chunks).forEach(k => {
             if (!priorityKeys.includes(k) && chunks[k] && chunks[k].length > 20) candidates.push(chunks[k]);
         });
         for (const rawStr of candidates) {
-            try {
-                const parsed = JSON.parse(rawStr);
-                if (parsed && (parsed.name || parsed.description || parsed.data)) return parsed;
-            } catch(e) {}
-            try {
-                const decoded = utf8Base64Decode(rawStr);
-                const parsed = JSON.parse(decoded);
-                if (parsed && (parsed.name || parsed.description || parsed.data)) return parsed;
-            } catch(e) {}
+            const parsed = parseLooseJson(rawStr);
+            if (parsed) return parsed;
         }
         return null;
     }
@@ -476,14 +536,14 @@
         let embeddedWorldbook = null;
         try {
             const dataObj = json.data || json;
-            name = dataObj.name || dataObj.character_name || json.name || '';
-            gender = dataObj.gender || json.gender || '男';
-            nationality = dataObj.nationality || json.nationality || '中国';
-            const desc = dataObj.description || '';
+            name = dataObj.name || dataObj.nickname || dataObj.char_name || dataObj.character_name || dataObj.characterName || json.name || json.nickname || '';
+            gender = dataObj.gender || dataObj.sex || json.gender || '男';
+            nationality = dataObj.nationality || dataObj.country || json.nationality || '中国';
+            const desc = dataObj.description || dataObj.desc || dataObj.persona || '';
             const personality = dataObj.personality || '';
-            const scenario = dataObj.scenario || '';
-            const firstMsg = dataObj.first_mes || '';
-            const mesExample = dataObj.mes_example || '';
+            const scenario = dataObj.scenario || dataObj.world || '';
+            const firstMsg = dataObj.first_mes || dataObj.first_message || dataObj.firstMessage || dataObj.greeting || '';
+            const mesExample = dataObj.mes_example || dataObj.mesExample || dataObj.example_dialogue || dataObj.exampleMessage || '';
             let settingParts = [];
             if (desc) settingParts.push("【外貌与基本设定】\n" + desc);
             if (personality) settingParts.push("【性格特征】\n" + personality);
@@ -1286,6 +1346,36 @@
         const file = this.files[0];
         if (!file) return;
         importPngFileInput.value = '';
+        // ===== 兼容直接导入 JSON 角色卡文件 =====
+        const isJson = /\.json$/i.test(file.name || '') || file.type === 'application/json';
+        if (isJson) {
+            const jr = new FileReader();
+            jr.onload = function(ev) {
+                try {
+                    let text = String(ev.target.result || '').replace(/^\uFEFF/, '').trim();
+                    let cardData = null;
+                    try { cardData = JSON.parse(text); } catch (e2) { cardData = parseLooseJson(text); }
+                    if (!cardData || typeof cardData !== 'object') { showInfo('导入失败', '这不是有效的角色卡 JSON。'); return; }
+                    const parsedC = parseCardData(cardData);
+                    if (isEditMode) exitEditMode();
+                    openEditModal(null);
+                    if (parsedC.name) inputName.value = parsedC.name;
+                    if (parsedC.gender) inputGender.value = parsedC.gender;
+                    if (parsedC.nationality) inputNationality.value = parsedC.nationality;
+                    if (parsedC.setting) inputSetting.value = parsedC.setting;
+                    if (parsedC.embeddedWorldbook && parsedC.embeddedWorldbook.entries && parsedC.embeddedWorldbook.entries.length) {
+                        importEmbeddedWorldbook(parsedC.embeddedWorldbook).then(function(wb) {
+                            if (wb && !worldbookBindings.some(w => w.id === wb.id)) { worldbookBindings.push({ id: wb.id, group: wb.group || '' }); renderWorldbookList(); }
+                        }).catch(function() {});
+                    }
+                } catch(err) {
+                    showInfo('导入失败', '解析 JSON 遇到错误: ' + (err.message || err));
+                }
+            };
+            jr.onerror = function() { showInfo('导入失败', '读取文件失败'); };
+            jr.readAsText(file);
+            return;
+        }
         // ⭐ pako 按需加载（原为 <head> 阻塞脚本，现改为用到时再加载）
         ensurePako().then(function() {
             const reader = new FileReader();

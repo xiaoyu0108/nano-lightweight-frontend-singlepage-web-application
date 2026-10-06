@@ -286,6 +286,12 @@ const INITIAL_CSS = `/* ========================================================
    #rerollBtn{position:absolute;left:12px;bottom:14px}          // 想搬去哪就改 left/right/top/bottom
    // 纯装饰占位（不可点）：给稳定父元素加 ::before/::after
    .bottom::before{content:"";position:absolute;left:56px;bottom:16px;width:20px;height:20px;pointer-events:none;background:url("https://装饰.png") center/20px no-repeat}
+   // 底栏左侧现在是「圆形头像按钮」#composerAvatarBtn，点击弹出竖向菜单(.om-menu)。
+   // 隐藏 / 移动头像、改菜单样式：
+   .composer .avatar-btn{--offline-avatar-x:0px;--offline-avatar-y:0px}   // 平移头像
+   // 隐藏头像按钮：.composer .avatar-btn{display:none}（隐藏后菜单需另设触发点）
+   .om-menu{background:var(--card);border-radius:16px}                    // 菜单底
+   .om-item{color:var(--ink)}                                             // 菜单项文字/图标色
    // 注意：底栏默认透明是为了滑动时不遮挡卡片；若给 .bottom 加了不透明底色，
    // 就相当于又盖住了卡片，可按需给 .chat 加大 padding-bottom 或只在中间留胶囊。
    // 加「装饰性」插件（纯 CSS 只能加不可点的装饰；真正的新功能需加 HTML/JS，可让纳米帮你加）：
@@ -1066,6 +1072,137 @@ function sendBgPreview(image) {
   }
   updateBgName();
 })();
+
+// ===== 线下输入框菜单插件（JS）：存 localStorage.offline_menu_plugins =====
+const MENU_PLUGIN_KEY = 'offline_menu_plugins';
+const MENU_PLUGIN_TEMPLATE = [
+  '// 线下输入框菜单插件模板（粘贴到这里，或用 JSON 导入）',
+  '// 可用 api：addItem({ label, icon, run }) / toast(msg) / getMessages() / scrollToFloor(i)',
+  '// 还能：reroll() / tidy() / openFloors() / scrollTop() / scrollBottom() / clearBeautify() / clearFrame() / hideAvatar() / showAvatar()',
+  'api.addItem({',
+  '  label: "示例插件",',
+  '  icon: \'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>\',',
+  '  run: function () {',
+  '    api.toast("插件被点击了");',
+  '    // var msgs = api.getMessages();   // 当前线下消息数组',
+  '    // api.scrollToFloor(0);           // 滚动到第 1 楼',
+  '  }',
+  '});'
+].join('\n');
+let mpEditing = -1;
+function mpRead() { try { return JSON.parse(localStorage.getItem(MENU_PLUGIN_KEY) || '[]') || []; } catch (e) { return []; } }
+function mpWrite(list) { try { localStorage.setItem(MENU_PLUGIN_KEY, JSON.stringify((list || []).slice(0, 40))); } catch (e) {} }
+function mpEdit(i) {
+  const p = mpRead()[i]; if (!p) return;
+  mpEditing = i;
+  const ta = document.getElementById('menuPluginText'); if (ta) ta.value = String(p.js || '');
+  const lab = document.getElementById('menuPluginEditLabel'); if (lab) lab.textContent = '编辑插件：' + String(p.name || ('插件 ' + (i + 1)));
+}
+function mpNew() {
+  mpEditing = -1;
+  const ta = document.getElementById('menuPluginText'); if (ta) ta.value = '';
+  const lab = document.getElementById('menuPluginEditLabel'); if (lab) lab.textContent = '新建插件';
+}
+function mpRender() {
+  const box = document.getElementById('menuPluginList');
+  if (!box) return;
+  const list = mpRead();
+  box.innerHTML = list.length ? '' : '<div style="font-size:11px;color:var(--sub)">还没有插件</div>';
+  list.forEach(function (p, i) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(120,120,128,.08);border-radius:10px;padding:8px 10px';
+    const name = document.createElement('button');
+    name.type = 'button';
+    name.style.cssText = 'flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;border:0;background:transparent;color:inherit;font-weight:600;cursor:pointer';
+    name.textContent = String(p.name || ('插件 ' + (i + 1)));
+    name.onclick = function () { mpEdit(i); };
+    const del = document.createElement('button');
+    del.textContent = '删除';
+    del.style.cssText = 'border:0;background:#fbe9ea;color:#c98a8a;font-size:12px;font-weight:600;border-radius:8px;padding:6px 10px;cursor:pointer';
+    del.onclick = function () {
+      var l = mpRead(); l.splice(i, 1); mpWrite(l);
+      if (mpEditing === i) mpNew(); else if (mpEditing > i) mpEditing--;
+      mpRender(); showToast('已删除');
+    };
+    row.appendChild(name); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+(function bindMenuPlugins() {
+  const openBtn = document.getElementById('menuPluginOpen');
+  const ta = document.getElementById('menuPluginText');
+  const save = document.getElementById('menuPluginSave');
+  const tpl = document.getElementById('menuPluginTemplate');
+  const imp = document.getElementById('menuPluginImport');
+  const neu = document.getElementById('menuPluginNew');
+  const file = document.getElementById('menuPluginFile');
+  if (openBtn) openBtn.onclick = function () { mpRender(); openSheet('menuPluginSheet'); };
+  if (tpl && ta) tpl.onclick = function () { ta.value = MENU_PLUGIN_TEMPLATE; };
+  if (neu) neu.onclick = mpNew;
+  if (save && ta) save.onclick = function () {
+    const js = (ta.value || '').trim();
+    if (!js) { showToast('先写插件 JS'); return; }
+    var l = mpRead();
+    if (mpEditing >= 0 && l[mpEditing]) {
+      l[mpEditing].js = js;
+      var nm = window.prompt('插件名字', l[mpEditing].name || ('插件 ' + (mpEditing + 1)));
+      if (nm != null && String(nm).trim()) l[mpEditing].name = String(nm).trim();
+      mpWrite(l); mpRender(); showToast('已保存修改');
+      const lab = document.getElementById('menuPluginEditLabel'); if (lab) lab.textContent = '编辑插件：' + l[mpEditing].name;
+    } else {
+      var name = window.prompt('给这个插件起个名字', '菜单插件 ' + (l.length + 1));
+      if (name == null) return;
+      l.push({ name: String(name || '').trim() || ('菜单插件 ' + (l.length + 1)), js: js });
+      mpWrite(l); mpRender(); mpNew(); showToast('已添加插件');
+    }
+  };
+  if (imp && file) imp.onclick = function () { file.click(); };
+  if (file) file.addEventListener('change', function () {
+    const f = this.files && this.files[0]; this.value = '';
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        const data = JSON.parse(reader.result);
+        const arr = Array.isArray(data) ? data : [data];
+        const l = mpRead(); let n = 0;
+        arr.forEach(function (item) { if (item && item.js) { l.push({ name: String(item.name || ('导入插件 ' + (l.length + 1))), js: String(item.js) }); n++; } });
+        mpWrite(l); mpRender(); showToast('已导入 ' + n + ' 个插件');
+      } catch (e) { showToast('JSON 解析失败'); }
+    };
+    reader.readAsText(f);
+  });
+  mpRender();
+})();
+
+// ===== 场景 tab 标签（剧情 / 小剧场 可改名）=====
+(function bindSceneLabels() {
+  const KEY = 'offline_scene_labels';
+  function read() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function write(o) { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
+  function loadInputs() {
+    const o = read();
+    const a = document.getElementById('sceneLabelStory');
+    const b = document.getElementById('sceneLabelTheater');
+    if (a) a.value = o.story || '';
+    if (b) b.value = o.theater || '';
+  }
+  function save() {
+    const o = read();
+    const a = document.getElementById('sceneLabelStory');
+    const b = document.getElementById('sceneLabelTheater');
+    o.story = (a && a.value.trim()) || '';
+    o.theater = (b && b.value.trim()) || '';
+    write(o);
+    try { window.parent.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {}
+  }
+  const a = document.getElementById('sceneLabelStory');
+  const b = document.getElementById('sceneLabelTheater');
+  if (a) a.addEventListener('change', save);
+  if (b) b.addEventListener('change', save);
+  loadInputs();
+})();
+
 document.getElementById('cssExport').onclick = function() {
   const sel = document.getElementById('cssPreset');
   const val = sel ? sel.value : 'custom';
@@ -1410,7 +1547,7 @@ if (nsfwSwitch) {
     settings.nsfw = !nsfwSwitch.classList.contains('on');
     saveSettings();
     nsfwSwitch.classList.toggle('on', settings.nsfw);
-    showToast(settings.nsfw ? '成人向尺度已开启' : '成人向尺度已关闭');
+    showToast(settings.nsfw ? 'NSFW 已开启' : 'NSFW 已关闭');
   });
 }
 document.getElementById('memorySummaryOpen').onclick = function() {

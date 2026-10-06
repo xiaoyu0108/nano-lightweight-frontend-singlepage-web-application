@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>表情包</title>
-    <link rel="stylesheet" href="css/emoji.css">
+    <link rel="stylesheet" href="css/emoji.css?v=20261006a">
     <script src="js/appearance.js"></script>
 </head>
 <body>
@@ -49,7 +49,7 @@
                 <label>
                     <span>文件导入</span>
                     <span style="display:flex;align-items:center;gap:6px;">
-                        <span class="file-types">TXT / WORD / JSON</span>
+                        <span class="file-types">TXT / WORD / JSON / PNG</span>
                         <span class="import-icon" id="fileImportIcon" title="导入文件">
                             <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -145,23 +145,27 @@
         </div>
     </div>
 
-    <!-- ===== 信息弹窗 ===== -->
+    <!-- ===== 信息 / 确认弹窗 ===== -->
     <div class="modal-overlay" id="infoModal">
         <div class="modal-card">
             <div class="modal-title" id="infoTitle">提示</div>
             <div class="modal-body" id="infoBody" style="font-size:15px;color:#3a3a3c;text-align:center;padding:6px 0;line-height:1.6;">内容</div>
-            <div class="form-actions">
+            <div class="form-actions" id="infoActions">
                 <button class="form-btn primary" id="infoOk" data-close>知道了</button>
+            </div>
+            <div class="form-actions" id="confirmActions" style="display:none">
+                <button class="form-btn" id="confirmCancelBtn">取消</button>
+                <button class="form-btn danger" id="confirmOkBtn">确定</button>
             </div>
         </div>
     </div>
 
-    <input type="file" class="hidden-input" id="fileInput" accept=".txt,.json,.docx,.doc">
+    <input type="file" class="hidden-input" id="fileInput" accept=".txt,.json,.docx,.doc,.png,.webp,.gif,.jpg,.jpeg,image/*">
     <input type="file" class="hidden-input" id="imageFileInput" accept="image/*">
 
 </div>
 
-<script src="js/emoji.js"></script>
+<script src="js/emoji.js?v=20261006a"></script>
 
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>

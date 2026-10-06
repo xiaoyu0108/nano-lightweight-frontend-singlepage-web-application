@@ -6,7 +6,7 @@
     <title>聊天</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="css/chat-inner.css?v=20261005d">
-    <link rel="stylesheet" href="css/heart.css?v=20261004n">
+    <link rel="stylesheet" href="css/heart.css?v=20261006a">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://unpkg.com">
     <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
@@ -415,7 +415,7 @@
 <script src="js/nano-assistant-knowledge.js?v=20260929a"></script>
 <script src="js/nano-assistant-tools.js?v=20260929a"></script>
 <script src="js/family-card-store.js"></script>
-<script src="js/chat-core.js?v=20261005e"></script>
+<script src="js/chat-core.js?v=20261006b"></script>
 <script src="js/chat-transfer.js"></script>
 <script src="js/chat-gift.js"></script>
 <script src="js/chat-image.js"></script>
@@ -529,6 +529,15 @@
 
         <div class="iv-setting">
           <div class="iv-setting-header">
+            <span class="iv-setting-title">头像框</span>
+          </div>
+          <div class="iv-quick iv-quick-frame">
+            <button class="iv-template-btn primary iv-block-btn" type="button" onclick="window.NanoAvatarFrame&&NanoAvatarFrame.openUI('heart')">设置头像框 / 预设</button>
+          </div>
+        </div>
+
+        <div class="iv-setting">
+          <div class="iv-setting-header">
             <span class="iv-setting-title">快捷 DIY</span>
           </div>
           <div class="iv-quick">
@@ -539,12 +548,6 @@
             <label class="iv-quick-row"><span class="iv-quick-label">显示「此刻 · 印象」</span><span class="iv-switch"><input type="checkbox" id="ivShowSubject" checked><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">显示收件信息</span><span class="iv-switch"><input type="checkbox" id="ivShowMeta" checked><i></i></span></label>
             <label class="iv-quick-row"><span class="iv-quick-label">隐藏未读红点</span><span class="iv-switch"><input type="checkbox" id="ivHideUnread"><i></i></span></label>
-        <div class="iv-quick-field">
-          <span class="iv-quick-field-title">头像框</span>
-          <div class="iv-quick-field-row">
-            <button class="iv-template-btn primary" type="button" onclick="window.NanoAvatarFrame&&NanoAvatarFrame.openUI('heart')">设置头像框 / 预设</button>
-          </div>
-        </div>
             <div class="iv-quick-field">
               <span class="iv-quick-field-title">按钮文案</span>
               <div class="iv-quick-field-row">
@@ -556,7 +559,7 @@
               <span class="iv-quick-field-title">内置提示词（AI 生成心声时必读）</span>
               <textarea id="ivBuiltinPrompt" placeholder="例如：必须提及今天的约定"></textarea>
             </div>
-            <div class="iv-quick-actions"><button class="iv-template-btn primary" id="ivQuickSave">保存快捷设置</button></div>
+            <div class="iv-quick-actions"><button class="iv-template-btn primary iv-block-btn" id="ivQuickSave">保存快捷设置</button></div>
           </div>
         </div>
       </div>
@@ -608,7 +611,7 @@
 })();
 </script>
 <script src="js/api-float.js?v=20261005a"></script>
-<script src="js/avatar-frame.js?v=20261005b"></script>
+<script src="js/avatar-frame.js?v=20261006d"></script>
 <script src="swipe-back.js"></script>
 <script>
 // iOS 键盘：收缩聊天容器，让输入栏位于键盘上方（父页面也会 postMessage 同步）
