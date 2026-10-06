@@ -23,6 +23,7 @@
      渐变遮罩用变量 --chat-topbar-mask / --chat-bottom-mask（见配方 K2）
    - 底部 dock 图标重排 / 把功能挪到新图标位置：见「配方 N」
      （真按钮换外衣+挪位，千万别删按钮；::before/::after 画的图标不能点）
+   - 卡片（转账/红包/一起听/文件等）完全重构：可换行 / 换图标 / 换底色 → 见「配方 O」
    - 隐藏但保留功能：visibility:hidden（点击区还在；display:none 会移除点击区）
    - 移动：order / position / transform / margin
    ============================================================ */
@@ -721,6 +722,59 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
    - 坐标是写死的，窄屏可能挤；可用 @media (max-width:420px) 收窄 left 间距。
    - 群聊同理，把前缀 .nano-chat-inner 换成 .nano-groups 即可。
    - 想换 #moreBtn / #sendBtn 的图标也一样：隐藏其 svg/i，再给按钮设 background。
+   ============================================================ */
+
+/* ============================================================
+   配方 O：卡片（转账 / 红包 / 一起听 / 文件 / 情侣卡…）完全重构
+   ------------------------------------------------------------
+   所有卡片同构（变体：transfer / gift / listen / file / couple / invite / call / image / familycard / takeout / location …）：
+     .bubble-card.<变体>
+       .card-main
+         .icon-wrap (内含 svg)
+         div                      ← 文字组：没有类名，用 .card-main > div:not(.icon-wrap) 选中
+           .card-title
+           .card-sub
+       .card-footer
+         .card-footer-text
+         .card-actions > .card-btn[.return-btn]
+   重点：默认是「图标 + 文字」一行排列；下面可改成任意多行 / 多栏，功能按钮不受影响。
+
+   // ① 允许换行（不必挤在一行）
+   .nano-chat-inner .bubble-card .card-main { flex-wrap: wrap; align-items: flex-start; }
+   // 让文字整组换到第二行（图标独占一行）：
+   .nano-chat-inner .bubble-card .card-main > div:not(.icon-wrap) { flex: 1 1 100%; min-width: 0; }
+   // 或让标题、副标题各自独占一行：
+   .nano-chat-inner .bubble-card .card-title { flex: 0 0 100%; }
+   .nano-chat-inner .bubble-card .card-sub   { flex: 0 0 100%; }
+   // 长文本自动折行、不溢出：
+   .nano-chat-inner .bubble-card .card-title,
+   .nano-chat-inner .bubble-card .card-sub { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+
+   // ② 换图标（隐藏原 svg，再给 .icon-wrap 换背景图）
+   .nano-chat-inner .bubble-card.transfer .icon-wrap svg { display: none; }
+   .nano-chat-inner .bubble-card.transfer .icon-wrap { background: url("https://.../icon.svg") center/20px no-repeat; }
+
+   // ③ 换底色 / 圆角 / 宽度
+   .nano-chat-inner .bubble-card.transfer { background: #5b8def; color: #fff; border-radius: 12px; }
+   .nano-chat-inner .bubble-card { width: 208px; }        // 想更宽/更窄改这里，改宽才好排版
+   // 给整张卡铺一张图（图 + 兜底色）：
+   .nano-chat-inner .bubble-card.gift { background: url("https://.../card-bg.png") center/cover no-repeat, #ff6fa0; }
+
+   // ④ 底栏也换行 / 按钮换行
+   .nano-chat-inner .bubble-card .card-footer { flex-wrap: wrap; gap: 6px; }
+   .nano-chat-inner .bubble-card .card-actions { flex: 1 1 100%; justify-content: flex-end; }
+
+   // ⑤ 用 grid 做更自由的多行版式（例：图标跨两行，右侧标题+副标题）
+   .nano-chat-inner .bubble-card .card-main {
+     display: grid; grid-template-columns: 32px 1fr; gap: 4px 10px; align-items: center;
+   }
+   .nano-chat-inner .bubble-card .icon-wrap { grid-row: span 2; }
+   // 想完全上下堆叠：grid-template-columns: 1fr; 再让图标 grid-column: 1 / -1; justify-self: start;
+
+   注意：
+   - 文字组没类名，用 .card-main > div:not(.icon-wrap) 命中；只改某变体就再加 .transfer / .gift…
+   - 通话卡/一起听卡的部分文字带行内样式，改不动时用 !important（例如 .card-sub{... !important}）。
+   - 换行/重排是纯 CSS，接收/退回按钮与点击事件照旧；但别删 .card-btn 等元素，删了功能会丢。
    ============================================================ */
 
 /* 配方 L：只移动「消息头像」，顶栏「设置」按钮原地不动、逻辑不变
