@@ -31,7 +31,8 @@ button{border:0;background:none;color:inherit}
 .topbar{
   min-height:44px;
   flex:none;
-  padding:calc(10px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 12px 10px;
+  padding:10px 12px 10px;
+  border-top:max(0px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)) solid transparent;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -203,7 +204,7 @@ button{border:0;background:none;color:inherit}
 .voice:active,.plus:active{background:#f2f2f2}
 .voice svg,.plus svg{width:28px;height:28px;stroke:#111;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 @media (max-width:700px){
-  .topbar{min-height:44px;flex:none;padding:calc(10px + max(10px, var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 12px 10px}
+  .topbar{min-height:44px;flex:none;padding:10px 12px 10px;border-top:max(0px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)) solid transparent}
   .left-tools,.right-tools{width:128px;gap:8px}
   .icon-btn{width:40px;height:40px}
   .icon-btn svg{width:26px;height:26px}

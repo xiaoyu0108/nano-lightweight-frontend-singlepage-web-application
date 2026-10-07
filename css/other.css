@@ -19,9 +19,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;
+    padding: 10px 12px;
     min-height: 44px;
-    border-top: none;
+    border-top: var(--safe-top, env(safe-area-inset-top, 0px)) solid transparent;
     background: rgba(255, 255, 255, 0.86);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
