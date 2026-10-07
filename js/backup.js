@@ -1,6 +1,6 @@
 /* =========================================================
    全局备份与恢复
-   - 导出：IndexedDB + localStorage + sessionStorage + CacheStorage
+   -    导出：IndexedDB + localStorage + sessionStorage（不含 CacheStorage，可再生、会让备份巨大且很慢）
    - 两种格式：JSON（文本）/ ZIP（含二进制）
    - 导入：完全覆盖当前数据后还原
    ========================================================= */
@@ -217,37 +217,9 @@ async function collectAllData(opts = { binary: false }) {
     } catch {}
 
     // ---------- CacheStorage ----------
-    if (window.caches && caches.keys) {
-        try {
-            const cacheNames = await caches.keys();
-            for (const cacheName of cacheNames) {
-                const cache = await caches.open(cacheName);
-                const reqs = await cache.keys();
-                const entries = [];
-                for (const req of reqs) {
-                    const res = await cache.match(req);
-                    if (!res) continue;
-                    const headers = {};
-                    res.headers.forEach((v, k) => { headers[k] = v; });
-                    const bodyBuf = await res.arrayBuffer();
-                    entries.push({
-                        url: req.url,
-                        method: req.method,
-                        headers,
-                        status: res.status,
-                        statusText: res.statusText,
-                        body: opts.binary
-                            ? await binaryToBase64(new Blob([bodyBuf]))
-                            : null,
-                        bodySkipped: !opts.binary
-                    });
-                }
-                data.cacheStorage[cacheName] = entries;
-            }
-        } catch (e) {
-            console.warn('CacheStorage 导出失败:', e);
-        }
-    }
+    // 不打包 Service Worker 缓存：那是可再生的静态资源（JS/CSS/图片），
+    // 打进备份会让文件巨大、导出/导入都很慢，恢复时也没有意义（会自动重新缓存）。
+    // 旧备份若含 cacheStorage，导入时会自动忽略。
 
     return data;
 }
@@ -350,40 +322,7 @@ async function exportZip() {
     zip.file('sessionStorage.json', JSON.stringify(collectStorage(sessionStorage)));
 
     // ---------- CacheStorage ----------
-    const cacheRoot = zip.folder('cacheStorage');
-    if (window.caches && caches.keys) {
-        try {
-            const cacheNames = await caches.keys();
-            for (const cacheName of cacheNames) {
-                const cache = await caches.open(cacheName);
-                const reqs = await cache.keys();
-                const folder = cacheRoot.folder(safeName(cacheName));
-                const entries = [];
-                let idx = 0;
-
-                for (const req of reqs) {
-                    const res = await cache.match(req);
-                    if (!res) continue;
-                    const headers = {};
-                    res.headers.forEach((v, k) => { headers[k] = v; });
-                    const bodyBuf = await res.arrayBuffer();
-                    const binName = `body_${idx++}.bin`;
-                    folder.file(binName, new Blob([bodyBuf]));
-                    entries.push({
-                        url: req.url,
-                        method: req.method,
-                        headers,
-                        status: res.status,
-                        statusText: res.statusText,
-                        __binaryFile: binName
-                    });
-                }
-                folder.file('entries.json', JSON.stringify(entries));
-            }
-        } catch (e) {
-            console.warn('CacheStorage ZIP 导出失败:', e);
-        }
-    }
+    // 跳过 Service Worker 缓存（可再生资源），让备份更小、导出/导入更快
 
     zip.file('meta.json', JSON.stringify(meta));
 
@@ -452,21 +391,16 @@ async function clearAllData() {
         });
     }
 
-    // CacheStorage：删除所有缓存
-    if (window.caches && caches.keys) {
-        try {
-            const names = await caches.keys();
-            await Promise.all(names.map((n) => caches.delete(n)));
-        } catch {}
-    }
+    // CacheStorage：不动（那是可再生的静态资源缓存，清掉只会让下次打开变慢）
 }
 
 /** 从 JSON 对象还原 */
-async function importFromJson(data) {
+async function importFromJson(data, onProgress) {
     if (!data || data.meta?.type !== 'full-site-backup') {
         throw new Error('不是有效的全站备份文件');
     }
 
+    if (typeof onProgress === 'function') onProgress('清空旧数据…');
     await clearAllData();
 
     // ---------- IndexedDB ----------
@@ -553,27 +487,9 @@ async function importFromJson(data) {
     }
 
     // ---------- CacheStorage ----------
-    if (data.cacheStorage && window.caches) {
-        for (const cacheName of Object.keys(data.cacheStorage)) {
-            try {
-                const cache = await caches.open(cacheName);
-                const entries = data.cacheStorage[cacheName] || [];
-                for (const entry of entries) {
-                    if (!entry.body) continue;
-                    const body = base64ToArrayBuffer(entry.body);
-                    const res = new Response(body, {
-                        status: entry.status || 200,
-                        statusText: entry.statusText || '',
-                        headers: entry.headers || {}
-                    });
-                    const req = new Request(entry.url, { method: entry.method || 'GET' });
-                    await cache.put(req, res);
-                }
-            } catch (e) {
-                console.warn('恢复缓存失败:', cacheName, e);
-            }
-        }
-    }
+    // 忽略备份里的 Service Worker 缓存（可再生），导入更快、也不清掉当前缓存
+
+    if (typeof onProgress === 'function') onProgress('整理数据…');
 }
 
 /** 旧备份没有 schema 时：从记录里推断 keyPath（值里与 key 相等的字段） */
@@ -613,8 +529,9 @@ function openDatabaseWithSchema(name, version, schema) {
 }
 
 /** 从 ZIP 还原 */
-async function importFromZip(file) {
+async function importFromZip(file, onProgress) {
     if (!window.JSZip) throw new Error('JSZip 未加载');
+    if (typeof onProgress === 'function') onProgress('解压中…');
     const zip = await JSZip.loadAsync(file);
 
     // ---------- 解析 meta ----------
@@ -635,8 +552,11 @@ async function importFromZip(file) {
                 if (seg.length >= 1) dbNames.add(seg[0]);
             }
         });
+        const dbNameArr = Array.from(dbNames);
+        let _dbi = 0;
 
-        for (const dbName of dbNames) {
+        for (const dbName of dbNameArr) {
+            if (typeof onProgress === 'function') onProgress('导入数据库 ' + (++_dbi) + '/' + dbNameArr.length + '…');
             const dbFolder = idbFolder.folder(dbName);
             const dbMetaFile = dbFolder.file('__meta__.json');
             let version;
@@ -755,44 +675,9 @@ async function importFromZip(file) {
     }
 
     // ---------- CacheStorage ----------
-    const cacheRoot = zip.folder('cacheStorage');
-    if (cacheRoot && window.caches) {
-        const cacheNames = new Set();
-        cacheRoot.forEach((path, entry) => {
-            if (entry.dir) {
-                const seg = path.split('/').filter(Boolean);
-                if (seg.length >= 1) cacheNames.add(seg[0]);
-            }
-        });
+    // 忽略备份里的 Service Worker 缓存（可再生的静态资源），导入更快、也不会清掉当前缓存
 
-        for (const cacheName of cacheNames) {
-            const folder = cacheRoot.folder(cacheName);
-            const entriesFile = folder.file('entries.json');
-            if (!entriesFile) continue;
-            let entries = [];
-            try { entries = JSON.parse(await entriesFile.async('string')); } catch {}
-            if (!Array.isArray(entries)) continue;
-
-            try {
-                const cache = await caches.open(cacheName);
-                for (const entry of entries) {
-                    if (!entry.__binaryFile) continue;
-                    const binFile = folder.file(entry.__binaryFile);
-                    if (!binFile) continue;
-                    const ab = await binFile.async('arraybuffer');
-                    const res = new Response(ab, {
-                        status: entry.status || 200,
-                        statusText: entry.statusText || '',
-                        headers: entry.headers || {}
-                    });
-                    const req = new Request(entry.url, { method: entry.method || 'GET' });
-                    await cache.put(req, res);
-                }
-            } catch (e) {
-                console.warn('恢复缓存失败:', cacheName, e);
-            }
-        }
-    }
+    if (typeof onProgress === 'function') onProgress('整理数据…');
 }
 
 // ================= 页面交互 =================
@@ -860,11 +745,11 @@ async function executeAction() {
             await withLoading('btnImport', '导入中', async () => {
                 const name = pendingFile.name.toLowerCase();
                 if (name.endsWith('.zip')) {
-                    await importFromZip(pendingFile);
+                    await importFromZip(pendingFile, (t) => setLoadingText('btnImport', t));
                 } else {
                     const text = await pendingFile.text();
                     const data = JSON.parse(text);
-                    await importFromJson(data);
+                    await importFromJson(data, (t) => setLoadingText('btnImport', t));
                 }
             });
         }
@@ -873,6 +758,13 @@ async function executeAction() {
         pendingFile = null;
         setTimeout(() => alert('操作失败：' + (e.message || e)), 100);
     }
+}
+
+function setLoadingText(btnId, text) {
+    const btn = $(btnId);
+    if (!btn) return;
+    const status = btn.querySelector('.item-text-status');
+    if (status) status.textContent = text;
 }
 
 async function withLoading(btnId, loadingText, task) {
