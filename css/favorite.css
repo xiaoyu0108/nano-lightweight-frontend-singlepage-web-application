@@ -32,22 +32,24 @@ body {
 /* ===== 顶部导航 ===== */
 .nav-bar {
     background: #ffffff;
-    padding: 14px 20px 10px 20px;
+    padding: calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;
     display: flex;
     align-items: center;
     border-bottom: 1px solid #f0f0f0;
     flex-shrink: 0;
-    min-height: 60px;
+    min-height: 44px;
 }
 .nav-back {
+    width: 40px;
+    height: 40px;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 30px;
+    border-radius: 50%;
     transition: background 0.15s;
     flex-shrink: 0;
 }
@@ -62,10 +64,10 @@ body {
 .nav-title {
     flex: 1;
     text-align: center;
-    font-size: 18px;
-    font-weight: 500;
+    font-size: 17px;
+    font-weight: 600;
     color: #1c1c1e;
-    margin-right: 36px;
+    margin-right: 40px;
     letter-spacing: -0.2px;
 }
 
@@ -366,4 +368,4 @@ body {
     .fav-content { font-size: 14px; }
 }
 
-.nav-bar { padding-top: calc(14px + var(--safe-top, 0px)); }
+.nav-bar { padding-top: calc(10px + var(--safe-top, 0px)); }

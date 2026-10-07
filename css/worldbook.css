@@ -44,7 +44,7 @@ body {
     background: rgba(255, 255, 255, 0.96);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
-    padding: 10px 16px 8px;
+    padding: 10px 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -64,7 +64,7 @@ body {
     padding: 4px 0;
     font-weight: 300;
     line-height: 1;
-    width: 36px;
+    width: 40px;
     text-align: left;
 }
 .navbar .back::before {
@@ -1014,5 +1014,5 @@ select.form-control {
 }
 
 /* 内页顶栏：留出灵动岛�?-safe-top 由主框架注入�?*/
-.navbar { padding-top: calc(14px + var(--safe-top, 0px)); }
+.navbar { padding-top: calc(10px + var(--safe-top, 0px)); }
 

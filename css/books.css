@@ -13,16 +13,17 @@ img{display:block;max-width:100%}
 
 /* 顶栏 */
 .topbar{
-  padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 14px) 22px 12px;
+  padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 10px) 12px 10px;
   display:flex;align-items:center;justify-content:space-between;
   background:transparent;z-index:5;flex:none;
+  min-height:44px;
 }
 .topbar h1{font-size:30px;margin:0;font-weight:800;letter-spacing:-1px}
 .topbar h1.clickable{cursor:pointer;transition:opacity .15s}
 .topbar h1.clickable:active{opacity:.55}
 .topbar .actions{display:flex;align-items:center;gap:10px}
 .iconbtn{
-  width:42px;height:42px;border-radius:50%;
+  width:40px;height:40px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   color:#18191b;flex:none;background:#fff;
   box-shadow:0 2px 10px rgba(0,0,0,.05);
@@ -31,12 +32,13 @@ img{display:block;max-width:100%}
 .iconbtn:active{background:#f0f0f2;transform:scale(.94)}
 .iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .iconbtn.on{background:#18191b;color:#fff}
-.placeholder{width:42px;height:42px;flex:none}
+.placeholder{width:40px;height:40px;flex:none}
 
 .reader-topbar{
-  padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 8px) 14px 8px;
+  padding:calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 10px) 12px 10px;
   display:flex;align-items:center;justify-content:space-between;
   background:transparent;z-index:5;flex:none;
+  min-height:44px;
 }
 .reader-topbar h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.2px}
 .reader-topbar .iconbtn{background:transparent;box-shadow:none}

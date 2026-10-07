@@ -27,7 +27,8 @@ body {
 
 /* ===== 顶栏 ===== */
 .top-bar {
-    padding: calc(14px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 0 6px 0;
+    padding: calc(10px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 12px 10px;
+    min-height: 44px;
     text-align: center;
     background: #FFFFFF;
     position: sticky;
@@ -46,7 +47,7 @@ body {
     margin: 0 auto;
     padding: 0 16px 40px 16px;
     overflow-y: auto;
-    height: calc(100vh - 50px - max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
+    height: calc(100vh - 44px - max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
     background-color: #FFFFFF;
 }
 

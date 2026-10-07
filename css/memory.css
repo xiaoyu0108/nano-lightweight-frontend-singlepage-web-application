@@ -42,14 +42,14 @@ body {
     align-items: center;
     justify-content: space-between;
     min-height: 44px;
-    padding: 0 6px;
+    padding: calc(10px + var(--safe-top, 0px)) 12px 10px;
     background-color: #ffffff;
     border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
     flex-shrink: 0;
 }
 .topbar-back {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border: none;
     background: transparent;
     border-radius: 8px;
@@ -68,13 +68,13 @@ body {
     flex: 1;
     text-align: center;
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 600;
     color: #000000;
     pointer-events: none;
 }
 .topbar-save {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border: none;
     background: transparent;
     border-radius: 8px;
@@ -521,5 +521,5 @@ input:checked + .slider:before { transform: translateX(20px); }
     .toast-box { padding: 24px 20px; }
 }
 
-.memory-topbar { padding-top: calc(14px + var(--safe-top, 0px)); }
+.memory-topbar { padding-top: calc(10px + var(--safe-top, 0px)); }
 

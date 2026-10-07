@@ -19,8 +19,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 12px 52px 8px;
-    border-top: var(--safe-top, env(safe-area-inset-top, 0px)) solid transparent;
+    padding: calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;
+    min-height: 44px;
+    border-top: none;
     background: rgba(255, 255, 255, 0.86);
     backdrop-filter: saturate(180%) blur(20px);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -31,8 +32,8 @@ body {
     left: 10px;
     top: 50%;
     transform: translateY(-50%);
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border: none;
     background: transparent;
     color: #007AFF;
@@ -59,7 +60,7 @@ body {
     margin: 0 auto;
     padding: 14px 16px 44px;
     overflow-y: auto;
-    height: calc(100vh - 56px - var(--safe-top, env(safe-area-inset-top, 0px)));
+    height: calc(100vh - 44px - var(--safe-top, env(safe-area-inset-top, 0px)));
 }
 .card-group { margin-bottom: 22px; }
 

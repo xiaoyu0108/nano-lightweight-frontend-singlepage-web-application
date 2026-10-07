@@ -31,24 +31,26 @@ body {
     background: rgba(255,255,255,0.6);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    padding: 14px 16px 10px 16px;
+    padding: calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid rgba(255,255,255,0.3);
     flex-shrink: 0;
-    min-height: 56px;
+    min-height: 44px;
     position: relative;
 }
 .nav-back {
+    width: 40px;
+    height: 40px;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 30px;
+    border-radius: 50%;
     transition: background 0.15s;
     flex-shrink: 0;
     position: relative;
@@ -72,7 +74,7 @@ body {
     max-width: 46%;
     text-align: center;
     font-size: 17px;
-    font-weight: 500;
+    font-weight: 600;
     color: #1c1c1e;
     letter-spacing: -0.2px;
     white-space: nowrap;
@@ -634,4 +636,4 @@ body {
     }
 }
 
-.nav-bar { border-top: var(--safe-top, env(safe-area-inset-top, 0px)) solid transparent; }
+.nav-bar { border-top: none; }

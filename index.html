@@ -271,14 +271,16 @@
             display: flex;
             justify-content: flex-start;
             align-items: center;
-            padding: calc(14px + var(--safe-inset-top)) 0 12px 0;
+            padding: 10px 12px 10px 12px; /* 顶部安全区已由 .fullscreen-overlay 统一下移，这里不再叠加 */
+            min-height: 44px;
+            box-sizing: border-box;
             flex-shrink: 0;
             position: relative;
         }
         .overlay-header .back-btn {
-            width: 38px;
-            height: 38px;
-            border-radius: 38px;
+            width: 40px;
+            height: 40px;
+            border-radius: 40px;
             background: rgba(0, 0, 0, 0.03);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
             border: 0.5px solid rgba(0, 0, 0, 0.04);
@@ -660,6 +662,14 @@
                 border-radius: 0;
             }
         }
+
+        /* ===== 统一顶部安全区：由外壳整体下移，页面内不再各自叠加 safe-top =====
+           这样所有页面的顶栏行为一致：buttons 都在灵动岛下方，不会有的页多一条空白、有的页又顶进岛里。
+           可用 localStorage.nano_shell_safe_offset = '0' 关闭，回到各页自己处理的老方式。 */
+        .app-container, .fullscreen-overlay { box-sizing: border-box; }
+        .app-container { padding-top: var(--shell-safe-top, 0px); }
+        .fullscreen-overlay { padding-top: var(--shell-safe-top, 0px); padding-bottom: 0; }
+        .fullscreen-overlay .overlay-inner { height: 100%; }
     </style>
 
     <!-- ============================================================
@@ -1153,21 +1163,37 @@
         }
 
         // 让底栏留白区域的颜色跟随当前页面，避免出现一条与主题不符的白边
+        function frameBodyBg(frame) {
+            try {
+                var doc = frame && frame.contentDocument;
+                if (!doc || !doc.body) return '';
+                var c = getComputedStyle(doc.body).backgroundColor;
+                if (!c || c === 'transparent' || c === 'rgba(0, 0, 0, 0)') {
+                    c = getComputedStyle(doc.documentElement).backgroundColor;
+                }
+                if (c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)') return c;
+            } catch (e) {}
+            return '';
+        }
         function syncShellBg() {
             try {
                 var bgEl = document.querySelector('.bg');
-                if (!bgEl) return;
-                var bi = bgEl.style.backgroundImage;
-                if (bi && bi !== 'none' && bi !== '') return; // 用户设了自定义壁纸就保留
-                var frame = document.querySelector('.iframe-container.active iframe');
-                var doc = frame && frame.contentDocument;
-                if (!doc || !doc.body) return;
-                var c = '';
-                try { c = getComputedStyle(doc.body).backgroundColor; } catch (e) {}
-                if (!c || c === 'transparent' || c === 'rgba(0, 0, 0, 0)') {
-                    try { c = getComputedStyle(doc.documentElement).backgroundColor; } catch (e) {}
+                if (bgEl) {
+                    var bi = bgEl.style.backgroundImage;
+                    if (!(bi && bi !== 'none' && bi !== '')) { // 用户设了自定义壁纸就保留
+                        var c = frameBodyBg(document.querySelector('.iframe-container.active iframe'));
+                        if (c) bgEl.style.backgroundColor = c;
+                    }
                 }
-                if (c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)') bgEl.style.backgroundColor = c;
+                // 全屏子页：让安全区那一条的颜色跟随当前子页背景，避免出现白色/异色空白条
+                var ov = document.getElementById('fullscreenOverlay');
+                if (ov && ov.classList.contains('active')) {
+                    var of = null;
+                    try { of = nanoActiveOverlayFrame ? nanoActiveOverlayFrame() : null; } catch (e) {}
+                    if (!of) of = ov.querySelector('iframe');
+                    var oc = frameBodyBg(of);
+                    if (oc) ov.style.backgroundColor = oc;
+                }
             } catch (e) {}
         }
         try {
@@ -1459,15 +1485,24 @@
                 doc.head.appendChild(st);
             } catch (e) {}
         }
+        function shellSafeOffsetEnabled() {
+            try { return localStorage.getItem('nano_shell_safe_offset') !== '0'; } catch (e) { return true; }
+        }
         function applySafeTopToFrames() {
             try {
                 const insets = measureSafeInsets();
-                const topVal = insets.top ? (insets.top + 'px') : '0px';
+                const topPx = insets.top || 0;
+                const useShell = shellSafeOffsetEnabled();
+                // 统一策略：由外壳整体下移（.app-container/.fullscreen-overlay 的 padding-top），
+                // 页面内不再各自叠加 safe-top，避免每个页面顶栏高度不一。
+                document.documentElement.style.setProperty('--shell-safe-top', (useShell && topPx) ? (topPx + 'px') : '0px');
+                const topVal = useShell ? '0px' : (topPx ? (topPx + 'px') : '0px');
                 const botVal = insets.bottom ? (insets.bottom + 'px') : '0px';
                 getSafeTopFrames().forEach(function (f) {
                     setSafeVars(f, topVal, botVal);
                     applySafeFallback(f);
                 });
+                try { syncShellBg(); } catch (e) {}
             } catch (e) {}
         }
         // 内页 iframe 的 load 事件要等所有子资源（大脚本/CDN）加载完才触发，

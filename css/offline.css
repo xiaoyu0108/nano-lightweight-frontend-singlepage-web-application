@@ -35,17 +35,17 @@ button:active{opacity:.55}
 .app{height:100%;display:flex;flex-direction:column}
 
 .topbar{
-  height:calc(64px + var(--safe-top, env(safe-area-inset-top, 0px)));flex:none;padding-top:var(--safe-top, env(safe-area-inset-top, 0px));
+  min-height:44px;flex:none;padding:calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;
   display:flex;align-items:center;justify-content:space-between;
   background:rgba(248,243,244,.92);backdrop-filter:blur(20px);
   border-bottom:1px solid rgba(220,212,213,.6);position:relative;z-index:30;
 }
 .top-title{
-  flex:1;min-width:0;text-align:center;font-size:17px;font-weight:650;letter-spacing:.15px;color:#5a4e50;
+  flex:1;min-width:0;text-align:center;font-size:17px;font-weight:600;letter-spacing:.15px;color:#5a4e50;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px;
   pointer-events:none;position:relative;z-index:1;
 }
-.top-btn{flex:none;width:50px;height:50px;display:grid;place-items:center;color:#b8aaac;position:relative;z-index:2}
+.top-btn{flex:none;width:40px;height:40px;display:grid;place-items:center;color:#b8aaac;position:relative;z-index:2}
 #settingsBtn{z-index:3}
 /* 美化预览模式：只展示，不允许在预览里操作输入/切换 */
 .offline-preview .bottom,.offline-preview .scene-tabs,.offline-preview .select-bar{pointer-events:none}

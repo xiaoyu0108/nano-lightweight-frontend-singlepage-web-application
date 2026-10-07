@@ -10,10 +10,10 @@ button svg{pointer-events:none;vertical-align:middle;flex-shrink:0}
 #app{height:100vh;height:100vh;width:100%;display:flex;flex-direction:column;background:#ffffff}
 
 /* ===== Header ===== */
-.header{height:50px;padding-top:var(--safe-top, env(safe-area-inset-top, 0px));box-sizing:content-box;flex:none;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;background:rgba(255,255,255,.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:0.5px solid rgba(60,60,67,.08)}
-.header-left{display:flex;align-items:center;padding-left:8px}
-.header-right{display:flex;align-items:center;padding-right:8px}
-.back{width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.04);color:#007aff;display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:0;padding:0}
+.header{min-height:44px;padding:calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;box-sizing:border-box;flex:none;display:grid;grid-template-columns:40px 1fr 40px;align-items:center;background:rgba(255,255,255,.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:0.5px solid rgba(60,60,67,.08)}
+.header-left{display:flex;align-items:center;padding-left:0}
+.header-right{display:flex;align-items:center;padding-right:0}
+.back{width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.04);color:#007aff;display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:0;padding:0}
 .back:active{transform:scale(.88);background:rgba(0,0,0,.08)}
 .back svg{width:20px;height:20px;stroke:#007aff;display:block;flex-shrink:0}
 .title{font-size:17px;font-weight:600;text-align:center;color:#1c1c1e;letter-spacing:-.2px}

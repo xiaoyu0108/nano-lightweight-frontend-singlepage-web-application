@@ -23,7 +23,7 @@ html, body {
     max-width: 430px;
     margin: 0 auto;
     background: #ffffff;
-    padding: 0 16px 16px 16px;
+    padding: 0 12px 16px 12px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -35,7 +35,7 @@ html, body {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    padding: 12px 0 8px 0;
+    padding: 10px 0 10px 0;
     flex-shrink: 0;
     min-height: 44px;
     gap: 8px;
@@ -51,8 +51,8 @@ html, body {
     display: none;
 }
 .nav-bar .page-back {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     border: none;
     background: rgba(0, 0, 0, 0.04);
@@ -88,7 +88,7 @@ html, body {
 /* 右侧等宽占位，使标题在整条顶栏中居中 */
 .nav-bar .page-header::after {
     content: '';
-    width: 34px;
+    width: 40px;
     flex-shrink: 0;
 }
 
@@ -881,7 +881,7 @@ html, body {
     transform: scale(0.95);
 }
 
-.nav-bar { padding-top: 12px; }
+.nav-bar { padding-top: 10px; }
 
 /* 全屏时整页让出灵动岛（--safe-top 由主框架仅在 PWA 时注入；普通浏览器为 0 不影响） */
 .app-container {

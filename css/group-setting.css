@@ -17,7 +17,8 @@ html, body {
 .nav-bar {
     position: sticky; top: 0; z-index: 10;
     display: flex; align-items: center; justify-content: space-between;
-    padding: calc(8px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;
+    padding: calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;
+    min-height: 44px;
     background: rgba(255, 255, 255, 0.94);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -30,7 +31,7 @@ html, body {
 }
 .nav-bar .nav-btn i { font-size: 22px; }
 .nav-bar .nav-btn.bold { font-weight: 600; justify-content: flex-end; }
-.nav-bar .nav-title { font-size: 17px; font-weight: 600; color: #000; }
+.nav-bar .nav-title { flex: 1; text-align: center; font-size: 17px; font-weight: 600; color: #000; }
 
 /* 群资料卡 */
 .group-profile {

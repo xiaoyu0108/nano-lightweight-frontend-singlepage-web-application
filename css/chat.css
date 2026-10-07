@@ -45,13 +45,14 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)) 0 0 0;
+    padding: calc(10px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 12px 0 12px;
+    min-height: 44px;
     flex-shrink: 0;
     }
 .page-topbar-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 38px;
+    width: 40px;
+    height: 40px;
+    border-radius: 40px;
     background: #ffffff;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
     border: 0.5px solid rgba(0, 0, 0, 0.04);

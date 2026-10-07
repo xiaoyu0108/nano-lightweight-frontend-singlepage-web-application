@@ -33,7 +33,7 @@ body{overflow-x:hidden}
 ::-webkit-scrollbar{display:none}
 *{scrollbar-width:none;-ms-overflow-style:none}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
-.app{max-width:520px;margin:auto;min-height:100vh;padding:var(--safe-top, 0px) 20px 34px;position:relative}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:var(--safe-top, 0px) 12px 34px;position:relative}
 
 /* ---------- 首页 ---------- */
 .brand{margin-top:14px}
@@ -125,9 +125,9 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 }
 
 /* ---------- 内页顶栏 ---------- */
-.top{height:56px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.top{min-height:44px;padding:10px 0;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .back-btn{
-  width:36px;height:36px;
+  width:40px;height:40px;
   display:flex;align-items:center;justify-content:center;
   font-size:26px;color:var(--deep);flex:none;
   transition:.15s;padding-bottom:3px;

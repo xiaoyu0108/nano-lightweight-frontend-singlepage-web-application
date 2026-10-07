@@ -21,17 +21,17 @@ body.dark{
 .page-inner{padding:14px 16px calc(0px + 110px)}
 .page.no-nav .page-inner{padding-bottom:28px}
 .topbar{
-  height:calc(54px + var(--safe-top, env(safe-area-inset-top, 0px)));display:flex;align-items:center;justify-content:space-between;
-  padding:calc(var(--safe-top, env(safe-area-inset-top, 0px))) 18px 0;position:relative;z-index:10;
+  min-height:44px;display:flex;align-items:center;justify-content:space-between;
+  padding:calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;position:relative;z-index:10;
   background:color-mix(in srgb,var(--bg) 84%,transparent);
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
 }
-.topbar .title{font-size:19px;font-weight:700;letter-spacing:-.035em}
+.topbar .title{font-size:17px;font-weight:600;letter-spacing:-.035em}
 .topbar .title.home-back{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .topbar .title.home-back .backdot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--surface2);color:var(--text)}
 .topbar .title.home-back .backdot svg{width:13px;height:13px}
 .topbar .title.home-back.has-mini .backdot{background:var(--accent);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 14%,transparent)}
-.iconbtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center}
+.iconbtn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center}
 .iconbtn:active{background:var(--surface2)}
 svg{display:block}
 .nav{

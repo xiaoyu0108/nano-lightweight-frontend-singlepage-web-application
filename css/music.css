@@ -32,11 +32,12 @@ html, body {
 /* ===== 顶栏 ===== */
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: calc(16px + var(--safe-top, env(safe-area-inset-top, 0px))) 20px 10px; flex-shrink: 0; background: transparent;
+  padding: calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px; flex-shrink: 0; background: transparent;
+  min-height: 44px;
   position: relative; z-index: 10;
 }
 .topbar-btn {
-  width: 36px; height: 36px; border: none; background: transparent;
+  width: 40px; height: 40px; border: none; background: transparent;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; border-radius: 50%;
   transition: background 0.15s, transform 0.15s; color: var(--gray-1);

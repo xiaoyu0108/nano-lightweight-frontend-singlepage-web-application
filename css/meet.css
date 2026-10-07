@@ -17,9 +17,10 @@ html, body {
 
 .kt-top {
   flex: none; display: flex; align-items: center; justify-content: space-between;
-  padding: calc(var(--safe-top, 0px) + 12px) 14px 12px;
+  min-height: 44px;
+  padding: calc(var(--safe-top, 0px) + 10px) 12px 10px;
 }
-.kt-back { width: 34px; height: 34px; border: 0; background: transparent; color: #1f1f1f; display: flex; align-items: center; justify-content: center; padding: 0; }
+.kt-back { width: 40px; height: 40px; border: 0; background: transparent; color: #1f1f1f; display: flex; align-items: center; justify-content: center; padding: 0; }
 .kt-back svg { width: 22px; height: 22px; }
 .kt-title { font-size: 17px; font-weight: 600; letter-spacing: 0.14em; color: #1f1f1f; }
 

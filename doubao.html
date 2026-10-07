@@ -29,9 +29,9 @@ button{border:0;background:none;color:inherit}
   overflow:hidden;
 }
 .topbar{
-  height:calc(76px + max(16px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
-  flex:0 0 calc(76px + max(16px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)));
-  padding:max(16px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)) 25px 8px;
+  min-height:44px;
+  flex:none;
+  padding:calc(10px + max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 12px 10px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -42,7 +42,7 @@ button{border:0;background:none;color:inherit}
 .left-tools,.right-tools{display:flex;align-items:center;gap:25px;width:180px}
 .right-tools{justify-content:flex-end}
 .icon-btn{
-  width:42px;height:42px;
+  width:40px;height:40px;
   display:grid;place-items:center;
   cursor:pointer;
   border-radius:12px;
@@ -52,8 +52,8 @@ button{border:0;background:none;color:inherit}
 .title-wrap{
   position:absolute;
   left:50%;
-  top:calc(13px + max(0px, calc(max(var(--safe-top, 0px), env(safe-area-inset-top, 0px)) - 16px)));
-  transform:translateX(-50%);
+  top:50%;
+  transform:translate(-50%,-50%);
   text-align:center;
   white-space:nowrap;
   line-height:1;
@@ -203,11 +203,11 @@ button{border:0;background:none;color:inherit}
 .voice:active,.plus:active{background:#f2f2f2}
 .voice svg,.plus svg{width:28px;height:28px;stroke:#111;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 @media (max-width:700px){
-  .topbar{height:calc(64px + max(10px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)));flex-basis:calc(64px + max(10px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)));padding:max(10px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)) 13px 5px}
+  .topbar{min-height:44px;flex:none;padding:calc(10px + max(10px, var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 12px 10px}
   .left-tools,.right-tools{width:128px;gap:8px}
   .icon-btn{width:40px;height:40px}
   .icon-btn svg{width:26px;height:26px}
-  .title{font-size:18px}
+  .title{font-size:17px}
   .subtitle{font-size:11px;margin-top:6px}
   .chat{padding:5px 10px 194px}
   .message{margin-bottom:15px}
