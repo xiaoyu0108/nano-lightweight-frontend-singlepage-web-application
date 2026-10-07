@@ -462,7 +462,10 @@
             const u = new URL(s);
             const host = u.hostname;
             const cur = window.location.hostname;
-            if ((host === 'localhost' || host === '127.0.0.1' || host === '[::1]') && cur && cur !== 'localhost' && cur !== '127.0.0.1' && cur !== '0.0.0.0') {
+            const isLan = cur && (/^(localhost|127\.0\.0\.1|\[::1\]|::1)$/.test(cur) || /^10\./.test(cur) || /^192\.168\./.test(cur) || /^172\.(1[6-9]|2\d|3[01])\./.test(cur) || /\.local$/.test(cur));
+            // 只有当页面本身也在本地 / 局域网时，才把 localhost 换成当前主机；
+            // 部署在 github.io / cloudflare 等公网域名时保留原地址，避免把它换成不可达的公网主机名
+            if ((host === 'localhost' || host === '127.0.0.1' || host === '[::1]') && isLan) {
                 u.hostname = cur;
             }
             return u.toString();
@@ -476,7 +479,11 @@
         return s;
     }
 
+    const __translateCache = {};
     async function translateToZh(text) {
+        const key = String(text || '').trim();
+        if (!key) return null;
+        if (__translateCache[key]) return __translateCache[key];
         const config = await getApiConfig();
         if (!config) {
             console.warn('[Translate] 未配置 API，跳过翻译');
@@ -498,7 +505,9 @@
             });
             if (!response.ok) return null;
             const data = await response.json();
-            return data.choices?.[0]?.message?.content?.trim() || null;
+            const out = data.choices?.[0]?.message?.content?.trim() || null;
+            if (out) __translateCache[key] = out;
+            return out;
         } catch (e) {
             console.error('[Translate] 异常', e);
             return null;
@@ -618,6 +627,8 @@
         if (__grpBlock) prompt += '\n' + __grpBlock + '\n';
         // 小号：注入大号最新的私聊近况（仅小号自己知道）
         if (__originContext) prompt += '\n' + __originContext + '\n';
+        // 大号：注入名下小号的最新动态（大号知道自己开过小号）
+        if (__altChildrenContext) prompt += '\n' + __altChildrenContext + '\n';
 
         prompt += '\n\n【人格核心——你是真人，活生生的人类，不是AI助手，不能用AI助手的语气对话】\n';
         prompt += '1. 你的情绪强度、语气、说话风格完全由你的【角色人设】决定：人设安静就安静、人设高冷就高冷、人设内敛就内敛。绝不主动加戏、不刻意活泼、不强行说土味情话；情绪跟着当下的情境自然流动，不预设、不拔高、不刻意煽情，也不给自己加设定外的固定腔调或口头禅。注意：除非人设本身就是毒舌/傲娇/腹黑，否则不要对用户冷嘲热讽、阴阳怪气、摆脸色、把每句话都怼回去。\n';
@@ -1218,6 +1229,8 @@
     let __groupMemHint = '';
     // 小号专属：大号最新 2 轮私聊（供小号掌握 TA 的近况，但不暴露）
     let __originContext = '';
+    // 大号专属：名下小号的最新消息（让本人知道自己开过小号试探 TA）
+    let __altChildrenContext = '';
     // 上下文读取条数（记忆页「上下文保留条数」）：每次回复读取多少条前文
     let __memContextLimit = 30;
 
@@ -1345,6 +1358,31 @@
                     __originContext = '';
                 }
             }).catch(function() {});
+        }).then(function () {
+            // 大号：读取自己名下所有小号的最新消息，让本人知道开过小号试探 user
+            if (!window.NanoMemLink || (characterData && characterData.isAltProbe && characterData.altOriginId)) return null;
+            return window.NanoMemLink.familyIds(chatId).then(function (ids) {
+                const childIds = (ids || []).filter(function (id) { return String(id) !== String(chatId); });
+                if (!childIds.length) { __altChildrenContext = ''; return; }
+                return Promise.all(childIds.map(function (cid) {
+                    return Promise.all([
+                        window.NanoMemLink.readMessages(cid).catch(function () { return []; }),
+                        window.NanoMemLink.getChar(cid).catch(function () { return null; })
+                    ]);
+                })).then(function (rows) {
+                    const parts = [];
+                    rows.forEach(function (r) {
+                        const msgs = r[0] || [];
+                        const name = (r[1] && r[1].name) || '小号';
+                        const recent = msgs.filter(function (m) { return m && !m.recalled && !m.isTip; }).slice(-20);
+                        const body = __formatMsgs(recent, name);
+                        if (body) parts.push('小号「' + name + '」最近和 TA 的消息：\n' + body);
+                    });
+                    __altChildrenContext = parts.length
+                        ? ('【你开的小号 · 只有你自己知道】你本人注册了小号去接近 / 试探 TA，TA 并不知道小号就是你。以下是小号最近的动态；你（大号）心里清楚这件事，但绝不能暴露、不要承认，也不要提小号这个设定。\n' + parts.join('\n\n'))
+                        : '';
+                });
+            }).catch(function () {});
         }).then(function () {
             return __memCfg('contextLimit');
         }).then(function (v) {
@@ -3434,19 +3472,23 @@
     // ===== 小号试探：随机独立调用一次 API 生成（不跟随刷新/回复）=====
     var __altTimer = null;
     function altProbeLastKey() { return 'alt_probe_last_' + chatId; }
+    function altProbeDayKey() { return 'alt_probe_day'; }
+    function altToday() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
     function startAltProbeScheduler() {
         if (__altTimer) return;
-        __altTimer = setInterval(__altProbeTick, 45000);
-        setTimeout(__altProbeTick, 15000 + Math.random() * 20000);
+        __altTimer = setInterval(__altProbeTick, 180000);          // 3 分钟检查一次
+        setTimeout(__altProbeTick, 60000 + Math.random() * 60000); // 首次 1~2 分钟后
     }
     function __altProbeTick() {
         try {
             if (isNanoChat) return;   // 纳米助手不做小号试探
             if (!getChatSetting('altProbe', false)) return;
             if (window.__altProbePending) return;
+            // 全站每天最多生成一个小号
+            if (localStorage.getItem(altProbeDayKey()) === altToday()) return;
             var last = parseInt(localStorage.getItem(altProbeLastKey()) || '0', 10) || 0;
-            if (Date.now() - last < 7 * 24 * 3600 * 1000) return; // 同一角色一周内只小号试探一次
-            if (Math.random() > 0.12) return;               // 每次检查低概率触发
+            if (Date.now() - last < 14 * 24 * 3600 * 1000) return;  // 同一角色 14 天内只小号试探一次
+            if (Math.random() > 0.1) return;                        // 低概率触发（一天最多一个仍由上面的日限兜底）
             __altProbeGenerate();
         } catch (e) {}
     }
@@ -3471,6 +3513,7 @@
                 if (!obj || !obj.name) return;
                 var alt = { id: 'alt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: String(obj.name).slice(0, 20), bio: String(obj.bio || '').slice(0, 60), origin: altOriginInfo() };
                 localStorage.setItem(altProbeLastKey(), String(Date.now()));
+                localStorage.setItem(altProbeDayKey(), altToday());   // 标记今天已生成过一个小号
                 // 同步进「Meet 好友申请中心」，可在那里同意/拒绝
                 try {
                     var _frAll = JSON.parse(localStorage.getItem('nano_friend_requests') || '[]') || [];

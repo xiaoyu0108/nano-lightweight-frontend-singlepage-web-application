@@ -1051,10 +1051,10 @@
     (function() {
         // 全屏 / PWA 下刘海或状态栏可能压住顶栏按钮：给顶部安全区一个最小高度，
         // 只把按钮往下让一点，仍然保持全屏。
-        // 顶部安全区 = 刚好越过灵动岛的像素值。默认 48px；可用
-        // 「其他 → 界面 → 灵动岛安全区」或 localStorage.nano_top_inset 覆盖微调。
-        // 灵动岛安全区开关：仅 iPhone 全面屏需要。关闭时顶部安全区一律按 0 处理，
-        // 这样安卓/不需要的机型不会多出一块空白，也不会让顶栏被透明点击带盖住。
+        // 顶部安全区 = 刚好越过灵动岛的像素值。默认：全屏 PWA 用 48~54px；
+        // 普通浏览器/非全屏直接用浏览器真实 env（不凭空留白）。
+        // 可用「其他 → 界面 → 灵动岛安全区」或 localStorage.nano_top_inset 覆盖微调。
+        // 灵动岛安全区开关：关闭只影响「全屏 PWA 报 0 时的 48px 兜底」，仍尊重浏览器真实安全区。
         function topInsetEnabled() {
             try {
                 var v = localStorage.getItem('nano_top_inset_enabled');
@@ -1063,17 +1063,29 @@
             } catch (e) {}
             try { return /iPhone/.test(navigator.userAgent); } catch (e) { return false; }
         }
+        // 是否处于「已安装的全屏 PWA」：只有这时才需要用 48px 兜底（因为这种模式下 env() 可能报 0）
+        function isStandalonePWA() {
+            try {
+                if (navigator.standalone === true) return true;
+                if (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches || window.matchMedia('(display-mode: minimal-ui)').matches)) return true;
+            } catch (e) {}
+            return false;
+        }
         function applyTopInset() {
             var custom = NaN;
             try { custom = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
             try {
-                // 键盘兜底：把顶部安全区夹在 48~54px，避免某些 WebView 把 env() 报得很大导致顶栏离灵动岛很远
-                document.documentElement.style.setProperty(
-                    '--safe-inset-top',
-                    topInsetEnabled()
-                        ? ((isFinite(custom) && custom >= 0) ? (custom + 'px') : 'max(min(env(safe-area-inset-top, 0px), 54px), 48px)')
-                        : '0px'
-                );
+                var val;
+                if (topInsetEnabled() && isFinite(custom) && custom >= 0) {
+                    val = custom + 'px';                         // 用户自定义，优先
+                } else if (isStandalonePWA()) {
+                    // 已安装全屏 PWA：env 报 0 时兜底 48px（刚好越过灵动岛），报得再大也夹到 54px
+                    val = 'max(min(env(safe-area-inset-top, 0px), 54px), 48px)';
+                } else {
+                    // 普通浏览器 / 未全屏：直接用浏览器给的真实安全区（通常为 0），不凭空加一条空白
+                    val = 'env(safe-area-inset-top, 0px)';
+                }
+                document.documentElement.style.setProperty('--safe-inset-top', val);
             } catch (e) {}
         }
         try { applyTopInset(); } catch (e) {}
@@ -1416,11 +1428,13 @@
                 //  · 报成 0 的 WebView → 48（刚好越过灵动岛）
                 //  · 报得很大的 WebView（某些内嵌浏览器 env 会到 100+）→ 54，避免顶栏离灵动岛很远
                 // 想要更精确可用「其他 → 界面 → 灵动岛安全区」或 localStorage.nano_top_inset 覆盖。
-                if (!topInsetEnabled()) return { top: 0, bottom: bottom };
+                // 注意：关闭开关时不写死 0，而是保留浏览器真实安全区 —— 否则全屏 PWA 下按钮会跑到灵动岛里
                 var _customTop = NaN;
                 try { _customTop = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
-                if (isFinite(_customTop) && _customTop >= 0) top = _customTop;
-                else top = Math.min(Math.max(top, 48), 54);
+                if (isFinite(_customTop) && _customTop >= 0) { top = _customTop; }
+                else if (top > 0) { top = Math.min(top, 54); }                 // 真实安全区（全屏 PWA）→ 直接用，封顶 54
+                else if (topInsetEnabled() && isStandalonePWA()) { top = 48; }  // 全屏 PWA 却报 0 → 兜底 48
+                else { top = 0; }                                              // 非全屏 / 无安全区 → 0，不凭空留白
                 return { top: top, bottom: bottom };
             } catch (e) { return { top: 0, bottom: 0 }; }
         }

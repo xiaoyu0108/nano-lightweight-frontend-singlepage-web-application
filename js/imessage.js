@@ -988,6 +988,17 @@ async function translateLines(lines) {
     return String(out).split(/\n+/).map(s => s.replace(/^\s*\d+[.、)]\s*/, '').trim()).filter(Boolean);
   } catch (e) { return []; }
 }
+// 已翻译缓存：同一句原文只翻译一次，避免反复调用翻译 API 烧 token
+const __transCache = (function () {
+  try { return JSON.parse(localStorage.getItem('nano_trans_cache') || '{}') || {}; } catch (e) { return {}; }
+})();
+function __transCacheSave() {
+  try {
+    const keys = Object.keys(__transCache);
+    if (keys.length > 400) { keys.slice(0, keys.length - 400).forEach(k => delete __transCache[k]); }
+    localStorage.setItem('nano_trans_cache', JSON.stringify(__transCache));
+  } catch (e) {}
+}
 // 确保每一行都有「原文||中文」：外语角色或说外语时自动补翻译（和线上一致）
 async function ensureTranslatedLines(ch, lines) {
   const arr = (lines || []).map(l => String(l || '').trim()).filter(Boolean);
@@ -1004,10 +1015,22 @@ async function ensureTranslatedLines(ch, lines) {
   const anyForeign = isForeignChar(ch) || needIdx.some(i => looksNonChinese(arr[i]));
   if (!anyForeign) return arr;
   const natives = needIdx.map(i => arr[i]);
-  let zh = await translateLines(natives);
-  if (!zh || zh.length < natives.length) { const retry = await translateLines(natives); if (retry && retry.length) zh = retry; }
+  const zhOut = new Array(natives.length).fill('');
+  natives.forEach((t, k) => { if (__transCache[t]) zhOut[k] = __transCache[t]; });
+  const missIdx = [], missTexts = [];
+  natives.forEach((t, k) => { if (!zhOut[k]) { missIdx.push(k); missTexts.push(t); } });
+  if (missTexts.length) {
+    let res = await translateLines(missTexts);
+    // 仅在完全失败（没有结果）时才重试一次，避免行数不符就重复调用、翻倍烧 token
+    if (!res || !res.length) { const retry = await translateLines(missTexts); if (retry && retry.length) res = retry; }
+    missIdx.forEach((k, j) => {
+      const t = (res && res[j]) ? String(res[j]).trim() : '';
+      if (t) { zhOut[k] = t; __transCache[natives[k]] = t; }
+    });
+    if (missIdx.length) __transCacheSave();
+  }
   needIdx.forEach((i, k) => {
-    const t = (zh && zh[k]) ? String(zh[k]).trim() : '';
+    const t = zhOut[k] ? String(zhOut[k]).trim() : '';
     if (t) arr[i] = arr[i] + '||' + t;
   });
   return arr;
@@ -1217,11 +1240,18 @@ async function applyRefreshRaw(raw, picks) {
 async function maybeAltProbe() {
   try {
     if (localStorage.getItem('nano_imessage_altprobe_' + currentNs()) === '0') return 0;
-    const last = parseInt(localStorage.getItem('nano_imessage_altprobe_at_' + currentNs()) || '0', 10) || 0;
-    if (Date.now() - last < 6 * 3600 * 1000) return 0;      // 6 小时最多一次
-    if (Math.random() > 0.5) return 0;                       // 约一半概率出现
-    const pool = state.chars.filter(c => c && c.id && !/^alt_/.test(c.id) && !c.isAltProbe && !isAssistantChar(c));
+    // 全站每天最多生成一个小号
+    const _d = new Date();
+    const dayKey = _d.getFullYear() + '-' + (_d.getMonth() + 1) + '-' + _d.getDate();
+    if (localStorage.getItem('nano_imessage_altprobe_day_' + currentNs()) === dayKey) return 0;
+    const pool = state.chars.filter(c => c && c.id && !/^alt_/.test(c.id) && !c.isAltProbe && !isAssistantChar(c))
+      .filter(c => {
+        // 同一角色 14 天内只小号试探一次
+        const lastChar = parseInt(localStorage.getItem('nano_imessage_altprobe_char_' + currentNs() + '_' + c.id) || '0', 10) || 0;
+        return Date.now() - lastChar >= 14 * 24 * 3600 * 1000;
+      });
     if (!pool.length) return 0;
+    if (Math.random() > 0.4) return 0;                       // 有资格时约四成概率触发（日限兜底）
     const ch = pool[Math.floor(Math.random() * pool.length)];
     const u = readCurrentUser() || {};
     const userName = u.name || '用户';
@@ -1255,6 +1285,9 @@ async function maybeAltProbe() {
     chat.preview = lastM.text; chat.lastTime = lastM.time; chat.sortTime = lastM.ts; chat.unread = (chat.unread || 0) + list.length;
     await saveChat(chat);
     localStorage.setItem('nano_imessage_altprobe_at_' + currentNs(), String(Date.now()));
+    const _dd = new Date();
+    localStorage.setItem('nano_imessage_altprobe_day_' + currentNs(), _dd.getFullYear() + '-' + (_dd.getMonth() + 1) + '-' + _dd.getDate());
+    localStorage.setItem('nano_imessage_altprobe_char_' + currentNs() + '_' + ch.id, String(Date.now()));
     notifyApp(name, list[0].text || lines[0], { group: name });
     if (state.current && state.current.id === chat.id) { state.messages = chat.history; renderMessages(); renderBanner(chat); }
     else renderList();

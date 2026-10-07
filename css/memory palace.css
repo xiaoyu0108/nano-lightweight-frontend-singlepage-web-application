@@ -276,8 +276,8 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
   background:rgba(255,255,255,.5);line-height:1.8;
 }
 
-/* 底部按钮 */
-.bottom-actions{display:flex;gap:10px;margin-top:22px}
+/* 操作按钮（置于卡片上方，方便随时保存/新增） */
+.bottom-actions{display:flex;gap:10px;margin:2px 0 16px}
 .bottom-actions .btn{
   flex:1;border-radius:16px;padding:13px;font-size:14px;
   font-weight:600;text-align:center;transition:.2s;
@@ -342,6 +342,16 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .heart-subject{font-size:12px;font-weight:600;color:#c0556f;letter-spacing:.02em;margin-bottom:6px}
 .heart-thought{font-family:Georgia,"Songti SC",serif;font-size:14px;line-height:1.8;color:#4d3a40;white-space:pre-wrap}
 .heart-meta{font-size:11px;color:#c0aab1;margin-top:8px}
+
+/* 4★+ 专用标签 & 长列表折叠 */
+.star-chip{color:#c2185b;border-color:#f3c6d5;background:#fff5f8}
+.star-chip.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+.list-more{
+  display:block;width:100%;margin:14px 0 4px;padding:12px;
+  border:1px dashed var(--line);border-radius:14px;background:#fff;
+  color:var(--deep);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;
+}
+.list-more:active{background:#faf3f5}
 
 /* Toast */
 .toast{

@@ -500,7 +500,9 @@
             var u = new URL(s);
             var host = u.hostname;
             var cur = window.location.hostname;
-            if ((host === 'localhost' || host === '127.0.0.1' || host === '[::1]') && cur && cur !== 'localhost' && cur !== '127.0.0.1' && cur !== '0.0.0.0') {
+            var isLan = cur && (/^(localhost|127\.0\.0\.1|\[::1\]|::1)$/.test(cur) || /^10\./.test(cur) || /^192\.168\./.test(cur) || /^172\.(1[6-9]|2\d|3[01])\./.test(cur) || /\.local$/.test(cur));
+            // 仅当页面也在本地/局域网时才把 localhost 换成当前主机，公网域名下保留原地址
+            if ((host === 'localhost' || host === '127.0.0.1' || host === '[::1]') && isLan) {
                 u.hostname = cur;
             }
             return u.toString();

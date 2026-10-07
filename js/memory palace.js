@@ -188,6 +188,8 @@ let curId=null, W=null;
 let F={room:'',q:''};
 let dirty=false;
 let activeIndex=0;
+let listShowAll=false;
+const LIST_LIMIT=20;
 
 const cur=()=>S.chars.find(c=>c.id===curId);
 function markDirty(){dirty=true;renderSaveState();}
@@ -298,16 +300,20 @@ function renderStats(){
 function renderRails(){
   const rc={};
   W.mems.forEach(m=>{rc[m.room]=(rc[m.room]||0)+1;});
-  if(F.room&&!rc[F.room])F.room='';
+  const starCount=W.mems.filter(m=>m.imp>=4).length;
+  if(F.room&&F.room!=='__star4'&&!rc[F.room])F.room='';
+  if(F.room==='__star4'&&!starCount)F.room='';
   let h=`<button class="chip${F.room?'':' on'}" type="button" data-room="">全部 ${W.mems.length}</button>`;
   ROOMS.forEach(r=>{if(rc[r.id])h+=`<button class="chip${F.room===r.id?' on':''}" type="button" data-room="${r.id}">${r.seal} ${r.name} ${rc[r.id]}</button>`;});
+  if(starCount)h+=`<button class="chip star-chip${F.room==='__star4'?' on':''}" type="button" data-room="__star4">★ 重要 4★+ ${starCount}</button>`;
   $('#roomRail').innerHTML=h;
 }
 
 function filtered(){
   const q=F.q.trim().toLowerCase();
   return W.mems.filter(m=>{
-    if(F.room&&m.room!==F.room)return false;
+    if(F.room==='__star4'){ if(!(Number(m.imp)>=4))return false; }
+    else if(F.room&&m.room!==F.room)return false;
     if(q&&!(m.text+' '+m.tags.join(' ')+' '+(m.date||'')+' '+roomOf(m.room).name).toLowerCase().includes(q))return false;
     return true;
   });
@@ -330,7 +336,9 @@ function renderList(){
   if(!list.length){
     $('#list').innerHTML='<div class="empty">没有符合条件的记忆。<br>试试清除筛选或搜索。</div>';return;
   }
-  $('#list').innerHTML=list.map(m=>{
+  const over=list.length>LIST_LIMIT;
+  const shown=(over&&!listShowAll)?list.slice(0,LIST_LIMIT):list;
+  let html=shown.map(m=>{
     const r=roomOf(m.room);
     const stars=Array.from({length:5},(_,i)=>`<span class="star${i<m.imp?' on':''}" data-act="star" data-id="${m.id}" data-v="${i+1}">★</span>`).join('');
     return `<div class="tl-item${m.imp===0?' forgot':''}" data-id="${m.id}" data-imp="${m.imp}">
@@ -354,6 +362,10 @@ function renderList(){
       </div>
     </div>`;
   }).join('');
+  if(over){
+    html+=`<button class="list-more" type="button" data-act="toggle-more">${listShowAll?'收起（仅显示前 '+LIST_LIMIT+' 条）':'展开全部 · 共 '+list.length+' 条'}</button>`;
+  }
+  $('#list').innerHTML=html;
 }
 
 function renderSaveState(){
@@ -559,16 +571,17 @@ $('#btnBack').addEventListener('click',()=>{
   if(dirty){openLeaveConfirm();}else{goSelect();}
 });
 
-$('#q').addEventListener('input',e=>{F.q=e.target.value;renderList();});
+$('#q').addEventListener('input',e=>{F.q=e.target.value;listShowAll=false;renderList();});
 
 $('#roomRail').addEventListener('click',e=>{
   const b=e.target.closest('[data-room]');if(!b)return;
-  F.room=b.getAttribute('data-room');renderRails();renderList();
+  F.room=b.getAttribute('data-room');listShowAll=false;renderRails();renderList();
 });
 
 $('#list').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   const act=b.getAttribute('data-act'),id=b.getAttribute('data-id');
+  if(act==='toggle-more'){listShowAll=!listShowAll;renderList();return;}
   const m=W.mems.find(x=>x.id===id);if(!m)return;
   if(act==='star'){
     const v=+b.getAttribute('data-v');

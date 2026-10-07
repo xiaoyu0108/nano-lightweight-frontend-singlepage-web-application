@@ -709,13 +709,19 @@
         try {
             if (TK.active) return;
             if (localStorage.getItem('nano_takeover_proactive') === '0') return;
-            var last = parseInt(localStorage.getItem('nano_takeover_proactive_at') || '0', 10);
-            // 主动「反查手机」的最小间隔：拉长一点，别太频繁（90 分钟）
-            if (Date.now() - last < 90 * 60 * 1000) return;
+            // 全天最多一名角色被反查
+            var d = new Date();
+            var dayKey = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+            if (localStorage.getItem('nano_takeover_day') === dayKey) return;
             var lc = JSON.parse(localStorage.getItem('nano_last_chat') || 'null');
             if (!lc || !lc.id || lc.id === 'nano_ai') return;   // 纳米不参与反查
+            // 同一角色 14 天内只被反查一次
+            var perChar = parseInt(localStorage.getItem('nano_takeover_char_at_' + lc.id) || '0', 10) || 0;
+            if (Date.now() - perChar < 14 * 24 * 3600 * 1000) return;
+            if (Math.random() > 0.35) return;
             localStorage.setItem('nano_takeover_proactive_at', String(Date.now()));
-            if (Math.random() > 0.5) return;
+            localStorage.setItem('nano_takeover_day', dayKey);
+            localStorage.setItem('nano_takeover_char_at_' + lc.id, String(Date.now()));
             start({ id: lc.id, name: lc.name || 'TA', avatar: lc.avatar || '' });
         } catch (e) {}
     }
@@ -735,5 +741,5 @@
         else if (d.type === 'takeoverProactive') proactiveNow();
     });
 
-    try { setInterval(checkProactive, 12 * 60 * 1000); } catch (e) {}
+    try { setInterval(checkProactive, 30 * 60 * 1000); } catch (e) {}
 })();
