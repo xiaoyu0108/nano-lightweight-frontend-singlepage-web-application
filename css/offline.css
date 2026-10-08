@@ -280,6 +280,8 @@ button:active{opacity:.55}
 .modal-delete{color:var(--danger);font-weight:650}
 /* 退出线下：无内部分割线，圆角胶囊按钮 */
 .exit-modal .modal-body{padding-bottom:14px}
+.exit-mem-toggle{display:flex;align-items:flex-start;gap:8px;margin:12px 18px 4px;font-size:13px;line-height:1.5;color:var(--ink,#4f4446);cursor:pointer}
+.exit-mem-toggle input{width:16px;height:16px;margin-top:1px;flex-shrink:0;accent-color:var(--pink-deep,#e0a8b2)}
 .exit-actions{display:flex;gap:10px;padding:0 18px}
 .exit-btn{
   flex:1;height:46px;border:0;border-radius:15px;cursor:pointer;
@@ -333,9 +335,10 @@ button:active{opacity:.55}
 /* ===== 修复：底部无白条、段落缩进与空行 ===== */
 html, body, .app{background:var(--page,#f5f0f0)}
 .bottom{background:var(--header,#f0eaea);padding:8px 10px 10px}
-.content .env-block,.content .psych-block,.content .dialogue-block,.content .action-block,.content .inner-block{
+.content .env-block,.content .psych-block,.content .dialogue-block,.content .action-block,.content .inner-block,.content .narration-block{
   text-indent:2em;margin-top:0;margin-bottom:2px;
 }
+.content .narration-block{display:block}
 .content span{white-space:pre-wrap}
 
 
@@ -429,4 +432,14 @@ html, body, .app{background:var(--page,#f5f0f0)}
 .om-floor .om-text{font-size:13px;line-height:1.5;color:var(--ink,#4f4446);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .om-more{margin:2px 6px 8px;height:38px;border:1px dashed var(--line,#eadfe1);border-radius:11px;background:transparent;color:#8d7d80;font-size:13px;cursor:pointer}
 .om-card-foot{padding:8px 16px 14px}
+.om-foot2{display:flex;gap:10px}
+.om-close.om-primary{background:var(--pink-deep,#bca8ab);color:#fff}
+.om-tidy-body{padding:0 16px 4px;display:flex;flex-direction:column;gap:10px}
+.om-tidy-hint{font-size:12.5px;color:var(--muted,#b0a2a4);line-height:1.5}
+.om-tidy-row{display:flex;align-items:center;gap:8px}
+.om-tidy-row label{font-size:13px;color:var(--ink,#4f4446);flex-shrink:0}
+.om-tidy-row input{flex:1;min-width:0;height:38px;border:1px solid var(--line,#eadfe1);border-radius:10px;padding:0 10px;font-size:14px;color:#333;background:#fff;outline:none}
+.om-tidy-row input:disabled{opacity:.5}
+.om-tidy-check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink,#4f4446);cursor:pointer;line-height:1.4}
+.om-tidy-check input{width:16px;height:16px;flex-shrink:0}
 .om-close{width:100%;height:42px;border:0;border-radius:12px;background:var(--gray-pink,#f1e6e8);color:#6f6164;font-size:14px;font-weight:600;cursor:pointer}

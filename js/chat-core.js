@@ -548,7 +548,7 @@
         prompt += '【必须遵循（最高优先级）】\n'
             + '1. 严格保持你的人物设定，任何时候都不要 OOC、不要跳出角色。\n'
             + '2. 每次回复前先对照「世界书」与「长期记忆」：凡涉及到的设定、人物、地点、事件，都要与它们保持一致；如有冲突，以世界书/记忆为准，绝不编造相抵的内容。\n'
-            + '3. 表情包 / 贴图只是表达态度或情绪的方式，**不代表真实发生了某件事**；不要把它当成事件，也不要过度解读或反复揣测它的含义。\n\n';
+            + '3. 表情包 / 贴图只是表达态度或情绪的方式，**不代表真实发生了某件事**；不要把它当成事件，也不要过度解读或反复揣测它的含义。对方发“喝酒/干杯”类表情包通常是烦躁、无语、烦闷的心情，不是真的在喝酒，绝不能追问“你怎么又喝酒了”；发“哭/发誓/流泪”类表情包往往只是感动、激动、委屈、撒娇，不是真哭，别问“你怎么哭了”。\n\n';
         prompt += '【四条底线 · 任何时候都不能破】\n';
         prompt += '1. 贴人设：你的性格、说话方式、情绪、称呼、距离感与分寸，全部由【角色人设】和【世界书】决定——不是“在扮演”这个人，而是你就是这个人；不给自己加设定外的固定腔调或口头禅。\n';
         prompt += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、小可爱、姑娘、丫头、女人、低吼一声、揉进骨血、你是我的、逃不掉、宠你、乖”等油腻或人机感表达；不强行撩、不刻意讨好、不刻意煽情。禁止“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 抱抱我 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话术。\n';
@@ -687,7 +687,8 @@
         prompt += '- [头像:用户照片] 把对方最近发来的照片设成你自己的头像（会裁成方形）；想只取一部分可以写 [头像:用户照片|上方]（可填 上方/下方/左半/右半/中心），也可以写 [头像:我的头像] 用对方当前头像。只在氛围合适、你真想换头像时才偶尔用。\n';
         prompt += '- [情侣头像:用户照片] 你想换一个有点情侣感的头像时，从对方最近发来的照片里随机截取一块，换成你自己的头像，例如 [情侣头像:用户照片]。这只改你自己的头像；【绝对禁止】修改、覆盖或替用户更换 TA 的头像——用户的头像是用户自己的，任何情况下都不要碰。仅关系亲密、你也愿意时偶尔用。\n';
         prompt += '- [纪念日:标题|YYYY-MM-DD|每年] 你主动记下一个对你们重要的日子（真的想记时才用，别频繁）。例如 [纪念日:第一次见面|2024-05-20|每年]；不重复的写 [纪念日:一起看日出|2025-06-01]。记下后对方在情侣空间能看到。\n';
-        prompt += '- [继续拉黑] 只有当用户做了让你非常生气、越界或伤到你的事，你决定暂时关闭线上聊天（拉黑 TA）时才用，独占一行；平时绝对不要乱用。\n';
+        prompt += '- [微信号:新号] 你偶尔任性地把自己的微信号改成新的（独占一行，很少用、别频繁），例如 [微信号:chenyu_0713]。改完对方在角色资料里能看到你的新微信号。\n';
+        prompt += '- [继续拉黑]（等同于 [拉黑我]）只有当用户做了让你非常生气、越界或伤到你的事——例如小号/马甲身份被对方笃定地识破并反复追问、你觉得没法再聊下去时——你决定关闭线上聊天（拉黑 TA）时才用，独占一行；平时绝对不要乱用。被拉黑后对方线上发来的消息会显示“已拒收”，你也可以稍后再决定是否 [加回我]。\n';
         prompt += '- [加回我] 当你决定把之前被你拉黑的用户重新加回线上聊天时使用，独占一行。\n';
         prompt += '用户可能会用你的亲属卡（亲密付）消费，系统会给你一条提示；你可以偶尔自然地提一句（比如"你刚是不是刷了我的卡"），但不要每一笔都追问或计较。\n';
         // 线上动描：开启后在气泡之间穿插动作描写
@@ -712,7 +713,7 @@
         if (__emojiNames.length) {
             prompt += '\n【表情包 · 按意思主动发】\n';
             prompt += '你会在合适的时候主动发用户表情包里的表情：[emoji:名称]（独占一行），平均每 2~3 轮至少发一次。看懂当前这句话的意思和情绪，从列表里挑最贴切的一个（开心、无语、委屈、调侃、害羞、生气、赞同等）；不要连着几轮都不发，也不要同一轮发好几张。\n';
-            prompt += '【表情包的定位 · 别较真】表情包只是你此刻心境、情绪的一种“表示/投射”，不代表你现实里真的做了那个表情或动作，也不代表真实发生的事。别人发表情包时，读它传达的心情就好，不要当成对方的现实状态去追问、质疑或当真；自己发表情包也只是顺手表达心情，不必解释“我真的在笑/真的在做那个动作”。\n';
+            prompt += '【表情包的定位 · 千万别较真】表情包只是你此刻心境、情绪的一种“表示/投射”，不代表你现实里真的做了那个表情或动作，也不代表真实发生的事。对方发表情包时，只读它传达的心情，绝对不能当成对方的现实行为去追问、质疑或当真——例如对方发“喝酒/干杯”的表情包，往往只是无语、烦闷、烦躁、想借酒消愁的心情，并不是真的在喝酒，你绝不能问“你怎么还去喝酒/你又喝酒了”；对方发“发誓/哭哭/流泪”的表情包，可能只是激动、感动、委屈、撒娇，不是真的在哭，别问“你怎么哭了”“谁欺负你了”。自己发表情包也只是顺手表达心情，不必解释“我真的在笑/真的在做那个动作”。\n';
         }
         try {
             const myGroups = getGroupsForChar();
@@ -1353,7 +1354,7 @@
                 const body = __formatMsgs(rounds, originName);
                 if (body) {
                     __originContext = '【你本人（大号「' + originName + '」）最近的私聊 · 仅你知道】\n' + body
-                        + '\n（这是你本人用大号身份和 TA 刚聊的内容。你现在用小号身份接近 TA，可以据此判断 TA 的近况与情绪，但绝不能暴露你知道大号的事，也不要直接说破。）';
+                        + '\n（这是你本人用大号身份和 TA 刚聊的内容。你现在用小号身份接近 TA，可以据此判断 TA 的近况与情绪，默认不要主动说破你和大号的关系；但若对方已非常笃定地识破你，可按本人脾气松口承认或恼羞成怒地拉黑。）';
                 } else {
                     __originContext = '';
                 }
@@ -1379,7 +1380,7 @@
                         if (body) parts.push('小号「' + name + '」最近和 TA 的消息：\n' + body);
                     });
                     __altChildrenContext = parts.length
-                        ? ('【你开的小号 · 只有你自己知道】你本人注册了小号去接近 / 试探 TA，TA 并不知道小号就是你。以下是小号最近的动态；你（大号）心里清楚这件事，但绝不能暴露、不要承认，也不要提小号这个设定。\n' + parts.join('\n\n'))
+                        ? ('【你开的小号 · 只有你自己知道】你本人注册了小号去接近 / 试探 TA，TA 并不知道小号就是你。以下是小号最近的动态；你（大号）心里清楚这件事，默认不要暴露、不要主动承认，也不要主动提小号这个设定；但若对方已非常笃定地识破，可按本人脾气松口承认或干脆恼羞成怒地拉黑对方。\n' + parts.join('\n\n'))
                         : '';
                 });
             }).catch(function () {});
@@ -1631,6 +1632,57 @@
 
     // 只读取本地聊天记录，不自动清空任何数据
 
+    // 保存/读取角色的微信号（存在角色库 nano_characters_db 的 wechat 字段）
+    function saveCharWechat(v) {
+        v = String(v || '').trim().slice(0, 40);
+        if (!v) return;
+        try {
+            var req = indexedDB.open('nano_characters_db', 1);
+            req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {} };
+            req.onsuccess = function (e) {
+                var db = e.target.result;
+                try {
+                    var tx = db.transaction('characters', 'readwrite');
+                    var st = tx.objectStore('characters');
+                    var g = st.get(chatId);
+                    g.onsuccess = function () { var c = g.result || { id: chatId, name: displayName || chatName }; c.wechat = v; st.put(c); };
+                    tx.oncomplete = function () { try { db.close(); } catch (e2) {} };
+                } catch (err) { try { db.close(); } catch (e2) {} }
+            };
+        } catch (e) {}
+        try { window.parent.postMessage({ type: 'nanoCharUpdated', chatId: chatId, name: displayName, wechat: v }, '*'); } catch (e) {}
+    }
+    // 角色自己偶尔改微信号：[微信号:新号]
+    function settleWechatFromReplyText(text) {
+        var m = String(text || '').match(/\[(?:微信号|wechat)\s*[:：]\s*([^\]\n]{2,40})\]/i);
+        if (m) { saveCharWechat(m[1]); return String(text).replace(m[0], '').trim(); }
+        return text;
+    }
+
+    // 消费外部（Meet 加好友）注入的欢迎消息
+    function consumeChatInject() {
+        try {
+            var key = 'nano_chat_inject_' + chatId;
+            var arr = JSON.parse(localStorage.getItem(key) || '[]') || [];
+            if (!arr.length) return;
+            localStorage.removeItem(key);
+            arr.forEach(function (m) {
+                if (!m || !m.text) return;
+                messages.push({
+                    id: 'msg_inject_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+                    type: m.type === 'left' ? 'left' : 'right',
+                    text: String(m.text),
+                    time: m.time || nowHHMM(),
+                    status: null, recalled: false, isCard: false, cardData: null,
+                    transcript: null, translation: null, quote: null,
+                    isVoice: false, voiceData: null, isImage: false, imageData: null,
+                    favorite: false, turn: null, ts: Date.now(), think: null
+                });
+            });
+            saveMessages();
+        } catch (e) {}
+    }
+
     function loadMessages(callback) {
         try {
             if (typeof localforage !== 'undefined') {
@@ -1639,6 +1691,7 @@
                         messages.length = 0;
                         messages.push(...data);
                         restoreMessageState();
+                        consumeChatInject();
                         renderMessages();
                         if (callback) callback(true);
                     } else {
@@ -1668,11 +1721,15 @@
                     messages.length = 0;
                     messages.push(...parsed);
                     restoreMessageState();
+                    consumeChatInject();
                     renderMessages();
                     if (callback) callback(true);
                     return;
                 }
             }
+            // 即使是全新会话，也要消费 Meet 注入的欢迎消息
+            consumeChatInject();
+            renderMessages();
         } catch (e) {}
         if (callback) callback(false);
     }
@@ -2382,6 +2439,20 @@
 
         row.appendChild(content);
 
+        // 被角色拉黑（charBlocked）：用户发出的气泡显示红色感叹号 + “您的消息已被拒收”（类似微信）
+        if (type === 'right' && !recalled && !(cardData && cardData.systemNotice) && getChatSetting('charBlocked', false)) {
+            row.classList.add('char-blocked');
+            const badge = document.createElement('span');
+            badge.className = 'reject-badge';
+            badge.textContent = '!';
+            badge.title = '您的消息已被拒收';
+            content.appendChild(badge);
+            const note = document.createElement('div');
+            note.className = 'reject-note';
+            note.textContent = '您的消息已被拒收';
+            content.appendChild(note);
+        }
+
         const existing = messages.find(m => m.id === rowId);
         if (!existing) {
             messages.push({
@@ -2516,7 +2587,7 @@
             }
         }
 
-        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
+        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日|微信号|wechat)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
 
         return { tags: results, cleanedText: cleaned };
     }
@@ -3388,8 +3459,9 @@
         // 「是谁的小号」这类身份说明一律放最后一句，避免被用户从预览里看到。
         return (bio ? (bio + '\n') : ('网名「' + nn + '」。\n'))
             + (persona ? ('【你本人的完整设定，请以本人性格来扮演这个身份】\n' + persona + '\n\n') : '')
-            + '【铁律】以网名「' + nn + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定；用户若起疑，要自然地圆过去，不承认另一个身份。\n'
-            + '【小号身份】你是「' + charName + '」本人开的小号，网名「' + nn + '」。你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。绝对不能让用户察觉你就是「' + charName + '」：不要承认、不要暗示，不要用本人平时标志性的称呼或口头禅自曝。';
+            + '【铁律】以网名「' + nn + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定。\n'
+            + '【小号身份】你是「' + charName + '」本人开的小号，网名「' + nn + '」。你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。\n'
+            + '【被认出来时 · 别死鸭子嘴硬】默认不主动暴露、不主动承认，先用装傻/岔开/反将一军之类自然的方式应付；但如果对方已经非常笃定、证据十足地认定你就是「' + charName + '」（反复点名、说出只有本人才知道的细节、你越描越黑根本圆不过去），那就别再硬邦邦地否认、更不要复读“你认错人了”。按你本人的真实脾气处理：可以半推半就地松口承认、可以恼羞成怒地承认、也可以气到直接拉黑对方（在回复最后单独一行输出 [拉黑我]）来结束这场追问。承认或翻脸都要像真人，别演成一台只会说“不是”的机器。';
     }
     function handleAltProbeTag(payload, timeStr) {
         const parts = String(payload || '').split(/[|｜]/);
@@ -3618,9 +3690,14 @@
         let body = String(rawText || '');
         let changed = false;
         if (/\[继续拉黑\]|\[拉黑用户\]|\[拉黑我\]|\[blockuser\]/.test(body)) {
+            const wasBlocked = getChatSetting('charBlocked', false);
             setChatSetting('charBlocked', true);
             body = body.replace(/\[(继续拉黑|拉黑用户|拉黑我|blockuser)\]/g, '');
             changed = true;
+            if (!wasBlocked) {
+                try { window.parent.postMessage({ type: 'nanoCharBlocked', chatId: chatId }, '*'); } catch (e) {}
+                try { addSystemNotice('对方已把你拉黑，你的消息将被拒收（可在 iMessage 里联系 TA）'); } catch (e) {}
+            }
         }
         if (/\[加回我\]|\[取消拉黑\]|\[解除拉黑\]|\[unblockuser\]/.test(body)) {
             setChatSetting('charBlocked', false);
@@ -4788,7 +4865,23 @@
     function loadStoredChatRequest() { try { const raw = localStorage.getItem(chatReqKey()); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
     function clearChatRequest() { try { localStorage.removeItem(chatReqKey()); } catch (e) {} }
 
+    // 优先「本页直接 fetch」（与线下模式同一套，手机端最可靠）；
+    // 只有网络层失败时才回退到父窗口代理（老逻辑，用于极端兼容场景）。
     function sendChatRequest(payload) {
+        return fetch(payload.url, { method: payload.method, headers: payload.headers, body: payload.body })
+            .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }); })
+            .catch(function (err) { return { ok: false, status: 0, error: String((err && err.message) || err), __netErr: true }; })
+            .then(function (res) {
+                if (res && res.ok) return res;
+                // HTTP 错误（服务器已响应）：直接返回给上层显示，不做无谓重试
+                if (res && res.status && !res.__netErr) return res;
+                // 网络层失败：有父窗口时回退父窗口代理
+                if (window.parent === window) return res;
+                return sendChatRequestViaParent(payload, (res && res.error) || '');
+            });
+    }
+
+    function sendChatRequestViaParent(payload, firstErr) {
         return new Promise(function(resolve) {
             const resultKey = 'chat_api_result_' + payload.token;
             let settled = false;
@@ -4814,26 +4907,19 @@
             }
             if (takeResult()) return;
             window.addEventListener('message', onMsg);
-            if (window.parent !== window) {
-                try {
-                    window.parent.postMessage({
-                        type: 'chatApiFetch', token: payload.token, resultKey: resultKey,
-                        url: payload.url, method: payload.method, headers: payload.headers, body: payload.body
-                    }, '*');
-                } catch (e) { finish({ ok: false, status: 0, error: '无法请求' }); return; }
-                // 兜底轮询：父页面刷新丢消息时，结果仍会写到 localStorage
-                let tries = 0;
-                poll = setInterval(function() {
-                    tries++;
-                    if (takeResult()) return;
-                    if (tries > 900) finish({ ok: false, status: 0, error: '请求超时' });
-                }, 1000);
-            } else {
-                fetch(payload.url, { method: payload.method, headers: payload.headers, body: payload.body })
-                    .then(function(r) { return r.text().then(function(t) { return { ok: r.ok, status: r.status, text: t }; }); })
-                    .catch(function(err) { return { ok: false, status: 0, error: String(err && err.message || err) }; })
-                    .then(finish);
-            }
+            try {
+                window.parent.postMessage({
+                    type: 'chatApiFetch', token: payload.token, resultKey: resultKey,
+                    url: payload.url, method: payload.method, headers: payload.headers, body: payload.body
+                }, '*');
+            } catch (e) { finish({ ok: false, status: 0, error: firstErr || '无法请求' }); return; }
+            // 兜底轮询：父页面刷新丢消息时，结果仍会写到 localStorage
+            let tries = 0;
+            poll = setInterval(function() {
+                tries++;
+                if (takeResult()) return;
+                if (tries > 900) finish({ ok: false, status: 0, error: firstErr || '请求超时' });
+            }, 1000);
         });
     }
 
@@ -5732,6 +5818,8 @@
 
         // 头像 / 情侣头像：角色把用户发来的照片设成自己的头像，或裁成一对情侣头像
         replyBody = settleAvatarFromReplyText(replyBody);
+        // 角色自己改微信号：[微信号:新号]
+        replyBody = settleWechatFromReplyText(replyBody);
         // 主回复没表态 → 兜底单独问一次，保证邀请卡片一定会变成接受/婉拒
         if (!listenSettle.settled && getPendingListenUserCards().length > 0) {
             decideListenInviteFallback();
@@ -5774,7 +5862,7 @@
                     } else if (tag.kind === 'emoji') {
                         const em = await findEmojiByName(tag.payload);
                         if (em && em.url) {
-                            addMessage('left', '', timeStr, null, false, false, null, null, null, null, false, null, true, { url: em.url, desc: em.name || '表情包', emojiName: em.name || '' });
+                            addMessage('left', '', timeStr, null, false, false, null, null, null, null, false, null, true, { url: em.url, desc: '表情包', emojiName: em.name || '表情', isEmoji: true });
                         }
                     } else if (tag.kind === 'transfer') {
                         addMessage('left', '', timeStr, null, false, true, { cardType: 'transfer', amount: '¥' + tag.payload, title: '转账', footer: '待领取' });
@@ -5882,7 +5970,7 @@
                             const em = await findEmojiByName(tag.payload);
                             if (em && em.url) {
                                 addMessage('left', '', timeStr, null, false, false, null, null, null,
-                                    null, false, null, true, { url: em.url, desc: em.name || '表情包', emojiName: em.name || '' });
+                                    null, false, null, true, { url: em.url, desc: '表情包', emojiName: em.name || '表情', isEmoji: true });
                             }
                         } else if (tag.kind === 'inviteme') {
                             inviteMeToGroupFromTag(tag.payload);
@@ -6201,6 +6289,14 @@
             isWaitingForReply = false;
             updateSendButtonMode();
             try { showAlert('已拉黑', '你已把对方拉黑，TA 不能再在线上回复你。可在 iMessage 里联系 TA。'); } catch (e) {}
+            return;
+        }
+
+        // 角色已拉黑用户：线上消息被拒收，角色不会回复（只能通过 iMessage 求加回）
+        if (getChatSetting('charBlocked', false)) {
+            isWaitingForReply = false;
+            updateSendButtonMode();
+            try { showAlert('消息已被拒收', '对方已把你拉黑，消息无法送达。可在 iMessage 里联系 TA，或等 TA 把你加回。'); } catch (e) {}
             return;
         }
 
@@ -7501,6 +7597,13 @@ if (callCard) {
                 try { setAutoMsgState(false, getChatSetting('autoMsgInterval', 8)); } catch (e) {}
             }
             if (data.text) { try { addSystemNotice(String(data.text)); } catch (e) {} }
+            return;
+        }
+
+        // 角色拉黑了用户 / 把用户加回：重渲染，让“已拒收”标记实时出现或消失
+        if (data.type === 'nanoCharBlocked' || data.type === 'nanoCharUnblocked') {
+            if (data.chatId && String(data.chatId) !== String(chatId)) return;
+            try { renderMessages(); } catch (e) {}
             return;
         }
 

@@ -98,10 +98,63 @@
     // 本次弹窗里刚选择的照片 dataURL（优先于缩略图 src，避免部分图片读取/压缩失败）
     var pendingAvatarDataUrl = '';
 
+    // ===== 读取当前人设(Mask)头像，保证各页面头像一致 =====
+    function currentMaskId() {
+        try {
+            var md = JSON.parse(localStorage.getItem('nano_mask_data') || localStorage.getItem('nano_home_data') || 'null');
+            if (md) return String(md.currentMaskId || (md.masks && md.masks[0] && md.masks[0].id) || '');
+        } catch (e) {}
+        return '';
+    }
+    function getMaskAvatar() {
+        return new Promise(function (resolve) {
+            var maskId = currentMaskId();
+            if (!maskId) { resolve(''); return; }
+            try {
+                var req = indexedDB.open('MaskAvatarDB', 1);
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('avatars')) d.createObjectStore('avatars', { keyPath: 'id' }); } catch (err) {} };
+                req.onsuccess = function (e) {
+                    var db = e.target.result;
+                    try {
+                        var g = db.transaction('avatars', 'readonly').objectStore('avatars').get(maskId);
+                        g.onsuccess = function () { resolve((g.result && g.result.data) || ''); try { db.close(); } catch (e2) {} };
+                        g.onerror = function () { resolve(''); try { db.close(); } catch (e2) {} };
+                    } catch (err) { resolve(''); }
+                };
+                req.onerror = function () { resolve(''); };
+            } catch (e) { resolve(''); }
+        });
+    }
+    function setMaskAvatar(dataUrl) {
+        return new Promise(function (resolve) {
+            var maskId = currentMaskId();
+            if (!maskId) { resolve(); return; }
+            try {
+                var req = indexedDB.open('MaskAvatarDB', 1);
+                req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('avatars')) d.createObjectStore('avatars', { keyPath: 'id' }); } catch (err) {} };
+                req.onsuccess = function (e) {
+                    var db = e.target.result;
+                    try {
+                        var tx = db.transaction('avatars', 'readwrite');
+                        if (dataUrl) tx.objectStore('avatars').put({ id: maskId, data: dataUrl });
+                        else tx.objectStore('avatars').delete(maskId);
+                        tx.oncomplete = function () { resolve(); try { db.close(); } catch (e2) {} };
+                        tx.onerror = function () { resolve(); try { db.close(); } catch (e2) {} };
+                    } catch (err) { resolve(); }
+                };
+                req.onerror = function () { resolve(); };
+            } catch (e) { resolve(); }
+        });
+    }
+
     // ===== 加载用户数据（从 IndexedDB） =====
     async function loadUserData() {
         try {
             var savedAvatar = await idbGet(AVATAR_KEY);
+            if (!savedAvatar || savedAvatar.trim() === '') {
+                // 没单独设置时跟人设头像保持一致，避免各页头像不一致
+                savedAvatar = await getMaskAvatar();
+            }
             if (savedAvatar && savedAvatar.trim() !== '') {
                 avatarImg.src = savedAvatar;
                 avatarImg.style.display = 'block';
@@ -127,6 +180,7 @@
     async function saveAvatar(dataUrl) {
         try {
             await idbSet(AVATAR_KEY, dataUrl);
+            setMaskAvatar(dataUrl);   // 同步到人设头像，保持各页面一致
             avatarImg.src = dataUrl;
             avatarImg.style.display = 'block';
             avatarSvg.style.display = 'none';
@@ -151,6 +205,7 @@
     async function resetAvatar() {
         try {
             await idbDelete(AVATAR_KEY);
+            setMaskAvatar('');
             avatarImg.style.display = 'none';
             avatarSvg.style.display = 'block';
             avatarImg.src = '';

@@ -2380,7 +2380,7 @@
         var url = prompt('请输入新背景图的 URL：');
         if (url && url.trim() !== '') {
             var img = new Image();
-            img.onload = function() { localStorage.setItem(coverKey(), url.trim()); document.getElementById('coverImg').src = url.trim(); document.getElementById('profileCoverImg').src = url.trim(); };
+            img.onload = function() { try { localStorage.setItem(coverKey(), url.trim()); } catch (e2) {} document.getElementById('coverImg').src = url.trim(); document.getElementById('profileCoverImg').src = url.trim(); };
             img.onerror = function() { alert('图片加载失败'); };
             img.src = url.trim();
         }
@@ -2392,7 +2392,7 @@
         var reader = new FileReader();
         reader.onload = function(ev) {
             compressImage(ev.target.result, 400, function(compressed) {
-                localStorage.setItem(coverKey(), compressed);
+                try { localStorage.setItem(coverKey(), compressed); } catch (e2) { console.warn('封面保存失败（存储空间不足？）', e2); }
                 document.getElementById('coverImg').src = compressed;
                 document.getElementById('profileCoverImg').src = compressed;
                 document.getElementById('coverModal').classList.remove('show');

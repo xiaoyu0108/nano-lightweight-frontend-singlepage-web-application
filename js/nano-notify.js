@@ -49,9 +49,9 @@
                             });
                             if (changed) localStorage.setItem(k, JSON.stringify(posts));
                         }
-                    } else if (k.indexOf('nanoMomentsCover_') === 0) {
-                        if ((localStorage.getItem(k) || '').indexOf('data:') === 0) localStorage.removeItem(k);
                     }
+                    // 注意：朋友圈封面（nanoMomentsCover_*）不再在这里删除。
+                    // 之前会删掉 data: 开头的封面，导致用户刚换的背景图刷新后就没了（“换了没反应”）。
                 } catch (e) {}
             });
             try { localStorage.setItem('nano_storage_swept_v3', '1'); } catch (e) {}

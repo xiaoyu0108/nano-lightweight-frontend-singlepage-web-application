@@ -564,6 +564,17 @@
 
         if (!editMode) {
             editActionsBar.classList.remove('show');
+            var exportBtn = document.createElement('button');
+            exportBtn.className = 'nav-action';
+            exportBtn.title = '导出该分组';
+            exportBtn.setAttribute('aria-label', '导出该分组');
+            exportBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;display:block;margin:0 auto;"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></svg>';
+            exportBtn.addEventListener('click', function() {
+                var group = data.emojiGroups.find(function(g) { return g.id === currentGroupId; });
+                exportGroupEmojis(group);
+            });
+            actionContainer.appendChild(exportBtn);
+
             var editBtn = document.createElement('button');
             editBtn.className = 'nav-action';
             editBtn.textContent = '编辑';
@@ -767,6 +778,79 @@
     }
     if (fileImportIcon) {
         fileImportIcon.addEventListener('click', function() { fileInput.click(); });
+    }
+
+    // ============================================================
+    // 14.5 导出表情包（在分组详情页顶栏点图标导出当前分组）
+    //      统一格式：描述: 图片链接，可再次导入 / 交给 AI 识别。
+    //      iOS 优先用系统分享，避免卡在“存储到文件”页面出不来。
+    // ============================================================
+    function emojiExportIsIOS() {
+        try {
+            return /iP(hone|ad|od)/.test(navigator.platform || '') ||
+                ((navigator.userAgent || '').indexOf('Mac') >= 0 && 'ontouchend' in document);
+        } catch (e) { return false; }
+    }
+    function emojiExportFallback(text, filename) {
+        try {
+            var ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+            var card = document.createElement('div');
+            card.style.cssText = 'width:100%;max-width:460px;background:#fff;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;';
+            card.innerHTML = '<div style="font-size:14px;font-weight:600;color:#222;">' + filename + '（长按全选复制）</div>';
+            var ta = document.createElement('textarea');
+            ta.style.cssText = 'width:100%;height:240px;font-size:12px;border:1px solid #eee;border-radius:10px;padding:8px;';
+            ta.value = text;
+            var close = document.createElement('button');
+            close.textContent = '关闭';
+            close.style.cssText = 'height:40px;border:0;border-radius:10px;background:#1f1f1f;color:#fff;font-size:14px;';
+            close.onclick = function () { ov.remove(); };
+            card.appendChild(ta); card.appendChild(close); ov.appendChild(card);
+            document.body.appendChild(ov);
+            ta.focus(); ta.select();
+        } catch (e) { showToast('导出失败'); }
+    }
+    function emojiExportSaveText(text, filename) {
+        if (emojiExportIsIOS()) {
+            try {
+                if (navigator.canShare && navigator.share) {
+                    var f = new File([text], filename, { type: 'text/plain' });
+                    if (navigator.canShare({ files: [f] })) {
+                        navigator.share({ files: [f], title: filename }).then(function () { showToast('已导出'); }).catch(function () { showToast('已取消导出'); });
+                        return;
+                    }
+                }
+            } catch (e) {}
+            try {
+                navigator.clipboard.writeText(text).then(function () { showToast('已复制到剪贴板，可粘贴保存'); }).catch(function () { emojiExportFallback(text, filename); });
+                return;
+            } catch (e) {}
+            emojiExportFallback(text, filename);
+            return;
+        }
+        try {
+            var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.rel = 'noopener';
+            document.body.appendChild(a); a.click();
+            setTimeout(function () { try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {} }, 1500);
+            showToast('已导出到「下载」目录');
+        } catch (e) {
+            try { navigator.clipboard.writeText(text); showToast('已复制到剪贴板'); } catch (e2) { emojiExportFallback(text, filename); }
+        }
+    }
+    // 导出某个分组（顶部图标调用）
+    function exportGroupEmojis(group) {
+        try {
+            if (!group) { showToast('找不到分组'); return; }
+            var lines = [];
+            (group.emojis || []).forEach(function (e) { if (e && e.url) lines.push((e.name || '表情') + ': ' + e.url); });
+            if (!lines.length) { showToast('这个分组里还没有可导出的表情包'); return; }
+            var safe = String(group.name || '分组').replace(/[\\/:*?"<>|]/g, '_').slice(0, 30);
+            emojiExportSaveText(lines.join('\n'), 'emojis-' + safe + '.txt');
+        } catch (e) { showToast('导出失败'); }
     }
 
     if (fileInput) {

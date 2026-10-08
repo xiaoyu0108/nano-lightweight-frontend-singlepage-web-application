@@ -451,7 +451,10 @@ function parseContent(text) {
     const rawLine = line.replace(/\r$/, '');
     const trimmed = rawLine.trim();
     if (!trimmed) { 
-      if (currentBlock) { result += currentBlock + '\n\n'; currentBlock = ''; }
+      if (currentBlock) {
+        result += (currentBlock.startsWith('<span') ? currentBlock : '<span class="narration-block">' + currentBlock + '</span>') + '\n\n';
+        currentBlock = '';
+      }
       continue; 
     }
 
@@ -482,7 +485,7 @@ function parseContent(text) {
     if (className) {
       // 如果有暂存的普通文本块，先输出
       if (currentBlock && !currentBlock.startsWith('<span')) {
-        result += `<span>${escapeHTML(currentBlock)}</span>\n`;
+        result += `<span class="narration-block">${escapeHTML(currentBlock)}</span>\n`;
         currentBlock = '';
       }
       result += `<span class="${className}">${escapeHTML(content)}</span>\n`;
@@ -504,7 +507,7 @@ function parseContent(text) {
     if (currentBlock.startsWith('<span')) {
       result += currentBlock + '\n';
     } else {
-      result += `<span>${escapeHTML(currentBlock)}</span>\n`;
+      result += `<span class="narration-block">${escapeHTML(currentBlock)}</span>\n`;
     }
   }
 
@@ -939,18 +942,28 @@ const backBtnEl = document.getElementById('backBtn');
 if (backBtnEl) {
   backBtnEl.onclick = function (e) { try { e && e.stopPropagation(); } catch (_) {} openExitModal(); };
 }
+// 本轮是否还有没总结的剧情
+function offHasPendingMem() {
+  try {
+    var count = parseInt(localStorage.getItem(offMemCountKey()) || '0', 10) || 0;
+    var rel = messages.filter(function (m) { return (m.role === 'user' || m.role === 'assistant') && (m.scene || 'story') === 'story'; });
+    return rel.length > count;
+  } catch (e) { return false; }
+}
 (function bindExitModal() {
   var cancel = document.getElementById('exitCancel');
   var toChat = document.getElementById('exitToChat');
   var toOnline = document.getElementById('exitToOnline');
+  var memToggle = document.getElementById('exitSummarizeMem');
   var leaving = false;
+  // 后台整理：不阻塞退出；没有新内容时直接跳过
   function backgroundSummarize() {
-    // 强制补一次总结（把本轮剩余未总结的剧情写进长期记忆），不阻塞退出
     try {
-      if (typeof summarizeOfflineMemories === 'function') {
-        var p = summarizeOfflineMemories(true);
-        if (p && typeof p.catch === 'function') p.catch(function() {});
-      }
+      if (memToggle && !memToggle.checked) return;
+      if (typeof summarizeOfflineMemories !== 'function') return;
+      if (!offHasPendingMem()) return;   // 无新内容无需整理
+      var p = summarizeOfflineMemories(true);
+      if (p && typeof p.catch === 'function') p.catch(function () {});
     } catch (e) {}
   }
   if (cancel) cancel.onclick = closeExitModal;
@@ -959,6 +972,7 @@ if (backBtnEl) {
     closeExitModal();
     // 下次点开这个角色 → 直接进入线下
     setChatMode('offline');
+    window.__offSkipMemFlush = !!(memToggle && !memToggle.checked);
     backgroundSummarize();
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'nanoOfflineExitToChat', chatId: offlineChatId }, '*');
@@ -974,6 +988,7 @@ if (backBtnEl) {
     // 下次点开这个角色 → 进入线上
     setChatMode('online');
     var r = lastOfflineRound();
+    window.__offSkipMemFlush = !!(memToggle && !memToggle.checked);
     backgroundSummarize();
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'nanoOfflineReturnOnline', chatId: offlineChatId, name: settings.charName || '', lastUser: r.user, lastChar: r.char }, '*');
@@ -983,6 +998,21 @@ if (backBtnEl) {
       location.href = 'index.html';
     }
   };
+})();
+
+// 兜底：用户用系统返回 / 切换页面离开时，也尽力补一次总结（不阻塞）
+(function bindOfflineMemAutoFlush() {
+  var flushed = false;
+  function flush() {
+    if (flushed) return;
+    if (window.__offSkipMemFlush) return;   // 用户选择了“不整理”
+    try { if (typeof offHasPendingMem === 'function' && !offHasPendingMem()) return; } catch (e) {}
+    try { if (typeof summarizeOfflineMemories === 'function') { var p = summarizeOfflineMemories(true); if (p && p.catch) p.catch(function() {}); } } catch (e) {}
+  }
+  window.addEventListener('pagehide', flush, { capture: true });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') flush();
+  });
 })();
 
 // ============================================================
@@ -1557,8 +1587,9 @@ function omUpdateAvatar() {
 
 const omBuiltinItems = [
   { id: 'reroll', label: '重roll', icon: '<svg viewBox="0 0 24 24"><path d="M19 8a7.5 7.5 0 0 0-13.5-1.9L4 8.5"/><path d="M4 5v3.5h3.5"/><path d="M5 16a7.5 7.5 0 0 0 13.5 1.9l1.5-2.4"/><path d="M20 19v-3.5h-3.5"/></svg>', run: function () { doReroll(); } },
-  { id: 'tidy', label: '整理', icon: '<svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h7"/><path d="M16 14l2 2 3-3"/></svg>', run: function () { omTidy(); } },
+  { id: 'tidy', label: '整理楼层', icon: '<svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h7"/><path d="M16 14l2 2 3-3"/></svg>', run: function () { omOpenTidy(); } },
   { id: 'floors', label: '楼层预览', icon: '<svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>', run: function () { omOpenFloors(); } },
+  { id: 'roundTop', label: '回本轮顶部', icon: '<svg viewBox="0 0 24 24"><path d="M12 4v9"/><path d="M8 8l4-4 4 4"/><path d="M5 20h14"/></svg>', run: function () { omScrollToRoundTop(); } },
   { id: 'top', label: '回顶', icon: '<svg viewBox="0 0 24 24"><path d="M12 19V6"/><path d="m6 12 6-6 6 6"/></svg>', run: function () { chat.scrollTo({ top: 0, behavior: 'smooth' }); } },
   { id: 'bottom', label: '回底', icon: '<svg viewBox="0 0 24 24"><path d="M12 5v13"/><path d="m18 12-6 6-6-6"/></svg>', run: function () { chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' }); } },
   { id: 'clearCss', label: '清空美化', icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 4.6L18 8l-4.3 1.4L12 14l-1.7-4.6L6 8l4.3-1.4L12 2z"/><path d="M19 13l.9 2.4L22 16l-2.1.6L19 19l-.9-2.4L16 16l2.1-.6L19 13z"/><path d="M5 14l.7 1.9L7.5 16l-1.8.5L5 18.5l-.7-2L2.5 16l1.8-.1L5 14z"/></svg>', run: function () { omClearBeautify(); } },
@@ -1632,6 +1663,92 @@ function omTidy() {
       omToast('已整理并写入记忆');
     } catch (e) { omToast('整理失败'); }
   })();
+}
+
+// 回到「本轮」顶部：本轮 = 最后一条用户消息开始
+function omScrollToRoundTop() {
+  let idx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i] && messages[i].role === 'user') { idx = i; break; }
+  }
+  if (idx >= 0) omScrollToFloor(idx);
+  else chat.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// 整理楼层：自选范围 → 一次 API 调用总结成记忆卡（可选删除已总结楼层，省 token）
+function omOpenTidy() {
+  const old = document.getElementById('omTidy');
+  if (old) old.remove();
+  const total = messages.length;
+  const ov = document.createElement('div');
+  ov.id = 'omTidy';
+  ov.className = 'om-modal open';
+  ov.innerHTML = '<div class="om-card">'
+    + '<div class="om-card-head">整理楼层 · 总结记忆</div>'
+    + '<div class="om-tidy-body">'
+    + '<div class="om-tidy-hint">选择要总结的楼层范围（第 1 ~ ' + total + ' 楼），只会发起一次总结，把剧情写进长期记忆卡。</div>'
+    + '<div class="om-tidy-row"><label>从</label><input type="number" id="omTidyFrom" min="1" max="' + total + '" value="1"><label>到</label><input type="number" id="omTidyTo" min="1" max="' + total + '" value="' + total + '"></div>'
+    + '<label class="om-tidy-check"><input type="checkbox" id="omTidyAll" checked> 全部楼层</label>'
+    + '<label class="om-tidy-check"><input type="checkbox" id="omTidyDel"> 总结后删除这些楼层（记忆保留，省 token / 内存）</label>'
+    + '</div>'
+    + '<div class="om-card-foot om-foot2"><button class="om-close" id="omTidyCancel">取消</button><button class="om-close om-primary" id="omTidyRun">开始整理</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  const fromEl = document.getElementById('omTidyFrom');
+  const toEl = document.getElementById('omTidyTo');
+  const allEl = document.getElementById('omTidyAll');
+  function syncAll() {
+    const on = allEl.checked;
+    fromEl.disabled = on; toEl.disabled = on;
+    if (on) { fromEl.value = 1; toEl.value = total; }
+  }
+  allEl.onchange = syncAll; syncAll();
+  document.getElementById('omTidyCancel').onclick = function () { ov.remove(); };
+  ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+  document.getElementById('omTidyRun').onclick = function () { omRunTidy(ov, fromEl, toEl, document.getElementById('omTidyDel')); };
+}
+
+async function omRunTidy(ov, fromEl, toEl, delEl) {
+  const total = messages.length;
+  let from = parseInt(fromEl.value, 10) || 1;
+  let to = parseInt(toEl.value, 10) || total;
+  from = Math.max(1, Math.min(from, total));
+  to = Math.max(from, Math.min(to, total));
+  const lo = from - 1, hi = to - 1;
+  const picked = [];
+  messages.forEach(function (m, i) {
+    if (i >= lo && i <= hi && m && (m.role === 'user' || m.role === 'assistant') && (m.scene || 'story') === 'story') picked.push({ m: m, i: i });
+  });
+  if (!picked.length) { omToast('这个范围里没有可总结的剧情'); return; }
+  const btn = document.getElementById('omTidyRun');
+  if (btn) { btn.disabled = true; btn.textContent = '整理中…'; }
+  try {
+    const chatText = picked.map(function (o) {
+      const m = o.m;
+      return (m.role === 'user' ? (settings.userName || '用户') : (m.name || settings.charName || '角色')) + '：' + String(m.content || '').slice(0, 900);
+    }).join('\n');
+    const n = await summarizeTextToMemory(chatText, offlineChatId);
+    if (!n) { omToast('总结失败或没有提取到记忆'); if (btn) { btn.disabled = false; btn.textContent = '开始整理'; } return; }
+    if (delEl && delEl.checked) {
+      const delSet = {};
+      picked.forEach(function (o) { delSet[o.i] = 1; });
+      const minAbs = Math.min.apply(null, picked.map(function (o) { return o.i; }));
+      const relBefore = messages.filter(function (m, i) {
+        return i < minAbs && m && (m.role === 'user' || m.role === 'assistant') && (m.scene || 'story') === 'story';
+      }).length;
+      const kept = messages.filter(function (m, i) { return !delSet[i]; });
+      messages.length = 0;
+      kept.forEach(function (m) { messages.push(m); });
+      try { localStorage.setItem(offMemCountKey(), String(relBefore)); } catch (e) {}
+      saveMessages(messages);
+      render();
+    }
+    if (ov) ov.remove();
+    omToast('已总结 ' + n + ' 条记忆' + (delEl && delEl.checked ? '，并清理了楼层' : ''));
+  } catch (e) {
+    omToast('整理失败');
+    if (btn) { btn.disabled = false; btn.textContent = '开始整理'; }
+  }
 }
 
 async function omClearBeautify() {
@@ -1836,6 +1953,65 @@ async function offExtractViaMain(chatText) {
   const data = await resp.json();
   return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
 }
+// 线下记忆：把总结出的条目转成记忆卡。若配置了 Embedding API，则顺手做向量化（向量记忆）。
+async function offBuildMemoryEntries(summary, chatId) {
+  const items = String(summary || '').split('\n').map(l => l.trim()).map(l => l.replace(/^[-*\d.\s、)]+/, '')).filter(l => l && l.length >= 6);
+  return await Promise.all(items.map(async function (t) {
+    const entry = { id: 'om' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), time: new Date().toLocaleString('zh-CN'), type: '长期记忆', chatId: chatId, content: t, embedding: null, hasVector: false };
+    try {
+      const emb = await offEmbed(t);
+      if (emb && emb.length) { entry.embedding = emb; entry.hasVector = true; }
+    } catch (e) {}
+    return entry;
+  }));
+}
+
+// 读取记忆页配置的 Embedding API（与 memory.js 共用纳米配置）
+async function offEmbConfig() {
+  try {
+    const url = await offMemGet('embUrl');
+    const key = await offMemGet('embKey');
+    const model = await offMemGet('embModel');
+    if (!url || !key || !model) return null;
+    let base = String(url).trim().replace(/\/+$/, '');
+    if (!/\/v1$/i.test(base)) base += '/v1';
+    return { url: base, key: String(key).trim(), model: String(model) };
+  } catch (e) { return null; }
+}
+async function offEmbed(text) {
+  const cfg = await offEmbConfig();
+  if (!cfg) return null;
+  try {
+    const resp = await fetch(cfg.url + '/embeddings', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + cfg.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: cfg.model, input: text, encoding_format: 'float' })
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return (data.data && data.data[0] && data.data[0].embedding) || null;
+  } catch (e) { return null; }
+}
+
+// 通用：把一段文本（可能跨多个楼层）一次性总结成记忆并入库。返回写入条数。
+async function summarizeTextToMemory(chatText, chatId) {
+  if (!chatText || !String(chatText).trim()) return 0;
+  const summary = await offExtractViaMain(chatText);
+  if (!summary) return 0;
+  const entries = await offBuildMemoryEntries(summary, chatId || offlineChatId);
+  if (!entries.length) return 0;
+  if (window.NanoMemLink && window.NanoMemLink.append) {
+    await window.NanoMemLink.append(chatId || offlineChatId, entries);   // 小号记忆计入大号记忆库
+  } else {
+    const list = (await offMemGet('memlist_' + (chatId || offlineChatId))) || [];
+    const arr = Array.isArray(list) ? list : [];
+    entries.forEach(e => arr.push(e));
+    await offMemPut('memlist_' + (chatId || offlineChatId), arr);
+  }
+  try { window.parent.postMessage({ type: 'NANO_MEMORY_UPDATED', chatId: chatId || offlineChatId }, '*'); } catch (e) {}
+  return entries.length;
+}
+
 async function summarizeOfflineMemories(force) {
   if (!offlineChatId || OFF_MEM_BUSY.v) return;
   // 小剧场（番外）不计入记忆
@@ -1850,25 +2026,13 @@ async function summarizeOfflineMemories(force) {
     const seg = rel.slice(count);
     const threshold = parseInt(settings.memThreshold || localStorage.getItem('offline_mem_threshold') || '5', 10) || 5;
     if (!force && seg.length < threshold) return;
-    const take = seg.slice(-12);
+    const take = seg.slice(0, 12);   // 从未总结的最早一段开始，避免跳过中间楼层
     const chatText = take.map(m => ((m.role === 'user' ? (settings.userName || '用户') : (m.name || settings.charName || '角色')) + '：' + String(m.content || '').slice(0, 900))).join('\n');
     if (!chatText.trim()) return;
-    const summary = await offExtractViaMain(chatText);
-    if (!summary) return;
-    const items = summary.split('\n').map(l => l.trim()).map(l => l.replace(/^[-*\d.\s、)]+/, '')).filter(l => l && l.length >= 6);
-    if (!items.length) return;
-    const entries = items.map(t => ({ id: 'om' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), time: new Date().toLocaleString('zh-CN'), type: '长期记忆', chatId: offlineChatId, content: t }));
-    if (window.NanoMemLink && window.NanoMemLink.append) {
-      await window.NanoMemLink.append(offlineChatId, entries);   // 小号记忆计入大号记忆库
-    } else {
-      const mem = await offMemGet('config', 'memlist_' + offlineChatId);
-      const list = (mem && Array.isArray(mem.value)) ? mem.value : [];
-      entries.forEach(e => list.push(e));
-      await offMemPut('config', { key: 'memlist_' + offlineChatId, value: list });
-    }
+    const n = await summarizeTextToMemory(chatText, offlineChatId);
+    if (!n) return;
     const lastIdx = rel.indexOf(take[take.length - 1]);
     localStorage.setItem(offMemCountKey(), String(Math.max(count, lastIdx + 1)));
-    try { window.parent.postMessage({ type: 'NANO_MEMORY_UPDATED', chatId: offlineChatId }, '*'); } catch (e) {}
   } catch (e) { console.warn('离线记忆总结失败', e); } finally { OFF_MEM_BUSY.v = false; }
 }
 

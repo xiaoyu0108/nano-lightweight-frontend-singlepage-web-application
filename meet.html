@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Meet</title>
-  <link rel="stylesheet" href="css/meet.css?v=20261004i">
+  <link rel="stylesheet" href="css/meet.css?v=20261008b">
   <script src="js/appearance.js"></script>
   <script src="js/friend-requests.js"></script>
 </head>
@@ -15,10 +15,18 @@
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <span class="kt-title">Meet</span>
-      <span style="width:34px"></span>
+      <button class="kt-refresh" id="ktRefresh" aria-label="刷新">
+        <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg>
+      </button>
     </header>
 
     <div class="kt-scroll">
+      <!-- 搜索好友微信号，重新加回 -->
+      <div class="kt-search-wrap">
+        <input class="kt-search" id="ktSearch" placeholder="输入微信号 / 昵称，找回好友" autocomplete="off">
+      </div>
+      <div class="kt-search-results" id="ktSearchResults"></div>
+
       <!-- 我的微信号（取自人设 Mask） -->
       <section class="kt-hero">
         <div class="kt-hero-label">MY WECHAT</div>
@@ -40,8 +48,22 @@
     </div>
 
     <div class="kt-toast" id="ktToast"></div>
+
+    <!-- 招呼栏 / 结果弹窗 -->
+    <div class="kt-modal" id="ktModal">
+      <div class="kt-modal-card">
+        <div class="kt-modal-title" id="ktModalTitle">添加好友</div>
+        <div class="kt-modal-sub" id="ktModalSub">发一句打招呼的话</div>
+        <div class="kt-chat-list" id="ktChatList"></div>
+        <input class="kt-modal-input" id="ktModalInput" placeholder="说点什么…" autocomplete="off">
+        <div class="kt-modal-actions">
+          <button class="kt-reject" id="ktModalCancel">关闭</button>
+          <button class="kt-accept" id="ktModalOk">发送</button>
+        </div>
+      </div>
+    </div>
   </div>
-  <script src="js/meet.js?v=20261004f"></script>
+  <script src="js/meet.js?v=20261008b"></script>
   <script src="swipe-back.js"></script>
 </body>
 </html>

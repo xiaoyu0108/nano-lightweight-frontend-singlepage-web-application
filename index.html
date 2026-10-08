@@ -34,6 +34,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Nano">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
     <link rel="manifest" href="manifest.json">
     <title>Nano</title>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -2688,7 +2692,7 @@
                 } catch (e) {}
             }
 
-            const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'autoSocialChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared', 'nanoTransMode', 'nanoBlockChanged', 'nanoCharUnblocked'];
+            const innerSettingTypes = ['autoMsgChanged', 'autoMsgIntervalChanged', 'autoMomentChanged', 'autoMomentIntervalChanged', 'autoSocialChanged', 'timeAwareChanged', 'allowImageChanged', 'allowMomentImageChanged', 'remarkChanged', 'cotChanged', 'messagesCleared', 'nanoTransMode', 'nanoBlockChanged', 'nanoCharBlocked', 'nanoCharUnblocked'];
             if (innerSettingTypes.indexOf(data.type) !== -1) {
                 const c = document.getElementById('chatInnerFrame');
                 if (c && frameBase(c) === 'chat_inner.html') {
@@ -2697,7 +2701,7 @@
             }
 
             // iMessage 是独立 App：拉黑后写入的新消息 / 拉黑状态变化要同步给正在打开的 iMessage
-            if (data.type === 'nanoIMessageUpdated' || data.type === 'nanoBlockChanged') {
+            if (data.type === 'nanoIMessageUpdated' || data.type === 'nanoBlockChanged' || data.type === 'nanoCharBlocked' || data.type === 'nanoCharUnblocked') {
                 document.querySelectorAll('iframe').forEach(function(f) {
                     try { if (f && f.contentWindow) f.contentWindow.postMessage(data, '*'); } catch (e) {}
                 });
@@ -3501,8 +3505,9 @@
             // 「是谁的小号」这类身份说明一律放最后一句，避免被用户从预览里看到。
             return (bio ? (bio + '\n') : ('网名「' + name + '」。\n'))
                 + (persona ? ('【你本人的完整设定，请以本人性格来扮演这个身份】\n' + persona + '\n\n') : '')
-                + '【铁律】以网名「' + name + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定；用户若起疑，要自然地圆过去，不承认另一个身份。\n'
-                + '【小号身份】你是「' + charName + '」本人开的小号，网名「' + name + '」。你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。绝对不能让用户察觉你就是「' + charName + '」：不要承认、不要暗示，不要用本人平时标志性的称呼或口头禅自曝。';
+                + '【铁律】以网名「' + name + '」的身份与用户交流，但内心与行为逻辑都遵循本人设定。\n'
+                + '【小号身份】你是「' + charName + '」本人开的小号，网名「' + name + '」。你非常清楚自己就是「' + charName + '」本人，只是为了试探/接近用户才披上这个身份。\n'
+                + '【被认出来时 · 别死鸭子嘴硬】默认不主动暴露、不主动承认，先用装傻/岔开/反将一军之类自然的方式应付；但如果对方已经非常笃定、证据十足地认定你就是「' + charName + '」（反复点名、说出只有本人才知道的细节、你越描越黑根本圆不过去），那就别再硬邦邦地否认、更不要复读“你认错人了”。按你本人的真实脾气处理：可以半推半就地松口承认、可以恼羞成怒地承认、也可以气到直接拉黑对方（在回复最后单独一行输出 [拉黑我]）来结束这场追问。承认或翻脸都要像真人，别演成一台只会说“不是”的机器。';
         }
         function addFriend(alt) {
             try {

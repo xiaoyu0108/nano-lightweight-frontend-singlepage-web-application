@@ -206,7 +206,7 @@
 
     function groupMsgPreview(lastMsg, groupId) {
         let text;
-        if (lastMsg.isImage && lastMsg.imageData && (lastMsg.imageData.isEmoji || lastMsg.imageData.emojiName || lastMsg.imageData.desc === '表情包')) text = '[表情包]' + (lastMsg.imageData.emojiName || lastMsg.imageData.desc || '');
+        if (lastMsg.isImage && lastMsg.imageData && (lastMsg.imageData.isEmoji || lastMsg.imageData.emojiName || lastMsg.imageData.desc === '表情包')) text = '[表情包：' + (lastMsg.imageData.emojiName || lastMsg.imageData.desc || '表情') + ']';
         else if (lastMsg.isImage) text = '图片';
         else if (lastMsg.isVoice) text = '语音';
         else if (lastMsg.isCard) text = '卡片消息';
@@ -757,7 +757,7 @@
         const lastMsg = getLastMessage(chatId);
         if (lastMsg) {
             if (lastMsg.isImage && lastMsg.imageData && (lastMsg.imageData.isEmoji || lastMsg.imageData.emojiName || lastMsg.imageData.desc === '表情包')) {
-                msg.textContent = '[表情包]' + (lastMsg.imageData.emojiName || lastMsg.imageData.desc || '');
+                msg.textContent = '[表情包：' + (lastMsg.imageData.emojiName || lastMsg.imageData.desc || '表情') + ']';
             } else if (lastMsg.isImage) {
                 msg.textContent = '图片';
             } else if (lastMsg.isCard) {
@@ -1156,7 +1156,8 @@
         try { localStorage.setItem(AVATAR_BAR_KEY, JSON.stringify(arr)); } catch (e) {}
     }
     function renderAvatarSlot(item, value) {
-        if (!item || !value) return;
+        if (!item) return;
+        if (!value) { item.innerHTML = ''; item.classList.remove('has-image'); return; }
         item.innerHTML = '';
         const img = document.createElement('img');
         img.src = value;
@@ -1172,21 +1173,14 @@
         writeAvatarBar(arr);
         renderAvatarSlot(document.querySelector('.avatar-item[data-index="' + index + '"]'), value);
     }
-    // 文件 → 居中裁成正方形的小图（优先 createImageBitmap 校正方向 / 兼容 HEIC）
-    async function cropToSquareDataURL(file, size) {
-        if (window.createImageBitmap) {
-            try {
-                const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-                const side = Math.min(bmp.width, bmp.height);
-                const sx = (bmp.width - side) / 2, sy = (bmp.height - side) / 2;
-                const canvas = document.createElement('canvas');
-                canvas.width = size; canvas.height = size;
-                canvas.getContext('2d').drawImage(bmp, sx, sy, side, side, 0, 0, size, size);
-                try { bmp.close && bmp.close(); } catch (e) {}
-                return canvas.toDataURL('image/jpeg', 0.88);
-            } catch (e) { /* 回退到 <img> 方案 */ }
-        }
+    // 文件 → 居中裁成正方形的小图。
+    // 用 FileReader + <img>（各手机浏览器最稳），不再依赖 createImageBitmap
+    // —— 后者在部分手机端会不返回/报错，导致「选了照片没反应」。失败则退回原图。
+    function cropToSquareDataURL(file, size) {
         return new Promise(function (resolve) {
+            let done = false;
+            function finish(v) { if (done) return; done = true; resolve(v); }
+            setTimeout(function () { finish(null); }, 15000);   // 兜底：别让 UI 永远无反应
             const reader = new FileReader();
             reader.onload = function (ev) {
                 const raw = ev.target.result;
@@ -1196,41 +1190,56 @@
                         const canvas = document.createElement('canvas');
                         canvas.width = size; canvas.height = size;
                         const ctx = canvas.getContext('2d');
-                        const side = Math.min(image.width, image.height);
-                        const sx = (image.width - side) / 2;
-                        const sy = (image.height - side) / 2;
+                        const side = Math.min(image.width, image.height) || size;
+                        const sx = Math.max(0, (image.width - side) / 2);
+                        const sy = Math.max(0, (image.height - side) / 2);
                         ctx.drawImage(image, sx, sy, side, side, 0, 0, size, size);
-                        resolve(canvas.toDataURL('image/jpeg', 0.88));
-                    } catch (e) { resolve(raw); }
+                        finish(canvas.toDataURL('image/jpeg', 0.88));
+                    } catch (e) { finish(raw); }
                 };
-                image.onerror = function () { resolve(raw); };
+                image.onerror = function () { finish(raw); };
                 image.src = raw;
             };
-            reader.onerror = function () { resolve(null); };
-            reader.readAsDataURL(file);
+            reader.onerror = function () { finish(null); };
+            try { reader.readAsDataURL(file); } catch (e) { finish(null); }
         });
     }
-    // 载入时恢复
-    (function hydrateAvatarBar() {
+    // 载入 / 回到前台 / 其他页面改动时恢复照片墙
+    function hydrateAvatarBar() {
         const arr = readAvatarBar();
         document.querySelectorAll('.avatar-item:not(.avatar-add)').forEach(function (item) {
             const idx = parseInt(item.dataset.index, 10);
-            if (!isNaN(idx) && arr[idx]) renderAvatarSlot(item, arr[idx]);
+            if (!isNaN(idx)) renderAvatarSlot(item, arr[idx] || '');
         });
-    })();
+    }
+    hydrateAvatarBar();
+    window.addEventListener('pageshow', hydrateAvatarBar);
+    window.addEventListener('focus', hydrateAvatarBar);
+    window.addEventListener('storage', function (e) { if (!e.key || e.key === AVATAR_BAR_KEY) hydrateAvatarBar(); });
 
+    // 打开系统相册：常驻一个挂在 body 上的隐藏 input 复用，
+    // 避免「临时创建 + 未入 DOM + 点一下」在部分手机浏览器上无效。
+    const avatarPickInput = document.createElement('input');
+    avatarPickInput.type = 'file';
+    avatarPickInput.accept = 'image/*';
+    avatarPickInput.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;';
+    document.body.appendChild(avatarPickInput);
+    let avatarPickTarget = null;
+    avatarPickInput.addEventListener('change', async function () {
+        const file = this.files && this.files[0];
+        const target = avatarPickTarget;
+        this.value = '';
+        if (!file || !target) return;
+        const dataUrl = await cropToSquareDataURL(file, 240);
+        if (dataUrl) setAvatarSlot(parseInt(target.dataset.index, 10), dataUrl);
+        avatarPickTarget = null;
+    });
     // 点击照片墙 → 直接打开相册（不再弹窗）
     function pickForItem(target) {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = async function (e) {
-            const file = e.target.files[0];
-            if (!file || !target) return;
-            const dataUrl = await cropToSquareDataURL(file, 240);
-            if (dataUrl) setAvatarSlot(parseInt(target.dataset.index, 10), dataUrl);
-        };
-        input.click();
+        if (!target) return;
+        avatarPickTarget = target;
+        try { avatarPickInput.value = ''; } catch (e) {}
+        avatarPickInput.click();
     }
     avatarItems.forEach(item => {
         item.addEventListener('click', function(e) {
@@ -1247,18 +1256,7 @@
     modalGallery.addEventListener('click', function() {
         const target = currentTarget;
         closeModal();
-        if (target) {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.onchange = async function(e) {
-                const file = e.target.files[0];
-                if (!file || !target) return;
-                const dataUrl = await cropToSquareDataURL(file, 200);
-                if (dataUrl) setAvatarSlot(parseInt(target.dataset.index, 10), dataUrl);
-            };
-            input.click();
-        }
+        if (target) pickForItem(target);
     });
 
     modalUrlBtn.addEventListener('click', function() {

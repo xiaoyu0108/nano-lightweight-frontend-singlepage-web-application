@@ -171,6 +171,63 @@
         }
     })();
 
+    // ===== 信息栏头像下方的「微信号」：显示角色的微信号，可点击修改 =====
+    var chatWechat = '';
+    function defaultWechat(id) {
+        var h = 0, s = String(id || '');
+        for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+        return 'wxid_' + h.toString(36);
+    }
+    function loadCharWechat(cb) {
+        try {
+            var req = indexedDB.open('nano_characters_db', 1);
+            req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {} };
+            req.onsuccess = function (e) {
+                var db = e.target.result;
+                try {
+                    var g = db.transaction('characters', 'readonly').objectStore('characters').get(chatId);
+                    g.onsuccess = function () { cb && cb((g.result && g.result.wechat) || ''); try { db.close(); } catch (e2) {} };
+                    g.onerror = function () { cb && cb(''); try { db.close(); } catch (e2) {} };
+                } catch (err) { cb && cb(''); try { db.close(); } catch (e2) {} }
+            };
+            req.onerror = function () { cb && cb(''); };
+        } catch (e) { cb && cb(''); }
+    }
+    function saveCharWechat(v) {
+        v = String(v || '').trim().slice(0, 40);
+        if (!v) return;
+        chatWechat = v;
+        if (displayUserId) { displayUserId.textContent = '微信号：' + v; displayUserId.dataset.wechat = v; }
+        try {
+            var req = indexedDB.open('nano_characters_db', 1);
+            req.onupgradeneeded = function (e) { try { var d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {} };
+            req.onsuccess = function (e) {
+                var db = e.target.result;
+                try {
+                    var tx = db.transaction('characters', 'readwrite');
+                    var st = tx.objectStore('characters');
+                    var g = st.get(chatId);
+                    g.onsuccess = function () { var c = g.result || { id: chatId, name: chatName || '角色' }; c.wechat = v; st.put(c); };
+                    tx.oncomplete = function () { try { db.close(); } catch (e2) {} };
+                } catch (err) { try { db.close(); } catch (e2) {} }
+            };
+        } catch (e) {}
+        try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'nanoCharUpdated', chatId: chatId, name: chatName, wechat: v }, '*'); } catch (e) {}
+    }
+    (function setupWechatEdit() {
+        var el = document.getElementById('displayUserId');
+        if (!el) return;
+        el.style.cursor = 'pointer';
+        el.title = '点一下可修改 TA 的微信号';
+        el.addEventListener('click', function () {
+            var cur = el.dataset.wechat || chatWechat || '';
+            var v = window.prompt('修改 TA 的微信号（角色自己也可能改）', cur);
+            if (v === null) return;
+            v = String(v).trim().slice(0, 40);
+            if (v) saveCharWechat(v);
+        });
+    })();
+
     var remarkPreview = document.getElementById('remarkPreview');
     var remarkInput = document.getElementById('remarkInput');
     var remarkModal = document.getElementById('remarkModal');
@@ -261,7 +318,16 @@
             remarkPreview.textContent = '未设置';
         }
 
-        displayUserId.textContent = 'ID: ' + chatId;
+        var initWx = chatWechat || defaultWechat(chatId);
+        displayUserId.textContent = '微信号：' + initWx;
+        displayUserId.dataset.wechat = initWx;
+        loadCharWechat(function (wx) {
+            if (wx) {
+                chatWechat = wx;
+                displayUserId.textContent = '微信号：' + wx;
+                displayUserId.dataset.wechat = wx;
+            }
+        });
 
         var cotVal = getSetting('cotPrompt', '');
         cotPreview.textContent = cotVal ? (cotVal.length > 8 ? cotVal.slice(0, 8) + '…' : cotVal) : '未设置';

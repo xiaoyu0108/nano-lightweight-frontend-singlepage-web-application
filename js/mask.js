@@ -576,6 +576,9 @@
             } catch(e) {
                 console.warn('保存头像到 IndexedDB 失败:', e);
             }
+        } else {
+            // 未设置/点了恢复默认：清掉库里旧头像，避免“改回默认却还是旧图”
+            try { await deleteAvatarFromDB(maskId); } catch(e) {}
         }
 
         saveData(data);

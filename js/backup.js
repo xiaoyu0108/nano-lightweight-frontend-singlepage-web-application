@@ -9,15 +9,47 @@ function $(id) { return document.getElementById(id); }
 
 // ================= 通用工具 =================
 
+function isIOSDevice() {
+    try {
+        return /iP(hone|ad|od)/.test(navigator.platform || '') ||
+            ((navigator.userAgent || '').indexOf('Mac') >= 0 && 'ontouchend' in document);
+    } catch (e) { return false; }
+}
+
 function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    // 只在 iOS 用系统分享：iOS 独立窗口用 <a download> 会卡在“存储到文件”页且退不回。
+    // 安卓/桌面仍用普通下载，文件会正常进系统「下载」目录（用户找得到）。
+    if (isIOSDevice()) {
+        try {
+            if (navigator.canShare && navigator.share) {
+                const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+                if (navigator.canShare({ files: [file] })) {
+                    navigator.share({ files: [file], title: filename }).catch(() => {});
+                    return;
+                }
+            }
+        } catch (e) {}
+        try {
+            blob.text().then((t) => { try { navigator.clipboard.writeText(t); alert('已复制到剪贴板，可粘贴保存'); } catch (e2) {} });
+        } catch (e2) {}
+        return;
+    }
+    // 非 iOS：普通下载
+    try {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) {
+        try {
+            blob.text().then((t) => { try { navigator.clipboard.writeText(t); alert('已复制到剪贴板，可粘贴保存'); } catch (e2) {} });
+        } catch (e2) {}
+    }
 }
 
 function timestampName(prefix, ext) {
@@ -374,17 +406,24 @@ function decodeKey(info) {
 
 // ================= 导入 =================
 
-/** 清空全站数据 */
-async function clearAllData() {
+/** 清空全站数据；dbNames 可选：iOS Safari 无 indexedDB.databases()，需显式给出要删的库 */
+async function clearAllData(dbNames) {
     // localStorage
     try { localStorage.clear(); } catch {}
 
     // sessionStorage
     try { sessionStorage.clear(); } catch {}
 
-    // IndexedDB：删除所有数据库
-    const dbs = await listDatabases();
-    for (const { name } of dbs) {
+    // IndexedDB：删除数据库（优先用传入的库名，否则枚举）
+    let names;
+    if (Array.isArray(dbNames)) {
+        names = dbNames.slice();
+    } else {
+        const dbs = await listDatabases();
+        names = dbs.map((d) => d.name).filter(Boolean);
+    }
+    for (const name of names) {
+        if (!name) continue;
         await new Promise((resolve) => {
             const req = indexedDB.deleteDatabase(name);
             req.onsuccess = req.onerror = req.onblocked = () => resolve();
@@ -401,7 +440,7 @@ async function importFromJson(data, onProgress) {
     }
 
     if (typeof onProgress === 'function') onProgress('清空旧数据…');
-    await clearAllData();
+    await clearAllData(data.indexedDB ? Object.keys(data.indexedDB) : []);
 
     // ---------- IndexedDB ----------
     if (data.indexedDB) {
@@ -525,6 +564,8 @@ function openDatabaseWithSchema(name, version, schema) {
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => resolve(null);
+        // 旧连接未释放时会触发 blocked：直接放行，避免导入“一直转”
+        req.onblocked = () => resolve(req.result || null);
     });
 }
 
@@ -532,15 +573,17 @@ function openDatabaseWithSchema(name, version, schema) {
 async function importFromZip(file, onProgress) {
     if (!window.JSZip) throw new Error('JSZip 未加载');
     if (typeof onProgress === 'function') onProgress('解压中…');
-    const zip = await JSZip.loadAsync(file);
+    // 解压加超时，避免大文件/内存不足时“一直转”
+    const zip = await Promise.race([
+        JSZip.loadAsync(file),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('解压超时：文件可能过大或内存不足，建议改用 JSON 备份，或换个浏览器再试')), 90000))
+    ]);
 
     // ---------- 解析 meta ----------
     const metaFile = zip.file('meta.json');
     if (!metaFile) throw new Error('ZIP 中缺少 meta.json');
     const meta = JSON.parse(await metaFile.async('string'));
     if (meta.type !== 'full-site-backup') throw new Error('不是有效的全站备份文件');
-
-    await clearAllData();
 
     // ---------- IndexedDB ----------
     const idbFolder = zip.folder('indexedDB');
@@ -553,6 +596,8 @@ async function importFromZip(file, onProgress) {
             }
         });
         const dbNameArr = Array.from(dbNames);
+        // 按备份里的库名删除（iOS Safari 不支持 indexedDB.databases()，必须显式指定，否则旧库没删干净）
+        await clearAllData(dbNameArr);
         let _dbi = 0;
 
         for (const dbName of dbNameArr) {
@@ -754,8 +799,10 @@ async function executeAction() {
             });
         }
         pendingFile = null;
+        try { fileInput.value = ''; } catch (e) {}
     } catch (e) {
         pendingFile = null;
+        try { fileInput.value = ''; } catch (e2) {}
         setTimeout(() => alert('操作失败：' + (e.message || e)), 100);
     }
 }
@@ -801,7 +848,9 @@ function handleFileSelect(event) {
     if (!file) return;
     pendingFile = file;
     openAlert('importConfirm', file.name);
-    event.target.value = '';
+    // 注意：这里不要清空 event.target.value。
+    // iOS 上清空后 File 句柄会失效，后续 JSZip.loadAsync / file.text() 会一直挂起（一直转）。
+    // 统一在导入结束后（executeAction）再清空。
 }
 
 // ================= 单个角色 导出 / 导入 =================

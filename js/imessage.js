@@ -887,6 +887,33 @@ function appendToChat(chat, msgs) {
   chat.lastTime = last.time; chat.sortTime = last.ts || Date.now(); chat.unread = (chat.unread || 0) + msgs.length;
   return saveChat(chat);
 }
+// 角色在 iMessage 里说要把你加回微信 → 往 Meet 好友申请中心推一条（同意即解除拉黑）
+function maybePushMeetReadd(charId, charName, chat) {
+  if (!charId) return;
+  try {
+    var KEY = 'nano_friend_requests';
+    var all = [];
+    try { all = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) {}
+    if (all.some(function (r) { return r && r.status === 'pending' && String(r.unblockCharId) === String(charId); })) return;
+    var owner = '';
+    try {
+      var md = JSON.parse(localStorage.getItem('nano_mask_data') || localStorage.getItem('nano_home_data') || 'null');
+      if (md) owner = String(md.currentMaskId || (md.masks && md.masks[0] && md.masks[0].id) || '');
+    } catch (e) {}
+    if (!owner) owner = 'default';
+    var ch = null;
+    try { ch = state.chars.find(function (x) { return String(x.id) === String(charId); }); } catch (e) {}
+    all.push({
+      id: 'fr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 5),
+      owner: owner, name: (ch && ch.name) || charName || '角色', avatar: (ch && ch.avatar) || '',
+      source: 'other', setting: '在吗？我想在微信上把你加回来。', originId: '', altOriginId: '',
+      requestNote: '想把你加回来', unblockCharId: charId, ts: Date.now(), status: 'pending'
+    });
+    try { localStorage.setItem(KEY, JSON.stringify(all.slice(-400))); } catch (e) {}
+    try { window.parent.postMessage({ type: 'homeDataUpdated' }, '*'); } catch (e) {}
+  } catch (e) {}
+}
+
 async function doReply() {
   const c = state.current;
   if (!c) return;
@@ -900,10 +927,14 @@ async function doReply() {
   } finally { setBusy(''); }
   if (!out || !out.bubbles || !out.bubbles.length) { toastMsg('没有收到回复' + (lastApiError ? ('：' + lastApiError) : '')); return; }
   // 关键：始终写入发起回复的那个会话 c，而不是当前打开的会话
+  if (c.kind === 'char') {
+    out.bubbles = (out.bubbles || []).map(function (b) { return String(b).replace(/\[(加好友|加微信|加回我|加我)\]/g, '').trim(); }).filter(Boolean);
+  }
   await appendToChat(c, bubblesToMessages(out.bubbles, c.kind));
   if (c.kind === 'char') {
-    if (/\[加回我\]|\[取消拉黑\]|\[unblockuser\]/.test(out.raw || '')) setSetting(c.charId, 'charBlocked', false);
-    if (/\[继续拉黑\]|\[blockuser\]/.test(out.raw || '')) setSetting(c.charId, 'charBlocked', true);
+    if (/\[加回我\]|\[取消拉黑\]|\[unblockuser\]/.test(out.raw || '')) { setSetting(c.charId, 'charBlocked', false); try { window.parent.postMessage({ type: 'nanoCharUnblocked', chatId: c.charId }, '*'); } catch (e) {} }
+    if (/\[继续拉黑\]|\[blockuser\]/.test(out.raw || '')) { setSetting(c.charId, 'charBlocked', true); try { window.parent.postMessage({ type: 'nanoCharBlocked', chatId: c.charId }, '*'); } catch (e) {} }
+    if (/\[(加好友|加微信|加回我|加我)\]/.test(out.raw || '')) maybePushMeetReadd(c.charId, c.name, c);
     if (state.current && state.current.id === c.id) renderBanner(c);
     try { maybeSummarize(c.charId, c.name, c.history); } catch (e) {}
   }
@@ -949,7 +980,8 @@ async function genCharReply(c) {
   sys += ctx;
   if (getSetting(c.charId, 'blocked', false)) sys += '【状态】用户把你在线上聊天里拉黑了，但这里是 iMessage，你们仍能正常聊天。你可以主动一点，试着沟通、解释或挽回。\n';
   if (getSetting(c.charId, 'charBlocked', false)) sys += '【状态】你之前关掉了线上聊天（拉黑了用户）。你可以决定是否加回：愿意就单独输出一行 [加回我]，否则输出 [继续拉黑]。\n';
-  sys += '【表情包】用户可能发来 [表情包：名称]，那代表用户发了一张该含义的表情包，请按这个含义自然理解和回应（不需要自己也发表情标签）。\n';
+  sys += '【加回微信】如果你愿意重新在微信/Meet 里把 TA 加为好友（会把好友申请发到 TA 的 Meet），单独输出一行 [加好友]。\n';
+  sys += '【表情包】用户可能发来 [表情包：名称]，那代表用户发了一张该含义的表情包，只表达当下的心情/态度（例如“喝酒”=烦躁无语、“哭哭”=感动委屈），不代表用户真的去做了什么；按心情自然回应即可，绝对不要当真去追问“你怎么又喝酒了/你怎么哭了”。（不需要自己也发表情标签）。\n';
   sys += '【短信风格】像真人连发消息那样：把想说的话自然拆成 2-5 条短消息，每条独立成行，每条约 5-25 字；不要把一整段塞进一条，也不要只蹦几个字让意思不完整。\n';
   sys += '【务必完整】每条消息都要是一句完整的话，不要说到一半就断掉；整体意思要表达完。';
   const foreign = isForeignChar(ch);
@@ -1110,8 +1142,9 @@ async function genStrangerReply(c) {
     const ctx = await charContextText(ch, c.history);
     let sys = '你其实是「' + (ch.name || '角色') + '」本人，用网名「' + c.name + '」的小号在 iMessage 里接近并试探「' + userName + '」，' + userName + ' 不知道小号是你。\n';
     if (c.setting) sys += '小号的公开身份 / 简介：' + c.setting + '。\n';
-    sys += '以「' + c.name + '」这个陌生身份说话，但你的说话方式、性格、内心与目的都遵循你本人设定；绝对不能暴露你就是' + (ch.name || '角色') + '。\n';
+    sys += '以「' + c.name + '」这个陌生身份说话，但你的说话方式、性格、内心与目的都遵循你本人设定；默认不主动暴露你就是' + (ch.name || '角色') + '。\n';
     sys += '可以有试探意味（打听 TA 的感情、平时和谁聊天、是不是一个人等），但别太露骨。\n';
+    sys += '如果对方已经非常笃定、证据十足地认定你就是' + (ch.name || '角色') + '，别一味硬撑或复读“你认错人”，可按本人脾气半推半就地承认或恼羞成怒地承认；也可以直接不回或冷处理。\n';
     sys += ctx;
     sys += '拆成 1-3 条短消息、每条独立成行（每条约 5-30 字），不要输出多余说明。';
     const history = [{ role: 'system', content: sys }].concat(historyForApi(16, c.history));
@@ -1260,7 +1293,7 @@ async function maybeAltProbe() {
       '要求：\n' +
       '1. 起一个真实的网络昵称（姓名或网名都行，禁止用「小号 / 陌生人 / 新朋友」这类词当名字）。\n' +
       '2. 写一句小号的公开简介 / 身份（为什么加 TA，如「同城摄影」「朋友介绍」「旧同学换号」，要合理）。\n' +
-      '3. 写 1-2 条发给 TA 的开场消息：自然、像真人搭话，能勾住 TA 回应、忍不住多聊；可以带一点试探意味（问 TA 有没有对象、平时和谁聊天、是不是一个人），但不要一上来就露骨，也不要暴露你就是' + ch.name + '。\n' +
+      '3. 写 1-2 条发给 TA 的开场消息：自然、像真人搭话，能勾住 TA 回应、忍不住多聊；可以带一点试探意味（问 TA 有没有对象、平时和谁聊天、是不是一个人），但不要一上来就露骨，也不要主动暴露你就是' + ch.name + '（但若对方非常笃定地认出来，后续可以按本人脾气松口承认）。\n' +
       '4. 你内心与行为逻辑仍遵循本人设定。\n' +
       '只输出 JSON：{"name":"网名","bio":"简介","messages":["第一条","第二条"]}\n' +
       ctx;
@@ -1339,8 +1372,9 @@ async function applyReplyRaw(chatId, raw) {
   const last = c.history[c.history.length - 1];
   c.preview = last.text; c.lastTime = last.time; c.sortTime = last.ts; c.unread = (c.unread || 0) + 1;
   if (c.kind === 'char') {
-    if (/\[加回我\]|\[取消拉黑\]|\[unblockuser\]/.test(String(raw))) setSetting(c.charId, 'charBlocked', false);
-    if (/\[继续拉黑\]|\[blockuser\]/.test(String(raw))) setSetting(c.charId, 'charBlocked', true);
+    if (/\[加回我\]|\[取消拉黑\]|\[unblockuser\]/.test(String(raw))) { setSetting(c.charId, 'charBlocked', false); try { window.parent.postMessage({ type: 'nanoCharUnblocked', chatId: c.charId }, '*'); } catch (e) {} }
+    if (/\[继续拉黑\]|\[blockuser\]/.test(String(raw))) { setSetting(c.charId, 'charBlocked', true); try { window.parent.postMessage({ type: 'nanoCharBlocked', chatId: c.charId }, '*'); } catch (e) {} }
+    if (/\[(加好友|加微信|加回我|加我)\]/.test(String(raw))) maybePushMeetReadd(c.charId, c.name, c);
   }
   saveChat(c);
   if (state.current && state.current.id === c.id) { state.messages = c.history; renderMessages(); renderBanner(c); }
@@ -1843,9 +1877,9 @@ async function loadIM() {
         if (d.type === 'currentMaskChanged') { loadIM().then(() => renderList()).catch(() => {}); }
       });
     }
-    if (d && (d.type === 'nanoIMessageUpdated' || d.type === 'nanoBlockChanged')) {
+    if (d && (d.type === 'nanoIMessageUpdated' || d.type === 'nanoBlockChanged' || d.type === 'nanoCharBlocked' || d.type === 'nanoCharUnblocked')) {
       reloadChatsFromDB();
-      if (d.type === 'nanoBlockChanged' && state.current) renderBanner(state.current);
+      if ((d.type === 'nanoBlockChanged' || d.type === 'nanoCharBlocked' || d.type === 'nanoCharUnblocked') && state.current) renderBanner(state.current);
     }
   });
 })();

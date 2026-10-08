@@ -209,6 +209,17 @@ html.keyboard-open .chat-container {
 .bubble.grouped::after {
   display: none;
 }
+
+/* 被角色拉黑：我发出的气泡显示红色感叹号 + “您的消息已被拒收” */
+.reject-badge {
+    position: absolute; left: -24px; top: 4px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #ff3b30; color: #fff; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; line-height: 1; z-index: 3;
+}
+.reject-note {
+    color: #ff3b30; font-size: 11px; margin-top: 3px; text-align: right;
+}
 .quote-block {
     position: relative; display: flex; align-items: flex-start; gap: 6px;
     border-radius: 10px; padding: 6px 10px; margin-top: 5px;
