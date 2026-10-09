@@ -3787,12 +3787,8 @@
             type: 'right', direction: 'user', toName: p.toName || ''
         }));
         try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
-        // 邀请后让角色自动表态（不用等用户再发消息）
-        setTimeout(function () {
-            try {
-                if (getPendingListenUserCards().length > 0) decideListenInviteFallback();
-            } catch (e) {}
-        }, 700);
+        // 不再为这张卡片单独调用一次 API（避免一轮多次调用）；
+        // 角色会在下一次正常回复里根据标记表态，卡片保持 pending 等待即可。
     }
 
     // 消费「一起听已结束」等暂存提示（音乐 App 结束时写入，进入聊天时补上）
@@ -3914,14 +3910,32 @@
     async function generateProactiveMessage() {
         suppressApiAlerts = true;
         try {
-            const reply = await callApi('（现在没有新消息，你突然想找对方说句话。请主动发一条自然、简短的消息，不要问“在吗”。）');
-            if (reply) {
-                const parsed = extractTagsFromText(stripThinkBlocks(reply));
-                const line = String(parsed.cleanedText || '').split(/\n+/).map(function(s){ return s.trim(); }).filter(Boolean)[0] || '';
-                if (line) return line;
+            // 一次 API 调用同时产出「消息正文 + 心声」。
+            // 明确要求顺着最近的聊天往下接，禁止汇报无关的日常流水账（上课/下课、做卷子等）。
+            const reply = await callApi(
+                '（现在没有对方的新消息。请顺着你们最近正在聊的内容，主动给对方发一条自然、简短的日常消息：'
+                + '接住上一次的话题、情绪或还没说完的事，就像真人随手拿起手机发出的那一条。'
+                + '禁止汇报与话题无关的日常进度流水账（例如上课/下课、写作业/做卷子、吃饭睡觉、我在做某事等），'
+                + '禁止问“在吗”，禁止编造不存在的日程，禁止括号旁白，禁止复述设定或系统提示。'
+                + '只输出这一条消息正文（一两句即可），随后另起一行输出心声，格式为 [heart:此刻的一句心理状态]。）'
+            );
+            if (!reply) return null;
+            let body = stripThinkBlocks(reply);
+            let heart = null;
+            const hm = body.match(/\[(?:heart|心声)\s*:\s*([\s\S]*?)\]/i);
+            if (hm) {
+                const hp = String(hm[1] || '').trim();
+                const sep = hp.indexOf('||');
+                heart = sep !== -1
+                    ? { subject: hp.slice(0, sep).trim(), thought: hp.slice(sep + 2).trim() }
+                    : { subject: '', thought: hp };
+                body = body.replace(hm[0], '');
             }
-        } catch (e) {} finally { suppressApiAlerts = false; }
-        return '';
+            const cleaned = (extractTagsFromText(body).cleanedText || '').trim();
+            const line = String(cleaned).split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).join(' ').slice(0, 200);
+            if (!line) return null;
+            return { line: line, heart: heart };
+        } catch (e) { return null; } finally { suppressApiAlerts = false; }
     }
 
     // 主动发消息：随机间隔（设定的 50%~150%），到点就调一次 API 主动发一条
@@ -3948,10 +3962,19 @@
             if (isProcessingApi || isWaitingForReply) return;
             isProcessingApi = true;
             try {
-                const line = await generateProactiveMessage();
+                const out = await generateProactiveMessage();
+                const line = out && out.line;
                 if (!line) return;
                 addMessage('left', line, nowHHMM(), null, false, false, null, null, null, null);
+                // 心声来自同一次 API 调用，挂到本轮刚发出的这条消息上
+                if (out.heart && (out.heart.subject || out.heart.thought)) {
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                        const m = messages[i];
+                        if (m.type === 'left' && m.turn === currentTurn) { m.heart = out.heart; }
+                    }
+                }
                 saveMessages();
+                renderMessages();
                 notifyCharMessage(String(line).slice(0, 60));
             } catch (e) {
             } finally { isProcessingApi = false; }
@@ -3962,9 +3985,9 @@
         if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
         if (!window.__autoMsgEnabled) return;
         const base = window.__autoMsgMins || 8;
+        // 严格按设定间隔（50%~150% 随机）发送，不再在开启时插一条「立即触发」，
+        // 避免用户没到点就被多扣一次 API。
         let ms = Math.max(30 * 1000, Math.round(base * (0.5 + Math.random()) * 60 * 1000));
-        // 刚开启时先来个 1~2 分钟内的首次触发，让用户能立刻看到效果；之后按设定间隔
-        if (first) ms = Math.min(ms, 60 * 1000 + Math.round(Math.random() * 60 * 1000));
         // 向外壳注册到期任务：即使本 frame 被切走/销毁，外壳到点也会调用 API 的兜底推送
         try {
             if (window.NanoKeepAlive && window.NanoKeepAlive.schedule) {
@@ -5820,10 +5843,8 @@
         replyBody = settleAvatarFromReplyText(replyBody);
         // 角色自己改微信号：[微信号:新号]
         replyBody = settleWechatFromReplyText(replyBody);
-        // 主回复没表态 → 兜底单独问一次，保证邀请卡片一定会变成接受/婉拒
-        if (!listenSettle.settled && getPendingListenUserCards().length > 0) {
-            decideListenInviteFallback();
-        }
+        // 不再为「一起听」表态单独补一次 API 调用：本轮主回复一次到位，
+        // 没表态时让卡片保持 pending，等下一次正常回复再结算，避免一轮多次调用。
         if (replyBody.indexOf('[邀请一起听]') !== -1) {
             replyBody = replyBody.replace(/\[邀请一起听\]/g, '').trim();
             setTimeout(function () {
@@ -5850,15 +5871,8 @@
                         let display = content;
                         if (zh) display = content ? (content + '\n' + zh) : zh;
                         const vrow = addMessage('left', '', timeStr, null, false, false, null, display || null, null, null, true, { duration: dur, unread: true, ttsText: content || display });
-                        // 没有中文翻译时，自动翻译后再补到语音转文字下方（外语角色的语音要看懂）
-                        if (!zh && content) {
-                            const vmid = vrow && vrow.dataset ? vrow.dataset.id : '';
-                            translateToZh(content).then(function(zh2) {
-                                if (!zh2) return;
-                                const vm = messages.find(function(x) { return x.id === vmid; });
-                                if (vm) { vm.transcript = content + '\n' + zh2; renderMessages(); saveMessages(); }
-                            }).catch(function() {});
-                        }
+                        // 不再自动额外调用一次 API 去翻译语音：外语原文照常显示，
+                        // 需要中文时由用户点「翻译」再单独触发。
                     } else if (tag.kind === 'emoji') {
                         const em = await findEmojiByName(tag.payload);
                         if (em && em.url) {

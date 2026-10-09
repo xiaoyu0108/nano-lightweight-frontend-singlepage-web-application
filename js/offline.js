@@ -445,18 +445,18 @@ function parseContent(text) {
   if (!text) return '';
   const lines = text.split('\n');
   let result = '';
-  let currentBlock = '';
+  let pendingBlank = false;
+  let hasBlock = false;
 
   for (let line of lines) {
     const rawLine = line.replace(/\r$/, '');
     const trimmed = rawLine.trim();
-    if (!trimmed) { 
-      if (currentBlock) {
-        result += (currentBlock.startsWith('<span') ? currentBlock : '<span class="narration-block">' + currentBlock + '</span>') + '\n\n';
-        currentBlock = '';
-      }
-      continue; 
-    }
+    if (!trimmed) { pendingBlank = true; continue; }
+
+    // 源码里的空行 → 段与段之间空一行（多个连续空行只算一行）
+    if (hasBlock && pendingBlank) result += '\n';
+    pendingBlank = false;
+    hasBlock = true;
 
     // 检测标记并移除，只保留内容
     let className = '';
@@ -477,37 +477,17 @@ function parseContent(text) {
     } else if (/^\[内心\]|^【内心】/.test(trimmed)) {
       className = 'inner-block';
       content = trimmed.replace(/^\[内心\]\s*|^【内心】\s*/, '');
-    } else if (/^\*\*(.+)\*\*$/.test(trimmed)) {
-      className = 'highlight';
-      content = trimmed.replace(/^\*\*|\*\*$/g, '');
     }
 
     if (className) {
-      // 如果有暂存的普通文本块，先输出
-      if (currentBlock && !currentBlock.startsWith('<span')) {
-        result += `<span class="narration-block">${escapeHTML(currentBlock)}</span>\n`;
-        currentBlock = '';
-      }
-      result += `<span class="${className}">${escapeHTML(content)}</span>\n`;
+      result += `<span class="${className}">${escapeHTML(content)}</span>`;
     } else {
-      // 普通文本，保留段首空格（缩进）并检测内联标记
-      let processed = escapeHTML(rawLine);
+      // 普通文本：去掉模型自己写的段首缩进（全角/半角空格），统一交给 CSS 的
+      // text-indent 处理，避免「首段2字符、后面4字符」这种模型缩进与 CSS 叠加的问题
+      let processed = escapeHTML(String(rawLine).replace(/^[\s\u3000]+/, ''));
       processed = processed.replace(/\*\*(.+?)\*\*/g, '<span class="highlight">$1</span>');
       processed = processed.replace(/——([^——]+)——/g, '<span class="env-block">——$1——</span>');
-      // 如果当前有暂存块，追加
-      if (currentBlock && !currentBlock.startsWith('<span')) {
-        currentBlock += '\n' + processed;
-      } else {
-        currentBlock = processed;
-      }
-    }
-  }
-
-  if (currentBlock) {
-    if (currentBlock.startsWith('<span')) {
-      result += currentBlock + '\n';
-    } else {
-      result += `<span class="narration-block">${escapeHTML(currentBlock)}</span>\n`;
+      result += `<span class="narration-block">${processed}</span>`;
     }
   }
 
@@ -693,90 +673,17 @@ function buildTypingCard() {
 // ============================================================
 // 6. 剧情推荐
 // ============================================================
-async function generatePlots() {
-  try {
-    const result = await callPlotAPI();
-    if (Array.isArray(result) && result.length >= 5) return result.slice(0, 5);
-    if (typeof result === 'string') {
-      const lines = result.split('\n').filter(l => l.trim());
-      if (lines.length >= 5) return lines.slice(0, 5);
-    }
-  } catch (e) { console.warn('Plot API failed'); }
-  return [];
-}
-
-async function callPlotAPI() {
-  try {
-    let apiConfig = null;
-    try {
-      apiConfig = await new Promise((resolve) => {
-        const req = indexedDB.open('nano_api_db', 2);
-        req.onupgradeneeded = function(e) {
-          const db = e.target.result;
-          if (!db.objectStoreNames.contains('api_data')) db.createObjectStore('api_data', { keyPath: 'key' });
-        };
-        req.onsuccess = function(e) {
-          const db = e.target.result;
-          const g = db.transaction('api_data', 'readonly').objectStore('api_data').get('nano_api_config');
-          g.onsuccess = () => resolve(g.result ? g.result.value : null);
-          g.onerror = () => resolve(null);
-        };
-        req.onerror = () => resolve(null);
-      });
-    } catch (e) {}
-    try { if (!apiConfig) apiConfig = JSON.parse(localStorage.getItem('nano_api_config') || 'null'); } catch (e) {}
-    if (!apiConfig || !apiConfig.mainUrl) return null;
-
-    let mainUrl = String(apiConfig.mainUrl).trim().replace(/\/+$/, '');
-    if (!/\/v1$/i.test(mainUrl)) mainUrl += '/v1';
-    const mainKey = String(apiConfig.mainKey || '').trim();
-    const mainModel = apiConfig.mainModel || 'gpt-3.5-turbo';
-
-    const last = messages.length ? messages[messages.length - 1] : null;
-    const context = last ? last.content : settings.charName + ' 与 ' + settings.userName + ' 刚开始聊天。';
-
-    const plotNsfw = settings.nsfw
-      ? '其中 1~2 条可以带有成人向/亲密(NSFW)的推进方向，按角色关系与氛围自然、大胆地展开，不要为了露骨而露骨；'
-      : '其中有1条可以带有暧昧/擦边(NSFW)的推进方向，但不露骨、不低俗；';
-    const plotPrompt = '你现在是剧情走向生成器。根据以下最近的剧情，给出5条不同的剧情走向选项。要求：每条20~30字，完整可读，像一句可以接着演的剧情；' + plotNsfw + '其余要合理、有趣、贴合角色人设。只要5行文字，每行一个选项，不要编号、不要序号、不要引号。\n\n最近剧情：\n' + context;
-
-    const resp = await fetch(mainUrl + '/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + mainKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: mainModel,
-        messages: [{ role: 'user', content: plotPrompt }],
-        max_tokens: 400,
-        temperature: 1.0,
-        stream: false
-      })
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-    const lines = text.split('\n').map(l => l.replace(/^[\d\s.、\-)]+/, '').trim()).filter(l => l.length >= 8);
-    return lines.length >= 5 ? lines.slice(0, 5) : null;
-  } catch (e) {
-    console.warn('Plot API error', e);
-    return null;
-  }
-}
-
+// 剧情走向只在「主回复的那一次 API 调用」里随正文一起生成（解析回复末尾的 [plot:]），
+// 本页不再单独调用任何 API；万一本条回复没带剧情走向，就直接提示，绝不暗自补一次调用。
 async function loadPlotsForMessage(i, container) {
-  try {
-    // 优先用本次回复自带的剧情选项（同一次 API 已生成，不再额外调用）
-    let plots = null;
-    if (messages[i] && Array.isArray(messages[i].plots) && messages[i].plots.length >= 5) {
-      plots = messages[i].plots.slice(0, 5);
-    } else {
-      plots = await generatePlots();
-    }
-    const buttons = container.querySelectorAll('.plot-opt');
-    (plots || []).forEach((text, idx) => { if (buttons[idx]) buttons[idx].textContent = text; });
-    container.dataset.loaded = '1';
-  } catch {
-    container.querySelectorAll('.plot-opt').forEach(b => b.textContent = '（加载失败）');
+  const buttons = container.querySelectorAll('.plot-opt');
+  const plots = (messages[i] && Array.isArray(messages[i].plots)) ? messages[i].plots.slice(0, 5) : [];
+  if (!plots.length) {
+    buttons.forEach(b => b.textContent = '（本条回复没有一起生成剧情走向）');
+  } else {
+    plots.forEach((text, idx) => { if (buttons[idx]) buttons[idx].textContent = text; });
   }
+  container.dataset.loaded = '1';
 }
 
 // ============================================================

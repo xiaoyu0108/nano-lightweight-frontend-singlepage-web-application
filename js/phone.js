@@ -3015,10 +3015,9 @@ async function startGeneration(ids){
   refreshSheet.classList.add("hidden");
   hideGenFail();
 
-  /* 生成策略：勾选多个 App 时，先尝试「一次请求全部」，成功就只调用一次 API（省钱）。
-     若因请求过大导致网关超时 / HTTP 错误，再自动拆成每批 CHUNK 个重试，避免整次白费。 */
-  const CHUNK = 5;
-
+  /* 生成策略：一次点击只调用一次 API（把勾选的 App 一次性生成）。
+     若网关超时 / HTTP 错误导致没生成，不再「暗自」自动拆分重试——
+     改为弹出失败面板，由用户自己点「重新生成」再补，绝不在背后多扣 API。 */
   const okAll = {};
   const fatalMsgs = [];
 
@@ -3036,29 +3035,16 @@ async function startGeneration(ids){
     (r.log || []).forEach(l => genState.log.push(l));
     if(r.fatal) fatalMsgs.push(`${label}：${r.fatal}`);
 
-    /* 每批生成完就立刻落盘，避免整次刷新白费 */
+    /* 生成完就立刻落盘 */
     for(const id of Object.keys(r.ok)){
       try{ await dataSet(`app_${currentChar.id}_${id}`, r.ok[id]); okAll[id] = r.ok[id]; }
       catch(e){ genState.log.push({t:"err", s:`写入 ${id} 失败: ${e.message}`}); }
     }
-    /* 每批完成后即时刷新界面，让用户看到进度 */
     await reRenderCurrentApp();
     return r;
   };
 
-  if(ids.length > CHUNK){
-    genState.log.push({t:"sec", s:`一次生成全部（${ids.length} 个 App，单次请求）`});
-    const first = await runBatch(ids, `正在一次生成全部 ${ids.length} 个 App…（可返回切换其它 App）`);
-    if(first.fatal){
-      genState.log.push({t:"warn", s:`一次生成失败，自动拆分为每批 ${CHUNK} 个重试…`});
-      for(let i = 0; i < ids.length; i += CHUNK){
-        const batch = ids.slice(i, i + CHUNK);
-        await runBatch(batch, `正在生成第 ${Math.floor(i / CHUNK) + 1} 批（${batch.length} 个 App）…`);
-      }
-    }
-  }else{
-    await runBatch(ids, `正在生成 ${ids.length} 个 App…（可返回切换其它 App）`);
-  }
+  await runBatch(ids, `正在一次生成 ${ids.length} 个 App…（可返回切换其它 App）`);
 
   genState.running = false;
   hideGenToast();

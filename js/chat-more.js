@@ -78,11 +78,17 @@
             icon: '<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
             color: '#32ADE6'
         },
+        {
+            id: 'takeover',
+            label: '接管手机',
+            icon: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>',
+            color: '#FF3B30'
+        },
     ];
 
-    // 「接管手机 / 反查」「看屏幕 / 屏幕共享」入口统一收进「查手机 → 设置」，
-    // 聊天加号菜单不再重复出现（这里同时过滤掉老用户数据库里已保存的旧项）。
-    const REMOVED_MENU_IDS = ['listen-accept', 'listen-end', 'screenshare', 'takeover'];
+    // 「接管手机」重新放回聊天加号菜单；
+    // 「看屏幕 / 屏幕共享」只在电脑端可用，保留在「查手机 → 设置」里，不进加号菜单，这里过滤掉。
+    const REMOVED_MENU_IDS = ['listen-accept', 'listen-end', 'screenshare'];
 
     // ===== IndexedDB 操作 =====
     const DB_NAME = 'nano_chat_menu_db';

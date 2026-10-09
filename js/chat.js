@@ -1148,12 +1148,60 @@
     }
 
     // ===== 头像栏持久化 + 统一裁成方图（修「存不住 / 不适配」）=====
+    // 头像图片体积大，localStorage 很容易被聊天记录占满，导致「换到第三张就存不住、
+    // 前面几张又被打回旧值」。这里改用 IndexedDB 做真正的主存储，容量足够放 4 张头像；
+    // localStorage 只在放得下时镜像一份，作为兼容旧数据 / 快速首屏。
     const AVATAR_BAR_KEY = 'nano_avatar_bar';
-    function readAvatarBar() {
+    const AVATAR_BAR_DB = 'NanoAvatarBarDB';
+    const AVATAR_BAR_STORE = 'bar';
+    let avatarBarCache = [];
+    let avatarBarDirty = false;   // 用户本次已改过：异步回读的旧数据不再覆盖
+
+    function readAvatarBarLocal() {
         try { const a = JSON.parse(localStorage.getItem(AVATAR_BAR_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
     }
+    function avatarBarOpenDB() {
+        return new Promise(function (resolve, reject) {
+            try {
+                const req = indexedDB.open(AVATAR_BAR_DB, 1);
+                req.onupgradeneeded = function (e) {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(AVATAR_BAR_STORE)) db.createObjectStore(AVATAR_BAR_STORE, { keyPath: 'id' });
+                };
+                req.onsuccess = function (e) { resolve(e.target.result); };
+                req.onerror = function (e) { reject(e.target.error); };
+            } catch (e) { reject(e); }
+        });
+    }
+    function avatarBarReadIDB() {
+        return avatarBarOpenDB().then(function (db) {
+            return new Promise(function (resolve) {
+                try {
+                    const g = db.transaction(AVATAR_BAR_STORE, 'readonly').objectStore(AVATAR_BAR_STORE).get('bar');
+                    g.onsuccess = function () { resolve((g.result && g.result.value) || []); };
+                    g.onerror = function () { resolve([]); };
+                } catch (e) { resolve([]); }
+            });
+        }).catch(function () { return []; });
+    }
+    function avatarBarWriteIDB(arr) {
+        return avatarBarOpenDB().then(function (db) {
+            return new Promise(function (resolve) {
+                try {
+                    const tx = db.transaction(AVATAR_BAR_STORE, 'readwrite');
+                    tx.objectStore(AVATAR_BAR_STORE).put({ id: 'bar', value: arr });
+                    tx.oncomplete = function () { resolve(); };
+                    tx.onerror = function () { resolve(); };
+                } catch (e) { resolve(); }
+            });
+        }).catch(function () {});
+    }
+    function readAvatarBar() { return avatarBarCache; }
     function writeAvatarBar(arr) {
-        try { localStorage.setItem(AVATAR_BAR_KEY, JSON.stringify(arr)); } catch (e) {}
+        avatarBarCache = Array.isArray(arr) ? arr : [];
+        avatarBarDirty = true;
+        try { avatarBarWriteIDB(avatarBarCache); } catch (e) {}
+        try { localStorage.setItem(AVATAR_BAR_KEY, JSON.stringify(avatarBarCache)); } catch (e) {}
     }
     function renderAvatarSlot(item, value) {
         if (!item) return;
@@ -1168,7 +1216,7 @@
     }
     function setAvatarSlot(index, value) {
         if (isNaN(index)) return;
-        const arr = readAvatarBar();
+        const arr = readAvatarBar().slice();
         arr[index] = value;
         writeAvatarBar(arr);
         renderAvatarSlot(document.querySelector('.avatar-item[data-index="' + index + '"]'), value);
@@ -1204,18 +1252,26 @@
             try { reader.readAsDataURL(file); } catch (e) { finish(null); }
         });
     }
-    // 载入 / 回到前台 / 其他页面改动时恢复照片墙
+    // 渲染照片墙（只读内存缓存，避免异步回读时把刚换好的图覆盖回去）
     function hydrateAvatarBar() {
-        const arr = readAvatarBar();
         document.querySelectorAll('.avatar-item:not(.avatar-add)').forEach(function (item) {
             const idx = parseInt(item.dataset.index, 10);
-            if (!isNaN(idx)) renderAvatarSlot(item, arr[idx] || '');
+            if (!isNaN(idx)) renderAvatarSlot(item, avatarBarCache[idx] || '');
         });
     }
+    // 先用旧版 localStorage 数据快速渲染，再以 IndexedDB 的正式数据为准
+    avatarBarCache = readAvatarBarLocal();
     hydrateAvatarBar();
+    avatarBarReadIDB().then(function (arr) {
+        if (avatarBarDirty) return;   // 用户已经改过：以用户操作为准，别用旧数据覆盖
+        if (Array.isArray(arr) && arr.length) {
+            avatarBarCache = arr;
+            hydrateAvatarBar();
+        } else if (avatarBarCache.length) {
+            avatarBarWriteIDB(avatarBarCache);   // 首次：把旧版 localStorage 数据迁移进 IndexedDB
+        }
+    });
     window.addEventListener('pageshow', hydrateAvatarBar);
-    window.addEventListener('focus', hydrateAvatarBar);
-    window.addEventListener('storage', function (e) { if (!e.key || e.key === AVATAR_BAR_KEY) hydrateAvatarBar(); });
 
     // 打开系统相册：常驻一个挂在 body 上的隐藏 input 复用，
     // 避免「临时创建 + 未入 DOM + 点一下」在部分手机浏览器上无效。
