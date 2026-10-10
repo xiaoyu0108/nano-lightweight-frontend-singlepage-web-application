@@ -169,9 +169,9 @@
                 + presets.map(function (p, i) { return '<option value="' + i + '">' + esc(p.name || ('预设' + (i + 1))) + '</option>'; }).join('')
                 + '</select><button class="naf-icon gray" id="nafDel" title="删除预设">' + SVG_TRASH + '</button></div>'
                 + '<div class="naf-sec">调节</div>'
-                + '<div class="naf-row"><label>头像</label><input id="nafAvSize" type="range" min="' + avRange.min + '" max="' + avRange.max + '" step="1" value="' + avNow + '"><span class="val" id="nafAvSizeVal">' + avNow + 'px</span></div>'
+                + '<div class="naf-row"><label>头像大小</label><input id="nafAvSize" type="range" min="' + avRange.min + '" max="' + avRange.max + '" step="1" value="' + avNow + '"><span class="val" id="nafAvSizeVal">' + avNow + 'px</span></div>'
                 + '<div class="naf-row"><label>框大小</label><input id="nafSize" type="range" min="60" max="220" step="5" value="' + getSize(scope) + '"><span class="val" id="nafSizeVal">' + getSize(scope) + '%</span></div>'
-                + '<div class="naf-row"><label>方圆</label><input id="nafRadius" type="range" min="0" max="50" step="1" value="' + getRadius(scope) + '"><span class="val" id="nafRadiusVal">' + getRadius(scope) + '%</span></div>'
+                + '<div class="naf-row"><label>头像方圆</label><input id="nafRadius" type="range" min="0" max="50" step="1" value="' + getRadius(scope) + '"><span class="val" id="nafRadiusVal">' + getRadius(scope) + '%</span></div>'
                 + '<div style="display:flex;gap:10px;margin-top:16px">'
                 + '<button id="nafClear" style="flex:1;height:44px;border:0;border-radius:12px;background:#f2f2f7;font-size:14px;font-weight:600;cursor:pointer">清除</button>'
                 + '<button id="nafApply" style="flex:1;height:44px;border:0;border-radius:12px;background:linear-gradient(135deg,#ff6aa8,#ff4d94);color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(255,77,148,.28)">应用</button></div>'

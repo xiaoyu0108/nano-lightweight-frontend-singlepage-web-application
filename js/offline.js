@@ -210,6 +210,26 @@ function newTheater(name) {
   return id;
 }
 function isTheaterScene(s) { return String(s || offlineScene).indexOf('theater') === 0; }
+
+// 线下存档（多开剧情）：story=主线（默认，第一份存档）；story:<sid>=之后新开的线下存档
+// 每份存档各自独立的聊天记录，可随时切换，都计入记忆。
+function _storyKey() { return 'offline_stories_' + (offlineChatId || 'none'); }
+function loadStories() { try { return JSON.parse(localStorage.getItem(_storyKey()) || '[]') || []; } catch (e) { return []; } }
+function saveStories(list) { try { localStorage.setItem(_storyKey(), JSON.stringify(list || [])); } catch (e) {} }
+function storyName(sid) {
+  if (sid === 'story') return '主线';
+  var t = loadStories().find(function (x) { return x.id === sid; });
+  return t ? t.name : '存档';
+}
+function newStory(name) {
+  var list = loadStories();
+  var id = 'st_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+  list.push({ id: id, name: name || ('线下存档 ' + (list.length + 1)), ts: Date.now() });
+  saveStories(list);
+  return 'story:' + id;
+}
+function isStoryScene(s) { s = String(s || offlineScene); return s === 'story' || s.indexOf('story:') === 0; }
+function storySidOf(s) { s = String(s || offlineScene); return s === 'story' ? 'story' : s.slice(6); }
 try {
   const _s = localStorage.getItem(SCENE_KEY);
   if (_s === 'theater') {
@@ -328,6 +348,340 @@ function findGroupMember(name) {
   return found;
 }
 
+// ============================================================
+// 2.6 酒馆开场白（角色卡 first_mes / alternate_greetings）
+// 进入线下第一个页面（剧情）时，若角色卡自带开场白，
+// 先让用户选择：用某条开场白进入 / 新增一条 / 空白进入 / 去小剧场。
+// 没有开场白的角色直接进入，不做任何拦截。
+// ============================================================
+let charGreetings = [];
+let charRecordCache = null;
+let openingPickerDismissed = false;
+
+function offCharDB() {
+  return new Promise(function (resolve) {
+    try {
+      const req = indexedDB.open('nano_characters_db', 1);
+      req.onupgradeneeded = function (e) {
+        try { const d = e.target.result; if (!d.objectStoreNames.contains('characters')) d.createObjectStore('characters', { keyPath: 'id' }); } catch (err) {}
+      };
+      req.onsuccess = function (e) { resolve(e.target.result); };
+      req.onerror = function () { resolve(null); };
+    } catch (e) { resolve(null); }
+  });
+}
+
+async function loadCharGreetings() {
+  charGreetings = [];
+  charRecordCache = null;
+  if (!offlineChatId) return;
+  const db = await offCharDB();
+  if (!db) return;
+  charRecordCache = await new Promise(function (resolve) {
+    try {
+      const g = db.transaction('characters', 'readonly').objectStore('characters').get(offlineChatId);
+      g.onsuccess = function () { resolve(g.result || null); };
+      g.onerror = function () { resolve(null); };
+    } catch (e) { resolve(null); }
+  });
+  if (charRecordCache && Array.isArray(charRecordCache.greetings)) {
+    charGreetings = charRecordCache.greetings
+      .filter(function (s) { return typeof s === 'string' && s.trim(); })
+      .map(function (s) { return s.trim(); });
+  }
+}
+
+// 把新开场白写回角色卡，下次进入仍可选
+function saveCharGreetings(list) {
+  charGreetings = (list || [])
+    .filter(function (s) { return typeof s === 'string' && s.trim(); })
+    .map(function (s) { return s.trim(); });
+  if (!offlineChatId) return;
+  offCharDB().then(function (db) {
+    if (!db) return;
+    try {
+      const tx = db.transaction('characters', 'readwrite');
+      const store = tx.objectStore('characters');
+      const g = store.get(offlineChatId);
+      g.onsuccess = function () {
+        const rec = g.result;
+        if (!rec) return;
+        rec.greetings = charGreetings.slice();
+        store.put(rec);
+      };
+    } catch (e) {}
+  }).catch(function () {});
+}
+
+// 替换开场白里的 {{char}} / {{user}}
+function fillOpening(text) {
+  return String(text == null ? '' : text)
+    .replace(/\{\{\s*char\s*\}\}/gi, settings.charName || '')
+    .replace(/\{\{\s*user\s*\}\}/gi, settings.userName || '');
+}
+
+function appendOpeningToStory(content) {
+  const text = String(content || '').trim();
+  if (!text) return;
+  const scene = isStoryScene(offlineScene) ? offlineScene : 'story';
+  messages.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    chatId: offlineChatId || '',
+    scene: scene,
+    role: 'assistant',
+    name: settings.charName,
+    avatar: settings.charAvatar,
+    content: text,
+    heart: '',
+    thinking: '',
+    plots: [],
+    isOpening: true,
+    showHeart: false,
+    showThinking: false,
+    selected: false
+  });
+  saveMessages(messages);
+  render();
+  requestAnimationFrame(function () { chat.scrollTop = chat.scrollHeight; });
+}
+
+// 用某条开场白作为剧情的第一条消息
+function startStoryWithOpening(text) {
+  const content = fillOpening(text);
+  if (!content.trim()) return;
+  if (!isStoryScene(offlineScene)) {
+    offlineScene = 'story';
+    try { localStorage.setItem(SCENE_KEY, 'story'); } catch (e) {}
+    updateSceneTabs();
+    getMessages().then(function (ms) { messages = ms || []; appendOpeningToStory(content); });
+    return;
+  }
+  appendOpeningToStory(content);
+}
+
+// 换（切换）开场白：第一条是开场白则替换，否则插到最前面
+function switchStoryOpening(text) {
+  const content = fillOpening(text);
+  if (!content.trim()) return;
+  if (!isStoryScene(offlineScene)) {
+    offlineScene = 'story';
+    try { localStorage.setItem(SCENE_KEY, 'story'); } catch (e) {}
+    updateSceneTabs();
+    getMessages().then(function (ms) { messages = ms || []; switchStoryOpening(text); });
+    return;
+  }
+  let idx = -1;
+  for (let i = 0; i < messages.length; i++) { if (messages[i] && messages[i].isOpening) { idx = i; break; } }
+  if (idx >= 0) {
+    messages[idx].content = content;
+    messages[idx].isOpening = true;
+    messages[idx].heart = '';
+    messages[idx].thinking = '';
+    messages[idx].plots = [];
+  } else {
+    messages.unshift({
+      id: Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      chatId: offlineChatId || '',
+      scene: offlineScene,
+      role: 'assistant',
+      name: settings.charName,
+      avatar: settings.charAvatar,
+      content: content,
+      heart: '',
+      thinking: '',
+      plots: [],
+      isOpening: true,
+      showHeart: false,
+      showThinking: false,
+      selected: false
+    });
+  }
+  saveMessages(messages);
+  render();
+}
+
+function openOpeningPicker(opts) {
+  opts = opts || {};
+  const switchMode = opts.mode === 'switch';
+  const old = document.getElementById('openingPicker');
+  if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'openingPicker';
+  ov.className = 'tp-mask';
+  const rows = charGreetings.map(function (g, i) {
+    return '<button class="op-row" data-open="' + i + '">'
+      + '<span class="op-idx">开场白 ' + (i + 1) + '</span>'
+      + '<span class="op-text">' + escapeHTML(openingPreview(g)) + '</span></button>';
+  }).join('');
+  const pick = switchMode ? switchStoryOpening : startStoryWithOpening;
+  ov.innerHTML = '<div class="tp-sheet">'
+    + '<div class="tp-head">' + (switchMode ? '换开场白' : '选择开场白 · 进入剧情') + '</div>'
+    + '<div class="tp-sub">' + (switchMode
+        ? '选一段开场白替换当前剧情的开场（不会动其它楼层），也可以新增一条。'
+        : '这张角色卡带有开场白。选一段直接开始剧情，也可以新增开场白、空白开始，或去小剧场。') + '</div>'
+    + '<div class="op-list">' + (rows || '<div class="tp-empty">还没有开场白，点下面新增一条吧</div>') + '</div>'
+    + '<div class="op-new-wrap" hidden>'
+    + '<textarea class="op-new-text" placeholder="在这里写一段开场白…"></textarea>'
+    + '<div class="op-new-actions"><button class="tp-mini op-new-cancel">返回</button><button class="tp-new op-new-ok">' + (switchMode ? '确定并替换' : '确定并进入') + '</button></div>'
+    + '</div>'
+    + '<div class="tp-actions op-actions"><button class="tp-new op-add">＋ 新增开场白</button></div>'
+    + '<div class="tp-actions op-actions2"><button class="tp-cancel op-blank">' + (switchMode ? '取消' : '空白进入剧情') + '</button>'
+    + (switchMode ? '' : '<button class="tp-cancel op-theater">小剧场</button>') + '</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  const close = function () { ov.remove(); };
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+
+  ov.querySelectorAll('[data-open]').forEach(function (b) {
+    b.onclick = function () {
+      const i = parseInt(this.getAttribute('data-open'), 10);
+      const t = charGreetings[i];
+      openingPickerDismissed = true;
+      close();
+      if (t) pick(t);
+    };
+  });
+
+  const newWrap = ov.querySelector('.op-new-wrap');
+  const list = ov.querySelector('.op-list');
+  const actions1 = ov.querySelector('.op-actions');
+  const actions2 = ov.querySelector('.op-actions2');
+  const ta = ov.querySelector('.op-new-text');
+  if (list) list.hidden = false;
+  ov.querySelector('.op-add').onclick = function () {
+    if (newWrap) newWrap.hidden = false;
+    if (list) list.hidden = true;
+    if (actions1) actions1.hidden = true;
+    if (actions2) actions2.hidden = true;
+    setTimeout(function () { try { ta.focus(); } catch (e) {} }, 40);
+  };
+  ov.querySelector('.op-new-cancel').onclick = function () {
+    if (newWrap) newWrap.hidden = true;
+    if (list) list.hidden = false;
+    if (actions1) actions1.hidden = false;
+    if (actions2) actions2.hidden = false;
+  };
+  ov.querySelector('.op-new-ok').onclick = function () {
+    const raw = (ta.value || '').trim();
+    if (!raw) { showToast('开场白不能为空'); return; }
+    if (charGreetings.indexOf(raw) === -1) { charGreetings.push(raw); saveCharGreetings(charGreetings); }
+    openingPickerDismissed = true;
+    close();
+    pick(raw);
+  };
+  ov.querySelector('.op-blank').onclick = function () { openingPickerDismissed = true; close(); };
+  const th = ov.querySelector('.op-theater');
+  if (th) th.onclick = function () { close(); openTheaterPicker(); };
+}
+
+function maybeShowOpeningPicker() {
+  if (OFFLINE_PREVIEW || offlineIsGroup) return;
+  if (!isStoryScene(offlineScene)) return;
+  if (isReplying) return;
+  if (messages.length) return;
+  if (openingPickerDismissed) return;
+  if (!charGreetings.length) return;
+  if (document.getElementById('openingPicker')) return;
+  openOpeningPicker();
+}
+
+// ============================================================
+// 2.7 世界书（线下读取：全局 / 单人；不读「线上」专用）
+// ============================================================
+const WB_LOCAL_KEY = 'nano_worldbook_data_v5';
+let offWorldbooks = [];
+function offNormalizeWorldbook(f) {
+  if (!f) return null;
+  const entries = Array.isArray(f.entries) ? f.entries : [];
+  const content = typeof f.content === 'string' ? f.content : '';
+  let list = entries.filter(e => e && e.content && String(e.content).trim());
+  if (!list.length && content && content.trim()) {
+    list = [{ title: f.name || '', keywords: '', keywordEnabled: false, permanent: true, content: content, position: (f.position === 'front' ? 'before_char' : (f.position === 'back' ? 'after_chat' : 'after_char')) }];
+  }
+  if (!list.length) return null;
+  return { id: f.id, name: f.name || '未命名', group: f.group || '', scope: (f.scope === 'offline' ? 'global' : (f.scope || 'global')), boundCharacters: Array.isArray(f.boundCharacters) ? f.boundCharacters : [], entries: list };
+}
+function offLoadWorldbooks() {
+  return new Promise(function (resolve) {
+    try {
+      const raw = localStorage.getItem(WB_LOCAL_KEY);
+      if (raw) { const d = JSON.parse(raw); if (d && Array.isArray(d.files)) offWorldbooks = d.files.map(offNormalizeWorldbook).filter(Boolean); }
+    } catch (e) {}
+    try {
+      const req = indexedDB.open('nano_worldbook_db', 1);
+      req.onupgradeneeded = function (e) { try { const db = e.target.result; if (!db.objectStoreNames.contains('worldbook_data')) db.createObjectStore('worldbook_data', { keyPath: 'key' }); } catch (err) {} };
+      req.onsuccess = function (e) {
+        try {
+          const db = e.target.result;
+          const r = db.transaction('worldbook_data', 'readonly').objectStore('worldbook_data').get('data');
+          r.onsuccess = function () {
+            const d = r.result ? r.result.value : null;
+            if (d && Array.isArray(d.files)) { offWorldbooks = d.files.map(offNormalizeWorldbook).filter(Boolean); try { localStorage.setItem(WB_LOCAL_KEY, JSON.stringify(d)); } catch (err) {} }
+            resolve();
+          };
+          r.onerror = function () { resolve(); };
+        } catch (err) { resolve(); }
+      };
+      req.onerror = function () { resolve(); };
+    } catch (e) { resolve(); }
+  });
+}
+function offRecentChatText() {
+  const parts = [];
+  for (let i = messages.length - 1; i >= 0 && parts.length < 80; i--) {
+    const m = messages[i];
+    if (!m || !m.content) continue;
+    const t = String(m.content).trim();
+    if (t) parts.unshift(t);
+  }
+  return parts.join('\n');
+}
+function offEntryHit(entry, recentText) {
+  const kw = (entry.keywords || '').trim();
+  if (!kw) return false;
+  const lower = recentText.toLowerCase();
+  return kw.split(/[,，、；\s]+/).filter(Boolean).some(function (k) { return k && lower.indexOf(k.toLowerCase()) > -1; });
+}
+function offShouldIncludeEntry(entry, recentText) {
+  if (entry.enabled === false) return false;
+  if (!entry.content || !String(entry.content).trim()) return false;
+  if (entry.permanent === true) return true;
+  if (entry.keywordEnabled !== false) { if (!(entry.keywords || '').trim()) return true; return offEntryHit(entry, recentText); }
+  return true;
+}
+function offGetWorldbookText() {
+  if (!offWorldbooks.length) return { front: '', middle: '', back: '' };
+  const rec = charRecordCache || {};
+  const idCandidates = [offlineChatId, rec.id, rec.name, settings.charName].filter(Boolean).map(String);
+  const bindIds = {};
+  try { (rec.worldbookBindings || []).forEach(function (b) { if (b && b.id) bindIds[String(b.id)] = true; }); } catch (e) {}
+  const recentText = offRecentChatText();
+  const front = [], middle = [], back = [];
+  offWorldbooks.forEach(function (w) {
+    if (!w) return;
+    const scope = w.scope || 'global';
+    if (scope === 'online') return;   // 线上专用，线下不读
+    if (scope === 'local') {
+      const hit = bindIds[String(w.id)] || (w.boundCharacters || []).some(function (b) { return idCandidates.indexOf(String(b)) > -1; });
+      if (!hit) return;
+    }
+    w.entries.forEach(function (en) {
+      if (!offShouldIncludeEntry(en, recentText)) return;
+      const pos = en.position || 'after_char';
+      const text = (en.title ? '【' + en.title + '】\n' : '') + String(en.content || '').trim();
+      if (pos === 'before_char') front.push(text);
+      else if (pos === 'after_chat') back.push(text);
+      else middle.push(text);
+    });
+  });
+  return {
+    front: front.length ? '\n\n【世界书 · 关键设定】\n' + front.join('\n\n') : '',
+    middle: middle.length ? '\n\n【世界书】\n' + middle.join('\n\n') : '',
+    back: back.length ? '\n\n【世界书 · 补充】\n' + back.join('\n\n') : ''
+  };
+}
+
+
 // 设置强制生效：规则 / 文风 / 思维链 / 字数 / 人称 / 用户行动预测 必须逐条读取并遵守
 function settingsComplianceInstruction() {
   return '【设置必读 · 强制生效】动笔前，必须逐条读取并严格遵守下面给出的全部设置：【额外规则】【文风偏好】【思维链预设】【字数要求】【人称要求】【用户行动预测】。这些是硬性要求，优先级高于任何通用写作习惯与默认风格；不得忽略、不得打折、不得只当参考，也不得以“自行发挥”为由跳过。输出前先自查一遍：是否满足了每一条设置？';
@@ -413,7 +767,11 @@ function buildGroupOfflinePrompt() {
   const cotInstruction = settings.cot ? ('思维链预设（COT，必须遵守，覆盖对 [thinking:] 的长度限制）：\n' + settings.cot + '\n请先严格按此预设思考，并把完整思考过程写入末尾的 [thinking:...] 段落中（可多行、可详细），然后再输出正文。\n') : '';
   p += '\n' + styleInstruction + wordInstruction + personInstruction + predictInstruction + cotInstruction;
   p += '\n【禁止】禁止解释规则、跳出角色、插入免责声明、评价自己的回答。只输出正文。\n';
-  p += '\n【每条回复末尾必须附带下面三段（供后台读取，不会展示给用户），都放在正文之后、独占的段落里】\n';
+  p += '\n【一次性输出 · 同一次回复里必须写全四样】\n';
+  p += '- 在同一次回复里，依次输出：①正文 ②[thinking:…] ③[heart:…] ④[plot:…]。四样一次给全、缺一不可，绝不分次生成、绝不省略、绝不只输出正文。\n';
+  p += '- 即便正文很长，也必须在正文写完后，把三段附带内容完整写完再停，不要因为正文写完就收尾。\n';
+  p += '- 三段都放在正文之后、各自独占段落；正文里不要出现这些标记。\n';
+  p += '\n【附带的三个段落（供后台读取，不会展示给用户）】\n';
   p += '[thinking:按思维链预设给出的思考摘要]\n';
   p += '[heart:此刻的一句心理状态，第一人称、简短自然、像心里闪过的一个念头；严禁"小姑娘/小东西/丫头/女人/低吼/揉碎/你是我的/逃不掉/我接住你/乖"等霸道油腻词汇，也严禁"过来让我抱一下/让我抱抱/抱一下/亲一下/摸摸头"这类撒娇求抱话术]\n';
   p += '[plot:剧情走向1\n剧情走向2\n剧情走向3\n剧情走向4\n剧情走向5]\n';
@@ -495,6 +853,79 @@ function parseContent(text) {
 }
 
 // ============================================================
+// 4.5 酒馆式富文本：HTML / 状态栏 / 模板代码
+//   开启「渲染 HTML」时按 HTML 展示状态栏等美化；关闭时把标签/模板代码剥掉，
+//   只留下可读文字，绝不让 <div>、<StatusPlaceHolderImpl/> 这类代码直接显示出来。
+// ============================================================
+function looksLikeMarkup(s) {
+  return /<\/?[a-zA-Z][^>]*>/.test(String(s || ''));
+}
+// 清掉酒馆模板宏（{{char}}/{{user}} 已替换；这里清掉 {{getvar::…}} 之类残留，避免显示成代码）
+function stripStrayMacros(s) {
+  return String(s == null ? '' : s)
+    .replace(/\{\{\s*char\s*\}\}/gi, settings.charName || '')
+    .replace(/\{\{\s*user\s*\}\}/gi, settings.userName || '')
+    .replace(/\{\{[^{}]{0,160}\}\}/g, '');
+}
+// 卡片里的状态栏 HTML 常被存成转义形式（&lt;div&gt;）；渲染前先还原，否则检测不到标签
+function decodeHtmlEntities(s) {
+  try { const ta = document.createElement('textarea'); ta.innerHTML = String(s == null ? '' : s); return ta.value; } catch (e) { return String(s == null ? '' : s); }
+}
+function maybeDecodeMarkup(s) {
+  const t = String(s == null ? '' : s);
+  if (/&lt;\/?[a-zA-Z]/i.test(t) || /&#\d+;|&#x[0-9a-f]+;/i.test(t)) {
+    const d = decodeHtmlEntities(t);
+    if (looksLikeMarkup(d)) return d;
+  }
+  return t;
+}
+// 去掉状态栏 / 面板 / 属性块（连同里面的文字一起不解析），其余标签转成纯文字
+function stripCardMarkup(s) {
+  let t = String(s == null ? '' : s);
+  // HTML 实体先还原，否则会看到 &lt;div&gt; 这种
+  if (/&(?:lt|gt|amp|quot|#\d+|#x[0-9a-f]+);/i.test(t)) {
+    try { const ta = document.createElement('textarea'); ta.innerHTML = t; t = ta.value; } catch (e) {}
+  }
+  // 卡片/开场白里的元信息注释（<!-- title: … -->、<!-- desc: … --> 等）一律去掉
+  t = t.replace(/<!--[\s\S]*?-->/g, '');
+  // 行内标记块（无 HTML 时也可能存在）：[状态栏]…[/状态栏]
+  t = t.replace(/[\[【]\s*(?:状态栏|status|面板|属性|数值|面板信息)\s*[\]】][\s\S]*?[\[【]\s*\/\s*(?:状态栏|status|面板|属性|数值|面板信息)\s*[\]】]/gi, '');
+  t = t.replace(/<\s*\/?\s*(?:StatusPlaceHolderImpl|StatusPlaceholder|status_?bar|vars|variable)\b[^>]*>/gi, '');
+  if (!looksLikeMarkup(t)) return t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  try {
+    // 先把块级闭合标签换成换行，保留段落
+    t = t.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(?:p|div|li|h[1-6]|tr|section|article|ul|ol|details|summary|table)>/gi, '\n');
+    const tmp = document.createElement('div');
+    tmp.innerHTML = t;
+    tmp.querySelectorAll('script,style,link,meta,iframe,object,embed,audio,video,noscript,details,summary,template').forEach(function (n) { n.remove(); });
+    // 整个丢掉状态栏 / 面板 / 属性 / 变量块（连同文字）
+    tmp.querySelectorAll('*').forEach(function (el) {
+      const sig = ((el.tagName || '') + ' ' + (el.getAttribute('class') || '') + ' ' + (el.getAttribute('id') || '') + ' ' + (el.getAttribute('data-type') || '')).toLowerCase();
+      if (/(status|状态|hud|面板|属性|好感|数值|stats?|state|stat[-_]?bar|statuspanel|statspanel|status[-_]?wrap|bar[-_]?wrap|mes[-_]?status|st[-_]?panel)/.test(sig)) el.remove();
+    });
+    let text = tmp.textContent || '';
+    return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  } catch (e) {
+    return t.replace(/<[^>]*>/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+}
+// 渲染消息正文：一律剥掉 HTML / 状态栏 / 模板代码，只保留可读正文
+function renderOfflineContent(text) {
+  let s = String(text == null ? '' : text);
+  if (!s) return '';
+  s = maybeDecodeMarkup(stripStrayMacros(s));
+  return parseContent(stripCardMarkup(s));
+}
+// 开场白在列表里的预览：始终去掉代码，只给人看文字
+function openingPreview(text) {
+  const t = stripCardMarkup(maybeDecodeMarkup(stripStrayMacros(fillOpening(text))));
+  return t
+    .replace(/^[\s\u3000]*[\[【]\s*(?:环境|心理|对话|动作|内心|旁白|思考)\s*[\]】]\s*/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// ============================================================
 // 5. 渲染
 // ============================================================
 function updateTopTitle() {
@@ -502,6 +933,8 @@ function updateTopTitle() {
   if (isTheaterScene()) {
     const tn = theaterName(offlineScene.slice(8)) || '小剧场';
     topTitle.textContent = name + ' · ' + tn;
+  } else if (isStoryScene(offlineScene) && offlineScene !== 'story') {
+    topTitle.textContent = name + ' · ' + storyName(storySidOf(offlineScene));
   } else {
     topTitle.textContent = name;
   }
@@ -553,9 +986,9 @@ function render() {
     const displayName = m.name || (m.role === 'user' ? settings.userName : settings.charName);
 
     const isChar = (m.role === 'assistant' || m.role === 'char');
-    const showPlot = isChar && m.content && m.content.length > 3;
+    const showPlot = isChar && !m.isOpening && m.content && m.content.length > 3;
 
-    const parsedContent = parseContent(m.content || '');
+    const parsedContent = renderOfflineContent(m.content || '');
 
     card.innerHTML = `
       <div class="message-head">
@@ -681,7 +1114,10 @@ async function loadPlotsForMessage(i, container) {
   if (!plots.length) {
     buttons.forEach(b => b.textContent = '（本条回复没有一起生成剧情走向）');
   } else {
-    plots.forEach((text, idx) => { if (buttons[idx]) buttons[idx].textContent = text; });
+    buttons.forEach((b, idx) => {
+      if (idx < plots.length) { b.style.display = ''; b.textContent = plots[idx]; }
+      else { b.style.display = 'none'; }
+    });
   }
   container.dataset.loaded = '1';
 }
@@ -853,7 +1289,7 @@ if (backBtnEl) {
 function offHasPendingMem() {
   try {
     var count = parseInt(localStorage.getItem(offMemCountKey()) || '0', 10) || 0;
-    var rel = messages.filter(function (m) { return (m.role === 'user' || m.role === 'assistant') && (m.scene || 'story') === 'story'; });
+    var rel = messages.filter(function (m) { return (m.role === 'user' || m.role === 'assistant') && isStoryScene(m.scene || 'story'); });
     return rel.length > count;
   } catch (e) { return false; }
 }
@@ -1029,9 +1465,79 @@ async function switchScene(scene) {
   selectMode = false;
   deleteTarget = null;
   showAllMessages = false;
+  openingPickerDismissed = false;
   updateSceneTabs();
   messages = await getMessages();
   render();
+  try { maybeShowOpeningPicker(); } catch (e) {}
+}
+
+// ===== 线下存档：新开一份线下 / 切换回之前聊过的 =====
+function newOfflineStory() {
+  let nm = null;
+  try { nm = window.prompt('给这份线下存档起个名字（可留空，默认「线下存档 N」）', ''); } catch (e) {}
+  if (nm === null) return;   // 取消
+  const scene = newStory(nm && nm.trim() ? nm.trim() : undefined);
+  switchScene(scene);   // 切到新存档（空剧情，会自动弹出开场白选择）
+}
+function openStorySessions() {
+  const old = document.getElementById('storyPicker');
+  if (old) old.remove();
+  const curSid = isStoryScene(offlineScene) ? storySidOf(offlineScene) : '';
+  const list = loadStories();
+  function row(id, name, active, custom) {
+    return '<div class="tp-row' + (active ? ' active' : '') + '">'
+      + '<button class="tp-open" data-open="' + id + '">' + _tpEsc(name) + '</button>'
+      + (custom ? '<button class="tp-mini" data-rename="' + id + '">改名</button>'
+                + '<button class="tp-mini tp-danger" data-del="' + id + '">删除</button>' : '')
+      + '</div>';
+  }
+  let rows = row('story', '主线', curSid === 'story', false);
+  rows += list.map(function (t) { return row(t.id, t.name, curSid === t.id, true); }).join('');
+  const ov = document.createElement('div');
+  ov.id = 'storyPicker';
+  ov.className = 'tp-mask';
+  ov.innerHTML = '<div class="tp-sheet">'
+    + '<div class="tp-head">线下存档</div>'
+    + '<div class="tp-sub">每一份存档各自独立（不同开场白 / 不同剧情），可随时切换，也都会计入记忆。</div>'
+    + '<div class="tp-list">' + rows + '</div>'
+    + '<div class="tp-actions"><button class="tp-new">＋ 新开线下</button><button class="tp-cancel">取消</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+  ov.querySelector('.tp-cancel').onclick = function () { ov.remove(); };
+  ov.querySelector('.tp-new').onclick = function () { ov.remove(); newOfflineStory(); };
+  ov.querySelectorAll('[data-open]').forEach(function (b) {
+    b.onclick = function () {
+      const sid = this.getAttribute('data-open');
+      ov.remove();
+      const scene = sid === 'story' ? 'story' : ('story:' + sid);
+      if (scene !== offlineScene) switchScene(scene);
+    };
+  });
+  ov.querySelectorAll('[data-rename]').forEach(function (b) {
+    b.onclick = function () {
+      const sid = this.getAttribute('data-rename');
+      const l2 = loadStories(); const t = l2.find(function (x) { return x.id === sid; });
+      let nm = null; try { nm = window.prompt('重命名线下存档', t ? t.name : ''); } catch (e) {}
+      if (nm && nm.trim() && t) { t.name = nm.trim(); saveStories(l2); if (storySidOf(offlineScene) === sid) updateTopTitle(); openStorySessions(); }
+    };
+  });
+  ov.querySelectorAll('[data-del]').forEach(function (b) {
+    b.onclick = function () {
+      const sid = this.getAttribute('data-del');
+      if (!window.confirm('删除这份线下存档？其中的聊天记录会一起删除。')) return;
+      saveStories(loadStories().filter(function (x) { return x.id !== sid; }));
+      deleteTheaterMessages('story:' + sid);
+      if (storySidOf(offlineScene) === sid) {
+        offlineScene = 'story';
+        try { localStorage.setItem(SCENE_KEY, 'story'); } catch (e) {}
+      }
+      openStorySessions();
+      updateSceneTabs();
+      getMessages().then(function (ms) { messages = ms || []; render(); });
+    };
+  });
 }
 
 (function bindSceneTabs() {
@@ -1040,7 +1546,7 @@ async function switchScene(scene) {
   tabs.querySelectorAll('.scene-tab').forEach(b => {
     b.addEventListener('click', function () {
       if (this.dataset.scene === 'theater') openTheaterPicker();
-      else switchScene('story');
+      else { switchScene('story'); try { maybeShowOpeningPicker(); } catch (e) {} }
     });
   });
   updateSceneTabs();
@@ -1069,8 +1575,8 @@ function extractMeta(content) {
       if (p.key === 'heart' && !heart) heart = mm[1].trim();
       if (p.key === 'thinking' && !thinking) thinking = mm[1].trim();
       if (p.key === 'plots') {
-        const arr = mm[1].split('\n').map(s => s.trim()).map(s => s.replace(/^[-*\d.\s、)]+/, '')).filter(s => s && s.length >= 6);
-        if (arr.length >= 5) plots = arr.slice(0, 5);
+        const arr = mm[1].split('\n').map(s => s.trim()).map(s => s.replace(/^[-*\d.\s、)]+/, '')).filter(s => s && s.length >= 4);
+        if (arr.length) plots = arr.slice(0, 5);
       }
     }
   });
@@ -1129,7 +1635,7 @@ function addMessage(role, content, extra = {}) {
       }
     }
   } catch (e) {}
-  if ((role === 'assistant' || role === 'char') && offlineChatId && offlineScene === 'story') {
+  if ((role === 'assistant' || role === 'char') && offlineChatId && isStoryScene(offlineScene)) {
     scheduleOfflineMem();
   }
 }
@@ -1255,7 +1761,12 @@ async function callMainAPI(history) {
 
 请用这种风格生成 {{char}} 的回复。只输出正文，不解释、不评价。
 
-【每条回复末尾必须附带下面三段（供后台读取，不会展示给用户），都放在正文之后、独占的段落里】
+【一次性输出 · 同一次回复里必须写全四样】
+- 在同一次回复里，依次输出：①正文 ②[thinking:…] ③[heart:…] ④[plot:…]。四样一次给全、缺一不可，绝不分次生成、绝不省略、绝不只输出正文。
+- 即便正文很长，也必须在正文写完后，把 thinking / heart / plot 三段附带内容完整写完再停，不要因为正文写完就收尾。
+- 三段都放在正文之后、各自独占段落；正文里不要出现这些标记，也不要用它们做小标题。
+
+【附带的三个段落（供后台读取，不会展示给用户）】
 [thinking:一行简洁的底层思考过程摘要，说明你为什么这样回，不要长]
 [heart:此刻的一句心理状态，第一人称、简短自然、像心里闪过的一个念头；严禁"小姑娘/小东西/丫头/女人/低吼/揉碎/你是我的/逃不掉/我接住你/乖"等霸道油腻词汇，不写占有欲和露骨暗示；也严禁"过来让我抱一下/让我抱抱/抱一下/亲一下/摸摸头"这类撒娇求抱话术]
 [plot:剧情走向1
@@ -1328,6 +1839,17 @@ async function callMainAPI(history) {
     const mainKey = String(apiConfig.mainKey || '').trim();
     const mainModel = apiConfig.mainModel || 'gpt-3.5-turbo';
 
+    // 兼容部分 API 不接受首条消息为 assistant：把开头的角色开场白并入系统提示，
+    // 其余历史保持原样（正常对话首条是 user，这段逻辑不产生任何改动）。
+    let leadingOpening = '';
+    let firstUserIdx = 0;
+    while (firstUserIdx < history.length && history[firstUserIdx].role !== 'user') {
+      const c = String(history[firstUserIdx].content || '').trim();
+      if (c) leadingOpening += (leadingOpening ? '\n\n' : '') + c;
+      firstUserIdx++;
+    }
+    if (firstUserIdx > 0) history = history.slice(firstUserIdx);
+
     const userMessages = history.filter(m => m.role === 'user').map(m => m.content);
     const lastUserMsg = userMessages[userMessages.length - 1] || '';
     const chatText = history.map(h => h.content).join('\n');
@@ -1351,23 +1873,33 @@ async function callMainAPI(history) {
       const raw = localStorage.getItem('chat_messages_' + offlineChatId);
       if (raw) {
         const arr = JSON.parse(raw);
-        const recent = (Array.isArray(arr) ? arr : []).slice(-20).map(function (m) {
-          var txt = String((m && m.text) || '').trim();
-          if (!txt) return '';
-          var who = (m.type === 'right') ? (settings.userName || '用户') : (settings.charName || '角色');
-          return who + '：' + txt;
-        }).filter(Boolean);
-        if (recent.length) onlineBlock = '【线上最近的对话（进入线下前，供衔接）】\n' + recent.join('\n') + '\n\n';
+        const src = Array.isArray(arr) ? arr : [];
+        // 读取线上最近「2 轮完整对话」（各取最近 2 条 user + 2 条 char），保证线上线下衔接完整
+        const rounds = 2;
+        const picked = [];
+        let users = 0, chars = 0;
+        for (let i = src.length - 1; i >= 0 && (users < rounds || chars < rounds); i--) {
+          const m = src[i];
+          const txt = String((m && m.text) || '').trim();
+          if (!txt) continue;
+          const isUser = m.type === 'right';
+          if (isUser) { if (users < rounds) { picked.unshift((settings.userName || '用户') + '：' + txt); users++; } }
+          else { if (chars < rounds) { picked.unshift((settings.charName || '角色') + '：' + txt); chars++; } }
+        }
+        if (picked.length) onlineBlock = '【线上最近 ' + rounds + ' 轮完整对话（进入线下前，供衔接与延续）】\n' + picked.join('\n') + '\n\n';
       }
     } catch (e) {}
 
-    const systemPromptStr = memBlock + onlineBlock + (offlineIsGroup
+    const openingBlock = leadingOpening ? ('【已发生的开场（角色已经说过的内容，请顺着它继续，不要重复）】\n' + leadingOpening + '\n\n') : '';
+    let wb = { front: '', middle: '', back: '' };
+    try { if (!offlineIsGroup) wb = offGetWorldbookText(); } catch (e) {}
+    const systemPromptStr = wb.front + memBlock + onlineBlock + openingBlock + (offlineIsGroup
       ? (buildGroupOfflinePrompt() + (rules.length
           ? ('\n\n【额外规则 · 强制遵守】\n' + rules.map((r, i) => `${i + 1}. ${r}`).join('\n'))
           : ''))
       : systemPrompt
           .replace(/{{char}}/g, settings.charName)
-          .replace(/{{user}}/g, settings.userName || '对方'));
+          .replace(/{{user}}/g, settings.userName || '对方')) + wb.middle + wb.back;
     const promptStr = systemPromptStr + '\n\n' + chatText;
 
     // 线下长文按「目标字数」估算输出 token：中文约 1.8 token/字，再加思维链/心声/剧情选项的余量。
@@ -1379,9 +1911,11 @@ async function callMainAPI(history) {
       // 用户在「线下设置 → 输出上限」里手动指定
       offlineMaxTokens = Math.min(Math.max(wantTokens, 1024), 32768);
     } else {
-      offlineMaxTokens = Math.ceil(wantChars * 1.8) + 1600;
-      offlineMaxTokens = Math.max(4096, offlineMaxTokens);
-      offlineMaxTokens = Math.min(offlineMaxTokens, 16384);
+      // 正文按目标字数估算，再为思维链 / 心声 / 5 条剧情走向预留余量；
+      // 下限提到 8192，避免模型正文还没写完附带的三段就被 max_tokens 截断。
+      offlineMaxTokens = Math.ceil(wantChars * 1.8) + 2600;
+      offlineMaxTokens = Math.max(8192, offlineMaxTokens);
+      offlineMaxTokens = Math.min(offlineMaxTokens, 32768);
     }
 
     const body = {
@@ -1494,13 +2028,14 @@ function omUpdateAvatar() {
 
 const omBuiltinItems = [
   { id: 'reroll', label: '重roll', icon: '<svg viewBox="0 0 24 24"><path d="M19 8a7.5 7.5 0 0 0-13.5-1.9L4 8.5"/><path d="M4 5v3.5h3.5"/><path d="M5 16a7.5 7.5 0 0 0 13.5 1.9l1.5-2.4"/><path d="M20 19v-3.5h-3.5"/></svg>', run: function () { doReroll(); } },
+  { id: 'opening', label: '换开场白', icon: '<svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>', run: function () { openOpeningPicker({ mode: 'switch' }); } },
+  { id: 'stories', label: '存档', icon: '<svg viewBox="0 0 24 24"><path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1z"/></svg>', run: function () { openStorySessions(); } },
   { id: 'tidy', label: '整理楼层', icon: '<svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h7"/><path d="M16 14l2 2 3-3"/></svg>', run: function () { omOpenTidy(); } },
   { id: 'floors', label: '楼层预览', icon: '<svg viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>', run: function () { omOpenFloors(); } },
   { id: 'roundTop', label: '回本轮顶部', icon: '<svg viewBox="0 0 24 24"><path d="M12 4v9"/><path d="M8 8l4-4 4 4"/><path d="M5 20h14"/></svg>', run: function () { omScrollToRoundTop(); } },
   { id: 'top', label: '回顶', icon: '<svg viewBox="0 0 24 24"><path d="M12 19V6"/><path d="m6 12 6-6 6 6"/></svg>', run: function () { chat.scrollTo({ top: 0, behavior: 'smooth' }); } },
   { id: 'bottom', label: '回底', icon: '<svg viewBox="0 0 24 24"><path d="M12 5v13"/><path d="m18 12-6 6-6-6"/></svg>', run: function () { chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' }); } },
-  { id: 'clearCss', label: '清空美化', icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 4.6L18 8l-4.3 1.4L12 14l-1.7-4.6L6 8l4.3-1.4L12 2z"/><path d="M19 13l.9 2.4L22 16l-2.1.6L19 19l-.9-2.4L16 16l2.1-.6L19 13z"/><path d="M5 14l.7 1.9L7.5 16l-1.8.5L5 18.5l-.7-2L2.5 16l1.8-.1L5 14z"/></svg>', run: function () { omClearBeautify(); } },
-  { id: 'clearFrame', label: '清空头像框', icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3 7.5 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2.5L15 3H9zm3 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/></svg>', run: function () { omClearFrame(); } }
+  { id: 'beautify', label: '美化', icon: '<svg viewBox="0 0 24 24"><path d="M12 2l2.1 7.4L22 12l-7.9 2.6L12 22l-2.1-7.4L2 12l7.9-2.6z"/></svg>', run: function () { omOpenBeautifyMenu(); } }
 ];
 
 function omAddExtra(item) {
@@ -1624,7 +2159,7 @@ async function omRunTidy(ov, fromEl, toEl, delEl) {
   const lo = from - 1, hi = to - 1;
   const picked = [];
   messages.forEach(function (m, i) {
-    if (i >= lo && i <= hi && m && (m.role === 'user' || m.role === 'assistant') && (m.scene || 'story') === 'story') picked.push({ m: m, i: i });
+    if (i >= lo && i <= hi && m && (m.role === 'user' || m.role === 'assistant') && isStoryScene(m.scene || 'story')) picked.push({ m: m, i: i });
   });
   if (!picked.length) { omToast('这个范围里没有可总结的剧情'); return; }
   const btn = document.getElementById('omTidyRun');
@@ -1641,7 +2176,7 @@ async function omRunTidy(ov, fromEl, toEl, delEl) {
       picked.forEach(function (o) { delSet[o.i] = 1; });
       const minAbs = Math.min.apply(null, picked.map(function (o) { return o.i; }));
       const relBefore = messages.filter(function (m, i) {
-        return i < minAbs && m && (m.role === 'user' || m.role === 'assistant') && (m.scene || 'story') === 'story';
+        return i < minAbs && m && (m.role === 'user' || m.role === 'assistant') && isStoryScene(m.scene || 'story');
       }).length;
       const kept = messages.filter(function (m, i) { return !delSet[i]; });
       messages.length = 0;
@@ -1681,6 +2216,106 @@ async function omClearBeautify() {
 function omClearFrame() {
   try { if (window.NanoAvatarFrame) { NanoAvatarFrame.set('offline', ''); NanoAvatarFrame.apply('offline'); } } catch (e) {}
   showToast('已清空头像框');
+}
+
+// ===== 头像菜单 → 美化弹窗：切换美化预设 / 切换头像框预设 / 还原美化 / 还原头像框 =====
+function omSaveCustomCss(css) {
+  settings.customCSS = String(css || '');
+  let tag = document.getElementById('offline-custom-css');
+  if (!tag) { tag = document.createElement('style'); tag.id = 'offline-custom-css'; document.head.appendChild(tag); }
+  tag.textContent = settings.customCSS;
+  try {
+    openDB().then(function (db) {
+      try {
+        const tx = db.transaction(SETTINGS_STORE, 'readwrite');
+        const store = tx.objectStore(SETTINGS_STORE);
+        const g = store.get('main_settings');
+        g.onsuccess = function () { const rec = g.result || { id: 'main_settings' }; rec.customCSS = settings.customCSS; store.put(rec); };
+      } catch (e) {}
+    }).catch(function () {});
+  } catch (e) {}
+  try { window.parent.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {}
+}
+function omReadCssPresets() {
+  return openDB().then(function (db) {
+    return new Promise(function (resolve) {
+      try {
+        const r = db.transaction('cssPresets', 'readonly').objectStore('cssPresets').get('css_presets');
+        r.onsuccess = function () { resolve((r.result && r.result.presets) || []); };
+        r.onerror = function () { resolve([]); };
+      } catch (e) { resolve([]); }
+    });
+  }).catch(function () { return []; });
+}
+function omOpenBeautifyMenu() {
+  const old = document.getElementById('omBeautify'); if (old) old.remove();
+  const tabBtn = function (id, label) { return '<button class="om-tab" data-tab="' + id + '" style="flex:1;height:38px;border:0;background:transparent;border-radius:10px;font-size:14px;font-weight:700;color:#9a8b8d;cursor:pointer">' + label + '</button>'; };
+  const selStyle = 'width:100%;height:44px;border:1px solid #eadfe1;border-radius:12px;padding:0 12px;font-size:14px;background:#faf5f5;color:#4a3f40;outline:none';
+  const resetStyle = 'width:100%;height:42px;margin-top:12px;border:0;border-radius:12px;background:#f1e6e8;color:#8b7a7c;font-size:14px;font-weight:600;cursor:pointer';
+  const ov = document.createElement('div'); ov.id = 'omBeautify'; ov.className = 'om-modal open';
+  ov.innerHTML = '<div class="om-card"><div class="om-card-head">美化</div>'
+    + '<div style="display:flex;gap:6px;background:#f3eaec;border-radius:12px;padding:4px;margin:0 4px 14px">' + tabBtn('css', '美化') + tabBtn('frame', '头像框') + '</div>'
+    + '<div style="padding:2px 6px">'
+    +   '<div data-pane="css"><select id="omCssPresetSel" style="' + selStyle + '"><option value="">选择美化预设…</option></select><button id="omCssReset" style="' + resetStyle + '">还原美化</button></div>'
+    +   '<div data-pane="frame" style="display:none"><select id="omFramePresetSel" style="' + selStyle + '"><option value="">选择头像框预设…</option></select><button id="omFrameReset" style="' + resetStyle + '">还原头像框</button></div>'
+    + '</div>'
+    + '<div class="om-card-foot"><button class="om-close" id="omBeautifyClose">关闭</button></div></div>';
+  document.body.appendChild(ov);
+  const setTab = function (id) {
+    ov.querySelectorAll('.om-tab').forEach(function (b) {
+      const on = b.getAttribute('data-tab') === id;
+      b.style.background = on ? '#fff' : 'transparent';
+      b.style.color = on ? '#4a3f40' : '#9a8b8d';
+      b.style.boxShadow = on ? '0 2px 8px rgba(0,0,0,.08)' : 'none';
+    });
+    ov.querySelectorAll('[data-pane]').forEach(function (p) { p.style.display = (p.getAttribute('data-pane') === id) ? '' : 'none'; });
+  };
+  setTab('css');
+  ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+  ov.querySelector('#omBeautifyClose').onclick = function () { ov.remove(); };
+  ov.querySelectorAll('.om-tab').forEach(function (b) { b.onclick = function () { setTab(this.getAttribute('data-tab')); }; });
+
+  // 美化 tab：预设下拉 + 还原
+  const cssSel = ov.querySelector('#omCssPresetSel');
+  omReadCssPresets().then(function (presets) {
+    presets.forEach(function (p, i) {
+      const o = document.createElement('option');
+      o.value = String(i); o.textContent = p.name || ('预设 ' + (i + 1));
+      cssSel.appendChild(o);
+    });
+    const cur = String(settings.customCSS || '');
+    if (cur) presets.forEach(function (p, i) { if (!cssSel.value && String(p.content || '') === cur) cssSel.value = String(i); });
+  });
+  cssSel.onchange = function () {
+    if (this.value === '') return;
+    const idx = parseInt(this.value, 10);
+    omReadCssPresets().then(function (presets) {
+      const p = presets[idx];
+      if (!p) return;
+      omSaveCustomCss(p.content || '');
+      showToast('已切换美化预设');
+    });
+  };
+  ov.querySelector('#omCssReset').onclick = function () { omClearBeautify(); cssSel.value = ''; };
+
+  // 头像框 tab：预设下拉 + 还原
+  const frameSel = ov.querySelector('#omFramePresetSel');
+  let framePresets = [];
+  try { framePresets = (window.NanoAvatarFrame && NanoAvatarFrame.getPresets()) || []; } catch (e) {}
+  framePresets.forEach(function (p, i) {
+    const o = document.createElement('option');
+    o.value = String(i); o.textContent = p.name || ('头像框 ' + (i + 1));
+    frameSel.appendChild(o);
+  });
+  try { const curUrl = window.NanoAvatarFrame ? NanoAvatarFrame.get('offline') : ''; if (curUrl) framePresets.forEach(function (p, i) { if (p.url === curUrl) frameSel.value = String(i); }); } catch (e) {}
+  frameSel.onchange = function () {
+    if (this.value === '') return;
+    const p = framePresets[parseInt(this.value, 10)];
+    if (!p || !p.url) return;
+    try { NanoAvatarFrame.set('offline', p.url); NanoAvatarFrame.apply('offline'); } catch (e) {}
+    showToast('已切换头像框');
+  };
+  ov.querySelector('#omFrameReset').onclick = function () { omClearFrame(); frameSel.value = ''; };
 }
 
 function omScrollToFloor(idx) {
@@ -1785,7 +2420,12 @@ sendBtn.onclick = send;
 // 15A. 线下记忆：把 offline 对话也总结进共享记忆库(nano_vector_memory_db / memlist_<chatId>)
 // ============================================================
 const OFF_MEM_BUSY = { v: false };
-function offMemCountKey() { return 'offline_mem_count_' + (offlineChatId || 'none'); }
+// 记忆进度按「存档」分别记录：主线沿用旧键，其它线下存档各记一份
+function offMemCountKey(scene) {
+  var s = scene || offlineScene;
+  var base = 'offline_mem_count_' + (offlineChatId || 'none');
+  return s === 'story' ? base : (base + '_' + s);
+}
 
 function offMemOpen() {
   return new Promise(function(resolve, reject) {
@@ -1850,19 +2490,32 @@ async function offExtractViaMain(chatText) {
   if (!/\/v1$/i.test(url)) url += '/v1';
   const key = String(cfg.mainKey || '').trim();
   const model = cfg.mainModel || 'gpt-3.5-turbo';
-  const prompt = '你是记忆提取助手。下面是某角色与用户的一段对话（可能是线下长文记录）。提取其中值得长期记住的信息：重要事件、约定、喜好、称呼、关系进展、双方说过的重要话。要求具体、像人记住的事实，每条 40~200 字，尽量把细节、原因与后续影响都写清楚；只输出若干条记忆，一行一条，不要编号、不要解释、不要输出对话原文。\n\n对话：\n' + chatText;
+  const prompt = '你是记忆提取助手。下面是某角色与用户的一段对话（可能是线下长文记录）。请挑出真正值得长期记住的信息：重要事件、约定与承诺、关键关系进展、称呼与喜好的变化、双方说过的重要话与关键决定。要求：\n'
+    + '- 只保留有长期价值的关键点，合并同类，删掉寒暄、日常口水话和没有后续影响的小事；\n'
+    + '- 每条具体、像人记住的一件事实，40~160 字，写清人物、经过与影响；\n'
+    + '- 最多 5 条，宁缺毋滥；确实没有值得记的就什么都不要输出；\n'
+    + '- 一行一条，不要编号、不要解释、不要照抄对话原文。\n\n对话：\n' + chatText;
   const resp = await fetch(url + '/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: model, messages: [{ role: 'user', content: prompt }],         max_tokens: 6000, temperature: 0.6, stream: false })
+      body: JSON.stringify({ model: model, messages: [{ role: 'user', content: prompt }],         max_tokens: 3000, temperature: 0.6, stream: false })
   });
   if (!resp.ok) return '';
   const data = await resp.json();
   return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
 }
-// 线下记忆：把总结出的条目转成记忆卡。若配置了 Embedding API，则顺手做向量化（向量记忆）。
+// 线下记忆：把总结出的条目转成记忆卡。总结只调用一次主模型；
+// 向量化允许多次调用（Embedding 模型通常免费），这里逐条向量化，兼容性更好。
 async function offBuildMemoryEntries(summary, chatId) {
-  const items = String(summary || '').split('\n').map(l => l.trim()).map(l => l.replace(/^[-*\d.\s、)]+/, '')).filter(l => l && l.length >= 6);
+  let items = String(summary || '').split('\n').map(l => l.trim()).map(l => l.replace(/^[-*\d.\s、)]+/, '')).filter(l => l && l.length >= 6);
+  const seen = {};
+  items = items.filter(function (t) {
+    const k = t.slice(0, 40);
+    if (seen[k]) return false;
+    seen[k] = 1;
+    return true;
+  }).slice(0, 6);
+  if (!items.length) return [];
   return await Promise.all(items.map(async function (t) {
     const entry = { id: 'om' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), time: new Date().toLocaleString('zh-CN'), type: '长期记忆', chatId: chatId, content: t, embedding: null, hasVector: false };
     try {
@@ -1899,6 +2552,28 @@ async function offEmbed(text) {
     return (data.data && data.data[0] && data.data[0].embedding) || null;
   } catch (e) { return null; }
 }
+// 批量向量化：一次请求把多条记忆一起 embedding，减少 API 调用
+async function offEmbedMany(texts) {
+  const arr = Array.isArray(texts) ? texts : [];
+  if (!arr.length) return [];
+  const cfg = await offEmbConfig();
+  if (!cfg) return arr.map(function () { return null; });
+  try {
+    const resp = await fetch(cfg.url + '/embeddings', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + cfg.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: cfg.model, input: arr, encoding_format: 'float' })
+    });
+    if (!resp.ok) return arr.map(function () { return null; });
+    const data = await resp.json();
+    const out = arr.map(function () { return null; });
+    (data.data || []).forEach(function (d, i) {
+      const idx = (typeof d.index === 'number') ? d.index : i;
+      if (idx >= 0 && idx < out.length) out[idx] = d.embedding || null;
+    });
+    return out;
+  } catch (e) { return arr.map(function () { return null; }); }
+}
 
 // 通用：把一段文本（可能跨多个楼层）一次性总结成记忆并入库。返回写入条数。
 async function summarizeTextToMemory(chatText, chatId) {
@@ -1922,13 +2597,13 @@ async function summarizeTextToMemory(chatText, chatId) {
 async function summarizeOfflineMemories(force) {
   if (!offlineChatId || OFF_MEM_BUSY.v) return;
   // 小剧场（番外）不计入记忆
-  if (offlineScene !== 'story') return;
+  if (!isStoryScene(offlineScene)) return;
   // 自动总结开关关闭时，自动触发跳过；force（退出线下时）不受开关和条数阈值限制
   if (!force && settings.autoSummary === false) return;
   OFF_MEM_BUSY.v = true;
   try {
     const count = parseInt(localStorage.getItem(offMemCountKey()) || '0', 10) || 0;
-    const rel = messages.filter(m => (m.role === 'user' || m.role === 'assistant') && (m.scene || 'story') === 'story');
+    const rel = messages.filter(m => (m.role === 'user' || m.role === 'assistant') && isStoryScene(m.scene || 'story'));
     if (count >= rel.length) return;
     const seg = rel.slice(count);
     const threshold = parseInt(settings.memThreshold || localStorage.getItem('offline_mem_threshold') || '5', 10) || 5;
@@ -1977,6 +2652,8 @@ async function init() {
   const dbSettings = await loadSettingsFromDB();
   settings = { ...dbSettings, userName: settings.userName || dbSettings.userName, charName: settings.charName || dbSettings.charName, userAvatar: settings.userAvatar || dbSettings.userAvatar, charAvatar: settings.charAvatar || dbSettings.charAvatar };
   try { applyBackgroundImage(settings.bgImage); } catch (e) {}
+  try { await loadCharGreetings(); } catch (e) { charGreetings = []; }
+  try { await offLoadWorldbooks(); } catch (e) { offWorldbooks = []; }
 
   let stored = await getMessages();
   if ((!stored || !stored.length) && offlineScene === 'story') {
@@ -2041,9 +2718,12 @@ async function init() {
   } catch (e) {}
 
   // 首次进入：把历史未总结的线下对话补进共享记忆（小剧场不计入）
-  if (offlineChatId && offlineScene === 'story') {
+  if (offlineChatId && isStoryScene(offlineScene)) {
     setTimeout(function() { summarizeOfflineMemories(); }, 3000);
   }
+
+  // 剧情第一页：有开场白就先让用户选择进入方式
+  try { maybeShowOpeningPicker(); } catch (e) {}
 }
 
 // ============================================================

@@ -70,7 +70,7 @@
             </button>
         </section>
         <div class="section-footer">
-            导出全部数据：IndexedDB、localStorage、sessionStorage、缓存。JSON 可读，ZIP 含二进制。
+            导出全部数据：IndexedDB、localStorage、sessionStorage。日常备份推荐用 <b>JSON</b>（可读、最稳、不依赖网络）；<b>ZIP</b> 体积更小、含二进制，但需要 JSZip（已内置，联网时也可回退 CDN）。
         </div>
 
         <!-- ================= 单个角色 ================= -->
@@ -175,8 +175,17 @@
         </div>
     </div>
 
-    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="js/backup.js?v=20261008d"></script>
+    <!-- ================= 进度弹层 ================= -->
+    <div class="progress-overlay" id="progressOverlay">
+        <div class="progress-card">
+            <div class="progress-title" id="progressTitle">正在处理…</div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text" id="progressText">准备中…</div>
+        </div>
+    </div>
+
+    <script defer src="js/jszip.min.js"></script>
+    <script src="js/backup.js?v=20261010b"></script>
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>
 </body>

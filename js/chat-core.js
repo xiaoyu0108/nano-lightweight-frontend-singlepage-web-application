@@ -300,10 +300,13 @@
         allWorldbooks.forEach(function(w) {
             if (!w) return;
             const scope = w.scope || 'global';
+            const boundList = Array.isArray(w.boundCharacters) ? w.boundCharacters : [];
+            const boundHit = bindIds[String(w.id)] ||
+                boundList.some(function(b) { return idCandidates.indexOf(String(b)) !== -1; });
             if (scope === 'local') {
-                const boundHit = bindIds[String(w.id)] ||
-                    w.boundCharacters.some(function(b) { return idCandidates.indexOf(String(b)) !== -1; });
-                if (!boundHit) return;
+                if (!boundHit) return;                       // 单人：必须命中绑定角色
+            } else if (scope === 'online') {
+                if (boundList.length && !boundHit) return;   // 线上：选了角色就按角色过滤，未选＝全部
             }
             w.entries.forEach(function(en) {
                 if (!shouldIncludeEntry(en, recentText)) return;

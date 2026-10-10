@@ -341,13 +341,25 @@
         return new Promise(function(resolve) {
             const img = new Image();
             img.onload = function() {
-                let w = img.width, h = img.height;
-                if (w > maxWidth) { h = h * (maxWidth / w); w = maxWidth; }
-                if (h > maxHeight) { w = w * (maxHeight / h); h = maxHeight; }
+                // 头像一律裁成正方形（取中心 4:4 区域），避免 9:16 竖图在圆头像里被压扁/露半张脸
+                let sx = 0, sy = 0, sw = img.width, sh = img.height;
+                let outW, outH;
+                if (maxWidth === maxHeight) {
+                    const side = Math.min(img.width, img.height);
+                    sx = (img.width - side) / 2;
+                    sy = (img.height - side) / 2;
+                    sw = sh = side;
+                    outW = outH = Math.min(maxWidth, side) || side;
+                } else {
+                    outW = sw; outH = sh;
+                    if (outW > maxWidth) { outH = outH * (maxWidth / outW); outW = maxWidth; }
+                    if (outH > maxHeight) { outW = outW * (maxHeight / outH); outH = maxHeight; }
+                }
                 const canvas = document.createElement('canvas');
-                canvas.width = w; canvas.height = h;
+                canvas.width = Math.max(1, Math.round(outW));
+                canvas.height = Math.max(1, Math.round(outH));
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
                 resolve(canvas.toDataURL('image/jpeg', quality || 0.7));
             };
             img.src = dataUrl;
@@ -516,24 +528,40 @@
         return null;
     }
 
+    function cardGreetingScore(parsed) {
+        try {
+            const data = (parsed && parsed.data) ? parsed.data : parsed;
+            if (!data || typeof data !== 'object') return -1;
+            const first = data.first_mes || data.first_message || data.firstMessage || data.greeting || '';
+            const alt = data.alternate_greetings || data.alternateGreetings || data.greetings || [];
+            const altLen = Array.isArray(alt) ? alt.length : 0;
+            return (first ? 10 : 0) + altLen * 3 + (data.name ? 2 : 0) + (data.description || data.personality ? 1 : 0);
+        } catch (e) { return -1; }
+    }
+
     function parseCardDataFromChunks(chunks) {
-        const priorityKeys = ['chara', 'character', 'ccv3', 'card', 'data', 'json', 'chub', 'character_card', 'character_card_v3'];
+        const priorityKeys = ['ccv3', 'character_card_v3', 'chara', 'character', 'card', 'data', 'json', 'chub', 'character_card'];
         const candidates = [];
         priorityKeys.forEach(k => { if (chunks[k]) candidates.push(chunks[k]); });
         Object.keys(chunks).forEach(k => {
             if (!priorityKeys.includes(k) && chunks[k] && chunks[k].length > 20) candidates.push(chunks[k]);
         });
+        // 多个候选（如同时有 V2 的 chara 与 V3 的 ccv3）时，取信息最全、开场白最多的那一份
+        let best = null, bestScore = -1;
         for (const rawStr of candidates) {
             const parsed = parseLooseJson(rawStr);
-            if (parsed) return parsed;
+            if (!parsed) continue;
+            const score = cardGreetingScore(parsed);
+            if (score > bestScore) { bestScore = score; best = parsed; }
         }
-        return null;
+        return best;
     }
 
     function parseCardData(json) {
         let name = '', gender = '男', nationality = '未知', setting = '';
         let matchedWorldbooks = [];
         let embeddedWorldbook = null;
+        let greetings = [];
         try {
             const dataObj = json.data || json;
             name = dataObj.name || dataObj.nickname || dataObj.char_name || dataObj.character_name || dataObj.characterName || json.name || json.nickname || '';
@@ -542,7 +570,14 @@
             const desc = dataObj.description || dataObj.desc || dataObj.persona || '';
             const personality = dataObj.personality || '';
             const scenario = dataObj.scenario || dataObj.world || '';
-            const firstMsg = dataObj.first_mes || dataObj.first_message || dataObj.firstMessage || dataObj.greeting || '';
+            const firstMsg = dataObj.first_mes || dataObj.first_message || dataObj.firstMessage || dataObj.greeting || dataObj.char_greeting || dataObj.firstGreeting || '';
+            const altRaw = dataObj.alternate_greetings || dataObj.alternateGreetings || dataObj.alternate_greeting || dataObj.alternateGreeting || dataObj.greetings || dataObj.greeting_list || [];
+            (Array.isArray(firstMsg) ? firstMsg : [firstMsg])
+                .concat(Array.isArray(altRaw) ? altRaw : (typeof altRaw === 'string' ? [altRaw] : []))
+                .forEach(function(g) {
+                    const t = (typeof g === 'string') ? g.trim() : '';
+                    if (t && greetings.indexOf(t) === -1) greetings.push(t);
+                });
             const mesExample = dataObj.mes_example || dataObj.mesExample || dataObj.example_dialogue || dataObj.exampleMessage || '';
             let settingParts = [];
             if (desc) settingParts.push("【外貌与基本设定】\n" + desc);
@@ -592,7 +627,7 @@
         } catch(e) {
             console.error('Parse error:', e);
         }
-        return { name, gender, nationality, setting, matchedWorldbooks, embeddedWorldbook };
+        return { name, gender, nationality, setting, greetings, matchedWorldbooks, embeddedWorldbook };
     }
 
     // ===== 酒馆世界书 entries → 本项目 v5 世界书条目 =====
@@ -692,6 +727,7 @@
     let selectedIds = new Set();
     let editingId = null;
     let tempAvatar = '';
+    let tempGreetings = [];
     let worldbookBindings = [];
 
     // ===== DOM 引用 =====
@@ -886,6 +922,7 @@
             inputSetting.value = item.setting || '';
             inputBindUser.value = item.bindUser || '';
             worldbookBindings = (item.worldbookBindings || []).map(w => ({ ...w }));
+            tempGreetings = Array.isArray(item.greetings) ? item.greetings.slice() : [];
             editSave.textContent = '保存';
         } else {
             editTitle.textContent = '新增角色';
@@ -898,6 +935,7 @@
             const curUser = getCurrentUser();
             inputBindUser.value = curUser ? curUser.id : '';
             worldbookBindings = [];
+            tempGreetings = [];
             editSave.textContent = '添加';
         }
         updateAvatarPreview();
@@ -938,12 +976,12 @@
     function populateWorldbookSelect() {
         if (!worldbookSelect) return;
         worldbookSelect.innerHTML = '<option value="">选择世界书...</option>';
-        // 只显示局部绑定的世界书
-        const localBooks = allWorldbooks.filter(w => w.scope === 'local');
+        // 显示所有「非全局」的世界书（单人 / 线上），方便绑定到具体角色
+        const localBooks = allWorldbooks.filter(w => (w.scope || 'global') !== 'global');
         if (localBooks.length === 0) {
             const opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = '暂无局部绑定的世界书';
+            opt.textContent = '暂无可绑定的世界书（全局世界书无需绑定）';
             opt.disabled = true;
             worldbookSelect.appendChild(opt);
         } else {
@@ -962,7 +1000,7 @@
         if (!groupSelect) return;
         const groups = {};
         allWorldbooks.forEach(w => {
-            if (w.group && w.scope === 'local') {
+            if (w.group && (w.scope || 'global') !== 'global') {
                 if (!groups[w.group]) groups[w.group] = [];
                 groups[w.group].push(w);
             }
@@ -989,7 +1027,7 @@
             const data = await readWorldbookData();
             if (!data || !Array.isArray(data.files)) return;
             const file = data.files.find(f => f.id === worldbookId);
-            if (!file || (file.scope || 'global') !== 'local') return;
+            if (!file || (file.scope || 'global') === 'global') return;
             if (!Array.isArray(file.boundCharacters)) file.boundCharacters = [];
             if (add) {
                 if (!file.boundCharacters.includes(charId)) file.boundCharacters.push(charId);
@@ -1055,6 +1093,7 @@
             bindUser,
             isNpc: existingItem ? !!existingItem.isNpc : false,
             nanoAssistant: existingItem ? !!existingItem.nanoAssistant : false,
+            greetings: tempGreetings.slice(),
             worldbookBindings: worldbookBindings.map(w => ({ ...w }))
         };
 
@@ -1367,6 +1406,7 @@
                     if (parsedC.gender) inputGender.value = parsedC.gender;
                     if (parsedC.nationality) inputNationality.value = parsedC.nationality;
                     if (parsedC.setting) inputSetting.value = parsedC.setting;
+                    tempGreetings = Array.isArray(parsedC.greetings) ? parsedC.greetings.slice() : [];
                     if (parsedC.embeddedWorldbook && parsedC.embeddedWorldbook.entries && parsedC.embeddedWorldbook.entries.length) {
                         importEmbeddedWorldbook(parsedC.embeddedWorldbook).then(function(wb) {
                             if (wb && !worldbookBindings.some(w => w.id === wb.id)) { worldbookBindings.push({ id: wb.id, group: wb.group || '' }); renderWorldbookList(); }
@@ -1404,6 +1444,7 @@
                     if (parsed.gender) inputGender.value = parsed.gender;
                     if (parsed.nationality) inputNationality.value = parsed.nationality;
                     if (parsed.setting) inputSetting.value = parsed.setting;
+                    tempGreetings = Array.isArray(parsed.greetings) ? parsed.greetings.slice() : [];
                     tempAvatar = compressedAvatar;
                     updateAvatarPreview();
 
@@ -1468,10 +1509,10 @@
                 showInfo('提示', '请先选择分组');
                 return;
             }
-            // 找到该分组下所有局部绑定的世界书
-            const books = allWorldbooks.filter(w => w.group === group && w.scope === 'local');
+            // 找到该分组下所有非全局的世界书（单人 / 线上）
+            const books = allWorldbooks.filter(w => w.group === group && (w.scope || 'global') !== 'global');
             if (books.length === 0) {
-                showInfo('提示', '该分组下没有局部绑定的世界书');
+                showInfo('提示', '该分组下没有可绑定的世界书');
                 return;
             }
             let added = 0;

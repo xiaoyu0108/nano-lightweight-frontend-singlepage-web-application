@@ -1075,6 +1075,10 @@
             } catch (e) {}
             return false;
         }
+        // 仅 iOS 保留顶部安全留白；其它平台默认不留白
+        function isIOSDevice() {
+            try { return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); } catch (e) { return false; }
+        }
         function applyTopInset() {
             var custom = NaN;
             try { custom = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
@@ -1082,11 +1086,11 @@
                 var val;
                 if (topInsetEnabled() && isFinite(custom) && custom >= 0) {
                     val = custom + 'px';                         // 用户自定义，优先
-                } else if (isStandalonePWA()) {
-                    // 已安装全屏 PWA：env 报 0 时兜底 48px（刚好越过灵动岛），报得再大也夹到 54px
+                } else if (isStandalonePWA() && isIOSDevice()) {
+                    // 已安装全屏 PWA（iOS）：env 报 0 时兜底 48px（刚好越过灵动岛），报得再大也夹到 54px
                     val = 'max(min(env(safe-area-inset-top, 0px), 54px), 48px)';
                 } else {
-                    // 普通浏览器 / 未全屏：直接用浏览器给的真实安全区（通常为 0），不凭空加一条空白
+                    // 普通浏览器 / 非 iOS：直接用浏览器给的真实安全区（通常为 0），不凭空加一条空白
                     val = 'env(safe-area-inset-top, 0px)';
                 }
                 document.documentElement.style.setProperty('--safe-inset-top', val);
@@ -1437,8 +1441,8 @@
                 try { _customTop = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
                 if (isFinite(_customTop) && _customTop >= 0) { top = _customTop; }
                 else if (top > 0) { top = Math.min(top, 54); }                 // 真实安全区（全屏 PWA）→ 直接用，封顶 54
-                else if (topInsetEnabled() && isStandalonePWA()) { top = 48; }  // 全屏 PWA 却报 0 → 兜底 48
-                else { top = 0; }                                              // 非全屏 / 无安全区 → 0，不凭空留白
+                else if (topInsetEnabled() && isStandalonePWA() && isIOSDevice()) { top = 48; }  // 全屏 PWA(iOS) 却报 0 → 兜底 48
+                else { top = 0; }                                              // 非全屏 / 非 iOS / 无安全区 → 0，不凭空留白
                 return { top: top, bottom: bottom };
             } catch (e) { return { top: 0, bottom: 0 }; }
         }
@@ -1493,7 +1497,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-06-06';
+        var BUILD = 'nano-2026-10-10-01';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {

@@ -102,15 +102,6 @@
     });
   });
 
-  var dotsBox = document.getElementById('dots');
-  if (dotsBox) {
-    cards.forEach(function (_, i) {
-      var d = document.createElement('span');
-      d.className = 'dot' + (i === 0 ? ' active' : '');
-      dotsBox.appendChild(d);
-    });
-  }
-
   function positionCards() {
     if (!total) return;
     cards.forEach(function (card) {
@@ -119,15 +110,10 @@
       card.className = 'card';
       if (diff === 0) card.classList.add('center');
       else if (diff === 1) card.classList.add('right');
-      else if (diff === 2) card.classList.add('farright');
       else if (diff === total - 1) card.classList.add('left');
+      else if (diff === 2) card.classList.add('farright');
       else card.classList.add('farleft');
     });
-    if (dotsBox) {
-      Array.prototype.forEach.call(dotsBox.children, function (d, i) {
-        d.classList.toggle('active', i === current);
-      });
-    }
   }
 
   if (total) {

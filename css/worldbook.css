@@ -858,6 +858,9 @@ select.form-control {
 .segmented-2 {
     grid-template-columns: repeat(2, 1fr);
 }
+.segmented-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
 .segmented label {
     text-align: center;
     padding: 8px 4px;
@@ -1015,4 +1018,88 @@ select.form-control {
 
 /* 内页顶栏：留出灵动岛�?-safe-top 由主框架注入�?*/
 .navbar { padding-top: calc(10px + var(--safe-top, 0px)); }
+
+/* ============================================================
+   世界书详情页 · 绑定范围 tabs 与表单优化
+   ============================================================ */
+.segmented {
+    border-radius: 12px;
+    padding: 4px;
+    background: #F2F2F7;
+}
+.segmented label {
+    border-radius: 9px;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 9px 4px;
+    transition: background .18s, color .18s, box-shadow .18s;
+}
+.segmented label:has(input:checked) {
+    color: #007AFF;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.10);
+}
+.segmented-3 label { font-size: 13.5px; }
+
+/* 线上「全选 / 指定角色」胶囊 */
+.char-target-seg { margin-bottom: 10px; }
+.char-target-seg label { font-size: 13px; padding: 7px 4px; }
+.online-pill-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.online-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0 16px;
+    border-radius: 15px;
+    border: 1px solid #E5E5EA;
+    background: #F2F2F7;
+    color: #6b6b70;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s, transform .12s;
+}
+.online-pill.active {
+    background: rgba(0, 122, 255, 0.12);
+    border-color: #007AFF;
+    color: #007AFF;
+}
+.online-pill:active { transform: scale(0.96); }
+
+/* 绑定范围整块做成轻卡片 */
+.inner-top-form #fileScopeGroup {
+    background: #F7F7FA;
+    border: 1px solid #ECECF0;
+    border-radius: 14px;
+    padding: 12px 12px 10px;
+}
+.inner-top-form #fileScopeGroup > label { color: #6b6b70; }
+
+/* 角色绑定区 */
+.char-bind {
+    margin-top: 12px;
+    background: #FFFFFF;
+    border: 1px solid #ECECF0;
+    border-radius: 14px;
+    padding: 12px;
+}
+.char-chip { background: #F7F7FA; }
+.char-chip.checked { background: rgba(0, 122, 255, 0.10); }
+
+/* 详情页表单更清爽 */
+.inner-top-form .form-group label {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 12.5px;
+    color: #6b6b70;
+}
+.inner-top-form .form-group input,
+.inner-top-form .form-group select {
+    border-bottom-color: #ECECF0;
+}
+.inner-content .card {
+    border-color: #ECECF0;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+.inner-content .card:active { transform: scale(0.995); }
 

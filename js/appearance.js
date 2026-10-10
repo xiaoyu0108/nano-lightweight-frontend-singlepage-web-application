@@ -305,6 +305,8 @@
                 + 'top:' + inset + '% !important;right:' + inset + '% !important;bottom:' + inset + '% !important;left:' + inset + '% !important;'
                 + 'background-image:url("' + url + '") !important;background-position:center center !important;'
                 + 'background-size:contain !important;background-repeat:no-repeat !important;'
+                // 头像框不受「头像方圆 / 头像大小」影响：不继承圆角，只由「框大小」决定缩放
+                + 'border-radius:0 !important;overflow:visible !important;'
                 + 'pointer-events:none !important;z-index:2147483000 !important;';
             if (!existing) node.appendChild(el);
             try {

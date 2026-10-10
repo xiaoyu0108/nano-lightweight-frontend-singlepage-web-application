@@ -117,6 +117,7 @@ function makeGodGroup() {
       { id: 'god-12', name: '擎天神·阿特拉斯（🈲矮化）', enabled: true, content: '你是擎天的阿特拉斯，撑得起重量与尊严。严禁矮化任何一方：不贬低角色或用户的价值、身份与人格，不写“你什么都不懂”“没我不行”这类打压性台词，也不靠贬损对方来抬高自己。可以调侃，但不能践踏尊严。' },
       { id: 'god-13', name: '回声女神·厄科（🈲重复）', enabled: true, content: '你曾是只会重复别人话的回声女神厄科，如今最懂“重复”有多乏味。严禁重复与复读：不反复复述同一句话、同一个动作、同一种句式，不在同一段里叠用相同词句；上一轮说过的意思要换一种说法，场景与反应要有变化，避免口水话和凑字数。' },
       { id: 'god-14', name: '美惠三女神·卡里忒斯（细节质感）', enabled: true, content: '你受美惠三女神卡里忒斯眷顾，最擅长把细节写得有质感。写作时把抽象换成具体：不写“气氛微妙”“心情复杂”这类空泛概括，而用可感知的物件、声音、光影、触感、气味和细微动作去呈现；细节要贴合人物身份与当下情境，少而准，不堆砌形容词。' },
+      { id: 'god-15', name: '巨人神·癸干忒斯（体型差）', enabled: true, content: '你是远古巨人癸干忒斯，身躯远超常人。开启后主打“体型差”：用身高、肩宽、手掌与骨架的悬殊，让角色自然而然地觉得对方娇小、想要“关爱”和“保护”——这不是碾压，也不是把对方矮化或弱化，而是打心底里想把人照顾好。日常里是下意识的照拂（俯身听你说话、递东西时的一顿、下意识把你护在内侧），亲密时则自然长出更强的占有欲、保护欲与掌控欲：想把人整个圈在怀里、护在身后、不让受一点委屈。落笔要具体（俯下的阴影、掌心与后颈的大小对比、被一只手圈住的手腕、衣料垂坠的落差），而不是空喊“好大”“好小”；始终尊重对方的主体性，掌控是带着珍视的保护，不写成支配、羞辱或逞凶。' },
     ]
   };
 }
@@ -172,7 +173,7 @@ async function loadAllData() {
 
     // 内置规则组升级：确保 God 组存在，并补齐 / 刷新内置神规则（不动用户自建规则）
     try {
-      if (localStorage.getItem('nano_offline_god_v2') !== '1') {
+      if (localStorage.getItem('nano_offline_god_v4') !== '1') {
         const fresh = makeGodGroup();
         let god = (ruleGroups || []).find(function (g) { return g && g.id === 'god'; });
         if (!god) {
@@ -187,7 +188,7 @@ async function loadAllData() {
           });
         }
         await saveRules();
-        localStorage.setItem('nano_offline_god_v2', '1');
+        localStorage.setItem('nano_offline_god_v4', '1');
       }
     } catch (e) {}
 

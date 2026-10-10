@@ -182,13 +182,13 @@ input,textarea{font-family:inherit}
   align-items:center;
   justify-content:center;
   border-radius:clamp(16px,3.5vw,22px);
-  background:var(--glass);
-  backdrop-filter:blur(24px) saturate(80%);
-  -webkit-backdrop-filter:blur(24px) saturate(80%);
-  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.6);
+  background:rgba(255,255,255,.42);
+  backdrop-filter:blur(30px) saturate(180%);
+  -webkit-backdrop-filter:blur(30px) saturate(180%);
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.65),inset 0 0 0 .5px rgba(255,255,255,.35);
   transition:background .18s ease,box-shadow .18s ease;
 }
-.app:active .icon-box{background:var(--glass-strong)}
+.app:active .icon-box{background:rgba(255,255,255,.66)}
 
 .icon-box.has-custom{
   background-size:cover;
@@ -229,7 +229,7 @@ input,textarea{font-family:inherit}
   width:100%;
   display:flex;
   justify-content:center;
-  transform:translateY(-clamp(60px,9vh,88px));
+  transform:translateY(calc(-1 * clamp(28px, 4.5vh, 46px)));
 }
 .dock{
   width:min(84%,410px);
@@ -240,10 +240,10 @@ input,textarea{font-family:inherit}
   justify-content:space-around;
   gap:16px;
   border-radius:clamp(24px,5vw,32px);
-  background:rgba(255,255,255,.62);
-  backdrop-filter:blur(28px) saturate(75%);
-  -webkit-backdrop-filter:blur(28px) saturate(75%);
-  box-shadow:0 14px 38px rgba(0,0,0,.09),inset 0 1px 0 rgba(255,255,255,.7);
+  background:rgba(255,255,255,.40);
+  backdrop-filter:blur(36px) saturate(180%);
+  -webkit-backdrop-filter:blur(36px) saturate(180%);
+  box-shadow:0 14px 38px rgba(0,0,0,.10),inset 0 1px 0 rgba(255,255,255,.7),inset 0 0 0 .5px rgba(255,255,255,.4);
 }
 .dock-slot{
   width:clamp(48px,12vw,60px);

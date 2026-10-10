@@ -405,6 +405,7 @@
     var fileBoundDisplay = document.getElementById('fileBoundDisplay');
     var fileCharBind = document.getElementById('fileCharBind');
     var fileCharBindList = document.getElementById('fileCharBindList');
+    var onlinePillRow = document.getElementById('onlinePillRow');
     var innerSearchInput = document.getElementById('innerSearchInput');
     var innerAddBtn = document.getElementById('innerAddBtn');
     var cardContainer = document.getElementById('cardContainer');
@@ -635,6 +636,7 @@
         if (!target || !Array.isArray(target.files)) return;
         target.files.forEach(function(f) {
             if (!Array.isArray(f.entries)) f.entries = [];
+            if (f.scope === 'offline') f.scope = 'global';   // 旧的「线下」已取消，回退为全局
             if (f.scope === undefined) {
                 var hasLocal = f.entries.some(function(e) { return (e.scope || 'global') === 'local'; });
                 f.scope = hasLocal ? 'local' : 'global';
@@ -727,18 +729,35 @@
 
     function renderFileBoundArea() {
         var scope = getFileScope();
-        var isLocal = scope === 'local';
-        if (fileScopeHint) {
-            fileScopeHint.textContent = isLocal
-                ? '局部绑定：仅下方绑定的角色对话时会读取这本世界书的全部条目（可点选/取消角色，支持多选）'
-                : '全局绑定：不限角色，任何角色对话都会读取这本世界书的全部条目';
-        }
-        if (fileCharBind) fileCharBind.classList.toggle('show', isLocal);
-
-        // ⭐ 角色已不存在时，绑定标签自动清除
+        var isLocal = scope === 'local';       // 单人
+        var isOnline = scope === 'online';     // 线上（全选 / 指定角色）
+        var showBind = isLocal || isOnline;
         var f = currentFile();
         var bound = (f && Array.isArray(f.boundCharacters)) ? f.boundCharacters : [];
-        if (isLocal && charBindLoaded && f) {
+
+        if (fileScopeHint) {
+            if (isLocal) fileScopeHint.textContent = '单人：仅下方绑定的角色，线上与线下都会读取（可点选/取消角色，支持多选）';
+            else if (isOnline) fileScopeHint.textContent = '线上：仅线上聊天读取；默认「全选」，也可只选指定角色';
+            else fileScopeHint.textContent = '全局：不限角色，线上与线下都会读取这本世界书';
+        }
+        if (fileCharBind) fileCharBind.classList.toggle('show', showBind);
+        if (onlinePillRow) onlinePillRow.style.display = isOnline ? '' : 'none';
+
+        // 线上：全选 / 指定角色（用 file.onlineTarget 明确记录，避免空选时死锁）
+        var isPick = false;
+        if (isOnline && f) {
+            if (f.onlineTarget !== 'pick' && f.onlineTarget !== 'all') f.onlineTarget = bound.length ? 'pick' : 'all';
+            isPick = f.onlineTarget === 'pick';
+            if (onlinePillRow) onlinePillRow.querySelectorAll('.online-pill').forEach(function (b) {
+                b.classList.toggle('active', (b.getAttribute('data-target') === 'pick') === isPick);
+            });
+            if (fileCharBindList) fileCharBindList.style.display = isPick ? '' : 'none';
+        } else if (fileCharBindList) {
+            fileCharBindList.style.display = '';
+        }
+
+        // 角色已不存在时，绑定标签自动清除
+        if (showBind && charBindLoaded && f) {
             var before = bound.length;
             f.boundCharacters = bound.filter(function(id) {
                 return allCharsForBind.some(function(ch) { return ch.id === id; });
@@ -748,14 +767,15 @@
         }
 
         if (fileBoundDisplay) {
-            fileBoundDisplay.style.display = isLocal ? 'block' : 'none';
+            fileBoundDisplay.style.display = showBind ? 'block' : 'none';
             var names = bound.map(function(id) {
                 var c = allCharsForBind.find(function(ch) { return ch.id === id; });
                 return c ? c.name : null;
             }).filter(function(n) { return n; });
-            fileBoundDisplay.textContent = names.length ? '📌 已绑定角色：' + names.join('、') : '📌 未绑定任何角色';
+            if (isOnline && !names.length) fileBoundDisplay.textContent = '📌 全部角色';
+            else fileBoundDisplay.textContent = names.length ? '📌 已绑定角色：' + names.join('、') : '📌 未绑定任何角色';
         }
-        if (isLocal) renderFileCharChips();
+        if (showBind) renderFileCharChips();
     }
 
     function syncCharactersForSavedFile(file) {
@@ -1711,7 +1731,22 @@
             var f = currentFile();
             if (!f) return;
             f.scope = e.target.value;
-            if (f.scope !== 'local') f.boundCharacters = [];
+            if (f.scope === 'online') { f.onlineTarget = 'all'; f.boundCharacters = []; }
+            else if (f.scope !== 'local') { f.boundCharacters = []; }
+            saveData(data);
+            renderFileBoundArea();
+        });
+    }
+    // ⭐ 线上：全选 / 指定角色 胶囊
+    if (onlinePillRow) {
+        onlinePillRow.addEventListener('click', function(e) {
+            var b = e.target && e.target.closest ? e.target.closest('.online-pill') : null;
+            if (!b) return;
+            var f = currentFile();
+            if (!f) return;
+            var target = b.getAttribute('data-target');
+            f.onlineTarget = target === 'pick' ? 'pick' : 'all';
+            if (f.onlineTarget === 'all') f.boundCharacters = [];
             saveData(data);
             renderFileBoundArea();
         });

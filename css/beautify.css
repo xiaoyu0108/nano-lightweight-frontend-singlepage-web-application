@@ -22,11 +22,11 @@ button svg{pointer-events:none;vertical-align:middle;flex-shrink:0}
 .content{min-height:0;flex:1;overflow:auto;padding:10px 14px calc(20px + 0px);-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none}
 .content::-webkit-scrollbar{display:none;width:0;height:0}
 
-/* ===== Tabs（白底下划线样式，避免顶栏下方出现灰条）===== */
-.tabs{height:40px;padding:0;background:#ffffff;border-bottom:0.5px solid rgba(60,60,67,.10);border-radius:0;display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:0 0 12px}
-.tabs button{border-radius:0;background:transparent;color:#8e8e93;font-size:13.5px;font-weight:500;cursor:pointer;transition:color .2s;position:relative}
-.tabs button.active{background:transparent;color:#007aff;box-shadow:none;font-weight:600}
-.tabs button.active::after{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:26px;height:2.5px;border-radius:2px;background:#007aff}
+/* ===== Tabs（胶囊分段样式） ===== */
+.tabs{height:44px;padding:4px;background:#f2f2f7;border:none;border-radius:13px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:2px 0 14px}
+.tabs button{border-radius:10px;background:transparent;color:#8e8e93;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .18s,color .18s,box-shadow .18s;position:relative}
+.tabs button.active{background:#ffffff;color:#007aff;box-shadow:0 1px 5px rgba(0,0,0,.10);font-weight:700}
+.tabs button.active::after{display:none}
 .page{display:none}.page.active{display:block}
 
 /* ===== Label Row ===== */

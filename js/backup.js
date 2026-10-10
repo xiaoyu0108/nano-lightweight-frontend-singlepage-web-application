@@ -7,7 +7,73 @@
 
 function $(id) { return document.getElementById(id); }
 
-// ================= 通用工具 =================
+// ================= JSZip 按需加载（本地优先，失败回退 CDN） =================
+let _jszipPromise = null;
+const JSZIP_SOURCES = [
+    'js/jszip.min.js',
+    'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+    'https://cdn.bootcdn.net/ajax/libs/jszip/3.10.1/jszip.min.js',
+    'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'
+];
+function ensureJSZip() {
+    if (window.JSZip) return Promise.resolve(window.JSZip);
+    if (_jszipPromise) return _jszipPromise;
+    _jszipPromise = new Promise(function (resolve, reject) {
+        let i = 0;
+        (function tryNext() {
+            if (i >= JSZIP_SOURCES.length) { _jszipPromise = null; reject(new Error('JSZip 加载失败：请检查网络，或改用 JSON 导出/导入（JSON 不需要 JSZip）')); return; }
+            const s = document.createElement('script');
+            s.src = JSZIP_SOURCES[i++];
+            let done = false;
+            const timer = setTimeout(function () { if (done) return; done = true; if (s.parentNode) s.parentNode.removeChild(s); tryNext(); }, 15000);
+            s.onload = function () {
+                if (done) return; done = true; clearTimeout(timer);
+                if (window.JSZip) resolve(window.JSZip);
+                else { if (s.parentNode) s.parentNode.removeChild(s); tryNext(); }
+            };
+            s.onerror = function () { if (done) return; done = true; clearTimeout(timer); if (s.parentNode) s.parentNode.removeChild(s); tryNext(); };
+            document.head.appendChild(s);
+        })();
+    });
+    return _jszipPromise;
+}
+
+// ================= 进度弹层 =================
+let _progressEls = null;
+function progressEls() {
+    if (!_progressEls) _progressEls = { ov: $('progressOverlay'), title: $('progressTitle'), fill: $('progressFill'), text: $('progressText') };
+    return _progressEls;
+}
+function showProgress(title) {
+    const e = progressEls();
+    if (!e.ov) return;
+    if (title && e.title) e.title.textContent = title;
+    if (e.fill) e.fill.style.width = '0%';
+    if (e.text) e.text.textContent = '准备中…';
+    e.ov.classList.add('active');
+}
+function setProgress(pct, text) {
+    const e = progressEls();
+    if (!e.ov) return;
+    if (typeof pct === 'number' && isFinite(pct) && e.fill) e.fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    if (text && e.text) e.text.textContent = text;
+}
+function hideProgress() {
+    const e = progressEls();
+    if (e.ov) e.ov.classList.remove('active');
+}
+// 带进度的读文件（大文件也能看到进展，不至于像卡死）
+function readFileText(file, onPct) {
+    return new Promise(function (resolve, reject) {
+        try {
+            const r = new FileReader();
+            r.onprogress = function (ev) { if (ev.lengthComputable && typeof onPct === 'function') onPct((ev.loaded / ev.total) * 100); };
+            r.onload = function () { resolve(String(r.result || '')); };
+            r.onerror = function () { reject(new Error('读取文件失败，请重试或换个浏览器')); };
+            r.readAsText(file);
+        } catch (e) { reject(e); }
+    });
+}
 
 function isIOSDevice() {
     try {
@@ -265,7 +331,7 @@ async function exportJson() {
 
 /** 导出为 ZIP（结构清晰，二进制单独存放，体积更小） */
 async function exportZip() {
-    if (!window.JSZip) throw new Error('JSZip 未加载');
+    await ensureJSZip();
 
     const zip = new JSZip();
     const meta = {
@@ -435,11 +501,23 @@ async function clearAllData(dbNames) {
 
 /** 从 JSON 对象还原 */
 async function importFromJson(data, onProgress) {
-    if (!data || data.meta?.type !== 'full-site-backup') {
-        throw new Error('不是有效的全站备份文件');
+    if (!data || typeof data !== 'object') throw new Error('不是有效的备份文件');
+    // 兼容旧版备份：只要有 indexedDB / localStorage / sessionStorage 就认，不强制 meta.type
+    const isBackup = !!data.indexedDB || !!data.localStorage || !!data.sessionStorage || (data.meta && data.meta.type === 'full-site-backup');
+    if (!isBackup) throw new Error('不是有效的全站备份文件');
+    const _prog = (t, p) => { if (typeof onProgress === 'function') onProgress(t, p); };
+    // 统计总记录数，用于进度条
+    let totalRec = 0;
+    if (data.indexedDB) {
+        for (const dbName of Object.keys(data.indexedDB)) {
+            const stores = (data.indexedDB[dbName] && data.indexedDB[dbName].stores) || {};
+            for (const s of Object.keys(stores)) totalRec += (stores[s] || []).length;
+        }
     }
+    let doneRec = 0;
+    const reportRec = (extra) => _prog(extra || ('写入数据 ' + doneRec + '/' + totalRec), 5 + (totalRec ? (doneRec / totalRec) * 88 : 40));
 
-    if (typeof onProgress === 'function') onProgress('清空旧数据…');
+    _prog('清空旧数据…', 2);
     await clearAllData(data.indexedDB ? Object.keys(data.indexedDB) : []);
 
     // ---------- IndexedDB ----------
@@ -501,6 +579,8 @@ async function importFromJson(data, onProgress) {
                         } catch (e) {
                             console.warn('写入记录失败', dbName, storeName, e);
                         }
+                        doneRec++;
+                        if (doneRec % 40 === 0) reportRec();
                     }
                     await txDone(tx);
                 } catch (e) {
@@ -512,6 +592,7 @@ async function importFromJson(data, onProgress) {
     }
 
     // ---------- localStorage ----------
+    _prog('写入本地存储…', 94);
     if (data.localStorage) {
         for (const k of Object.keys(data.localStorage)) {
             try { localStorage.setItem(k, data.localStorage[k]); } catch {}
@@ -528,7 +609,7 @@ async function importFromJson(data, onProgress) {
     // ---------- CacheStorage ----------
     // 忽略备份里的 Service Worker 缓存（可再生），导入更快、也不清掉当前缓存
 
-    if (typeof onProgress === 'function') onProgress('整理数据…');
+    _prog('整理数据…', 98);
 }
 
 /** 旧备份没有 schema 时：从记录里推断 keyPath（值里与 key 相等的字段） */
@@ -546,44 +627,67 @@ function inferKeyPathFromRecords(records) {
     return null;
 }
 
-/** 打开数据库并确保 schema 存在（schema: { storeName: { keyPath, autoIncrement } }） */
+/** 打开数据库并确保 schema 存在（schema: { storeName: { keyPath, autoIncrement } }）
+ *  不降级已存在的库：始终按“当前/新建”版本打开，缺少的 store 通过升版本补建，
+ *  这样导入旧备份（版本更低）或旧库缺表都不会失败。 */
 function openDatabaseWithSchema(name, version, schema) {
     return new Promise((resolve) => {
-        const req = indexedDB.open(name, version || undefined);
-        req.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            for (const storeName of Object.keys(schema || {})) {
-                if (!db.objectStoreNames.contains(storeName)) {
-                    const sc = schema[storeName] || {};
-                    const opts = {};
-                    if (sc.keyPath !== undefined && sc.keyPath !== null) opts.keyPath = sc.keyPath;
-                    if (sc.autoIncrement) opts.autoIncrement = true;
-                    db.createObjectStore(storeName, opts);
+        const doOpen = (ver) => {
+            let req;
+            try { req = indexedDB.open(name, ver); } catch (e) { resolve(null); return; }
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                for (const storeName of Object.keys(schema || {})) {
+                    if (!db.objectStoreNames.contains(storeName)) {
+                        const sc = schema[storeName] || {};
+                        const opts = {};
+                        if (sc.keyPath !== undefined && sc.keyPath !== null) opts.keyPath = sc.keyPath;
+                        if (sc.autoIncrement) opts.autoIncrement = true;
+                        db.createObjectStore(storeName, opts);
+                    }
                 }
-            }
+            };
+            req.onsuccess = () => {
+                const db = req.result;
+                const missing = Object.keys(schema || {}).some((s) => !db.objectStoreNames.contains(s));
+                if (missing) {
+                    const nv = db.version + 1;
+                    try { db.close(); } catch (e) {}
+                    doOpen(nv);   // 升版本补建缺失的 store
+                } else {
+                    resolve(db);
+                }
+            };
+            req.onerror = () => resolve(null);
+            // 旧连接未释放会触发 blocked：关闭自身，避免“一直转”
+            req.onblocked = () => { try { if (req.result) req.result.close(); } catch (e) {} };
         };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => resolve(null);
-        // 旧连接未释放时会触发 blocked：直接放行，避免导入“一直转”
-        req.onblocked = () => resolve(req.result || null);
+        // 用不指定版本打开（当前版本，或新建），彻底避免 VersionError
+        doOpen();
     });
 }
 
 /** 从 ZIP 还原 */
 async function importFromZip(file, onProgress) {
-    if (!window.JSZip) throw new Error('JSZip 未加载');
-    if (typeof onProgress === 'function') onProgress('解压中…');
+    await ensureJSZip();
+    const _prog = (t, p) => { if (typeof onProgress === 'function') onProgress(t, p); };
+    _prog('解压中…', 3);
     // 解压加超时，避免大文件/内存不足时“一直转”
     const zip = await Promise.race([
         JSZip.loadAsync(file),
         new Promise((_, rej) => setTimeout(() => rej(new Error('解压超时：文件可能过大或内存不足，建议改用 JSON 备份，或换个浏览器再试')), 90000))
     ]);
 
-    // ---------- 解析 meta ----------
-    const metaFile = zip.file('meta.json');
-    if (!metaFile) throw new Error('ZIP 中缺少 meta.json');
-    const meta = JSON.parse(await metaFile.async('string'));
-    if (meta.type !== 'full-site-backup') throw new Error('不是有效的全站备份文件');
+    // ---------- 解析 meta（兼容旧版备份：没有 meta.json 也照导）----------
+    let meta = null;
+    const metaFile = zip.file('meta.json') || zip.file('meta.js');
+    if (metaFile) {
+        try { meta = JSON.parse(await metaFile.async('string')); } catch (e) {}
+    }
+    const hasIdb = !!zip.folder('indexedDB');
+    const hasLs = !!zip.file('localStorage.json');
+    if (!meta && !hasIdb && !hasLs) throw new Error('ZIP 不是有效的备份文件（缺少 meta.json / indexedDB / localStorage）');
+    if (meta && meta.type && meta.type !== 'full-site-backup') throw new Error('不是有效的全站备份文件');
 
     // ---------- IndexedDB ----------
     const idbFolder = zip.folder('indexedDB');
@@ -601,7 +705,7 @@ async function importFromZip(file, onProgress) {
         let _dbi = 0;
 
         for (const dbName of dbNameArr) {
-            if (typeof onProgress === 'function') onProgress('导入数据库 ' + (++_dbi) + '/' + dbNameArr.length + '…');
+            if (typeof onProgress === 'function') onProgress('导入数据库 ' + (++_dbi) + '/' + dbNameArr.length + '…', 5 + (_dbi / dbNameArr.length) * 88);
             const dbFolder = idbFolder.folder(dbName);
             const dbMetaFile = dbFolder.file('__meta__.json');
             let version;
@@ -702,6 +806,7 @@ async function importFromZip(file, onProgress) {
     }
 
     // ---------- localStorage ----------
+    _prog('写入本地存储…', 94);
     const lsFile = zip.file('localStorage.json');
     if (lsFile) {
         const obj = JSON.parse(await lsFile.async('string'));
@@ -787,16 +892,37 @@ async function executeAction() {
         } else if (action === 'exportZip') {
             await withLoading('btnExportZip', '导出中', exportZip);
         } else if (action === 'importConfirm' && pendingFile) {
-            await withLoading('btnImport', '导入中', async () => {
-                const name = pendingFile.name.toLowerCase();
-                if (name.endsWith('.zip')) {
-                    await importFromZip(pendingFile, (t) => setLoadingText('btnImport', t));
-                } else {
-                    const text = await pendingFile.text();
-                    const data = JSON.parse(text);
-                    await importFromJson(data, (t) => setLoadingText('btnImport', t));
-                }
-            });
+            showProgress('正在导入备份');
+            try {
+                await withLoading('btnImport', '导入中', async () => {
+                    const name = pendingFile.name.toLowerCase();
+                    const onP = (t, pct) => { setProgress(pct, t); setLoadingText('btnImport', t); };
+                    if (name.endsWith('.zip')) {
+                        setProgress(2, '读取 ZIP…');
+                        try {
+                            await importFromZip(pendingFile, onP);
+                        } catch (ze) {
+                            // 有些“备份”其实是 JSON 但被命名成 .zip；或旧版 zip 结构不同 → 回退按文本导入
+                            setProgress(18, '按备份文件重试…');
+                            const text = await readFileText(pendingFile, (p) => setProgress(18 + p * 0.2, '读取文件 ' + Math.round(p) + '%'));
+                            let data;
+                            try { data = JSON.parse(text); } catch (e) { throw ze; }
+                            await importFromJson(data, onP);
+                        }
+                    } else {
+                        setProgress(1, '读取文件…');
+                        const text = await readFileText(pendingFile, (p) => setProgress(p * 0.35, '读取文件 ' + Math.round(p) + '%'));
+                        setProgress(38, '解析 JSON…');
+                        let data;
+                        try { data = JSON.parse(text); }
+                        catch (pe) { throw new Error('JSON 解析失败：文件可能损坏或过大（可改用 ZIP 备份）'); }
+                        await importFromJson(data, onP);
+                    }
+                    setProgress(100, '完成');
+                });
+            } finally {
+                setTimeout(hideProgress, 700);
+            }
         }
         pendingFile = null;
         try { fileInput.value = ''; } catch (e) {}

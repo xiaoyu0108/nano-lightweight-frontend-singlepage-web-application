@@ -68,16 +68,21 @@
                     </div>
                 </div>
 
-                <!-- ⭐ 整本绑定范围（全局/局部） -->
+                <!-- ⭐ 整本绑定范围（全局/线上/单人） -->
                 <div class="form-group" id="fileScopeGroup">
                     <label>绑定范围</label>
-                    <div class="segmented segmented-2" id="fileScopeRadios">
-                        <label><input type="radio" name="fileScope" value="global" checked> 全局绑定</label>
-                        <label><input type="radio" name="fileScope" value="local"> 局部绑定</label>
+                    <div class="segmented segmented-3" id="fileScopeRadios">
+                        <label><input type="radio" name="fileScope" value="global" checked> 全局</label>
+                        <label><input type="radio" name="fileScope" value="online"> 线上</label>
+                        <label><input type="radio" name="fileScope" value="local"> 单人</label>
                     </div>
-                    <div class="hint-text" id="fileScopeHint">全局绑定：不限角色，任何角色对话都会读取这本世界书的全部条目</div>
+                    <div class="hint-text" id="fileScopeHint">全局：不限角色，线上与线下都会读取</div>
                     <div id="fileBoundDisplay" style="font-size:13px;color:#007AFF;padding:8px 0 4px 0;"></div>
                     <div class="char-bind" id="fileCharBind">
+                        <div class="online-pill-row" id="onlinePillRow">
+                            <button type="button" class="online-pill" data-target="all">全选</button>
+                            <button type="button" class="online-pill" data-target="pick">指定角色</button>
+                        </div>
                         <div class="char-bind-list" id="fileCharBindList"></div>
                     </div>
                 </div>

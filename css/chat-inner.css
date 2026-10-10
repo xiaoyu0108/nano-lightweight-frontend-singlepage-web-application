@@ -1037,26 +1037,26 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 }
 .ios-img-preview-box img { width: 100%; height: 100%; object-fit: cover; }
 
-/* ===== 底部更多菜单 - 从底部弹出 ===== */
+/* ===== 底部更多菜单 - 从底部整条弹起（底部弹层） ===== */
 .more-overlay {
     display: none;
     position: absolute;
-    bottom: 72px;
-    left: 12px;
-    right: 12px;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: #ffffff;
-    border-radius: 18px;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.18);
     z-index: 50;
-    padding: 12px 10px;
+    padding: 16px 12px calc(16px + env(safe-area-inset-bottom, 0px));
     flex-wrap: wrap;
     gap: 4px;
-    animation: slideUp 0.25s ease-out;
+    animation: slideUp 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px) scale(0.96); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0.5; transform: translateY(100%); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .more-overlay.active { display: flex; }

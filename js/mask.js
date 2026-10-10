@@ -367,12 +367,12 @@
                 if (clickTimer) {
                     clearTimeout(clickTimer);
                     clickTimer = null;
-                    openEditModal(item.id);
+                    setCurrentMask(item.id);   // 双击：切换面具
                     return;
                 }
                 clickTimer = setTimeout(() => {
                     clickTimer = null;
-                    setCurrentMask(item.id);
+                    openEditModal(item.id);    // 单击：进入详情
                 }, 250);
             });
 

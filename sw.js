@@ -8,7 +8,7 @@
    “后台回复”依赖页面常驻 + 音频保活；真正的“关闭也能收到”需要服务端配合（见 push 事件）。 */
 'use strict';
 
-var CACHE = 'nano-static-v52';
+var CACHE = 'nano-static-v53';
 var STATIC_RE = /\.(css|js|png|jpg|jpeg|webp|svg|gif|ico|woff2?|ttf|mp3)$/i;
 var HTML_FRESH_MS = 0;                // 0：每次打开都联网取最新 HTML（断网/超时再用缓存）
 var NET_TIMEOUT_MS = 1500;            // 有缓存时，网络最多等 1.5 秒，超时先上缓存
@@ -68,7 +68,8 @@ self.addEventListener('fetch', function (event) {
         return;
     }
 
-    // JS 采用「联网优先」：保证改完代码刷新一次就是新版（网络慢时退回缓存）
+    // JS 采用「先用缓存秒开，后台静默更新」（stale-while-revalidate）：
+    // 改完代码刷新两次即可看到新版；带 ?v= 的资源是新缓存键，会直接走网络。
     if (/\.js$/i.test(url.pathname)) {
         event.respondWith(
             caches.open(CACHE).then(function (cache) {
@@ -77,11 +78,11 @@ self.addEventListener('fetch', function (event) {
                         try { if (res && res.status === 200) cache.put(req, res.clone()); } catch (e) {}
                         return res;
                     });
-                    if (!cached) return network.catch(function () { return cached; });
-                    return Promise.race([
-                        network,
-                        new Promise(function (resolve) { setTimeout(function () { resolve(cached); }, NET_TIMEOUT_MS); })
-                    ]).catch(function () { return cached; });
+                    if (cached) {
+                        event.waitUntil(network.catch(function () {}));
+                        return cached;
+                    }
+                    return network.catch(function () { return cached; });
                 });
             })
         );
