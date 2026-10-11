@@ -981,6 +981,8 @@
     let autoMomentTimer = null;
     let suppressApiAlerts = false;
     let pendingJumpMsgId = null;
+    // 主 API 最近一次的结束原因（'stop'/'length'/...），用于识别「输出被 max_tokens 截断」
+    let lastFinishReason = '';
 
     // ===== 通话记录 IndexedDB 存储 =====
     const CALL_DB_NAME = 'voice_call_records_db';
@@ -5076,8 +5078,17 @@
                 history.push({ role: 'user', content: tail });
             }
 
+            // 记录本次请求对应的「最新一条用户消息」id：断点续生成时用它判断请求是否已过期，
+            // 避免用户又发了新消息后，回到聊天里还用旧请求去回答很久以前的问题。
+            let __lastUserId = '';
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const m = messages[i];
+                if (m && m.type === 'right' && !m.recalled) { __lastUserId = m.id || ''; break; }
+            }
             const payload = {
                 token: 'creq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                __chatId: chatId,
+                __lastUserId: __lastUserId,
                 url: baseUrl + '/chat/completions',
                 method: 'POST',
                 headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
@@ -5118,6 +5129,7 @@
             }
 
             const data = JSON.parse(result.text || '{}');
+            try { lastFinishReason = (data.choices && data.choices[0] && data.choices[0].finish_reason) || ''; } catch (e) { lastFinishReason = ''; }
             return data.choices?.[0]?.message?.content || null;
         } catch (error) {
             console.error('[Chat API] 异常', error);
@@ -5714,10 +5726,32 @@
             processNanoReply(next || '（继续后没有生成内容）', 1);
         });
     }
+    // 输出被 max_tokens 截断时的「继续生成」卡片（纳米长文/长 CSS 常见）。
+    function renderNanoContinueGen(row, depth) {
+        var host = nanoAttachTo(row);
+        if (!host) return;
+        var box = document.createElement('div');
+        box.className = 'nano-action';
+        box.innerHTML = '<div class="nano-action-title">回复被截断，还没写完</div>'
+            + '<div class="nano-action-desc">点「继续生成」让纳米接着写完；也可在「纳米设置 → 最大输出」调大上限。</div>'
+            + '<div class="nano-action-btns"><button class="nano-skip">忽略</button><button class="nano-run">继续生成</button></div>';
+        host.appendChild(box);
+        box.querySelector('.nano-skip').addEventListener('click', function () { box.innerHTML = '<div class="nano-action-title">已忽略</div>'; });
+        box.querySelector('.nano-run').addEventListener('click', async function () {
+            box.innerHTML = '<div class="nano-action-title">继续生成中…</div>';
+            var next = await callApi('', '（你上一条回复因为长度限制被截断了。请只接着把没写完的部分补完，不要重复已经输出的内容，也不要重新解释。）');
+            processNanoReply(next || '（继续后没有生成内容）', (parseInt(depth, 10) || 0) + 1);
+        });
+    }
     async function processNanoReply(reply, depth) {
         var NA = window.NanoAssistant;
         if (!NA) return;
-        var parsed = NA.parseActions(stripThinkBlocks(reply));
+        // 必须先解析原始回复里的 <action>：cleanReplyText 会移除所有 <...> 标签，
+        // 之前先 stripThinkBlocks 再解析，会把 <action> 连同动作一起删掉，
+        // 导致界面不再出现「复制 / 立即执行」卡片（并让动作 JSON 当正文显示）。
+        var parsed = NA.parseActions(reply);
+        // 只对剩余正文去掉思考链，动作已单独抽走，不会被误删。
+        parsed.clean = stripThinkBlocks(parsed.clean);
         var row = null;
         if (parsed.clean) {
             row = addMessage('left', parsed.clean, nowHHMM(), null, false, false, null, null, null, null);
@@ -5741,6 +5775,12 @@
                 return processNanoReply(next || '（读取后没有生成内容）', depth + 1);
             }
             renderNanoContinue(row, extra);
+            return;
+        }
+        // 输出被 max_tokens 截断：给一张「继续生成」卡片（最多续 2 次，避免死循环）
+        if (lastFinishReason === 'length' && depth < 2) {
+            if (!row) row = addMessage('left', '（内容较长，还没写完）', nowHHMM(), null, false, false, null, null, null, null);
+            renderNanoContinueGen(row, depth);
             return;
         }
         if (!parsed.clean && parsed.actions.length === 0) {
@@ -6268,6 +6308,19 @@
         if (isProcessingApi) return;
         const stored = loadStoredChatRequest();
         if (!stored || !stored.token) { chatPendingSet(false); return; }
+        // 过期请求保护：若这条断点续生成对应的已不是当前最近一条用户消息，
+        // 说明用户之后又发了新问题，旧请求不能再用，否则纳米会回答很久以前的问题。
+        try {
+            const lastRight = [...messages].reverse().find(m => m.type === 'right' && !m.recalled) || null;
+            if (stored.__lastUserId && lastRight && String(stored.__lastUserId) !== String(lastRight.id)) {
+                clearChatRequest();
+                chatPendingSet(false);
+                hideTyping();
+                isWaitingForReply = false;
+                updateSendButtonMode();
+                return;
+            }
+        } catch (e) {}
         isProcessingApi = true;
         showTyping();
         sendBtn.classList.add('disabled');

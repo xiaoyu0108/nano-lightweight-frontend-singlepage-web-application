@@ -542,14 +542,18 @@ body {
 .inner-search-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     padding: 8px 16px;
     background: #ffffff;
     flex-shrink: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
     border-bottom: 0.5px solid rgba(60, 60, 67, 0.06);
 }
 .inner-search-wrap {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     background: #E5E5EA;
     border-radius: 10px;
     display: flex;
@@ -560,7 +564,9 @@ body {
     background: none;
     border: none;
     outline: none;
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
     font-size: 15px;
     color: #1C1C1E;
 }
