@@ -174,17 +174,18 @@
     }
 
     // ===== 读写世界书数据（localStorage + IndexedDB 双写） =====
+    // 读取世界书：以 IndexedDB 为准（避免 localStorage 缓存过期/写满导致“新世界书看不到”）
     function readWorldbookData() {
         return new Promise(function(resolve) {
+            var fromLocal = function() {
+                try {
+                    const raw = localStorage.getItem(WB_CACHE_KEY);
+                    if (raw) { const d = JSON.parse(raw); if (d && d.files) { resolve(d); return; } }
+                } catch (e) {}
+                resolve(null);
+            };
             try {
-                const raw = localStorage.getItem(WB_CACHE_KEY);
-                if (raw) {
-                    const d = JSON.parse(raw);
-                    if (d && d.files) { resolve(d); return; }
-                }
-            } catch (e) {}
-            try {
-                if (typeof indexedDB === 'undefined') { resolve(null); return; }
+                if (typeof indexedDB === 'undefined') { fromLocal(); return; }
                 const req = indexedDB.open(WB_DB, 1);
                 req.onupgradeneeded = function(e) {
                     try {
@@ -198,39 +199,51 @@
                         const r = db.transaction(WB_STORE, 'readonly').objectStore(WB_STORE).get('data');
                         r.onsuccess = function() {
                             const d = r.result ? r.result.value : null;
-                            if (d && d.files) {
+                            if (d && Array.isArray(d.files)) {
                                 try { localStorage.setItem(WB_CACHE_KEY, JSON.stringify(d)); } catch (e) {}
                                 resolve(d);
-                            } else { resolve(null); }
+                            } else { fromLocal(); }
                         };
-                        r.onerror = function() { resolve(null); };
-                    } catch (e) { resolve(null); }
+                        r.onerror = function() { fromLocal(); };
+                    } catch (e) { fromLocal(); }
                 };
-                req.onerror = function() { resolve(null); };
-            } catch (e) { resolve(null); }
+                req.onerror = function() { fromLocal(); };
+            } catch (e) { fromLocal(); }
         });
     }
 
+    // 写入世界书：IDB 为准（返回 Promise），localStorage 仅作缓存（写满也不影响）
     function writeWorldbookData(d) {
-        if (!d) return;
-        try { localStorage.setItem(WB_CACHE_KEY, JSON.stringify(d)); } catch (e) {}
-        try {
-            if (typeof indexedDB === 'undefined') return;
-            const req = indexedDB.open(WB_DB, 1);
-            req.onupgradeneeded = function(e) {
-                try {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(WB_STORE)) db.createObjectStore(WB_STORE, { keyPath: 'key' });
-                } catch (e) {}
-            };
-            req.onsuccess = function(e) {
-                try {
-                    const db = e.target.result;
-                    db.transaction(WB_STORE, 'readwrite').objectStore(WB_STORE).put({ key: 'data', value: d });
-                } catch (e) {}
-            };
-            req.onerror = function() {};
-        } catch (e) {}
+        if (!d) return Promise.resolve();
+        return new Promise(function(resolve) {
+            try {
+                if (typeof indexedDB === 'undefined') {
+                    try { localStorage.setItem(WB_CACHE_KEY, JSON.stringify(d)); } catch (e) {}
+                    resolve(); return;
+                }
+                const req = indexedDB.open(WB_DB, 1);
+                req.onupgradeneeded = function(e) {
+                    try {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(WB_STORE)) db.createObjectStore(WB_STORE, { keyPath: 'key' });
+                    } catch (e) {}
+                };
+                req.onsuccess = function(e) {
+                    try {
+                        const db = e.target.result;
+                        const tx = db.transaction(WB_STORE, 'readwrite');
+                        tx.objectStore(WB_STORE).put({ key: 'data', value: d });
+                        tx.oncomplete = function() {
+                            try { localStorage.setItem(WB_CACHE_KEY, JSON.stringify(d)); } catch (e) {}
+                            resolve();
+                        };
+                        tx.onerror = function() { resolve(); };
+                        tx.onabort = function() { resolve(); };
+                    } catch (e) { resolve(); }
+                };
+                req.onerror = function() { resolve(); };
+            } catch (e) { resolve(); }
+        });
     }
 
     let dbPromise = null;
@@ -1105,9 +1118,9 @@
                 let changed = false;
                 wbData.files.forEach(f => {
                     if (!Array.isArray(f.boundCharacters)) f.boundCharacters = [];
-                    // 全局世界书对所有角色生效，无需记录到 boundCharacters
-                    const isLocal = (f.scope || 'global') === 'local';
-                    const shouldBind = isLocal && worldbookBindings.some(w => w.id === f.id);
+                    // 全局世界书对所有角色生效，无需记录到 boundCharacters；非全局（单人/线上）才记录
+                    const isBindable = (f.scope || 'global') !== 'global';
+                    const shouldBind = isBindable && worldbookBindings.some(w => w.id === f.id);
                     const idx = f.boundCharacters.indexOf(charId);
                     if (shouldBind) {
                         if (idx === -1) { f.boundCharacters.push(charId); changed = true; }

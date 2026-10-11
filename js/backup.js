@@ -472,31 +472,15 @@ function decodeKey(info) {
 
 // ================= 导入 =================
 
-/** 清空全站数据；dbNames 可选：iOS Safari 无 indexedDB.databases()，需显式给出要删的库 */
+/** 清空全站数据（只清 localStorage / sessionStorage）。
+ *  不再删除 IndexedDB：删除会因其它页面/iframe 的旧连接触发 blocked → 导入卡死。
+ *  IndexedDB 改为“逐 store 清空后写入”，效果等价且不会被 blocked。 */
 async function clearAllData(dbNames) {
     // localStorage
     try { localStorage.clear(); } catch {}
-
     // sessionStorage
     try { sessionStorage.clear(); } catch {}
-
-    // IndexedDB：删除数据库（优先用传入的库名，否则枚举）
-    let names;
-    if (Array.isArray(dbNames)) {
-        names = dbNames.slice();
-    } else {
-        const dbs = await listDatabases();
-        names = dbs.map((d) => d.name).filter(Boolean);
-    }
-    for (const name of names) {
-        if (!name) continue;
-        await new Promise((resolve) => {
-            const req = indexedDB.deleteDatabase(name);
-            req.onsuccess = req.onerror = req.onblocked = () => resolve();
-        });
-    }
-
-    // CacheStorage：不动（那是可再生的静态资源缓存，清掉只会让下次打开变慢）
+    // CacheStorage / IndexedDB：不动（见上）
 }
 
 /** 从 JSON 对象还原 */
@@ -517,8 +501,7 @@ async function importFromJson(data, onProgress) {
     let doneRec = 0;
     const reportRec = (extra) => _prog(extra || ('写入数据 ' + doneRec + '/' + totalRec), 5 + (totalRec ? (doneRec / totalRec) * 88 : 40));
 
-    _prog('清空旧数据…', 2);
-    await clearAllData(data.indexedDB ? Object.keys(data.indexedDB) : []);
+    _prog('准备导入…', 2);
 
     // ---------- IndexedDB ----------
     if (data.indexedDB) {
@@ -559,6 +542,7 @@ async function importFromJson(data, onProgress) {
                 try {
                     const tx = db.transaction(storeName, 'readwrite');
                     const store = tx.objectStore(storeName);
+                    store.clear();   // 先清空再写入（覆盖），避免删库导致 blocked
                     for (const rec of records) {
                         let value;
                         if (rec.__binary) {
@@ -593,6 +577,7 @@ async function importFromJson(data, onProgress) {
 
     // ---------- localStorage ----------
     _prog('写入本地存储…', 94);
+    try { localStorage.clear(); } catch (e) {}
     if (data.localStorage) {
         for (const k of Object.keys(data.localStorage)) {
             try { localStorage.setItem(k, data.localStorage[k]); } catch {}
@@ -600,6 +585,7 @@ async function importFromJson(data, onProgress) {
     }
 
     // ---------- sessionStorage ----------
+    try { sessionStorage.clear(); } catch (e) {}
     if (data.sessionStorage) {
         for (const k of Object.keys(data.sessionStorage)) {
             try { sessionStorage.setItem(k, data.sessionStorage[k]); } catch {}
@@ -659,8 +645,8 @@ function openDatabaseWithSchema(name, version, schema) {
                 }
             };
             req.onerror = () => resolve(null);
-            // 旧连接未释放会触发 blocked：关闭自身，避免“一直转”
-            req.onblocked = () => { try { if (req.result) req.result.close(); } catch (e) {} };
+            // 旧连接未释放触发 blocked 时不要卡死：关闭自身并直接放行（跳过该库，其它库继续导）
+            req.onblocked = () => { try { if (req.result) req.result.close(); } catch (e) {} resolve(null); };
         };
         // 用不指定版本打开（当前版本，或新建），彻底避免 VersionError
         doOpen();
@@ -700,8 +686,7 @@ async function importFromZip(file, onProgress) {
             }
         });
         const dbNameArr = Array.from(dbNames);
-        // 按备份里的库名删除（iOS Safari 不支持 indexedDB.databases()，必须显式指定，否则旧库没删干净）
-        await clearAllData(dbNameArr);
+        // 不再删库：逐 store 清空写入（避免其它 iframe 旧连接导致 blocked 卡死）
         let _dbi = 0;
 
         for (const dbName of dbNameArr) {
@@ -784,6 +769,7 @@ async function importFromZip(file, onProgress) {
                 try {
                     const tx = db.transaction(storeName, 'readwrite');
                     const store = tx.objectStore(storeName);
+                    store.clear();   // 先清空再写入：等价于覆盖，且不需要删库（避免 blocked 卡死）
                     for (const item of payload[storeName]) {
                         try {
                             if (outOfLine) {
@@ -807,6 +793,7 @@ async function importFromZip(file, onProgress) {
 
     // ---------- localStorage ----------
     _prog('写入本地存储…', 94);
+    try { localStorage.clear(); } catch (e) {}
     const lsFile = zip.file('localStorage.json');
     if (lsFile) {
         const obj = JSON.parse(await lsFile.async('string'));
@@ -816,6 +803,7 @@ async function importFromZip(file, onProgress) {
     }
 
     // ---------- sessionStorage ----------
+    try { sessionStorage.clear(); } catch (e) {}
     const ssFile = zip.file('sessionStorage.json');
     if (ssFile) {
         const obj = JSON.parse(await ssFile.async('string'));

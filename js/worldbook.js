@@ -304,6 +304,20 @@
             render();
         }
         console.log('⚡ 页面秒开，共 ' + data.files.length + ' 个世界书');
+        // 秒开之后再用 IndexedDB 校准一次：角色页导入的角色卡世界书是写进 IDB 的，
+        // localStorage 缓存可能过期，这里静默刷新，保证“新世界书”能立刻看到。
+        wbIdbGet().then(function(d) {
+            if (d && d.groups && Array.isArray(d.files) && data) {
+                var same = false;
+                try { same = JSON.stringify(d) === JSON.stringify(data); } catch (e) {}
+                if (!same) {
+                    data = d;
+                    normalizeWorldbookFiles(data);
+                    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+                    render();
+                }
+            }
+        }).catch(function() {});
     } else {
         console.log('⏳ localStorage 为空，从 IndexedDB 加载...');
         data = JSON.parse(JSON.stringify(defaultData));
