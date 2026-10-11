@@ -591,6 +591,7 @@ body {
 .inner-content {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px 16px 30px;
     -webkit-overflow-scrolling: touch;
 }
@@ -601,6 +602,8 @@ body {
 /* �?世界书编辑页：整页一起上下滑动（顶栏表单 + 搜索 + 条目区） */
 #editPage {
     overflow-y: auto;
+    overflow-x: hidden;
+    touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
 }
 #editPage::-webkit-scrollbar {
