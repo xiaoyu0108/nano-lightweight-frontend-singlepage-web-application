@@ -2954,17 +2954,18 @@
                 return;
             }
 
-            // 线下 → 返回线上：提示「已结束线下」并把线下最新一轮带回线上作衔接
+            // 线下 → 返回线上：提示「已结束线下」并把线下最近几轮带回线上作衔接
             if (data.type === 'nanoOfflineReturnOnline') {
                 const chatId = data.chatId || '';
                 try { localStorage.setItem('nano_chat_mode_' + (chatId || 'default'), 'online'); } catch (e) {}
                 const lu = String(data.lastUser || '').trim();
                 const lc = String(data.lastChar || '').trim();
+                const rounds = Array.isArray(data.rounds) ? data.rounds : null;
                 const deliver = function (win) {
                     if (!win) return;
                     try {
                         win.postMessage({ type: 'NANO_SYS_NOTICE', text: '已结束线下' }, '*');
-                        if (chatId && (lu || lc)) win.postMessage({ type: 'NANO_OFFLINE_ROUND', chatId: chatId, lastUser: lu, lastChar: lc }, '*');
+                        if (chatId && (lu || lc || (rounds && rounds.length))) win.postMessage({ type: 'NANO_OFFLINE_ROUND', chatId: chatId, lastUser: lu, lastChar: lc, rounds: rounds }, '*');
                     } catch (e) {}
                 };
                 const cf2 = document.getElementById('chatInnerFrame');

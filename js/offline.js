@@ -385,10 +385,42 @@ async function loadCharGreetings() {
     } catch (e) { resolve(null); }
   });
   if (charRecordCache && Array.isArray(charRecordCache.greetings)) {
-    charGreetings = charRecordCache.greetings
+    const expanded = [];
+    charRecordCache.greetings
       .filter(function (s) { return typeof s === 'string' && s.trim(); })
-      .map(function (s) { return s.trim(); });
+      .forEach(function (s) {
+        splitCombinedGreetings(s).forEach(function (one) {
+          if (one && expanded.indexOf(one) === -1) expanded.push(one);
+        });
+      });
+    charGreetings = expanded;
   }
+}
+
+// 有些角色卡把多条开场白塞进同一个字段，用「开场白1 / 开场白2」这类行首小标题分隔。
+// 这里把这种合并写法拆成多条独立开场白，选择器才能分别列出、分别使用。
+// 只在能识别到 2 个及以上「行首开场白标记」时才拆，避免误伤正常正文。
+function splitCombinedGreetings(text) {
+  const t = String(text == null ? '' : text);
+  if (!t.trim()) return [];
+  const headRe = /(?:^|\n)[ \t]*(?:[【\[（(]\s*)?开场白\s*([0-9０-９一二三四五六七八九十两]{1,2})\s*(?:[】\]）):：.。、,，])?/g;
+  const marks = [];
+  let m;
+  while ((m = headRe.exec(t)) !== null) {
+    if (m.index === headRe.lastIndex) headRe.lastIndex++;   // 防零宽匹配死循环
+    marks.push({ start: m.index, headEnd: headRe.lastIndex });
+  }
+  if (marks.length < 2) return [t.trim()];
+  const out = [];
+  const prefix = t.slice(0, marks[0].start).trim();
+  if (prefix) out.push(prefix);
+  for (let i = 0; i < marks.length; i++) {
+    const from = marks[i].headEnd;
+    const to = (i + 1 < marks.length) ? marks[i + 1].start : t.length;
+    const seg = t.slice(from, to).trim();
+    if (seg) out.push(seg);
+  }
+  return out.length ? out : [t.trim()];
 }
 
 // 把新开场白写回角色卡，下次进入仍可选
@@ -1272,14 +1304,26 @@ function setChatMode(mode) { try { localStorage.setItem(chatModeKey(offlineChatI
 function openExitModal() { var m = document.getElementById('exitOfflineModal'); if (m) m.classList.add('open'); }
 function closeExitModal() { var m = document.getElementById('exitOfflineModal'); if (m) m.classList.remove('open'); }
 function lastOfflineRound() {
-  var lastUser = '', lastChar = '';
-  for (var i = messages.length - 1; i >= 0; i--) {
+  // 返回最近的若干「完整轮」（user + char 各一条），与线上→线下一边带 2 轮对齐，
+  // 让线上更能接住线下的进展；同时保留 lastUser/lastChar 字段兼容旧逻辑。
+  var rounds = [];       // 从旧到新
+  var curUser = '', curChar = '';
+  for (var i = messages.length - 1; i >= 0 && rounds.length < 2; i--) {
     var mm = messages[i];
-    if (!lastChar && (mm.role === 'assistant' || mm.role === 'char') && mm.content) lastChar = String(mm.content);
-    if (!lastUser && mm.role === 'user' && mm.content) lastUser = String(mm.content);
-    if (lastUser && lastChar) break;
+    if (!mm || !mm.content) continue;
+    if (mm.role === 'assistant' || mm.role === 'char') {
+      if (!curChar) curChar = String(mm.content);
+    } else if (mm.role === 'user') {
+      if (!curUser) curUser = String(mm.content);
+    }
+    if (curUser && curChar) {
+      rounds.unshift({ user: curUser, char: curChar });
+      curUser = ''; curChar = '';
+    }
   }
-  return { user: lastUser, char: lastChar };
+  if ((curUser || curChar) && rounds.length < 2) rounds.unshift({ user: curUser, char: curChar });
+  var last = rounds.length ? rounds[rounds.length - 1] : { user: '', char: '' };
+  return { user: last.user, char: last.char, rounds: rounds };
 }
 const backBtnEl = document.getElementById('backBtn');
 if (backBtnEl) {
@@ -1334,7 +1378,7 @@ function offHasPendingMem() {
     window.__offSkipMemFlush = !!(memToggle && !memToggle.checked);
     backgroundSummarize();
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'nanoOfflineReturnOnline', chatId: offlineChatId, name: settings.charName || '', lastUser: r.user, lastChar: r.char }, '*');
+      window.parent.postMessage({ type: 'nanoOfflineReturnOnline', chatId: offlineChatId, name: settings.charName || '', lastUser: r.user, lastChar: r.char, rounds: r.rounds }, '*');
     } else if (history.length > 1) {
       history.back();
     } else {
@@ -1667,7 +1711,9 @@ async function requestReply() {
     try {
       result = await callMainAPI(history);
     } catch (err) {
-      // 偶发网络抖动：重试一次再报错
+      // 4xx（Key 无效 / 参数超限 / 内容被拒）重试无意义，直接抛出；
+      // 5xx 或网络抖动才重试一次。
+      if (err && err.status >= 400 && err.status < 500) throw err;
       await new Promise(r => setTimeout(r, 1200));
       result = await callMainAPI(history);
     }
@@ -1939,10 +1985,43 @@ async function callMainAPI(history) {
     });
 
     if (!response.ok) {
+      // 一次性读完整响应体，JSON 解析失败时也能把上游原文展示出来（很多中转 500 返回 HTML/纯文本）
+      let raw = '';
+      try { raw = await response.text(); } catch (e) {}
       let apiMsg = '';
-      try { const d = await response.json(); apiMsg = d.error?.message || d.message || ''; } catch (e) {}
-      const statusText = 'API 错误 (' + response.status + ')'
-      throw new Error(apiMsg ? statusText + '\n' + apiMsg : statusText);
+      try {
+        const d = JSON.parse(raw || '{}');
+        apiMsg = (d && d.error && (d.error.message || d.error)) || (d && d.message) || '';
+      } catch (e) {
+        apiMsg = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+      }
+      if (typeof apiMsg !== 'string') { try { apiMsg = JSON.stringify(apiMsg); } catch (e) { apiMsg = String(apiMsg); } }
+      let hint = '';
+      const st = response.status;
+      // 中转常见的错误包装：Provider API error ... http status code: 0
+      if (/Provider API error|status code:\s*0/i.test(apiMsg)) {
+        hint += '\n\n这行「Provider API error … http status code: 0」是中转/上游的报错包装（不是 App 的错），常见三种原因：\n' +
+          '① 模型名在中转里不存在 / 不被上游支持（例如写成了中转没有的版本号）——请到「API」页把模型名改成该中转列表里真实存在的 id；\n' +
+          '② 参数不被该模型接受（最常见是 max_tokens 太大）——把「输出上限」调到 4096～8192 再试；\n' +
+          '③ 中转侧的内容安全拦截。\n' +
+          '自检：用同一个 Key + 同一个模型，发一句普通内容（例如「你好」）。普通内容也 500 → 是模型名/参数/中转问题；只有露骨内容才 500 → 是中转内容拦截。';
+      }
+      if (st === 500 || st === 502 || st === 503 || st === 504) {
+        hint += '\n\n提示（5xx 多为中转/模型服务端错误）：\n' +
+          '① 把「线下设置 → 输出上限」调小（Gemini 单次输出有上限，超过可能直接 5xx），先试 4096～8192；\n' +
+          '② 换模型或换中转（同一个 Key 换个模型试，或换一个中转站）；\n' +
+          '③ 部分中转会因内容安全直接返回 5xx：可先临时关闭 NSFW 验证是不是这个原因；\n' +
+          '④ 世界书/记忆/历史太长导致请求体过大，也会 5xx，先精简再试。';
+      } else if (st === 400) {
+        hint += '\n\n提示：400 常见于 max_tokens 超过模型上限、消息格式不被接受、或内容被拒。先调小输出上限再试。';
+      } else if (st === 401 || st === 403) {
+        hint += '\n\n提示：401/403 一般是 Key 无效、额度用尽或该模型无权限。';
+      } else if (st === 429) {
+        hint += '\n\n提示：429 是速率/用量限制，稍等再试或换 Key/中转。';
+      }
+      const e2 = new Error('API 错误 (' + st + ')' + (apiMsg ? ('\n' + apiMsg) : '') + hint);
+      e2.status = st;
+      throw e2;
     }
 
     const data = await response.json();

@@ -5003,10 +5003,22 @@
 
             const history = [];
             let __sys = buildSystemPrompt();
-            if (offlineRoundHint && (offlineRoundHint.user || offlineRoundHint.char)) {
-                __sys += '\n\n【刚从线下模式返回线上】你们刚刚在线下见过面（线下长文相处），线下最新一轮如下：\n'
-                    + (currentUserName || '用户') + '：' + (offlineRoundHint.user || '') + '\n'
-                    + (displayName || '角色') + '：' + (offlineRoundHint.char || '')
+            if (offlineRoundHint && (offlineRoundHint.user || offlineRoundHint.char || (offlineRoundHint.rounds && offlineRoundHint.rounds.length))) {
+                let roundText = '';
+                if (offlineRoundHint.rounds && offlineRoundHint.rounds.length) {
+                    roundText = offlineRoundHint.rounds.map(function (r) {
+                        const u = String((r && r.user) || '').trim();
+                        const c = String((r && r.char) || '').trim();
+                        return ((u ? ((currentUserName || '用户') + '：' + u + '\n') : '') +
+                                (c ? ((displayName || '角色') + '：' + c) : '')).trim();
+                    }).filter(Boolean).join('\n');
+                }
+                if (!roundText) {
+                    roundText = (currentUserName || '用户') + '：' + (offlineRoundHint.user || '') + '\n'
+                        + (displayName || '角色') + '：' + (offlineRoundHint.char || '');
+                }
+                __sys += '\n\n【刚从线下模式返回线上】你们刚刚在线下见过面（线下长文相处），线下最近几轮如下：\n'
+                    + roundText
                     + '\n请自然衔接这段线下的进展，继续线上聊天。';
                 offlineRoundHint = null;
             }
@@ -7596,8 +7608,12 @@ if (callCard) {
         }
         if (data.type === 'NANO_OFFLINE_ROUND') {
             try {
-                offlineRoundHint = { user: String(data.lastUser || ''), char: String(data.lastChar || '') };
-                if ((offlineRoundHint.user || offlineRoundHint.char) && typeof renderMessages === 'function') renderMessages();
+                offlineRoundHint = {
+                    user: String(data.lastUser || ''),
+                    char: String(data.lastChar || ''),
+                    rounds: Array.isArray(data.rounds) ? data.rounds : null
+                };
+                if ((offlineRoundHint.user || offlineRoundHint.char || (offlineRoundHint.rounds && offlineRoundHint.rounds.length)) && typeof renderMessages === 'function') renderMessages();
             } catch (e) {}
             return;
         }
