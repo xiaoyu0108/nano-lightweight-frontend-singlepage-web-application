@@ -755,6 +755,14 @@ body.popup-open .bottom-bar { display: none !important; }
 }
 .emoji-recommend.hidden { display: none; }
 .emoji-recommend::-webkit-scrollbar { display: none; }
+/* 表情推荐固定在底栏上方：锚定 .bottom-bar（它已 position:relative），
+   底栏高度怎么调都不影响，不会被遮挡，只留一点点空隙。 */
+.bottom-bar > .emoji-recommend {
+    position: absolute;
+    left: 12px; right: 12px;
+    bottom: calc(100% + 6px);
+    z-index: 70;
+}
 .er-item {
     flex: 0 0 auto;
     width: 56px;
@@ -1167,6 +1175,60 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     cursor: pointer;
     z-index: 2001;
 }
+
+/* ===== 图片相关底部半屏弹窗（重roll / 保存兜底） ===== */
+.iv-sheet {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 2100;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+}
+.iv-sheet.active { display: flex; }
+.iv-sheet-card {
+    width: 100%;
+    max-width: 460px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    padding: 16px 16px calc(18px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)));
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.18);
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    animation: ivSheetUp 0.22s ease;
+}
+@keyframes ivSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.iv-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.iv-sheet-title { font-size: 16px; font-weight: 600; color: #1c1c1e; }
+.iv-sheet-x {
+    width: 30px; height: 30px; border: none; border-radius: 50%;
+    background: rgba(120,120,128,0.12); color: #8e8e93; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.iv-sheet-x svg { width: 16px; height: 16px; }
+.iv-sheet-desc { font-size: 12px; color: #8e8e93; margin: 6px 0 10px; line-height: 1.5; }
+.iv-sheet-input {
+    width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical;
+    border: 1px solid rgba(120,120,128,0.2); border-radius: 12px;
+    padding: 10px 12px; font-size: 14px; line-height: 1.5; color: #1c1c1e;
+    font-family: inherit; outline: none; background: #f7f7f9;
+}
+.iv-sheet-input:focus { border-color: #007aff; background: #fff; }
+.iv-sheet-imgwrap {
+    flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center;
+    border-radius: 12px; background: #f2f2f5; padding: 8px;
+}
+.iv-sheet-imgwrap img { max-width: 100%; max-height: 46vh; object-fit: contain; border-radius: 8px; -webkit-touch-callout: default; }
+.iv-sheet-actions { display: flex; gap: 10px; margin-top: 12px; }
+.iv-sheet-btn {
+    flex: 1; height: 44px; border: none; border-radius: 14px; font-size: 15px; font-weight: 600;
+    background: rgba(120,120,128,0.12); color: #1c1c1e; cursor: pointer;
+}
+.iv-sheet-btn.primary { background: #007aff; color: #fff; }
+.iv-sheet-btn:active { opacity: 0.85; }
 
 @media (max-width: 480px) {
     .topbar { left: auto; right: auto; top: auto; padding: var(--chat-topbar-pad, max(var(--safe-top, 0px), env(safe-area-inset-top, 0px))) 10px 6px; gap: 8px; }

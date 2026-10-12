@@ -49,6 +49,7 @@
     </div>
 
     <footer class="bottom-bar">
+        <div class="emoji-recommend hidden" id="emojiRecommend"></div>
         <button class="more-btn" id="moreBtn">
             <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"/>
@@ -57,7 +58,6 @@
         </button>
         <div class="input-shell">
             <div class="above-input" id="aboveInput">
-                <div class="emoji-recommend hidden" id="emojiRecommend"></div>
                 <div class="quote-bar" id="quoteBar">
                     <span class="quote-name" id="quoteName"></span>
                     <span class="quote-text" id="quoteText">引用内容</span>
@@ -343,14 +343,48 @@
     </div>
 </div>
 
-    <!-- ===== 图片查看器（放大 + 底部四个按钮） ===== -->
+    <!-- ===== 图片查看器（放大 + 取消 / 重roll / 保存） ===== -->
     <div class="image-viewer" id="imageViewer">
         <img id="ivImg" src="" alt="图片" />
         <div class="iv-actions" id="ivActions">
             <div class="iv-act" id="ivClose" data-close>取消</div>
             <div class="iv-act" id="ivReroll">重roll</div>
-            <div class="iv-act" id="ivView">查看</div>
             <div class="iv-act" id="ivDownload">保存</div>
+        </div>
+    </div>
+
+    <!-- ===== 重roll 弹窗（底部半屏，可改提示词后重roll） ===== -->
+    <div class="iv-sheet" id="ivRerollSheet">
+        <div class="iv-sheet-card">
+            <div class="iv-sheet-head">
+                <div class="iv-sheet-title">重新生成图片</div>
+                <button class="iv-sheet-x" id="ivRerollClose" aria-label="关闭">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="iv-sheet-desc">可以修改提示词后再重roll，也可以不改直接重roll。</div>
+            <textarea class="iv-sheet-input" id="ivRerollInput" spellcheck="false" placeholder="描述这张图……"></textarea>
+            <div class="iv-sheet-actions">
+                <button class="iv-sheet-btn" id="ivRerollCancel">取消</button>
+                <button class="iv-sheet-btn primary" id="ivRerollGo">重roll</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 保存兜底弹窗（底部半屏，长按保存） ===== -->
+    <div class="iv-sheet" id="ivSaveSheet">
+        <div class="iv-sheet-card">
+            <div class="iv-sheet-head">
+                <div class="iv-sheet-title">保存图片</div>
+                <button class="iv-sheet-x" id="ivSaveClose" aria-label="关闭">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="iv-sheet-desc">长按下面这张图片，选择「存储到照片 / 保存图片」即可存进相册。</div>
+            <div class="iv-sheet-imgwrap"><img id="ivSaveImg" src="" alt="图片" /></div>
+            <div class="iv-sheet-actions">
+                <button class="iv-sheet-btn" id="ivSaveCancel">取消</button>
+            </div>
         </div>
     </div>
 </div>
@@ -415,8 +449,9 @@
 <script src="js/nano-assistant-knowledge.js?v=20260929a"></script>
 <script src="js/nano-assistant-tools.js?v=20260929a"></script>
 <script src="js/family-card-store.js?v=20261006a"></script>
-<script src="js/mem-link.js?v=20261006a"></script>
-<script src="js/chat-core.js?v=20261011a"></script>
+    <script src="js/mem-link.js?v=20261006a"></script>
+    <script src="js/nano-holiday.js?v=20261012a"></script>
+    <script src="js/chat-core.js?v=20261012a"></script>
 <script src="js/chat-transfer.js?v=20261006a"></script>
 <script src="js/chat-gift.js"></script>
 <script src="js/chat-image.js"></script>

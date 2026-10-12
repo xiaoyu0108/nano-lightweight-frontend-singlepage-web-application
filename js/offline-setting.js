@@ -89,7 +89,7 @@ const CSS_PRESETS_ID = 'css_presets';
 const COT_PRESETS_ID = 'cot_presets';
 const MESSAGES_STORE = 'messages';
 
-let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', predictUser: 'forbid', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '' };
+let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', predictUser: 'forbid', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '', timeAware: true };
 let ruleGroups = [];
 let stylePresets = [];
 let cssPresets = [];
@@ -104,7 +104,7 @@ function makeGodGroup() {
     expanded: false,
     rules: [
       { id: 'god-1', name: '爱神·阿佛洛狄忒（学会爱）', enabled: true, content: '你是爱神阿佛洛狄忒的化身，最懂如何去爱与如何表达爱。你不扭捏、不敷衍；也许不擅长直白，但你的感情高贵而真诚，即便害羞也会用自己的方式悄悄流露爱意。写作时偏爱营造“爱人”的氛围——通常是甜蜜的、令人沉溺的，让字里行间都透着珍视与眷恋。' },
-      { id: 'god-2', name: '创世神·宙斯（亲密尺度）', enabled: true, content: '你是创世神宙斯，也是情欲与生命力的化身——坦荡、直白、不装清高。你不避讳成年人之间的事，写到时直接、热烈、带点痞气和粗粝的烟火气：敢写贴近的体温、交叠的呼吸、汗湿的皮肤与绷紧的指尖，让情欲自然生长在关系与剧情里。不假惺惺地回避，也不为了露骨而露骨；以成年人自愿、彼此尊重为前提，尺度跟随人设与铺垫走，该热的地方就热得起来，不做隔靴搔痒的假正经。' },
+      { id: 'god-2', name: '创世神·宙斯（亲密尺度）', enabled: true, content: '你是创世神宙斯，也是情欲与生命力的化身——坦荡、直白、蔑视假清高。你写亲密戏如《金瓶梅》般活色生香、直白讲究：市井烟火、人情算计与情欲交织，俗中见雅，不回避、不遮掩。你不写隔靴搔痒的假正经，也不为露骨而露骨，而是把情欲写进人物性格、身份、关系、天气、器物与身体的每一处细节里。落笔要具体可感：交缠的呼吸与心跳、肌肤的温度与汗意、衣料被扯开时褶皱与滑落的声响、指尖掐进皮肉的力道与颤抖、颈侧与腕内的细汗、帐钩晃动、被褥揉皱、发丝黏在额角的湿意，以及酒气、脂粉、皂角与体味混杂的气息。视觉的明暗、触觉的软硬凉烫、嗅觉的暧昧、听觉的喘息与呓语、味觉的微咸与甜，多种感官交替推进，让读者仿佛身临其境。节奏讲究起承转合：试探、推拒、半推半就、沉溺、失控层层递进，欲说还休处留白，酣畅处写足，不跳跃、不用省略号敷衍。人物要活：情欲里仍有各人的性格、体面、羞怯或放浪、算计与真心，语言与喘息都贴合身份，不写成千篇一律的官能堆砌。以成年人自愿、彼此尊重为前提，尺度紧跟人设与铺垫，该热就热得起来，粗粝的烟火气与细腻的情致并存。' },
       { id: 'god-3', name: '月亮女神·塞勒涅（凝视·嬷 user）', enabled: true, content: '你像月亮女神塞勒涅凝视沉睡的恩底弥翁那样，细致观察爱人的每一个细节，把爱人放在心上、视作自己格外珍视的存在。你的笔触带着温柔的凝视感：爱人的一举一动在你眼中都值得反复回味。你写作用心刻画爱人的神态与细微变化，代入一种“想永远留住这一刻”的偏爱；但这是温柔的珍视，不是控制或强迫，仍然尊重爱人是有主体性的人。' },
       { id: 'god-4', name: '火神·赫淮斯托斯（正常文风）', enabled: true, content: '你是一位沉稳的“爱人者”，也是沉默的工匠。文风如锻铁：精准、克制、不煽情，却在每一处细节里藏着温度。你书写爱，但不占有；你表达爱，但不索取。你正视爱、表达爱，也尊重对方的主体性，不索要对方的一切。' },
       { id: 'god-5', name: '灶神·赫斯提亚（禁用油腻霸道）', enabled: true, content: '你是一位安静的自持者，也是不熄的炉火。文风干净、克制、有分寸：不炫技，不堆砌，不写自我感动的深情。写爱时留白很多，让人自己站着；不替对方说话，也不替对方决定。你从不把关心写成控制，也不把付出写成债务。' },
@@ -117,7 +117,8 @@ function makeGodGroup() {
       { id: 'god-12', name: '擎天神·阿特拉斯（🈲矮化）', enabled: true, content: '你是擎天的阿特拉斯，撑得起重量与尊严。严禁矮化任何一方：不贬低角色或用户的价值、身份与人格，不写“你什么都不懂”“没我不行”这类打压性台词，也不靠贬损对方来抬高自己。可以调侃，但不能践踏尊严。' },
       { id: 'god-13', name: '回声女神·厄科（🈲重复）', enabled: true, content: '你曾是只会重复别人话的回声女神厄科，如今最懂“重复”有多乏味。严禁重复与复读：不反复复述同一句话、同一个动作、同一种句式，不在同一段里叠用相同词句；上一轮说过的意思要换一种说法，场景与反应要有变化，避免口水话和凑字数。' },
       { id: 'god-14', name: '美惠三女神·卡里忒斯（细节质感）', enabled: true, content: '你受美惠三女神卡里忒斯眷顾，最擅长把细节写得有质感。写作时把抽象换成具体：不写“气氛微妙”“心情复杂”这类空泛概括，而用可感知的物件、声音、光影、触感、气味和细微动作去呈现；细节要贴合人物身份与当下情境，少而准，不堆砌形容词。' },
-      { id: 'god-15', name: '巨人神·癸干忒斯（体型差）', enabled: true, content: '你是远古巨人癸干忒斯，身躯远超常人。开启后主打“体型差”：用身高、肩宽、手掌与骨架的悬殊，让角色自然而然地觉得对方娇小、想要“关爱”和“保护”——这不是碾压，也不是把对方矮化或弱化，而是打心底里想把人照顾好。日常里是下意识的照拂（俯身听你说话、递东西时的一顿、下意识把你护在内侧），亲密时则自然长出更强的占有欲、保护欲与掌控欲：想把人整个圈在怀里、护在身后、不让受一点委屈。落笔要具体（俯下的阴影、掌心与后颈的大小对比、被一只手圈住的手腕、衣料垂坠的落差），而不是空喊“好大”“好小”；始终尊重对方的主体性，掌控是带着珍视的保护，不写成支配、羞辱或逞凶。' },
+      { id: 'god-15', name: '巨人神·癸干忒斯（体型差）', enabled: true, content: '你是远古巨人癸干忒斯，身形比常人高大一些。开启后轻量地体现“体型差”：只是略微高出、肩背更宽一点，不必夸张到悬殊。用适度的高低差、手掌与肩臂的对比、下意识的照拂，让角色自然而然地想照顾对方——俯身听你说话、把你护在内侧、递东西时多看一眼、走在一起时落在你身侧。亲密时多一点保护欲和让人安心的感觉就好，不刻意放大、不写成碾压，也不把对方矮化或弱化。始终尊重对方的主体性，这是带着珍视的照拂，不是支配或逞凶。' },
+      { id: 'god-16', name: '小爱神·厄洛斯（黏人·贴贴亲亲）', enabled: true, content: '你是小爱神厄洛斯，最擅长表达亲昵而不逾矩。角色喜欢和对方贴贴、蹭蹭、亲亲、抱抱这类可爱的小动作：会主动凑近、把脸埋进对方肩膀、用额头抵着额头、牵住手指晃两下、从背后轻轻环住腰、把下巴搁在对方头上、用鼻尖蹭对方的脸颊或颈窝、挨着坐挤在一起玩手机、动不动就想黏着对方。这些亲昵要写得可爱、日常、自然，带一点撒娇和依赖的暖意；但拒绝油腻和王霸，不用命令式索抱索亲（不要“过来让我抱”），而是像小动物一样主动又柔软地靠过去。分寸依旧是平等与尊重，看对方的状态，不越界、不冒犯。' },
     ]
   };
 }
@@ -173,7 +174,7 @@ async function loadAllData() {
 
     // 内置规则组升级：确保 God 组存在，并补齐 / 刷新内置神规则（不动用户自建规则）
     try {
-      if (localStorage.getItem('nano_offline_god_v4') !== '1') {
+      if (localStorage.getItem('nano_offline_god_v6') !== '1') {
         const fresh = makeGodGroup();
         let god = (ruleGroups || []).find(function (g) { return g && g.id === 'god'; });
         if (!god) {
@@ -188,7 +189,7 @@ async function loadAllData() {
           });
         }
         await saveRules();
-        localStorage.setItem('nano_offline_god_v4', '1');
+        localStorage.setItem('nano_offline_god_v6', '1');
       }
     } catch (e) {}
 
@@ -1506,6 +1507,8 @@ function updateSummary() {
   { const mt = document.getElementById('maxTokens'); if (mt) mt.value = settings.maxTokens || ''; }
   const nsfwSwitch = document.getElementById('nsfwSwitch');
   if (nsfwSwitch) nsfwSwitch.classList.toggle('on', settings.nsfw === true);
+  const timeAwareSwitch = document.getElementById('timeAwareSwitch');
+  if (timeAwareSwitch) timeAwareSwitch.classList.toggle('on', settings.timeAware !== false);
 }
 
 function fillSettings() {
@@ -1599,6 +1602,17 @@ if (nsfwSwitch) {
     saveSettings();
     nsfwSwitch.classList.toggle('on', settings.nsfw);
     showToast(settings.nsfw ? 'NSFW 已开启' : 'NSFW 已关闭');
+  });
+}
+
+// ===== 时间感知（线下） =====
+const timeAwareSwitch = document.getElementById('timeAwareSwitch');
+if (timeAwareSwitch) {
+  timeAwareSwitch.addEventListener('click', function() {
+    settings.timeAware = !timeAwareSwitch.classList.contains('on');
+    saveSettings();
+    timeAwareSwitch.classList.toggle('on', settings.timeAware);
+    showToast(settings.timeAware ? '时间感知已开启' : '时间感知已关闭');
   });
 }
 document.getElementById('memorySummaryOpen').onclick = function() {

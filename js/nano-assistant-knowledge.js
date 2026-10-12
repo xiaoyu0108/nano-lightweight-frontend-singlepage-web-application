@@ -85,7 +85,11 @@ window.NANO_ASSISTANT_KB = {
     emoji: 'IndexedDB nano_api_db/emoji_data，key=nano_emoji_data，值 {emojiGroups:[{id,name,emojis:[{id,name,url}]}], balance, favorites}；同时 localStorage.nano_emoji_data',
     characters: 'IndexedDB nano_characters_db/characters',
     mask: 'localStorage.nano_mask_data + IndexedDB nano_mask_db',
-    apiConfig: 'IndexedDB nano_api_db/api_data/nano_api_config'
+    apiConfig: 'IndexedDB nano_api_db/api_data/nano_api_config',
+    beautifyPresets: 'IndexedDB BeautifyAppDB/presets（每条 {category,name,code}；category = global|chat|chat-avatar|offline|font）',
+    heartTemplates: 'IndexedDB NanoVoiceDB/templates（每条 {id,name,css}）',
+    offlinePresets: 'IndexedDB MeetSettingsDB：文风 stylePresets（id=style_presets，presets:[{name,content}]）、思维链 cotPresets（id=cot_presets）、美化 cssPresets（id=css_presets）、规则 rules（id=main_rules，groups:[{name,rules:[{name,content,enabled}]}]）',
+    offlineMenuPlugins: 'localStorage.offline_menu_plugins（数组，每条 {name,js}；js 用 new Function("api", js) 在线下头像菜单执行）'
   },
 
   // 世界书条目字段
@@ -104,6 +108,12 @@ window.NANO_ASSISTANT_KB = {
   { tool: 'edit_persona', args: { name: '角色名或id', setting: '新的完整人设文本' }, note: '修改某个角色的完整人设（会自动先存一个历史版本，可回退）' },
   { tool: 'save_persona_version', args: { name: '角色名或id' }, note: '为某角色人设手动存一个历史版本' },
   { tool: 'list_persona_versions', args: { name: '角色名或id' }, note: '列出某角色保存过的人设历史版本（含版本号，用于回退）' },
-  { tool: 'restore_persona_version', args: { name: '角色名或id', index: 1 }, note: '把某角色人设回退到第 index 个历史版本（index 从 1 开始，1=最新保存的版本）' }
+  { tool: 'restore_persona_version', args: { name: '角色名或id', index: 1 }, note: '把某角色人设回退到第 index 个历史版本（index 从 1 开始，1=最新保存的版本）' },
+  { tool: 'save_preset', args: { scope: 'global|chat|chat-avatar|offline|heart|offline-style|offline-cot|offline-css', name: '预设名', content: '预设内容' }, note: '保存/覆盖一个预设。全局、聊天、聊天头像、线下美化存到 BeautifyAppDB（不会自动应用，只进预设列表）；heart 存心声模板；offline-style/offline-cot/offline-css 存线下「文风/思维链/美化」预设；menu-plugin 用 add_menu_plugin' },
+  { tool: 'delete_preset', args: { scope: '同上', name: '预设名' }, note: '删除某个已保存的预设' },
+  { tool: 'add_offline_rule', args: { group: '规则组名（可新建）', name: '规则名', content: '规则内容' }, note: '给线下「规则」新增一条规则；group 填已有组名（如“行为规则”）或新组名。用户说“给规则加一条/加个规则”时用这个' },
+  { tool: 'add_menu_plugin', args: { name: '插件名', js: '插件 JS 代码' }, note: '给线下输入框头像菜单添加一个 JS 插件按钮。js 里用 api.addItem({label,icon,run}) 注册按钮，可用 api.toast/getMessages/scrollToFloor/reroll 等。用户说“给线下加个插件/加个按钮功能”时用这个' },
+  { tool: 'list_presets', args: { scope: 'global|chat|chat-avatar|offline|heart|offline-style|offline-cot|offline-css|offline-rules|menu-plugin' }, note: '只读：列出该范围已保存的预设名与摘要（系统会把结果读给你，然后你继续回答）' },
+  { tool: 'read_preset', args: { scope: '同上', name: '预设名' }, note: '只读：读取某个预设的完整内容（系统会把内容读给你）' }
   ]
 };

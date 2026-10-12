@@ -393,9 +393,10 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 
 /* 2.7 底部 dock（私聊）
    HTML：<footer class="bottom-bar">
+           <div class="emoji-recommend hidden" id="emojiRecommend"></div>
            <button class="more-btn" id="moreBtn"><svg>+</svg></button>
            <div class="input-shell">
-             <div class="above-input" id="aboveInput"><div class="emoji-recommend hidden" id="emojiRecommend"></div>
+             <div class="above-input" id="aboveInput">
                <div class="quote-bar" id="quoteBar">…</div></div>
              <div class="input-row"><input class="input" id="messageInput">
                <div class="emoji-voice-group">
@@ -436,6 +437,7 @@ window.NANO_CHAT_TEMPLATE = `/* ================================================
 .nano-chat-inner .above-input > * { pointer-events: auto; }
 .nano-chat-inner .emoji-recommend { display: flex; gap: 8px; overflow-x: auto; padding: 8px 10px; background: rgba(255, 255, 255, 0.92); border-radius: 14px; border: 0.5px solid var(--chat-glass-line); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
 .nano-chat-inner .emoji-recommend.hidden { display: none; }
+.nano-chat-inner .bottom-bar > .emoji-recommend { position: absolute; left: 12px; right: 12px; bottom: calc(100% + 6px); z-index: 70; }
 .nano-chat-inner .er-item { border: none; background: transparent; padding: 4px; border-radius: 8px; cursor: pointer; }
 .nano-chat-inner .er-item img { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; }
 

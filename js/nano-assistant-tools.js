@@ -23,6 +23,13 @@
     lines.push('8. 用户发来"表情包 / 图片清单"（一般是「名字：图片链接」的形式）并要求加入表情包时，必须用 add_emoji，绝对不要用 add_worldbook。只有用户明确说要"世界书/设定"时才用 add_worldbook。');
     lines.push('9. 每次 apply_beautify 都会自动存成一个「可切换的预设」（在对应美化页里能选），所以 name 要起一个简短好认的名字，方便用户之后切换。若用户说「改我那个叫 XX 的预设」，就把 name 填成 XX —— 同名会直接更新那个预设，不会再多出一个。');
     lines.push('10. 用户让你「用我刚发的图当头像/换成我发的这张」时，用 set_avatar（args:{"useLast":true}），不要用 apply_beautify 硬套图片地址（iOS 上本地图片地址塞进 CSS/JSON 会失效）。');
+    lines.push('11. 只回答用户当前问的这一个问题，问什么就答什么；**不要反复回答之前已经回答过的问题**，不要每轮都把上一条结论再复述一遍，也不要把无关的旧内容重新倒出来。');
+    lines.push('');
+    lines.push('【不限于美化 · 你还能做的装修】');
+    lines.push('· 线下美化：apply_beautify（scope:"offline"），写入线下 customCSS，重新打开线下即生效。');
+    lines.push('· 线下菜单 JS 插件：add_menu_plugin（args:{name,js}），给线下输入框头像菜单加自定义按钮，js 里用 api.addItem({label,icon,run}) 注册，可用 api.toast/getMessages/scrollToFloor/reroll 等。');
+    lines.push('· 给线下「规则 / 文风 / 思维链 / 美化」加预设：add_offline_rule（规则，可指定已有组名或新建组）；save_preset（scope:"offline-style|offline-cot|offline-css"，name+content）。');
+    lines.push('· 读取/修改用户已存的预设：先用 list_presets / read_preset 读取（系统会把结果读给你，你再继续），再用 save_preset 覆盖、delete_preset 删除。scope：global/chat/chat-avatar/offline/heart/offline-style/offline-cot/offline-css/offline-rules/menu-plugin。');
     lines.push('');
     lines.push('【执行动作的方式】');
     lines.push('需要真正修改时，在回复里输出代码块（用户会看到确认按钮，确认后才生效）：');
@@ -668,6 +675,284 @@
     return true;
   }
 
+  /* ---------- 预设：读取 / 新增 / 修改 / 删除 ---------- */
+  // 统一 scope：
+  //   global | chat | chat-avatar | offline | font   → BeautifyAppDB/presets（category 同名）
+  //   heart                                          → NanoVoiceDB/templates
+  //   offline-style | offline-cot | offline-css       → MeetSettingsDB/{stylePresets,cotPresets,cssPresets}
+  //   offline-rules                                  → MeetSettingsDB/rules
+  //   menu-plugin                                    → localStorage.offline_menu_plugins
+  var OFFLINE_SIMPLE = {
+    'offline-style': { store: 'stylePresets', id: 'style_presets' },
+    'offline-cot': { store: 'cotPresets', id: 'cot_presets' },
+    'offline-css': { store: 'cssPresets', id: 'css_presets' }
+  };
+  var MENU_PLUGIN_KEY = 'offline_menu_plugins';
+
+  function openVersionedDB(name, version, setup) {
+    return new Promise(function (resolve) {
+      try {
+        var req = indexedDB.open(name, version);
+        req.onupgradeneeded = function (e) { try { setup(e.target.result); } catch (x) {} };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { resolve(null); };
+      } catch (e) { resolve(null); }
+    });
+  }
+  function ensureBeautifyStores(db) {
+    if (!db.objectStoreNames.contains('presets')) db.createObjectStore('presets', { keyPath: 'id', autoIncrement: true });
+    if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
+  }
+  function ensureMeetStores(db) {
+    ['settings', 'rules', 'stylePresets', 'cssPresets', 'cotPresets', 'messages'].forEach(function (s) {
+      if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: 'id' });
+    });
+  }
+  function idbAll(db, store) {
+    return new Promise(function (res) {
+      try {
+        if (!db || !db.objectStoreNames.contains(store)) { res([]); return; }
+        var rq = db.transaction(store, 'readonly').objectStore(store).getAll();
+        rq.onsuccess = function () { res(rq.result || []); };
+        rq.onerror = function () { res([]); };
+      } catch (e) { res([]); }
+    });
+  }
+  function idbPut(db, store, rec) {
+    return new Promise(function (res) {
+      try {
+        if (!db || !db.objectStoreNames.contains(store)) { res(false); return; }
+        var tx = db.transaction(store, 'readwrite');
+        tx.objectStore(store).put(rec);
+        tx.oncomplete = function () { res(true); };
+        tx.onerror = function () { res(false); };
+      } catch (e) { res(false); }
+    });
+  }
+  function idbDelete(db, store, key) {
+    return new Promise(function (res) {
+      try {
+        if (!db || !db.objectStoreNames.contains(store)) { res(false); return; }
+        var tx = db.transaction(store, 'readwrite');
+        tx.objectStore(store).delete(key);
+        tx.oncomplete = function () { res(true); };
+        tx.onerror = function () { res(false); };
+      } catch (e) { res(false); }
+    });
+  }
+
+  function menuPluginList() { try { return JSON.parse(localStorage.getItem(MENU_PLUGIN_KEY) || '[]') || []; } catch (e) { return []; } }
+  function menuPluginWrite(list) { try { localStorage.setItem(MENU_PLUGIN_KEY, JSON.stringify((list || []).slice(0, 40))); } catch (e) {} }
+
+  // 列出某范围已有的预设，返回 [{name, content}]（content 可能为空串）
+  async function presetList(scope) {
+    scope = String(scope || '').trim();
+    if (OFFLINE_SIMPLE[scope]) {
+      var cfg = OFFLINE_SIMPLE[scope];
+      var mdb = await openVersionedDB('MeetSettingsDB', 2, ensureMeetStores);
+      var recs = await idbAll(mdb, cfg.store);
+      if (mdb) mdb.close();
+      var rec = recs.find(function (r) { return r && r.id === cfg.id; });
+      return (rec && Array.isArray(rec.presets)) ? rec.presets.map(function (p) { return { name: p.name, content: p.content || '' }; }) : [];
+    }
+    if (scope === 'offline-rules') {
+      var mdb2 = await openVersionedDB('MeetSettingsDB', 2, ensureMeetStores);
+      var rrec = (await idbAll(mdb2, 'rules')).find(function (r) { return r && r.id === 'main_rules'; });
+      if (mdb2) mdb2.close();
+      var out = [];
+      ((rrec && rrec.groups) || []).forEach(function (g) { (g.rules || []).forEach(function (r) { out.push({ name: (g.name || '') + ' / ' + (r.name || ''), content: r.content || '' }); }); });
+      return out;
+    }
+    if (scope === 'menu-plugin') {
+      return menuPluginList().map(function (p) { return { name: p.name || '', content: String(p.js || '').slice(0, 200) }; });
+    }
+    if (scope === 'heart') {
+      var vdb = await openVersionedDB('NanoVoiceDB', 1, function (db) { if (!db.objectStoreNames.contains('templates')) db.createObjectStore('templates', { keyPath: 'id' }); });
+      var list = await idbAll(vdb, 'templates');
+      if (vdb) vdb.close();
+      return list.map(function (t) { return { name: t.name || t.id, content: t.css || '' }; });
+    }
+    if (scope === 'font') {
+      // 字体预设不在 BeautifyAppDB；仅提示
+      return [];
+    }
+    if (scope === 'global' || scope === 'chat' || scope === 'chat-avatar' || scope === 'offline') {
+      var bdb = await openVersionedDB('BeautifyAppDB', 1, ensureBeautifyStores);
+      var all = await idbAll(bdb, 'presets');
+      if (bdb) bdb.close();
+      return all.filter(function (p) { return p && p.category === scope; }).map(function (p) { return { name: p.name || '', content: p.code || '' }; });
+    }
+    throw new Error('不支持的 scope：' + scope);
+  }
+
+  async function presetRead(scope, name) {
+    var list = await presetList(scope);
+    name = String(name || '').trim();
+    var hit = list.find(function (p) { return p.name === name; });
+    if (!hit) throw new Error('没有找到预设「' + name + '」（scope=' + scope + '）');
+    if (scope === 'menu-plugin') {
+      var p = menuPluginList().find(function (x) { return (x.name || '') === name; });
+      return (p && p.js) || '';
+    }
+    return hit.content || '';
+  }
+
+  async function presetSave(scope, name, content) {
+    scope = String(scope || '').trim();
+    name = String(name || '').trim();
+    content = String(content || '');
+    if (!name) throw new Error('缺少预设名 name');
+    if (OFFLINE_SIMPLE[scope]) {
+      var cfg = OFFLINE_SIMPLE[scope];
+      var mdb = await openVersionedDB('MeetSettingsDB', 2, ensureMeetStores);
+      var recs = await idbAll(mdb, cfg.store);
+      var rec = recs.find(function (r) { return r && r.id === cfg.id; }) || { id: cfg.id, presets: [] };
+      if (!Array.isArray(rec.presets)) rec.presets = [];
+      var found = rec.presets.find(function (p) { return p && p.name === name; });
+      if (found) { found.content = content; } else { rec.presets.push({ name: name, content: content }); }
+      await idbPut(mdb, cfg.store, rec);
+      if (mdb) mdb.close();
+      return true;
+    }
+    if (scope === 'heart') {
+      var vdb = await openVersionedDB('NanoVoiceDB', 1, function (db) { if (!db.objectStoreNames.contains('templates')) db.createObjectStore('templates', { keyPath: 'id' }); });
+      var list = await idbAll(vdb, 'templates');
+      var key = 'nano_' + name;
+      var hit = list.find(function (t) { return t && (t.name === name || t.id === key); });
+      var rid = hit ? hit.id : key;
+      await idbPut(vdb, 'templates', { id: rid, name: name, css: content });
+      if (vdb) vdb.close();
+      return true;
+    }
+    if (scope === 'menu-plugin') {
+      var arr = menuPluginList();
+      var f = arr.find(function (p) { return (p.name || '') === name; });
+      if (f) { f.js = content; } else { arr.push({ name: name, js: content }); }
+      menuPluginWrite(arr);
+      try { window.parent.postMessage({ type: 'offlineMenuPluginsChanged' }, '*'); } catch (e) {}
+      return true;
+    }
+    if (scope === 'global' || scope === 'chat' || scope === 'chat-avatar' || scope === 'offline') {
+      var bdb = await openVersionedDB('BeautifyAppDB', 1, ensureBeautifyStores);
+      var all = await idbAll(bdb, 'presets');
+      var ex = all.find(function (p) { return p && p.category === scope && p.name === name; });
+      if (ex) { ex.code = content; ex.updatedAt = Date.now(); await idbPut(bdb, 'presets', ex); }
+      else { await idbPut(bdb, 'presets', { category: scope, name: name, code: content, createdAt: Date.now() }); }
+      if (bdb) bdb.close();
+      return true;
+    }
+    throw new Error('不支持的 scope：' + scope);
+  }
+
+  async function presetDelete(scope, name) {
+    scope = String(scope || '').trim();
+    name = String(name || '').trim();
+    var removed = false;
+    if (OFFLINE_SIMPLE[scope]) {
+      var cfg = OFFLINE_SIMPLE[scope];
+      var mdb = await openVersionedDB('MeetSettingsDB', 2, ensureMeetStores);
+      var recs = await idbAll(mdb, cfg.store);
+      var rec = recs.find(function (r) { return r && r.id === cfg.id; });
+      if (rec && Array.isArray(rec.presets)) {
+        var before = rec.presets.length;
+        rec.presets = rec.presets.filter(function (p) { return !(p && p.name === name); });
+        removed = rec.presets.length < before;
+        await idbPut(mdb, cfg.store, rec);
+      }
+      if (mdb) mdb.close();
+    } else if (scope === 'offline-rules') {
+      var mdb2 = await openVersionedDB('MeetSettingsDB', 2, ensureMeetStores);
+      var rrec = (await idbAll(mdb2, 'rules')).find(function (r) { return r && r.id === 'main_rules'; });
+      if (rrec && Array.isArray(rrec.groups)) {
+        rrec.groups.forEach(function (g) {
+          var before = (g.rules || []).length;
+          g.rules = (g.rules || []).filter(function (r) { return !(r && (((g.name || '') + ' / ' + (r.name || '')) === name || r.name === name)); });
+          if (g.rules.length < before) removed = true;
+        });
+        await idbPut(mdb2, 'rules', rrec);
+      }
+      if (mdb2) mdb2.close();
+    } else if (scope === 'menu-plugin') {
+      var arr = menuPluginList();
+      var before2 = arr.length;
+      var next = arr.filter(function (p) { return (p.name || '') !== name; });
+      removed = next.length < before2;
+      menuPluginWrite(next);
+      try { window.parent.postMessage({ type: 'offlineMenuPluginsChanged' }, '*'); } catch (e) {}
+    } else if (scope === 'heart') {
+      var vdb = await openVersionedDB('NanoVoiceDB', 1, function (db) { if (!db.objectStoreNames.contains('templates')) db.createObjectStore('templates', { keyPath: 'id' }); });
+      var list = await idbAll(vdb, 'templates');
+      var hit = list.find(function (t) { return t && (t.name === name || t.id === ('nano_' + name)); });
+      if (hit) { await idbDelete(vdb, 'templates', hit.id); removed = true; }
+      if (vdb) vdb.close();
+    } else if (scope === 'global' || scope === 'chat' || scope === 'chat-avatar' || scope === 'offline') {
+      var bdb = await openVersionedDB('BeautifyAppDB', 1, ensureBeautifyStores);
+      var all = await idbAll(bdb, 'presets');
+      var hit2 = all.filter(function (p) { return p && p.category === scope && p.name === name; });
+      for (var i = 0; i < hit2.length; i++) { await idbDelete(bdb, 'presets', hit2[i].id); removed = true; }
+      if (bdb) bdb.close();
+    } else {
+      throw new Error('不支持的 scope：' + scope);
+    }
+    if (!removed) throw new Error('没有找到要删除的预设「' + name + '」');
+    return true;
+  }
+
+  // 给线下规则新增一条规则（追加到已有规则组；组不存在则新建）
+  async function addOfflineRule(groupName, ruleName, content) {
+    if (!(await dbExists('MeetSettingsDB'))) throw new Error('线下规则库还没初始化，请先打开一次线下设置/线下模式');
+    var db = await openVersionedDB('MeetSettingsDB', 2, ensureMeetStores);
+    var recs = await idbAll(db, 'rules');
+    var rec = recs.find(function (r) { return r && r.id === 'main_rules'; });
+    if (!rec) throw new Error('线下规则库还没初始化（未找到 main_rules），请先打开一次线下设置');
+    if (!Array.isArray(rec.groups)) rec.groups = [];
+    var gname = String(groupName || '').trim() || '纳米新增规则';
+    var g = rec.groups.find(function (x) { return x && x.name === gname; });
+    if (!g) { g = { id: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5), name: gname, enabled: true, expanded: false, rules: [] }; rec.groups.push(g); }
+    if (!Array.isArray(g.rules)) g.rules = [];
+    g.rules.push({ id: 'r_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5), name: String(ruleName || '新规则').slice(0, 40), content: String(content || ''), enabled: true });
+    await idbPut(db, 'rules', rec);
+    if (db) db.close();
+    try { window.parent.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {}
+    return { group: gname, added: 1 };
+  }
+
+  // 给线下头像菜单添加一个 JS 插件
+  function addMenuPlugin(name, js) {
+    js = String(js || '').trim();
+    if (!js) throw new Error('插件 js 为空');
+    var arr = menuPluginList();
+    var nm = String(name || ('纳米插件 ' + (arr.length + 1))).trim().slice(0, 30);
+    var f = arr.find(function (p) { return (p.name || '') === nm; });
+    if (f) { f.js = js; } else { arr.push({ name: nm, js: js }); }
+    menuPluginWrite(arr);
+    try { window.parent.postMessage({ type: 'offlineMenuPluginsChanged' }, '*'); } catch (e) {}
+    return { name: nm, total: arr.length };
+  }
+
+  function scopeLabel(scope) {
+    var map = {
+      'global': '全局美化', 'chat': '聊天美化', 'chat-avatar': '聊天头像', 'offline': '线下美化', 'font': '字体',
+      'heart': '心声美化', 'offline-style': '线下文风', 'offline-cot': '线下思维链', 'offline-css': '线下美化预设',
+      'offline-rules': '线下规则', 'menu-plugin': '线下菜单插件'
+    };
+    return map[scope] || scope;
+  }
+
+  // 只读：把某范围的预设连同内容拼成文本（供模型读取后继续处理）
+  async function presetsToText(scope, name) {
+    scope = String(scope || '').trim();
+    if (name) {
+      var content = await presetRead(scope, name);
+      return '【' + scopeLabel(scope) + '·预设「' + name + '」】\n' + content;
+    }
+    var list = await presetList(scope);
+    if (!list.length) return '【' + scopeLabel(scope) + '】当前没有已保存的预设。';
+    return '【' + scopeLabel(scope) + '·共 ' + list.length + ' 个预设】\n' + list.map(function (p) {
+      return '· ' + p.name + (p.content ? ('：' + String(p.content).replace(/\s+/g, ' ').slice(0, 80)) : '');
+    }).join('\n');
+  }
+
   async function execAction(a) {
     if (!a || !a.tool) throw new Error('空动作');
     var args = a.args || {};
@@ -682,6 +967,11 @@
     if (a.tool === 'set_chat_background') return setChatBackground(args.color, args.image);
     if (a.tool === 'set_avatar') return setAvatar(args);
     if (a.tool === 'open_page') return openPage(args.url);
+    if (a.tool === 'save_preset') return presetSave(args.scope, args.name, args.content != null ? args.content : args.code);
+    if (a.tool === 'delete_preset') return presetDelete(args.scope, args.name);
+    if (a.tool === 'add_offline_rule') return addOfflineRule(args.group, args.name, args.content);
+    if (a.tool === 'add_menu_plugin') return addMenuPlugin(args.name, args.js);
+    if (a.tool === 'list_presets' || a.tool === 'read_preset') return null;  // 只读，由 chat-core 读取结果后喂回模型继续
     if (a.tool === 'read_file') return null;
     throw new Error('未知动作 ' + a.tool);
   }
@@ -703,6 +993,12 @@
     if (a.tool === 'set_chat_background') return '更换聊天背景：' + (a.args.image ? '图片' : (a.args.color || '默认'));
     if (a.tool === 'set_avatar') return '更换角色头像：' + (a.args.url ? '指定图片' : '用刚发送的图片');
     if (a.tool === 'open_page') return '打开页面：' + (a.args.url || '');
+    if (a.tool === 'save_preset') return '保存预设：' + (a.args.name || '') + '（' + scopeLabel(a.args.scope) + '）';
+    if (a.tool === 'delete_preset') return '删除预设：' + (a.args.name || '') + '（' + scopeLabel(a.args.scope) + '）';
+    if (a.tool === 'add_offline_rule') return '新增线下规则：' + (a.args.name || '') + '（规则组：' + (a.args.group || '纳米新增规则') + '）';
+    if (a.tool === 'add_menu_plugin') return '新增线下菜单插件：' + (a.args.name || '');
+    if (a.tool === 'list_presets') return '查看预设列表：' + scopeLabel(a.args.scope);
+    if (a.tool === 'read_preset') return '读取预设：' + (a.args.name || '') + '（' + scopeLabel(a.args.scope) + '）';
     return a.tool;
   }
 
@@ -713,6 +1009,14 @@
     parseActions: parseActions,
     fetchSource: fetchSource,
     execAction: execAction,
-    actionTitle: actionTitle
+    actionTitle: actionTitle,
+    // 只读预设（供 chat-core 读取后喂回模型继续处理）
+    listPresets: function (scope) { return presetsToText(scope, null); },
+    readPreset: function (scope, name) { return presetsToText(scope, name); },
+    // 供外部面板/调试使用
+    presetList: presetList,
+    presetRead: presetRead,
+    presetSave: presetSave,
+    presetDelete: presetDelete
   };
 })();

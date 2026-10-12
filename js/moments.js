@@ -2026,22 +2026,82 @@
             '<div class="mm-viewer-stage"><img id="mmViewerImg" alt=""><div id="mmViewerText" class="mm-viewer-text"></div></div>' +
             '<div class="mm-viewer-bar">' +
                 '<button class="mm-vbtn" data-mm="cancel" title="取消"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg><span>取消</span></button>' +
-                '<button class="mm-vbtn" data-mm="edit" title="编辑生图描述"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span>编辑</span></button>' +
-                '<button class="mm-vbtn" data-mm="regen" title="重新生成"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span>重新生成</span></button>' +
-                '<button class="mm-vbtn" data-mm="download" title="下载到相册"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg><span>下载</span></button>' +
-            '</div>';
+                '<button class="mm-vbtn" data-mm="regen" title="重新生成（可改提示词）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span>重roll</span></button>' +
+                '<button class="mm-vbtn" data-mm="download" title="保存到相册"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg><span>保存</span></button>' +
+            '</div>' +
+            '<div class="mm-sheet" id="mmRerollSheet"><div class="mm-sheet-card">' +
+                '<div class="mm-sheet-head"><div class="mm-sheet-title">重新生成图片</div><button class="mm-sheet-x" data-mmx="reroll-close" aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+                '<div class="mm-sheet-desc">可以修改提示词后再重roll，也可以不改直接重roll。</div>' +
+                '<textarea class="mm-sheet-input" id="mmRerollInput" spellcheck="false" placeholder="描述这张图……"></textarea>' +
+                '<div class="mm-sheet-actions"><button class="mm-sheet-btn" data-mmx="reroll-cancel">取消</button><button class="mm-sheet-btn primary" data-mmx="reroll-go">重roll</button></div>' +
+            '</div></div>' +
+            '<div class="mm-sheet" id="mmSaveSheet"><div class="mm-sheet-card">' +
+                '<div class="mm-sheet-head"><div class="mm-sheet-title">保存图片</div><button class="mm-sheet-x" data-mmx="save-close" aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+                '<div class="mm-sheet-desc">长按下面这张图片，选择「存储到照片 / 保存图片」即可存进相册。</div>' +
+                '<div class="mm-sheet-imgwrap"><img id="mmSaveImg" alt=""></div>' +
+                '<div class="mm-sheet-actions"><button class="mm-sheet-btn" data-mmx="save-cancel">取消</button></div>' +
+            '</div></div>';
         document.body.appendChild(v);
         v.addEventListener('click', function(e) {
-            if (e.target === v) { closeImageViewer(); return; }
+            var mb = e.target.closest('[data-mmx]');
+            if (mb) {
+                var mx = mb.dataset.mmx;
+                if (mx === 'reroll-go') doRegenViewerImage();
+                else if (mx === 'reroll-cancel' || mx === 'reroll-close') hideMmSheet('mmRerollSheet');
+                else if (mx === 'save-cancel' || mx === 'save-close') hideMmSheet('mmSaveSheet');
+                return;
+            }
             var btn = e.target.closest('[data-mm]');
-            if (!btn) return;
-            var act = btn.dataset.mm;
-            if (act === 'cancel') closeImageViewer();
-            else if (act === 'edit') editViewerImage();
-            else if (act === 'regen') regenViewerImage();
-            else if (act === 'download') downloadViewerImage();
+            if (btn) {
+                var act = btn.dataset.mm;
+                if (act === 'cancel') closeImageViewer();
+                else if (act === 'regen') showRerollSheet();
+                else if (act === 'download') downloadViewerImage();
+                return;
+            }
+            if (e.target === v) closeImageViewer();
+        });
+        ['mmRerollSheet', 'mmSaveSheet'].forEach(function (id) {
+            var s = v.querySelector('#' + id);
+            if (s) s.addEventListener('click', function (e) { if (e.target === s) s.classList.remove('show'); });
         });
         return v;
+    }
+    function hideMmSheet(id) { var s = document.getElementById(id); if (s) s.classList.remove('show'); }
+    function showRerollSheet() {
+        var item = momentsData.find(function(m) { return m.id === mmViewerState.postId; });
+        if (!item) return;
+        var inp = document.getElementById('mmRerollInput');
+        if (inp) inp.value = item.genPrompt || item.imageText || item.text || '';
+        var s = document.getElementById('mmRerollSheet');
+        if (s) s.classList.add('show');
+    }
+    // 保存：优先系统分享（iOS 分享面板可「存储图像」直接进相册），否则下载；都不行退回半屏长按保存
+    function saveImageToAlbum(url, fallback) {
+        fetch(url).then(function(r) { return r.blob(); }).then(function(blob) {
+            if (blob && navigator.canShare) {
+                try {
+                    var type = blob.type || 'image/png';
+                    var ext = (type.indexOf('jpeg') > -1 || type.indexOf('jpg') > -1) ? 'jpg' : 'png';
+                    var file = new File([blob], 'nano_' + Date.now() + '.' + ext, { type: type });
+                    if (navigator.canShare({ files: [file] })) {
+                        navigator.share({ files: [file] }).catch(function(e) { if (!(e && e.name === 'AbortError')) fallback(); });
+                        return;
+                    }
+                } catch (e) {}
+            }
+            if (blob) {
+                try {
+                    var u = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = u; a.download = 'nano_' + Date.now() + '.png';
+                    document.body.appendChild(a); a.click();
+                    setTimeout(function() { try { document.body.removeChild(a); URL.revokeObjectURL(u); } catch (e) {} }, 1000);
+                    return;
+                } catch (e) {}
+            }
+            fallback();
+        }).catch(function() { fallback(); });
     }
     function openImageViewer(postId, idx) {
         var item = momentsData.find(function(m) { return m.id === postId; });
@@ -2065,32 +2125,22 @@
         var v = document.getElementById('mmImageViewer');
         if (v) v.classList.remove('show');
     }
-    function editViewerImage() {
+    // 重roll：弹底部半屏，展示并可修改当前生图提示词（不改也能直接重roll）
+    async function doRegenViewerImage() {
         var item = momentsData.find(function(m) { return m.id === mmViewerState.postId; });
         if (!item) return;
-        var cur = item.genPrompt || item.imageText || '';
-        var val = window.prompt('修改生图描述', cur);
-        if (val === null) return;
-        val = String(val).trim();
-        if (!val) return;
-        item.genPrompt = val;
-        if (!item.images || !item.images.length) item.imageText = val;
-        saveMomentsData(momentsData);
-        renderFeed();
-        openImageViewer(item.id, mmViewerState.idx);
-    }
-    async function regenViewerImage() {
-        var item = momentsData.find(function(m) { return m.id === mmViewerState.postId; });
-        if (!item) return;
-        var prompt = item.genPrompt || item.imageText || item.text || '';
-        if (!prompt) { alert('没有可用的生图描述'); return; }
+        var inp = document.getElementById('mmRerollInput');
+        var val = inp ? String(inp.value).trim() : '';
+        if (!val) val = item.genPrompt || item.imageText || item.text || '';
+        if (!val) { alert('没有可用的生图描述'); return; }
+        hideMmSheet('mmRerollSheet');
         var v = document.getElementById('mmImageViewer');
         if (v) v.classList.add('loading');
         try {
-            var url = await generateImage(prompt);
+            var url = await generateImage(val);
             if (url) {
                 item.images = [url];
-                item.genPrompt = prompt;
+                item.genPrompt = val;
                 delete item.imageText;
                 saveMomentsData(momentsData);
                 renderFeed();
@@ -2107,24 +2157,12 @@
         if (!item) return;
         var url = (item.images && item.images.length) ? item.images[mmViewerState.idx] : '';
         if (!url) { alert('没有可下载的图片'); return; }
-        var name = 'moment_' + Date.now() + '.png';
-        function trigger(href, revoke) {
-            try {
-                var a = document.createElement('a');
-                a.href = href;
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(function() {
-                    try { document.body.removeChild(a); } catch (e) {}
-                    if (revoke) { try { URL.revokeObjectURL(href); } catch (e) {} }
-                }, 1000);
-            } catch (e) { alert('下载失败'); }
-        }
-        if (/^data:/i.test(url)) { trigger(url, false); return; }
-        fetch(url).then(function(r) { return r.blob(); }).then(function(b) {
-            trigger(URL.createObjectURL(b), true);
-        }).catch(function() { trigger(url, false); });
+        saveImageToAlbum(url, function() {
+            var si = document.getElementById('mmSaveImg');
+            if (si) si.src = url;
+            var s = document.getElementById('mmSaveSheet');
+            if (s) s.classList.add('show');
+        });
     }
 
     // ===== 详情页 =====

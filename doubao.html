@@ -29,9 +29,9 @@ button{border:0;background:none;color:inherit}
   overflow:hidden;
 }
 .topbar{
-  min-height:44px;
+  min-height:40px;
   flex:none;
-  padding:10px 12px 10px;
+  padding:6px 10px 6px;
   border-top:max(0px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)) solid transparent;
   display:flex;
   align-items:center;
@@ -40,16 +40,16 @@ button{border:0;background:none;color:inherit}
   position:relative;
   z-index:5;
 }
-.left-tools,.right-tools{display:flex;align-items:center;gap:25px;width:180px}
+.left-tools,.right-tools{display:flex;align-items:center;gap:8px;z-index:1}
 .right-tools{justify-content:flex-end}
 .icon-btn{
-  width:40px;height:40px;
+  width:32px;height:32px;
   display:grid;place-items:center;
   cursor:pointer;
-  border-radius:12px;
+  border-radius:9px;
 }
 .icon-btn:active{background:#f2f2f2}
-.icon-btn svg{width:29px;height:29px;stroke:#111;stroke-width:2.15;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn svg{width:20px;height:20px;stroke:#111;stroke-width:2.1;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .title-wrap{
   position:absolute;
   left:50%;
@@ -58,175 +58,176 @@ button{border:0;background:none;color:inherit}
   text-align:center;
   white-space:nowrap;
   line-height:1;
+  pointer-events:none;
 }
 .title{
   display:flex;
   align-items:center;
   justify-content:center;
-  gap:5px;
-  font-size:22px;
+  gap:3px;
+  font-size:17px;
   font-weight:600;
-  letter-spacing:-.3px;
+  letter-spacing:-.2px;
 }
-.title svg{width:13px;height:13px;stroke:#aaa;stroke-width:2.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.title svg{width:10px;height:10px;stroke:#aaa;stroke-width:2.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .subtitle{
-  margin-top:8px;
-  color:#b2b2b2;
-  font-size:14px;
+  margin-top:4px;
+  color:#b8b8b8;
+  font-size:10.5px;
   font-weight:400;
-  letter-spacing:.1px;
+  letter-spacing:0;
 }
 .chat{
   flex:1;
   min-height:0;
   overflow-y:auto;
   overscroll-behavior:contain;
-  padding:5px 17px 205px;
+  padding:4px 14px 150px;
   scrollbar-width:none;
 }
 .chat::-webkit-scrollbar{display:none}
-.message{display:flex;width:100%;margin:0 0 20px}
+.message{display:flex;width:100%;margin:0 0 14px}
 .message.char{justify-content:flex-end}
 .message.ai{justify-content:flex-start}
 .bubble{
   max-width:calc(100% - 20px);
-  line-height:1.65;
-  font-size:20px;
+  line-height:1.62;
+  font-size:15.5px;
   letter-spacing:.1px;
 }
 .char .bubble{
-  max-width:76%;
+  max-width:78%;
   background:var(--blue);
   color:white;
-  padding:12px 20px 13px;
-  border-radius:25px 25px 7px 25px;
+  padding:9px 14px 10px;
+  border-radius:19px 19px 6px 19px;
   box-shadow:0 1px 2px rgba(0,0,0,.03);
 }
 .ai-card{
   width:100%;
   background:#f7f7f7;
-  border-radius:21px;
-  padding:19px 22px 18px;
-  font-size:19px;
-  line-height:1.65;
+  border-radius:17px;
+  padding:14px 16px 13px;
+  font-size:15px;
+  line-height:1.62;
 }
 .ai-card h3{
-  margin:0 0 14px;
-  font-size:22px;
+  margin:0 0 10px;
+  font-size:17px;
   font-weight:700;
-  line-height:1.3;
+  line-height:1.32;
 }
-.ai-card p{margin:0 0 14px}
+.ai-card p{margin:0 0 10px}
 .ai-card p:last-child{margin-bottom:0}
 .ai-card strong{font-weight:700}
 .ai-card .quote{
-  margin:14px 0 2px;
-  padding:1px 0 1px 17px;
+  margin:10px 0 2px;
+  padding:1px 0 1px 13px;
   border-left:2px solid #d7d7d7;
   color:#777;
 }
-.ai-card .small{font-size:18px;color:#777}
+.ai-card .small{font-size:13.5px;color:#777}
 .list{
-  margin:9px 0 14px;
-  padding-left:26px;
+  margin:7px 0 10px;
+  padding-left:20px;
 }
-.list li{margin:5px 0}
+.list li{margin:4px 0}
 .strong-line{font-weight:700}
-.db-empty{color:#b2b2b2;font-size:15px;text-align:center;padding:60px 20px;line-height:1.8}
+.db-empty{color:#b2b2b2;font-size:13px;text-align:center;padding:48px 20px;line-height:1.8}
 .bottom{
   position:fixed;
   z-index:10;
   left:0;right:0;bottom:0;
   background:linear-gradient(to bottom,rgba(255,255,255,.96),#fff 20%);
-  padding:0 17px calc(13px + env(safe-area-inset-bottom));
+  padding:0 14px calc(10px + env(safe-area-inset-bottom));
 }
 .jump{
-  width:50px;height:50px;
-  margin:0 auto 14px;
+  width:42px;height:42px;
+  margin:0 auto 10px;
   border-radius:50%;
   background:#fff;
-  box-shadow:0 4px 18px rgba(0,0,0,.13);
+  box-shadow:0 4px 16px rgba(0,0,0,.13);
   display:grid;place-items:center;
   cursor:pointer;
 }
-.jump svg{width:24px;height:24px;stroke:#111;stroke-width:2.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.jump svg{width:21px;height:21px;stroke:#111;stroke-width:2.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .quick{
   display:flex;
-  gap:10px;
+  gap:8px;
   overflow-x:auto;
-  padding:0 0 13px;
+  padding:0 0 10px;
   scrollbar-width:none;
 }
 .quick::-webkit-scrollbar{display:none}
 .quick button{
-  height:48px;
-  padding:0 16px;
+  height:38px;
+  padding:0 12px;
   border:1px solid #e1e1e1;
   background:#fff;
-  border-radius:11px;
+  border-radius:10px;
   white-space:nowrap;
-  font-size:16px;
-  display:flex;align-items:center;gap:7px;
+  font-size:13px;
+  display:flex;align-items:center;gap:6px;
   box-shadow:0 1px 3px rgba(0,0,0,.02);
   cursor:pointer;
 }
 .quick button:active{background:#f6f6f6}
-.quick svg{width:20px;height:20px;stroke:#111;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.quick svg{width:16px;height:16px;stroke:#111;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .composer{
-  height:77px;
+  height:56px;
   border:1px solid #e5e5e5;
-  border-radius:22px;
-  box-shadow:0 2px 13px rgba(0,0,0,.08);
+  border-radius:18px;
+  box-shadow:0 2px 12px rgba(0,0,0,.08);
   background:#fff;
   display:flex;
   align-items:center;
-  padding:0 13px 0 18px;
-  gap:13px;
+  padding:0 9px 0 14px;
+  gap:8px;
 }
 .camera{
-  width:34px;height:34px;display:grid;place-items:center;flex:0 0 34px
+  width:28px;height:28px;display:grid;place-items:center;flex:0 0 28px
 }
-.camera svg{width:28px;height:28px;stroke:#111;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.camera svg{width:22px;height:22px;stroke:#111;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .placeholder{
   flex:1;
   min-width:0;
   color:#a4a4a4;
-  font-size:18px;
+  font-size:14.5px;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 .voice,.plus{
-  width:38px;height:38px;border-radius:50%;
-  display:grid;place-items:center;flex:0 0 38px;
+  width:32px;height:32px;border-radius:50%;
+  display:grid;place-items:center;flex:0 0 32px;
   cursor:pointer;
 }
 .voice:active,.plus:active{background:#f2f2f2}
-.voice svg,.plus svg{width:28px;height:28px;stroke:#111;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.voice svg,.plus svg{width:22px;height:22px;stroke:#111;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 @media (max-width:700px){
-  .topbar{min-height:44px;flex:none;padding:10px 12px 10px;border-top:max(0px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)) solid transparent}
-  .left-tools,.right-tools{width:128px;gap:8px}
-  .icon-btn{width:40px;height:40px}
-  .icon-btn svg{width:26px;height:26px}
-  .title{font-size:17px}
-  .subtitle{font-size:11px;margin-top:6px}
-  .chat{padding:5px 10px 194px}
-  .message{margin-bottom:15px}
-  .char .bubble{font-size:16px;max-width:79%;padding:9px 14px 10px;border-radius:20px 20px 6px 20px}
-  .ai-card{border-radius:17px;padding:14px 15px;font-size:15.5px}
-  .ai-card h3{font-size:18px;margin-bottom:11px}
-  .ai-card .small{font-size:14px}
-  .bottom{padding:0 9px calc(8px + env(safe-area-inset-bottom))}
-  .jump{width:43px;height:43px;margin-bottom:9px}
-  .quick{gap:7px;padding-bottom:8px}
-  .quick button{height:39px;padding:0 11px;font-size:13px;border-radius:9px}
-  .quick svg{width:17px;height:17px}
-  .composer{height:58px;border-radius:18px;padding-left:13px;gap:8px}
-  .placeholder{font-size:15px}
-  .camera{width:29px;height:29px;flex-basis:29px}
-  .camera svg{width:24px;height:24px}
-  .voice,.plus{width:34px;height:34px;flex-basis:34px}
-  .voice svg,.plus svg{width:25px;height:25px}
+  .topbar{min-height:38px;flex:none;padding:5px 8px;border-top:max(0px, var(--safe-top, 0px), env(safe-area-inset-top, 0px)) solid transparent}
+  .left-tools,.right-tools{gap:4px}
+  .icon-btn{width:30px;height:30px;border-radius:8px}
+  .icon-btn svg{width:19px;height:19px;stroke-width:2}
+  .title{font-size:15.5px}
+  .subtitle{font-size:9.5px;margin-top:3px}
+  .chat{padding:4px 11px 142px}
+  .message{margin-bottom:12px}
+  .char .bubble{font-size:15px;max-width:80%;padding:8px 13px 9px;border-radius:18px 18px 6px 18px}
+  .ai-card{border-radius:15px;padding:12px 13px;font-size:14px}
+  .ai-card h3{font-size:16px;margin-bottom:9px}
+  .ai-card .small{font-size:12.5px}
+  .bottom{padding:0 8px calc(7px + env(safe-area-inset-bottom))}
+  .jump{width:39px;height:39px;margin-bottom:8px}
+  .quick{gap:6px;padding-bottom:7px}
+  .quick button{height:36px;padding:0 11px;font-size:12.5px;border-radius:9px}
+  .quick svg{width:15px;height:15px}
+  .composer{height:51px;border-radius:16px;padding-left:12px;gap:7px}
+  .placeholder{font-size:13.5px}
+  .camera{width:26px;height:26px;flex-basis:26px}
+  .camera svg{width:21px;height:21px}
+  .voice,.plus{width:30px;height:30px;flex-basis:30px}
+  .voice svg,.plus svg{width:21px;height:21px}
 }
 </style>
 </head>

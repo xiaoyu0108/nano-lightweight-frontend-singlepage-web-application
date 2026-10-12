@@ -1168,6 +1168,12 @@
         var cn = ['中国', '台湾', '香港', '澳门'];
         return !cn.some(function(v){ return n.indexOf(v) > -1; });
     }
+    function isGroupCantoneseMember(c){
+        if (!c) return false;
+        var n = String(c.nationality || '').trim();
+        if (!n) return false;
+        return n.indexOf('香港') > -1 || n.indexOf('澳门') > -1 || n.indexOf('澳門') > -1;
+    }
     function buildGroupSystemPrompt(){
         var user = (currentMaskData && currentMaskData.name) ? currentMaskData.name : (settings.myNick || '你');
         var memberIds = group.members.map(function(m){ return m.id; });
@@ -1179,7 +1185,8 @@
         prompt += '1. 贴人设：每个角色必须严格基于自己的人物设定和世界书回复，说话风格、称呼、口癖、性格都以各自设定为准；角色之间不能串味、不能说得像同一个人，也不给自己加设定外的固定腔调。\n';
         prompt += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、姑娘、丫头、女人、低吼一声、揉碎、你是我的、逃不掉、我接住你”等油腻或人机感表达；不强行撩、不刻意讨好、不刻意煽情。禁止“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话术（正文与心声都禁止）。也严禁“过来我抱 / 过来抱一下 / 过来亲一下 / 给我个拥抱 / 乖，过来”这类命令式、上位者语气的索抱索亲；群里的角色与用户是平等的，爱是相互的。\n';
         prompt += '3. 不催人：禁止任何角色催促、命令、安排用户或其他人的生活（起床、吃饭、睡觉、喝水、吃药、吹头发、早点休息等）；可以关心，但不能反复催办、管教或替别人做决定。\n';
-        prompt += '4. 不 OOC、不出戏：不脱离设定、不跳戏、不替用户发言或写用户的反应；任何情况下都不承认自己是 AI、模型或程序，被问到时以各自角色的身份自然回应。\n\n';
+        prompt += '4. 不 OOC、不出戏：不脱离设定、不跳戏、不替用户发言或写用户的反应；任何情况下都不承认自己是 AI、模型或程序，被问到时以各自角色的身份自然回应。\n';
+        prompt += '【亲密与性 · 分寸（中庸之道）】性是爱与亲密的一部分，是成年人之间正常自然的事，不是禁忌。既不要主动开黄腔、油腻撩拨，也绝不要把「性」当成不能碰的东西：当用户主动聊起性、身体或亲密话题时，角色要自然、坦诚地接住——不回避、不装不懂、不集体打岔或转移话题；按各自人设与关系和用户的关系给出真实、有分寸的反应（害羞、打趣、认真、犹豫都可以，但要真实，不要用冰冷回避来推脱）。不要谈「色」色变、不要一边拒绝一边说教。分寸依旧是：不油腻、不强迫、不越界；除非 NSFW 已开启，否则不写露骨细节，但“聊到、表达态度”本身完全可以。\n\n';
 
         prompt += '【最重要的三条铁律】\n';
         prompt += '1. 你是一个人，同时扮演多个 {{char}}，每个角色都是独立、有自己脾气和说话习惯的活人，不是 AI、不是助手。\n';
@@ -1226,7 +1233,9 @@
                 if (c.setting && String(c.setting).trim()) prompt += String(c.setting).trim() + '\n';
                 if (isGroupForeignMember(c)) {
                     var flang = groupMemberLanguage(c) || '外语';
-                    prompt += '（' + name + '是外国人，母语是' + flang + '：TA 说的每句话都用自己的母语，并按「外文||中文翻译」输出在同一行，例如 Hello there||你好；系统会把中文翻译显示在这条消息下方。）\n';
+                    prompt += '（' + name + '是外国人，母语是' + flang + '：TA 说的每句话都用自己的母语，并按「外文||中文翻译」输出在同一行，例如 Hello there||你好；系统会把中文翻译显示在这条消息下方。中文翻译要有温度、贴合TA的性格与情绪，口语化、自然，不要官腔、不要生硬直译。）\n';
+                } else if (isGroupCantoneseMember(c)) {
+                    prompt += '（' + name + '是香港人，母语是粤语：TA 说粤语口语，用香港本地用字与说法（唔、係、咗、哋、嘅、啲、冇、嘢、邊度、點解、得闲、收工 等），不要用内地普通话的说法和书面腔；并按「粤语||普通话翻译」在同一行输出，例如 唔該晒你||真是谢谢你；翻译要有温度、贴合TA的性格与情绪，不要官腔、不要生硬直译。）\n';
                 }
             } else if (m.setting && String(m.setting).trim()) {
                 prompt += '（群内 NPC）\n' + String(m.setting).trim() + '\n';
@@ -1296,10 +1305,24 @@
 
         var timeAware = settings.timeAware !== false;
         if (timeAware) {
-            var now = new Date();
-            var weekdays = ['日','一','二','三','四','五','六'];
-            prompt += '\n【当前时间】' + now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 星期' + weekdays[now.getDay()] + ' ' +
-                String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + '。\n';
+            if (window.NanoHoliday && window.NanoHoliday.buildTimeBlock) {
+                var __lastUserMs = 0;
+                try {
+                    var __rights = [];
+                    for (var __i = messages.length - 1; __i >= 0 && __rights.length < 2; __i--) {
+                        var __m = messages[__i];
+                        if (__m && !__m.recalled && __m.type === 'right') __rights.push(__m.ts || 0);
+                    }
+                    if (__rights.length >= 2 && __rights[1]) __lastUserMs = __rights[1];
+                    else if (__rights.length === 1 && __rights[0] && (Date.now() - __rights[0]) > 3600000) __lastUserMs = __rights[0];
+                } catch (e) {}
+                prompt += '\n' + window.NanoHoliday.buildTimeBlock(new Date(), { lastUserMs: __lastUserMs }) + '\n';
+            } else {
+                var now = new Date();
+                var weekdays = ['日','一','二','三','四','五','六'];
+                prompt += '\n【当前时间】' + now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 星期' + weekdays[now.getDay()] + ' ' +
+                    String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + '。\n';
+            }
         }
         try {
             var __gbp = (localStorage.getItem('nano_builtin_prompt') || '').trim();
