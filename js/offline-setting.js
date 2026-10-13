@@ -467,8 +467,80 @@ body{color:var(--ink)}
 
 const BUILTIN_CSS = {
   soft: `:root{--page:#f7f4f5;--card:#fffdfd;--header:#fbf6f7;--line:#f1e7e9;--line-strong:#ead9dc;--ink:#40393b;--muted:#b5a8aa;--pink:#f3cdd4;--pink-deep:#e6b3bb;--gray-pink:#f1e6e8}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 5px 20px rgba(105,82,100,.06)}.topbar{background:rgba(251,246,247,.92)}`,
-  minimal: `:root{--page:#f0f1f3;--card:#fff;--header:#f6f7f8;--line:#e6e7ea;--line-strong:#d9dbe0;--ink:#2c2e32;--muted:#96989d;--pink:#e2e3e7;--pink-deep:#c9cbd2;--gray-pink:#eceef0}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 3px 14px rgba(30,35,40,.04)}.topbar{background:rgba(246,247,248,.95)}`
+  minimal: `:root{--page:#f0f1f3;--card:#fff;--header:#f6f7f8;--line:#e6e7ea;--line-strong:#d9dbe0;--ink:#2c2e32;--muted:#96989d;--pink:#e2e3e7;--pink-deep:#c9cbd2;--gray-pink:#eceef0}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 3px 14px rgba(30,35,40,.04)}.topbar{background:rgba(246,247,248,.95)}`,
+  textbook: `/* 语文书 · 简约（内置）— 重构版式：去掉 Diary 头，改为书页文章；暖白底色；重点色 黑/深蓝/红褐；无 emoji */
+:root{
+  --page:#f8f3ea;--card:#fffdf8;--header:#f8f3ea;--line:#ece1cc;--line-strong:#e2d6bd;
+  --ink:#2b2621;--muted:#9a8f7d;--pink:#d8cdb6;--pink-deep:#1f3a5f;--gray-pink:#f2ece0;
+  --shadow:none;--danger:#7a3b2e;
+  --env-color:#7a3b2e;--env-style:italic;
+  --psych-color:#6f675a;--psych-style:normal;
+  --dialogue-color:#1f3a5f;--dialogue-style:normal;
+  --action-color:#4a463f;--action-style:normal;
+  --inner-color:#7a7368;--inner-style:italic;
+}
+html,body{background:var(--page);color:var(--ink)}
+.chat{padding:18px 18px calc(150px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px)))}
+/* 顶栏 */
+.topbar{background:rgba(248,243,234,.94);border-bottom:1px solid var(--line-strong);backdrop-filter:blur(10px)}
+.top-title{color:#1f3a5f;font-family:"Songti SC","STSong","SimSun",serif;font-weight:600;letter-spacing:3px}
+.top-btn{color:#8a8175}
+/* 场景 Tab：改成下划线式，不占卡片感 */
+.scene-tabs{background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 2px;margin:8px 18px 0}
+.scene-tab{color:#9a8f7d;font-weight:600}
+.scene-tab.active{color:#1f3a5f}
+.scene-indicator{background:transparent;box-shadow:inset 0 -2px 0 #7a3b2e;border-radius:0;top:auto;bottom:-1px;height:2px}
+/* 卡片：书页文章 —— 去掉 Diary 头，左侧红褐书脊线，内容重新排序 */
+.message{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line-strong);border-radius:4px;box-shadow:none;position:relative;overflow:hidden}
+.message::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#7a3b2e;opacity:.9}
+.message.selected{box-shadow:0 0 0 2px rgba(31,58,95,.35)}
+.message-head{display:none}
+.identity-row{order:1;display:flex;align-items:center;gap:12px;padding:18px 22px 12px 26px;border-bottom:1px solid var(--line)}
+.identity-row .avatar{width:40px;height:40px;border-radius:4px;border:1px solid var(--line-strong);background:#faf6ec;box-shadow:none}
+.identity-row .avatar img{width:40px;height:40px;border-radius:4px}
+.avatar-fallback{color:#1f3a5f;font-family:"Songti SC","STSong","SimSun",serif;font-size:16px}
+.nickname{font-family:"Songti SC","STSong","SimSun",serif;font-size:17px;font-weight:600;letter-spacing:2px;color:#1f3a5f}
+.role-label{color:#9a8f7d;letter-spacing:2px}
+.content{order:2;padding:14px 26px 8px;color:#2b2621;font-size:15.5px;line-height:2.05}
+.content .dialogue-block{color:#1f3a5f;font-weight:500}
+.content .env-block{color:#7a3b2e;font-style:italic}
+.content .psych-block{color:#6f675a}
+.content .action-block{color:#4a463f}
+.content .inner-block{color:#7a7368;font-style:italic}
+.content .highlight{background:transparent;border-bottom:1.5px solid #7a3b2e;border-radius:0;padding:0 1px;font-weight:600}
+.heart-state{order:3;margin:2px 26px 10px;padding:10px 12px;background:#f5f0e6;border-left:3px solid #7a3b2e;border-radius:0 4px 4px 0;color:#6f675a;font-size:12.5px;line-height:1.55}
+.thinking{order:4;margin:2px 26px 10px;padding:10px 12px;background:#f5f0e6;border-left:3px solid #1f3a5f;border-radius:0 4px 4px 0;color:#6f675a;font-size:12.5px;line-height:1.6}
+.time-row{order:5;height:24px;justify-content:flex-end;color:#b3a992;padding:0 26px 6px}
+.time-row .clock-icon{opacity:.7}
+.plot-area{order:6;background:transparent;border-top:1px dashed var(--line-strong);border-radius:0;padding:6px 22px 12px}
+.plot-toggle{color:#9a8f7d}
+.plot-opt{background:#fdfbf6;border:1px solid var(--line-strong);border-radius:4px;color:#2b2621;font-weight:500}
+.plot-opt:active{background:#f2ece0;color:#1f3a5f}
+.actions{order:7;border-top:1px solid var(--line)}
+.action{color:#4a463f;font-weight:600;letter-spacing:1px}
+.action:hover{color:#1f3a5f}
+.edit-bar{order:8;background:#fdfbf6}
+.more-menu{background:rgba(255,253,248,.99);border:1px solid var(--line-strong);box-shadow:0 10px 26px rgba(40,34,26,.12)}
+.more-menu button{color:#2b2621}
+.more-menu button:active{background:#f2ece0}
+.bottom{background:rgba(248,243,234,.94);border-top:1px solid var(--line-strong)}
+.composer{grid-template-columns:43px 1fr 43px}
+.round-btn{background:#fffdf8;border:1px solid var(--line-strong);color:#8a8175;border-radius:6px}
+.send{background:#1f3a5f;border-color:#1f3a5f;color:#fff}
+.input{border:1px solid var(--line-strong);border-radius:6px;background:#fffdf8;color:#2b2621}
+.input:focus{border-color:#1f3a5f;box-shadow:0 0 0 2px rgba(31,58,95,.12)}
+.input::placeholder{color:#b3a992}
+.toast{background:#1f3a5f}
+.modal{background:rgba(255,253,248,.99)}
+.modal-title{color:#1f3a5f;font-family:"Songti SC","STSong","SimSun",serif}
+.exit-btn{background:#f2ece0}
+.exit-btn.primary{background:#1f3a5f;color:#fff;box-shadow:0 8px 18px rgba(31,58,95,.25)}
+.exit-mem-toggle input{accent-color:#1f3a5f}
+.select-bar{background:#1f3a5f}
+.typing-card .typing-dots span{background:#1f3a5f}`
 };
+// 内置主题以 js/offline-themes.js 为唯一数据源；共享源存在时覆盖这里的副本，避免两处不一致
+try { Object.assign(BUILTIN_CSS, (window.NANOOfflineThemes && window.NANOOfflineThemes.css) || {}); } catch (e) {}
 
 function escapeHTML(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c)); }
 
@@ -1065,7 +1137,7 @@ document.getElementById('cotPresetSelect').onchange = function() {
 function populateCssPresets() {
   const sel = document.getElementById('cssPreset');
   const current = sel.value;
-  sel.innerHTML = '<option value="initial">初始 CSS</option><option value="soft">Soft Pink</option><option value="minimal">Minimal Gray</option><option value="custom">当前 CSS</option>';
+  sel.innerHTML = '<option value="initial">初始 CSS</option><option value="soft">Soft Pink</option><option value="minimal">Minimal Gray</option><option value="textbook">语文书 · 简约</option><option value="custom">当前 CSS</option>';
   cssPresets.forEach((p, i) => {
     const opt = document.createElement('option');
     opt.value = 'user-' + i;
@@ -1113,15 +1185,20 @@ document.getElementById('cssPresetDelete').onclick = function() {
 
 document.getElementById('cssPreset').onchange = function() {
   const val = this.value;
-  if (val === 'initial') { document.getElementById('cssText').value = INITIAL_CSS; document.getElementById('cssPresetName').value = ''; return; }
-  if (val === 'soft') { document.getElementById('cssText').value = BUILTIN_CSS.soft; document.getElementById('cssPresetName').value = ''; return; }
-  if (val === 'minimal') { document.getElementById('cssText').value = BUILTIN_CSS.minimal; document.getElementById('cssPresetName').value = ''; return; }
-  if (val === 'custom') { document.getElementById('cssText').value = settings.customCSS || ''; document.getElementById('cssPresetName').value = ''; return; }
-  if (val.startsWith('user-')) {
+  const cssText = document.getElementById('cssText');
+  const nameEl = document.getElementById('cssPresetName');
+  if (val === 'initial') { cssText.value = INITIAL_CSS; nameEl.value = ''; }
+  else if (val === 'soft') { cssText.value = BUILTIN_CSS.soft; nameEl.value = ''; }
+  else if (val === 'minimal') { cssText.value = BUILTIN_CSS.minimal; nameEl.value = ''; }
+  else if (val === 'textbook') { cssText.value = BUILTIN_CSS.textbook; nameEl.value = ''; }
+  else if (val === 'custom') { cssText.value = settings.customCSS || ''; nameEl.value = ''; }
+  else if (val.startsWith('user-')) {
     const idx = parseInt(val.replace('user-', ''));
     const p = cssPresets[idx];
-    if (p) { document.getElementById('cssText').value = p.content || ''; document.getElementById('cssPresetName').value = p.name || ''; }
+    if (p) { cssText.value = p.content || ''; nameEl.value = p.name || ''; }
   }
+  // 选中即预览，内置主题（含「语文书 · 简约」）能立刻看到效果
+  applyCssPreview(cssText.value);
 };
 
 document.getElementById('clearCssBtn').onclick = function() { document.getElementById('cssText').value = ''; applyCssPreview(''); showToast('已清空CSS'); };

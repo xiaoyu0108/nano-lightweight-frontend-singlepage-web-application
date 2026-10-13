@@ -537,24 +537,28 @@ html.keyboard-open .chat-container {
     user-select: none;
 }
 
-/* 多图消息：横向滑动小图（类似微信），点「展开」逐张放大 */
-.image-group { display: flex; flex-direction: column; gap: 6px; max-width: 220px; }
-.image-group.right { align-self: flex-end; }
+/* 多图消息：折叠照片墙（叠成一小摞），左右滑动切换最前面的图 */
+.image-group {
+    position: relative; width: 184px; height: 182px;
+    align-self: flex-end; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
 .image-group.left { align-self: flex-start; }
-.image-group-strip {
-    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+.image-group-stack { position: absolute; inset: 0; }
+.image-group-stack img {
+    position: absolute; left: 0; top: 0; width: 128px; height: 128px;
+    object-fit: cover; border-radius: 16px; background: #eee;
+    border: 2px solid rgba(255, 255, 255, 0.92);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
-.image-group-strip::-webkit-scrollbar { display: none; }
-.image-group-strip img {
-    height: 130px; width: auto; flex: 0 0 auto; border-radius: 12px;
-    display: block; object-fit: cover; cursor: pointer;
+.image-group-stack img:nth-child(1) { transform: translate(0, 0) rotate(-3deg); z-index: 3; }
+.image-group-stack img:nth-child(2) { transform: translate(32px, 16px) rotate(2deg); z-index: 2; }
+.image-group-stack img:nth-child(3) { transform: translate(16px, 34px) rotate(6deg); z-index: 1; }
+.image-group-count {
+    position: absolute; right: 4px; top: 4px; z-index: 6;
+    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 12px; line-height: 1;
+    padding: 3px 9px; border-radius: 999px;
 }
-.image-group-expand {
-    align-self: flex-start; font-size: 12px; color: #576b95;
-    background: rgba(120, 120, 128, 0.10); padding: 3px 10px; border-radius: 999px; cursor: pointer;
-}
-.image-group.right .image-group-expand { align-self: flex-end; }
 
 /* 发送图片弹窗里的多选缩略图 */
 .ios-img-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }

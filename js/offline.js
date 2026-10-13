@@ -2486,24 +2486,44 @@ function omOpenBeautifyMenu() {
 
   // 美化 tab：预设下拉 + 还原
   const cssSel = ov.querySelector('#omCssPresetSel');
+  // 先加内置预设（语文书 · 简约 / Soft Pink / Minimal Gray）
+  let builtinThemes = [];
+  try { builtinThemes = (window.NANOOfflineThemes && window.NANOOfflineThemes.list) || []; } catch (e) {}
+  builtinThemes.forEach(function (t) {
+    const o = document.createElement('option');
+    o.value = 'builtin:' + t.key; o.textContent = t.name;
+    cssSel.appendChild(o);
+  });
   omReadCssPresets().then(function (presets) {
     presets.forEach(function (p, i) {
       const o = document.createElement('option');
-      o.value = String(i); o.textContent = p.name || ('预设 ' + (i + 1));
+      o.value = 'user:' + i; o.textContent = p.name || ('预设 ' + (i + 1));
       cssSel.appendChild(o);
     });
     const cur = String(settings.customCSS || '');
-    if (cur) presets.forEach(function (p, i) { if (!cssSel.value && String(p.content || '') === cur) cssSel.value = String(i); });
+    if (cur) {
+      const bt = builtinThemes.find(function (t) { return String(t.css || '') === cur; });
+      if (bt) cssSel.value = 'builtin:' + bt.key;
+      else presets.forEach(function (p, i) { if (!cssSel.value && String(p.content || '') === cur) cssSel.value = 'user:' + i; });
+    }
   });
   cssSel.onchange = function () {
-    if (this.value === '') return;
-    const idx = parseInt(this.value, 10);
-    omReadCssPresets().then(function (presets) {
-      const p = presets[idx];
-      if (!p) return;
-      omSaveCustomCss(p.content || '');
-      showToast('已切换美化预设');
-    });
+    const v = this.value;
+    if (v === '') return;
+    if (v.indexOf('builtin:') === 0) {
+      const t = builtinThemes.find(function (x) { return x.key === v.slice(8); });
+      if (t) { omSaveCustomCss(t.css || ''); showToast('已切换美化预设'); }
+      return;
+    }
+    if (v.indexOf('user:') === 0) {
+      const idx = parseInt(v.slice(5), 10);
+      omReadCssPresets().then(function (presets) {
+        const p = presets[idx];
+        if (!p) return;
+        omSaveCustomCss(p.content || '');
+        showToast('已切换美化预设');
+      });
+    }
   };
   ov.querySelector('#omCssReset').onclick = function () { omClearBeautify(); cssSel.value = ''; };
 

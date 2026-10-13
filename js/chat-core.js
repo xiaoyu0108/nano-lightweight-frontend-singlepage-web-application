@@ -151,6 +151,36 @@
         });
     }
 
+    // 用户头像（人设/面具头像）热更新：切换面具或换头像后，聊天内的用户头像立即平滑换上
+    let userAvatarChangedNote = false;
+    function refreshUserAvatar() {
+        try {
+            const cu = getCurrentUser();
+            if (cu && cu.avatar) currentUserAvatar = cu.avatar;
+            const maskId = cu ? cu.id : (currentUser ? currentUser.id : '');
+            if (!maskId) return;
+            getMaskAvatarFromDB(maskId).then(function (dataUrl) {
+                if (!dataUrl || String(dataUrl).trim() === '') return;
+                currentUserAvatar = dataUrl;
+                try {
+                    const avs = messageContainer.querySelectorAll('.message-avatar[data-side="right"]');
+                    avs.forEach(function (av) {
+                        let im = av.querySelector('img');
+                        if (!im) { av.textContent = ''; im = document.createElement('img'); im.alt = ''; av.appendChild(im); }
+                        if (im.src !== dataUrl) im.src = dataUrl;
+                    });
+                } catch (e) {}
+            });
+        } catch (e) {}
+    }
+    window.addEventListener('message', function (e) {
+        const d = e && e.data;
+        if (d && (d.type === 'currentMaskChanged' || d.type === 'userAvatarChanged')) {
+            userAvatarChangedNote = true;
+            refreshUserAvatar();
+        }
+    });
+
     // ===== 从存储加载世界书（与 worldbook.js 共用 nano_worldbook_data_v5 / nano_worldbook_db）=====
     const WB_LOCAL_KEY = 'nano_worldbook_data_v5';
     const WB_LEGACY_KEYS = ['nano_worldbook_data', 'peach_worldbook_data'];
@@ -2317,6 +2347,7 @@
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
         avatar.dataset.msgId = rowId;
+        avatar.dataset.side = type;
         if (type === 'left') {
             if (avatarSrc && avatarSrc.trim() !== '') {
                 const img = document.createElement('img');
@@ -2398,31 +2429,51 @@
                     ? imageData.urls.slice()
                     : [imageData.url];
                 if (urls.length > 1) {
+                    // 折叠照片墙：叠成一小摞，左右滑动小图切换最前面的大图；张数不限
                     const wrap = document.createElement('div');
                     wrap.className = 'image-group ' + type;
-                    const strip = document.createElement('div');
-                    strip.className = 'image-group-strip';
-                    urls.forEach(function(u, i) {
-                        const thumb = document.createElement('img');
-                        thumb.src = u;
-                        thumb.alt = (imageData.desc || '图片') + ' ' + (i + 1);
-                        thumb.loading = 'lazy';
-                        thumb.addEventListener('click', function(e) {
-                            e.stopPropagation();
-                            openImageViewer(u, id, { urls: urls, index: i });
+                    const stack = document.createElement('div');
+                    stack.className = 'image-group-stack';
+                    const cards = [];
+                    const cardCount = Math.min(3, urls.length);
+                    for (let k = 0; k < cardCount; k++) {
+                        const c = document.createElement('img');
+                        c.loading = 'lazy';
+                        stack.appendChild(c);
+                        cards.push(c);
+                    }
+                    let idx = 0;
+                    let lastSwipeTs = 0;
+                    const count = document.createElement('div');
+                    count.className = 'image-group-count';
+                    function render() {
+                        cards.forEach(function(c, k) {
+                            const u = urls[(idx + k) % urls.length];
+                            if (c.getAttribute('src') !== u) c.src = u;
+                            c.alt = '图片 ' + (((idx + k) % urls.length) + 1);
                         });
-                        strip.appendChild(thumb);
-                    });
-                    wrap.appendChild(strip);
-                    const chip = document.createElement('div');
-                    chip.className = 'image-group-expand';
-                    chip.textContent = '展开 ' + urls.length;
-                    chip.addEventListener('click', function(e) {
+                        count.textContent = urls.length + ' 张';
+                    }
+                    wrap.appendChild(stack);
+                    wrap.appendChild(count);
+                    let tx = 0;
+                    wrap.addEventListener('touchstart', function(e) { if (e.touches && e.touches.length === 1) tx = e.touches[0].clientX; }, { passive: true });
+                    wrap.addEventListener('touchend', function(e) {
+                        const t = e.changedTouches && e.changedTouches[0]; if (!t) return;
+                        const dx = t.clientX - tx;
+                        if (Math.abs(dx) > 40) {
+                            lastSwipeTs = Date.now();
+                            idx = ((idx + (dx < 0 ? 1 : -1)) % urls.length + urls.length) % urls.length;
+                            render();
+                        }
+                    }, { passive: true });
+                    wrap.addEventListener('click', function(e) {
                         e.stopPropagation();
-                        openImageViewer(urls[0], id, { urls: urls, index: 0 });
+                        if (Date.now() - lastSwipeTs < 350) return; // 刚滑过就不当成点击
+                        openImageViewer(urls[idx], id, { urls: urls, index: idx });
                     });
-                    wrap.appendChild(chip);
                     content.appendChild(wrap);
+                    render();
                 } else {
                     const ib = document.createElement('div');
                     ib.className = 'image-bubble ' + type;
@@ -5246,7 +5297,9 @@
         if (m.isImage) {
             if (m.text && m.text.trim()) return m.text;
             if (m.imageData) {
-                if (m.imageData.textImage) return '用户发送了文字图片：' + m.imageData.textImage;
+                if (m.imageData.textImage) return '用户发送了文字图片：' + (m.text || m.imageData.desc || '');
+                const n = Array.isArray(m.imageData.urls) ? m.imageData.urls.length : 0;
+                if (n > 1) return '用户发送了 ' + n + ' 张图片，请看清每一张的内容后再回应';
                 if (m.imageData.desc) return '用户发送了一张图片：' + m.imageData.desc;
             }
             return '用户发送了一张图片';
@@ -5545,11 +5598,15 @@
 
             // 收集用户消息：带图片的消息保留 data URL，稍后以多模态 content 数组发给模型，
             // 否则模型只能看到「用户发送了一张图片」这类文字，识别不了图片内容。
-            function pickImageUrl(m) {
-                if (!m || !m.isImage || !m.imageData) return null;
-                const u = m.imageData.url || (m.imageData.urls && m.imageData.urls[0]);
-                return (typeof u === 'string' && u.indexOf('data:image') === 0) ? u : null;
+            // 一张消息可能带多张图（多选发送），全部收集，保证模型能识别每张图
+            function pickImageUrls(m) {
+                if (!m || !m.isImage || !m.imageData) return [];
+                let list = [];
+                if (Array.isArray(m.imageData.urls) && m.imageData.urls.length) list = m.imageData.urls.slice();
+                else if (m.imageData.url) list = [m.imageData.url];
+                return list.filter(function (u) { return typeof u === 'string' && u.indexOf('data:image') === 0; });
             }
+            function pickImageUrl(m) { const a = pickImageUrls(m); return a.length ? a[0] : null; }
             let userMessages = [];
             for (let i = messages.length - 1; i >= 0; i--) {
                 const m = messages[i];
@@ -5558,8 +5615,8 @@
                 }
                 if (m.type === 'right' && !m.recalled) {
                     const desc = describeMsgForAI(m);
-                    const img = pickImageUrl(m);
-                    if (desc || img) userMessages.unshift({ text: desc || '（用户发来一张图片）', image: img });
+                    const imgs = pickImageUrls(m);
+                    if (desc || imgs.length) userMessages.unshift({ text: desc || '（用户发来一张图片）', image: imgs[0] || null, images: imgs });
                 }
             }
             
@@ -5569,10 +5626,10 @@
                 const lastMsg = messages[messages.length - 1];
                 if (lastMsg && lastMsg.type === 'right') {
                     const desc = describeMsgForAI(lastMsg);
-                    const img = pickImageUrl(lastMsg);
-                    userMessages = [{ text: desc || (userMessage && String(userMessage).trim()) || '（用户发来一张图片）', image: img }];
+                    const imgs = pickImageUrls(lastMsg);
+                    userMessages = [{ text: desc || (userMessage && String(userMessage).trim()) || '（用户发来一张图片）', image: imgs[0] || null, images: imgs }];
                 } else {
-                    userMessages = [{ text: (userMessage && String(userMessage).trim()) ? userMessage : '（请继续）', image: null }];
+                    userMessages = [{ text: (userMessage && String(userMessage).trim()) ? userMessage : '（请继续）', image: null, images: [] }];
                 }
             }
 
@@ -5612,7 +5669,24 @@
                         .replace(/\{\{user\}\}/g, currentUserName || '用户');
                 }
             } catch (e) {}
+            // 用户刚换了头像：把新头像本身作为图片发给模型，让角色真正「看清」对方的新头像
+            let avatarImageMsg = null;
+            try {
+                if (userAvatarChangedNote) {
+                    const av = String(currentUserAvatar || '');
+                    if (av.indexOf('data:image') === 0) {
+                        avatarImageMsg = { role: 'user', content: [
+                            { type: 'text', text: '（' + (currentUserName || '用户') + ' 换了一张新头像，你看清这张图，知道这是对方现在的头像就好，不必刻意提起。）' },
+                            { type: 'image_url', image_url: { url: av } }
+                        ]};
+                    } else {
+                        __sys += '\n\n【提醒】' + (currentUserName || '用户') + ' 刚刚换了新头像。';
+                    }
+                    userAvatarChangedNote = false;
+                }
+            } catch (e) {}
             history.push({ role: 'system', content: __sys });
+            if (avatarImageMsg) history.push(avatarImageMsg);
 
             let previousMessages = [];
             let foundAI = false;
@@ -5656,15 +5730,20 @@
                 } catch (e) {}
             }
 
+            let __imgBudget = 8; // 一次最多真正带上 8 张图，避免请求体过大
             userMessages.forEach((entry, idx) => {
                 const text = (entry && typeof entry === 'object') ? entry.text : entry;
-                const image = (entry && typeof entry === 'object') ? entry.image : null;
-                const useImg = !!(image && __keepImg[idx]);
-                if (useImg) {
-                    history.push({ role: 'user', content: [
-                        { type: 'text', text: (text && String(text).trim()) ? text : '（用户发来一张图片，请看清图片内容再回应）' },
-                        { type: 'image_url', image_url: { url: image } }
-                    ]});
+                let images = [];
+                if (entry && typeof entry === 'object') {
+                    images = (Array.isArray(entry.images) && entry.images.length) ? entry.images.slice() : (entry.image ? [entry.image] : []);
+                }
+                images = images.filter(Boolean);
+                const useImgs = __keepImg[idx] ? images.slice(0, Math.max(0, __imgBudget)) : [];
+                __imgBudget -= useImgs.length;
+                if (useImgs.length) {
+                    const content = [{ type: 'text', text: (text && String(text).trim()) ? text : '（用户发来图片，请看清图片内容再回应）' }];
+                    useImgs.forEach(function (u) { content.push({ type: 'image_url', image_url: { url: u } }); });
+                    history.push({ role: 'user', content: content });
                 } else if (text && String(text).trim()) {
                     history.push({ role: 'user', content: text });
                 }
