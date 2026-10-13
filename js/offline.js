@@ -255,6 +255,9 @@ let settings = { userName: 'user', charName: 'char', userAvatar: '', charAvatar:
 let selectMode = false;
 let deleteTarget = null;
 let isReplying = false;
+let offAbort = null;        // 当前线下回复请求的中止控制
+let offAbortTimer = null;   // 超时兜底计时器
+const OFFLINE_GEN_TIMEOUT = 180000;
 let showAllMessages = false;
 const MESSAGE_PAGE = 50;
 
@@ -1136,8 +1139,28 @@ function buildTypingCard() {
     '<div class="identity-row"><div class="avatar" aria-label="正在回复">' +
     (settings.charAvatar ? `<img src="${safeAvatar(settings.charAvatar)}" alt="">` : '<div class="avatar-fallback">' + escapeHTML((settings.charName || 'C').slice(0, 1)) + '</div>') +
     '</div><div><div class="nickname">' + escapeHTML(settings.charName || 'char') + '</div></div></div>' +
-    '<div class="typing-dots"><span></span><span></span><span></span></div>';
+    '<div class="typing-dots"><span></span><span></span><span></span></div>' +
+    '<button class="typing-stop" type="button" aria-label="停止生成"></button>';
+  const stop = tc.querySelector('.typing-stop');
+  if (stop) {
+    stop.addEventListener('click', function (e) {
+      try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
+      stopOfflineReply();
+    });
+  }
   return tc;
+}
+
+// 停止线下生成：中止 API 请求、清掉断点标记与「正在回复」三连点，之后可重新生成
+function stopOfflineReply() {
+  try { if (offAbort) offAbort.abort(); } catch (e) {}
+  offAbort = null;
+  if (offAbortTimer) { clearTimeout(offAbortTimer); offAbortTimer = null; }
+  isReplying = false;
+  try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
+  try { sendBtn.disabled = false; sendBtn.style.opacity = ''; } catch (e) {}
+  render();
+  try { showToast('已停止生成'); } catch (e) {}
 }
 
 // ============================================================
@@ -1716,6 +1739,8 @@ async function requestReply() {
     try {
       result = await callMainAPI(history);
     } catch (err) {
+      // 用户主动停止 / 超时中止：不重试、不弹错误框
+      if (err && err.aborted) throw err;
       // 4xx（Key 无效 / 参数超限 / 内容被拒）重试无意义，直接抛出；
       // 5xx 或网络抖动才重试一次。
       if (err && err.status >= 400 && err.status < 500) throw err;
@@ -1731,11 +1756,15 @@ async function requestReply() {
     }
   } catch (err) {
     console.error(err);
-    let errorMsg = err.message || String(err);
-    if (err.status) errorMsg = `状态码: ${err.status}\n${errorMsg}`;
-    if (err.responseText) errorMsg += `\n\n响应: ${err.responseText}`;
-    if (err.stack) errorMsg += `\n\n堆栈: ${err.stack}`;
-    showErrorModal(errorMsg);
+    if (err && err.aborted) {
+      // 已停止生成：静默收尾，不弹错误框
+    } else {
+      let errorMsg = err.message || String(err);
+      if (err.status) errorMsg = `状态码: ${err.status}\n${errorMsg}`;
+      if (err.responseText) errorMsg += `\n\n响应: ${err.responseText}`;
+      if (err.stack) errorMsg += `\n\n堆栈: ${err.stack}`;
+      showErrorModal(errorMsg);
+    }
   } finally {
     try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
     isReplying = false;
@@ -2016,7 +2045,17 @@ async function callMainAPI(history) {
       : systemPrompt
           .replace(/{{char}}/g, settings.charName)
           .replace(/{{user}}/g, settings.userName || '对方')) + wb.middle + wb.back;
-    const promptStr = systemPromptStr + '\n\n' + chatText;
+    // 可编辑的角色扮演 Prompt 模板（js/roleplay-prompt.js），用户可自行修改
+    let finalSystemPrompt = systemPromptStr;
+    try {
+      const RP = window.NanoRoleplayPrompt;
+      if (RP && RP.enabled !== false && typeof RP.build === 'function') {
+        finalSystemPrompt = String(RP.build(systemPromptStr) || systemPromptStr)
+          .replace(/\{\{char\}\}/g, settings.charName || '角色')
+          .replace(/\{\{user\}\}/g, settings.userName || '对方');
+      }
+    } catch (e) {}
+    const promptStr = finalSystemPrompt + '\n\n' + chatText;
 
     // 线下长文按「目标字数」估算输出 token：中文约 1.8 token/字，再加思维链/心声/剧情选项的余量。
     // 之前这里写死 1024，模型最多只能吐 ~1500 字，小剧场/长文必然被截断 —— 与破限无关，是 max_tokens 限制。
@@ -2037,7 +2076,7 @@ async function callMainAPI(history) {
     const body = {
       model: mainModel,
       messages: [
-      { role: 'system', content: systemPromptStr },
+      { role: 'system', content: finalSystemPrompt },
       ...history.map(m => ({ role: m.role, content: m.content }))
       ],
       max_tokens: offlineMaxTokens,
@@ -2045,14 +2084,34 @@ async function callMainAPI(history) {
       stream: false
     };
 
-    const response = await fetch(mainUrl + '/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + mainKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
+    try { if (offAbortTimer) clearTimeout(offAbortTimer); } catch (e) {}
+    let __ctrl = null;
+    try { if (typeof AbortController !== 'undefined') { __ctrl = new AbortController(); offAbort = __ctrl; } } catch (e) {}
+    if (__ctrl) {
+      const __c = __ctrl;
+      offAbortTimer = setTimeout(function () { try { offAbortTimer = null; __c.abort(); } catch (e) {} }, OFFLINE_GEN_TIMEOUT);
+    }
+    let response;
+    try {
+      response = await fetch(mainUrl + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + mainKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body),
+        signal: __ctrl ? __ctrl.signal : undefined
+      });
+    } catch (netErr) {
+      const aborted = !!(__ctrl && __ctrl.signal && __ctrl.signal.aborted) || !!(netErr && (netErr.name === 'AbortError' || /abort/i.test(String(netErr.message || ''))));
+      const ee = new Error(aborted ? '已停止生成' : ((netErr && netErr.message) || 'API 请求失败'));
+      ee.status = aborted ? 0 : 500;
+      ee.aborted = aborted;
+      throw ee;
+    } finally {
+      if (offAbort === __ctrl) offAbort = null;
+      if (offAbortTimer) { clearTimeout(offAbortTimer); offAbortTimer = null; }
+    }
 
     if (!response.ok) {
       // 一次性读完整响应体，JSON 解析失败时也能把上游原文展示出来（很多中转 500 返回 HTML/纯文本）
@@ -2104,6 +2163,7 @@ async function callMainAPI(history) {
     const error = new Error(err.message || 'API 请求失败');
     error.status = err.status || 500;
     error.responseText = err.responseText || '';
+    error.aborted = !!err.aborted;
     throw error;
   }
 }
@@ -2865,7 +2925,9 @@ async function init() {
     const pending = localStorage.getItem(PENDING_KEY);
     if (pending) {
       const last = messages[messages.length - 1];
-      if (last && last.role === 'user') {
+      const pendingTs = parseInt(pending, 10) || 0;
+      const stale = pendingTs && (Date.now() - pendingTs > 15 * 60 * 1000);
+      if (!stale && last && last.role === 'user') {
         setTimeout(() => { requestReply(); }, 400);
       } else {
         localStorage.removeItem(PENDING_KEY);

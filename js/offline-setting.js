@@ -583,9 +583,13 @@ function bindRuleEvents() {
       e.stopPropagation();
       const gi = parseInt(this.dataset.toggleGroupSwitch);
       ruleGroups[gi].enabled = !ruleGroups[gi].enabled;
+      // 关闭大规则组时，其下所有子规则一并关闭；重新打开则一并启用
+      const on = ruleGroups[gi].enabled !== false;
+      (ruleGroups[gi].rules || []).forEach(r => { r.enabled = on; });
       saveRules();
       renderRules();
       updateSummary();
+      showToast(on ? '已开启该规则组（含全部子规则）' : '已关闭该规则组（含全部子规则）');
     };
   });
 
@@ -822,28 +826,84 @@ document.getElementById('importFile').addEventListener('change', async function(
   if (!file) return;
   try {
     let text = '';
+    const baseNameOf = (f) => f.name.replace(/\.[^.]+$/, '');
+    const normalizeChild = (r) => {
+      const obj = (r && typeof r === 'object') ? r : { content: r };
+      const content = String(obj.content != null ? obj.content : (obj.text != null ? obj.text : '')).trim();
+      return {
+        id: obj.id || generateId(),
+        name: String(obj.name || obj.title || content.slice(0, 20) || '规则').slice(0, 40),
+        content: content,
+        enabled: obj.enabled !== false
+      };
+    };
+    const makeGroup = (name, rules) => ({
+      id: generateId(),
+      name: String(name || '导入规则'),
+      enabled: true,
+      expanded: true,
+      rules: rules
+    });
+    const normalizeGroup = (g) => {
+      const obj = (g && typeof g === 'object') ? g : { name: baseNameOf(file), content: g };
+      const rawChildren = Array.isArray(obj.rules) ? obj.rules
+        : (Array.isArray(obj.children) ? obj.children : null);
+      let children;
+      if (rawChildren) {
+        children = rawChildren.map(normalizeChild).filter(c => c.content || c.name);
+      } else if (obj.content != null || obj.text != null) {
+        // 组本身就是一条规则：整段作为一个子规则，绝不按行/按句拆碎
+        children = [normalizeChild(obj)];
+      } else {
+        children = [];
+      }
+      return {
+        id: obj.id || generateId(),
+        name: String(obj.name || obj.title || baseNameOf(file) || '导入规则'),
+        enabled: obj.enabled !== false,
+        expanded: obj.expanded !== false,
+        rules: children
+      };
+    };
+    // 纯文本（txt/docx）按「空行分段」切：一段 = 一条规则。没有空行就整体作为一条，
+    // 不再逐行拆碎（否则短短一段会被拆成几百条）。
+    const splitIntoRuleParagraphs = (raw) => {
+      const norm = String(raw || '').replace(/\r\n?/g, '\n');
+      const paras = norm.split(/\n\s*\n+/).map(p => p.replace(/\s+$/,'').trim()).filter(Boolean);
+      if (paras.length) return paras;
+      const whole = norm.trim();
+      return whole ? [whole] : [];
+    };
+
     if (file.name.toLowerCase().endsWith('.json')) {
       text = await file.text();
       const data = JSON.parse(text);
+      let imported = null;
       if (Array.isArray(data)) {
-        const imported = data.map(g => ({
-          ...g,
-          id: g.id || generateId(),
-          enabled: g.enabled !== false,
-          expanded: g.expanded !== false,
-          rules: (g.rules || []).map(r => ({
-            ...r,
-            id: r.id || generateId(),
-            enabled: r.enabled !== false
-          }))
-        }));
-        ruleGroups = imported;
+        // 判断是「规则组数组」还是「扁平规则数组」：整体带 rules/children 才算规则组，
+        // 否则把每一项当一条规则合并进同一个组，避免被拆成几百个组。
+        const looksLikeGroups = data.length > 0 && data.every(g => g && typeof g === 'object' && (Array.isArray(g.rules) || Array.isArray(g.children)));
+        if (looksLikeGroups) {
+          imported = data.map(normalizeGroup);
+        } else {
+          const rules = data.map(normalizeChild).filter(c => c.content || c.name);
+          imported = rules.length ? [makeGroup(baseNameOf(file) || '导入规则', rules)] : [];
+        }
+      } else if (data && typeof data === 'object') {
+        // 支持 {groups:[...]} / 单个规则组 {...} / 单个规则 {...}
+        if (Array.isArray(data.groups)) imported = data.groups.map(normalizeGroup);
+        else if (Array.isArray(data.rules)) imported = [normalizeGroup(data)];
+        else imported = [normalizeGroup(data)];
+      }
+
+      if (Array.isArray(imported) && imported.length) {
+        ruleGroups = ruleGroups.concat(imported);
         saveRules();
         renderRules();
         updateSummary();
-        showToast(`导入成功：${ruleGroups.length} 个规则组`);
+        showToast(`导入成功：${imported.length} 个规则组`);
       } else {
-        showToast('JSON 格式错误：需要数组');
+        showToast('JSON 格式错误：需要规则数组或规则组');
       }
     } else if (file.name.toLowerCase().endsWith('.txt') || file.name.toLowerCase().endsWith('.docx')) {
       if (file.name.toLowerCase().endsWith('.docx')) {
@@ -860,25 +920,14 @@ document.getElementById('importFile').addEventListener('change', async function(
       } else {
         text = await file.text();
       }
-      const lines = text.split('\n').filter(line => line.trim());
-      if (lines.length) {
-        const group = {
-          id: generateId(),
-          name: file.name.replace(/\.[^.]+$/, ''),
-          enabled: true,
-          expanded: true,
-          rules: lines.map(line => ({
-            id: generateId(),
-            name: line.slice(0, 20) + (line.length > 20 ? '...' : ''),
-            content: line.trim(),
-            enabled: true
-          }))
-        };
+      const paras = splitIntoRuleParagraphs(text);
+      if (paras.length) {
+        const group = makeGroup(baseNameOf(file), paras.map(p => normalizeChild({ content: p })));
         ruleGroups.push(group);
         saveRules();
         renderRules();
         updateSummary();
-        showToast(`导入成功：${lines.length} 条规则`);
+        showToast(`导入成功：${paras.length} 条规则`);
       } else {
         showToast('文件为空');
       }

@@ -12,7 +12,21 @@
     const imgPaneText = document.getElementById('imgPaneText');
     const imgPaneFile = document.getElementById('imgPaneFile');
     let selectedImageData = '';
+    let selectedImages = [];
     let imgTab = 'text';
+
+    function renderThumbs() {
+        const box = document.getElementById('imageThumbs');
+        if (box) {
+            box.innerHTML = '';
+            selectedImages.forEach(function (u) {
+                const im = document.createElement('img');
+                im.src = u; im.alt = '预览';
+                box.appendChild(im);
+            });
+        }
+        if (imagePreviewBox) imagePreviewBox.style.display = selectedImages.length ? 'block' : 'none';
+    }
 
     function setImgTab(t) {
         imgTab = t;
@@ -26,16 +40,24 @@
     setImgTab('text');
 
     imageFileInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
+        const files = Array.prototype.slice.call(e.target.files || []);
+        if (!files.length) return;
+        selectedImages = [];
+        let pending = files.length;
+        files.forEach(function (file, idx) {
             const reader = new FileReader();
             reader.onload = function(evt) {
-                selectedImageData = evt.target.result;
-                imagePreview.src = selectedImageData;
-                imagePreviewBox.style.display = 'block';
+                selectedImages[idx] = evt.target.result;
+                pending--;
+                if (pending === 0) {
+                    selectedImages = selectedImages.filter(Boolean);
+                    selectedImageData = selectedImages[0] || '';
+                    if (imagePreview) imagePreview.src = selectedImageData;
+                    renderThumbs();
+                }
             };
             reader.readAsDataURL(file);
-        }
+        });
     });
 
     imageCancel.addEventListener('click', function() {
@@ -45,7 +67,7 @@
     imageConfirm.addEventListener('click', function() {
         const textContent = imageTextInput.value.trim();
         if (imgTab === 'file') {
-            if (!selectedImageData) { window.__chat.showAlert('提示', '请选择一张照片'); return; }
+            if (!selectedImages.length) { window.__chat.showAlert('提示', '请选择照片'); return; }
         } else if (!textContent) {
             window.__chat.showAlert('提示', '请输入要生成的文字');
             return;
@@ -56,12 +78,21 @@
         const timeStr = h + ':' + m;
 
         if (imgTab === 'file') {
-            window.__chat.addMessage('right', '', timeStr, null, false, false, null, null, null,
-                null, false, null, true, { url: selectedImageData, desc: '图片' });
+            if (selectedImages.length > 1) {
+                // 多张一起发：一条消息里横向滑动查看（类似微信），点「展开」逐张放大
+                window.__chat.addMessage('right', '', timeStr, null, false, false, null, null, null,
+                    null, false, null, true, { urls: selectedImages.slice(), desc: '图片' });
+            } else {
+                window.__chat.addMessage('right', '', timeStr, null, false, false, null, null, null,
+                    null, false, null, true, { url: selectedImages[0], desc: '图片' });
+            }
         } else {
             window.__chat.addMessage('right', textContent, timeStr, null, false, false, null, null, null, null, false, null, true, { textImage: true });
         }
         window.__chat.saveMessages();
+        selectedImages = [];
+        selectedImageData = '';
+        renderThumbs();
         imagePopup.classList.remove('active');
     });
 

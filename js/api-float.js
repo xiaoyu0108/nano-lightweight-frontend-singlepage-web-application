@@ -250,7 +250,13 @@
 
     var coreEl, photoEl, presetEl, modelEl, statusEl, pullBtn;
     var beautyStatusEl, beautyPresetEl, beautyFontEl;
-    var beautyCat = 'global';
+    function readBeautyCat() {
+        try {
+            var c = localStorage.getItem('nano_beauty_cat');
+            return (c === 'chat' || c === 'font') ? c : 'global';
+        } catch (e) { return 'global'; }
+    }
+    var beautyCat = readBeautyCat();
     var activeCat = 'api';
     var working = { url: '', key: '', model: '', preset: '' };
     var modelCache = [];
@@ -520,7 +526,8 @@
         closeRing();
         closePanel(panel);
         beautyPanel.classList.add('ab-open');
-        loadBeautyPresets();
+        // 记住上次选中的分类与预设，重新打开时回填，避免看起来「切换没保存」
+        setBeautyCat(beautyCat);
         placePanel(beautyPanel);
     }
 
@@ -911,11 +918,18 @@
                 o.value = x.id; o.textContent = x.name || ('预设 ' + x.id);
                 beautyPresetEl.appendChild(o);
             });
+            // 回填上次选中的预设，避免「切换后返回又变回之前」的错觉
+            var saved = '';
+            try { saved = localStorage.getItem('nano_beauty_selected_' + beautyCat) || ''; } catch (e) {}
+            if (saved && list.some(function (x) { return String(x.id) === String(saved); })) {
+                beautyPresetEl.value = saved;
+            }
         });
     }
 
     function setBeautyCat(cat) {
         beautyCat = cat;
+        try { localStorage.setItem('nano_beauty_cat', cat); } catch (e) {}
         beautyPanel.querySelectorAll('.ab-bt-cat').forEach(function (b) {
             b.classList.toggle('ab-active', b.dataset.bt === cat);
         });
@@ -935,6 +949,9 @@
             if (!found) { flash('预设不存在，请重新选择', beautyStatusEl); return; }
             var css = found.code || '';
             applyBeautify(beautyCat, css);
+            // 记住当前分类与选中的预设，重开悬浮球时回填，且保证「切换后一直生效」
+            try { localStorage.setItem('nano_beauty_cat', beautyCat); } catch (e) {}
+            try { localStorage.setItem('nano_beauty_selected_' + beautyCat, String(id)); } catch (e) {}
             // 同步美化页草稿，避免返回美化 App 时显示旧内容/初始模板
             try { localStorage.setItem('beautify_draft_' + beautyCat, JSON.stringify({ code: css, name: found.name || '', presetId: id })); } catch (e) {}
             bdbSet('settings', { key: 'applied_' + beautyCat, value: css }).then(function () {
@@ -1059,6 +1076,8 @@
 
     function doBeautySave() {
         var id = Number(beautyPresetEl && beautyPresetEl.value) || 0;
+        try { localStorage.setItem('nano_beauty_cat', beautyCat); } catch (e) {}
+        if (id) { try { localStorage.setItem('nano_beauty_selected_' + beautyCat, String(id)); } catch (e) {} }
         var p;
         if (id) {
             p = bdbAllPresets().then(function (items) {

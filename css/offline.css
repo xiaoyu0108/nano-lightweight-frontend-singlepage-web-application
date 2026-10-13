@@ -309,6 +309,14 @@ button:active{opacity:.55}
 .typing-card .typing-dots span:nth-child(2){animation-delay:.2s}
 .typing-card .typing-dots span:nth-child(3){animation-delay:.4s}
 @keyframes typingBlink{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+/* 「停止生成」按钮：红色圆点，中止本次线下 API 调用 */
+.typing-card .typing-stop{
+  display:block;position:relative;width:26px;height:26px;margin:0 20px 18px;padding:0;
+  border:0;border-radius:50%;background:#ff3b30;color:transparent;font-size:0;line-height:0;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 6px rgba(255,59,48,.35);
+}
+.typing-card .typing-stop::after{content:'';position:absolute;top:50%;left:50%;width:9px;height:9px;border-radius:2px;background:#fff;transform:translate(-50%,-50%)}
+.typing-card .typing-stop:active{transform:scale(.9)}
 
 
 /* ===== 让内置主题的变量也作用到卡片底栏按钮与剧情选项 ===== */

@@ -518,20 +518,47 @@ html.keyboard-open .chat-container {
 }
 .image-actions button:active { background: rgba(120,120,128,0.22); }
 .image-actions button svg { width: 15px; height: 15px; }
+/* 文字图：淡淡的粉色方块 + 黑灰色艺术字（发出即为最终样式） */
 .text-image-bubble {
+    position: relative;
     width: 150px; aspect-ratio: 1 / 1;
-    background: #ffffff; border: 1px solid rgba(0,0,0,0.06);
-    border-radius: 12px; padding: 18px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    background: rgba(255, 243, 247, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 16px; padding: 18px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.08), inset 0 0 40px rgba(255, 255, 255, 0.6);
     display: flex; align-items: center; justify-content: center;
-    align-self: flex-end;
+    align-self: flex-end; overflow: hidden;
 }
 .text-image-bubble.left { align-self: flex-start; }
 .text-image-bubble .ti-text {
-    font-weight: 700; font-style: italic; font-size: 17px;
-    color: #8e8e93; text-align: center; line-height: 1.4;
-    word-break: break-word; white-space: pre-wrap;
+    font-weight: 800; font-style: italic; font-size: 17px;
+    color: #3a3a3c; text-align: center; line-height: 1.4;
+    letter-spacing: 0.5px; word-break: break-word; white-space: pre-wrap;
+    user-select: none;
 }
+
+/* 多图消息：横向滑动小图（类似微信），点「展开」逐张放大 */
+.image-group { display: flex; flex-direction: column; gap: 6px; max-width: 220px; }
+.image-group.right { align-self: flex-end; }
+.image-group.left { align-self: flex-start; }
+.image-group-strip {
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.image-group-strip::-webkit-scrollbar { display: none; }
+.image-group-strip img {
+    height: 130px; width: auto; flex: 0 0 auto; border-radius: 12px;
+    display: block; object-fit: cover; cursor: pointer;
+}
+.image-group-expand {
+    align-self: flex-start; font-size: 12px; color: #576b95;
+    background: rgba(120, 120, 128, 0.10); padding: 3px 10px; border-radius: 999px; cursor: pointer;
+}
+.image-group.right .image-group-expand { align-self: flex-end; }
+
+/* 发送图片弹窗里的多选缩略图 */
+.ios-img-thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ios-img-thumbs img { width: 54px; height: 54px; object-fit: cover; border-radius: 8px; }
 .image-desc-bubble {
     position: relative; width: 140px; min-height: 70px; border-radius: 16px; overflow: hidden;
     background: linear-gradient(135deg, #dfe7ef, #c9d6e3);
@@ -623,6 +650,21 @@ html.keyboard-open .chat-container {
 }
 .typing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+/* 「停止生成」按钮：红色圆点，点一下中止本次 API 调用 */
+.typing-indicator .ti-stop {
+    align-self: center; flex-shrink: 0; cursor: pointer; position: relative;
+    appearance: none; -webkit-appearance: none; border: 0;
+    width: 24px; height: 24px; border-radius: 50%; padding: 0;
+    background: #ff3b30; color: transparent; font-size: 0; line-height: 0;
+    box-shadow: 0 2px 6px rgba(255, 59, 48, 0.35);
+    -webkit-tap-highlight-color: transparent;
+}
+.typing-indicator .ti-stop::after {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    width: 8px; height: 8px; border-radius: 2px; background: #fff;
+    transform: translate(-50%, -50%);
+}
+.typing-indicator .ti-stop:active { transform: scale(0.88); }
 @keyframes typingBounce {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
     30% { transform: translateY(-6px); opacity: 1; }
@@ -1128,6 +1170,35 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     max-height: 70vh;
     object-fit: contain;
     border-radius: 8px;
+}
+/* 点开后的文字图：淡粉方块（一点点毛玻璃）+ 黑灰色艺术字 */
+.image-viewer .iv-text {
+    display: none; box-sizing: border-box;
+    width: min(76vw, 320px); aspect-ratio: 1 / 1; max-height: 70vh;
+    overflow: auto; padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.6); border-radius: 18px;
+    background: rgba(255, 214, 228, 0.82);
+    align-items: center; justify-content: center; text-align: center;
+    color: #3a3a3c; font-size: 22px; font-weight: 800; font-style: italic;
+    letter-spacing: 0.5px; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35), inset 0 0 40px rgba(255, 255, 255, 0.4);
+}
+.image-viewer .iv-nav {
+    position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 14px; pointer-events: none; z-index: 2001;
+}
+.image-viewer .iv-nav-btn {
+    pointer-events: auto; width: 42px; height: 42px; border-radius: 50%;
+    border: none; background: rgba(255, 255, 255, 0.18); color: #fff;
+    font-size: 24px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.image-viewer .iv-nav-btn:active { background: rgba(255, 255, 255, 0.32); }
+.image-viewer .iv-counter {
+    pointer-events: none; color: #fff; font-size: 13px; padding: 4px 12px;
+    background: rgba(0, 0, 0, 0.35); border-radius: 999px;
 }
 .image-viewer .iv-actions {
     position: absolute;

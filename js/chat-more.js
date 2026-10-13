@@ -414,6 +414,7 @@
                 document.getElementById('imagePreview').src = '';
                 document.getElementById('imageTextInput').value = '';
                 document.getElementById('imageFileInput').value = '';
+                (function () { var th = document.getElementById('imageThumbs'); if (th) th.innerHTML = ''; })();
                 (function () { var t = document.getElementById('imgTabText'); if (t) t.click(); })();
                 document.getElementById('imagePopup').classList.add('active');
                 break;

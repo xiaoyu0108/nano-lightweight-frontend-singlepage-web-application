@@ -676,10 +676,20 @@ function setupThoughtExpand(el) {
       if (e.target === this) closeVoice();
     });
 
-    // 美化面板开关（打开时关掉毛玻璃，iOS 不卡）
+    // 心声自定义 CSS 的启停：编辑美化面板时临时停用，保证「美化页面」不被心声样式影响
+    const setCustomCssEnabled = function (on) {
+      try {
+        const t = document.getElementById('nanoVoiceCustomCSS');
+        if (t) t.disabled = !on;
+        const q = document.getElementById('nanoVoiceQuickCSS');
+        if (q) q.disabled = !on;
+      } catch (e) {}
+    };
+    // 美化面板开关（打开时关掉毛玻璃，iOS 不卡；并隔离心声美化对面板的影响）
     const setCustomizing = function (on) {
       const layer = $('nanoVoiceLayer');
       if (layer) layer.classList.toggle('customizing', !!on);
+      setCustomCssEnabled(!on);
     };
     $('ivBeautify').addEventListener('click', async function() {
       $('ivCustomize').classList.add('show');

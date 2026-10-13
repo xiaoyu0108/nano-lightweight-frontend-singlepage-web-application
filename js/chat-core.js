@@ -805,7 +805,9 @@
 
         prompt += '\n【主动行动 · 要会自己用，别只等对方开口】\n';
         prompt += '0. 你是一个会主动推进关系、主动制造画面的人。结合【当下语境、你们的对话、你的人设与情绪】自己判断什么时候该发特殊卡片，不要总是被动等对方开口、被要求了才发。该出手就果断出手，让聊天更有画面感和推进力。\n';
-        prompt += '1. 语音 / 表情包 / 图片 / 定位 / 外卖：结合场景主动发。想对方了就发 [voice:秒数|内容]，看到好玩的就发 [emoji:名称]，路过有意思的地方就发 [定位:地点]，饭点或对方没好好吃饭可以主动点 [外卖:食品|店铺|价格|备注]，想到某个画面就发 [image:描述]。\n';
+        prompt += '1. 语音 / 表情包 / 定位 / 外卖：结合场景主动发。想对方了就发 [voice:秒数|内容]，看到好玩的就发 [emoji:名称]，路过有意思的地方就发 [定位:地点]，饭点或对方没好好吃饭可以主动点 [外卖:食品|店铺|价格|备注]。\n';
+        prompt += '1.1 图片要克制：[image:描述] 只在「你真的想分享此刻眼前的画面」时才发，对方明显想看、或场景确实值得分享才发；不要为了凑格式硬塞图片，也不要反复发同类的、没信息量的图。\n';
+        prompt += '1.2 文字图 [文字图:要展示的文字]：想发一张「白底黑字」的图片（比如把一句话、通知、纸条、便签、截图文字做成图）时用这个，不需要生图、也不耗 API。对方让你发文字图时就用它。\n';
         prompt += '2. 转账 / 礼物：在合适的时机主动表达，而不是等人要——纪念日、道歉、庆祝、心疼、制造惊喜、对方随口提过想要的东西、关系升温时，都可以主动来一份 [transfer:金额] 或 [gift:礼物名称]。频率比“克制版”更高一些，但每次都要有贴合语境的理由，不要无脑刷。\n';
         prompt += '3. 电话 [call:来电] / [call:视频]：情绪浓、想听对方声音、重要的时刻、想给惊喜时，都可以主动打过去；比“只有紧急才打”更主动，但也不要每轮都打。\n';
         prompt += '4. 亲属卡 / 情侣头像 / 一起听 / 建群 / 邀请进群：关系到位、气氛自然时主动发起，推动关系进展，不要干等。\n';
@@ -956,6 +958,7 @@
     const messageContainer = document.getElementById('messageContainer');
     const typingIndicator = document.getElementById('typingIndicator');
     const typingAvatar = document.getElementById('typingAvatar');
+    const typingStop = document.getElementById('typingStop');
 
     // 头像点击（心声）用事件委托，避免每次整体重建消息列表后最后几条的消息头像点不动（安卓）
     if (messageContainer) {
@@ -1006,6 +1009,12 @@
     let pendingJumpMsgId = null;
     // 主 API 最近一次的结束原因（'stop'/'length'/...），用于识别「输出被 max_tokens 截断」
     let lastFinishReason = '';
+    // 当前生成请求的中止控制（用于「停止生成」按钮与超时兜底，避免永远卡在「输入中」）
+    let currentChatAbort = null;
+    let currentChatAbortTimer = null;
+    let genCancelled = false;
+    // 生成请求超时时间（毫秒）：超过即自动中止，防止中转/网络卡死导致永久「输入中」
+    const CHAT_GEN_TIMEOUT = 180000;
 
     // ===== 通话记录 IndexedDB 存储 =====
     const CALL_DB_NAME = 'voice_call_records_db';
@@ -1162,6 +1171,7 @@
                             textImage: msg.imageData.textImage,
                             // 只保留普通 URL；base64 图片体积会把 localStorage 撑爆，交给 IndexedDB 存
                             url: (typeof msg.imageData.url === 'string' && msg.imageData.url.indexOf('data:') !== 0) ? msg.imageData.url : null,
+                            urls: (Array.isArray(msg.imageData.urls) && msg.imageData.urls.length) ? msg.imageData.urls.filter(function (u) { return typeof u === 'string' && u.indexOf('data:') !== 0; }) : undefined,
                             desc: msg.imageData.desc,
                             emojiName: msg.imageData.emojiName
                         } : null,
@@ -2376,19 +2386,56 @@
                 tiText.className = 'ti-text';
                 tiText.textContent = text || (imageData && imageData.desc) || '';
                 tib.appendChild(tiText);
-                content.appendChild(tib);
-            } else if (imageData && imageData.url) {
-                const ib = document.createElement('div');
-                ib.className = 'image-bubble ' + type;
-                const img = document.createElement('img');
-                img.src = imageData.url;
-                img.alt = imageData.desc || '图片';
-                ib.appendChild(img);
-                ib.addEventListener('click', function(e) {
+                // 文字图也是「图片」：可以点开查看/重roll（生图失败退回文字图后可重试）
+                tib.style.cursor = 'pointer';
+                tib.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    openImageViewer(imageData.url, id);
+                    openImageViewer('', id, { text: text || (imageData && imageData.desc) || '' });
                 });
-                content.appendChild(ib);
+                content.appendChild(tib);
+            } else if (imageData && ((imageData.urls && imageData.urls.length) || imageData.url)) {
+                const urls = (imageData.urls && imageData.urls.length)
+                    ? imageData.urls.slice()
+                    : [imageData.url];
+                if (urls.length > 1) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'image-group ' + type;
+                    const strip = document.createElement('div');
+                    strip.className = 'image-group-strip';
+                    urls.forEach(function(u, i) {
+                        const thumb = document.createElement('img');
+                        thumb.src = u;
+                        thumb.alt = (imageData.desc || '图片') + ' ' + (i + 1);
+                        thumb.loading = 'lazy';
+                        thumb.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            openImageViewer(u, id, { urls: urls, index: i });
+                        });
+                        strip.appendChild(thumb);
+                    });
+                    wrap.appendChild(strip);
+                    const chip = document.createElement('div');
+                    chip.className = 'image-group-expand';
+                    chip.textContent = '展开 ' + urls.length;
+                    chip.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        openImageViewer(urls[0], id, { urls: urls, index: 0 });
+                    });
+                    wrap.appendChild(chip);
+                    content.appendChild(wrap);
+                } else {
+                    const ib = document.createElement('div');
+                    ib.className = 'image-bubble ' + type;
+                    const img = document.createElement('img');
+                    img.src = imageData.url;
+                    img.alt = imageData.desc || '图片';
+                    ib.appendChild(img);
+                    ib.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        openImageViewer(imageData.url, id);
+                    });
+                    content.appendChild(ib);
+                }
             } else {
                 const idb = document.createElement('div');
                 idb.className = 'image-desc-bubble ' + type;
@@ -2564,7 +2611,7 @@
         const results = [];
         let cleaned = text;
 
-        const tagRegex = /\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日)\s*:\s*([^\]]*?)(?:\]|$)/gi;
+        const tagRegex = /\[(transfer|gift|voice|call|heart|image|textimage|text-image|文字图|文字图片|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日)\s*:\s*([^\]]*?)(?:\]|$)/gi;
         let match;
         while ((match = tagRegex.exec(text)) !== null) {
             const kind = match[1].toLowerCase();
@@ -2588,6 +2635,8 @@
                 results.push({ kind: 'heart', payload: payload });
             } else if (kind === 'image') {
                 if (payload) results.push({ kind: 'image', payload: payload });
+            } else if (kind === 'textimage' || kind === 'text-image' || kind === '文字图' || kind === '文字图片') {
+                if (payload) results.push({ kind: 'textimage', payload: payload });
             } else if (kind === 'reply') {
                 if (payload) results.push({ kind: 'reply', payload: payload });
             } else if (kind === 'creategroup') {
@@ -2615,7 +2664,7 @@
             }
         }
 
-        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日|微信号|wechat)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
+        cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|textimage|text-image|文字图|文字图片|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日|微信号|wechat)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
 
         return { tags: results, cleanedText: cleaned };
     }
@@ -2627,22 +2676,63 @@
         }, 50);
     }
 
-    // ===== 图片查看器 =====
+    // ===== 图片查看器（支持单图 / 多图左右翻看 / 文字图）=====
     let ivCurrentSrc = '';
     let ivCurrentMsgId = null;
     let ivCurrentPrompt = '';
-    function openImageViewer(src, msgId) {
+    let ivList = [];
+    let ivIndex = 0;
+    let ivCurrentText = '';
+    function setIvNav(on) {
+        const nav = document.getElementById('ivNav');
+        if (nav) nav.style.display = on ? 'flex' : 'none';
+        updateIvCounter();
+    }
+    function updateIvCounter() {
+        const c = document.getElementById('ivCounter');
+        if (c) c.textContent = (ivIndex + 1) + ' / ' + Math.max(1, ivList.length);
+    }
+    function ivShow(delta) {
+        if (ivList.length <= 1) return;
+        ivIndex = (ivIndex + delta + ivList.length) % ivList.length;
+        ivCurrentSrc = ivList[ivIndex] || '';
+        const img = document.getElementById('ivImg');
+        if (img) img.src = ivCurrentSrc;
+        updateIvCounter();
+    }
+    function openImageViewer(src, msgId, opts) {
         const viewer = document.getElementById('imageViewer');
         const img = document.getElementById('ivImg');
         if (!viewer || !img) return;
-        ivCurrentSrc = src || '';
+        opts = opts || {};
         ivCurrentMsgId = msgId || null;
-        img.src = ivCurrentSrc;
-        const msg = ivCurrentMsgId ? messages.find(x => x.id === ivCurrentMsgId) : null;
-        ivCurrentPrompt = (msg && msg.imageData && (msg.imageData.genPrompt || msg.imageData.desc)) || '';
+        const textEl = document.getElementById('ivText');
+        // 文字图模式：显示文字、隐藏图片与导航
+        if (opts.text) {
+            ivList = []; ivIndex = 0; ivCurrentSrc = ''; ivCurrentText = String(opts.text || '');
+            if (textEl) { textEl.textContent = opts.text; textEl.style.display = 'flex'; }
+            img.style.display = 'none'; img.removeAttribute('src');
+            setIvNav(false);
+            // 文字图也带上原提示词，允许直接重roll（生图失败退回文字图后可重试）
+            const msg = ivCurrentMsgId ? messages.find(x => x.id === ivCurrentMsgId) : null;
+            ivCurrentPrompt = (msg && msg.imageData && (msg.imageData.genPrompt || msg.imageData.desc)) || '';
+        } else {
+            ivCurrentText = '';
+            ivList = (opts.urls && opts.urls.length) ? opts.urls.slice() : (src ? [src] : []);
+            ivIndex = Math.max(0, Math.min(Number(opts.index) || 0, Math.max(0, ivList.length - 1)));
+            ivCurrentSrc = ivList[ivIndex] || '';
+            if (textEl) { textEl.style.display = 'none'; textEl.textContent = ''; }
+            img.style.display = '';
+            img.src = ivCurrentSrc;
+            setIvNav(ivList.length > 1);
+            const msg = ivCurrentMsgId ? messages.find(x => x.id === ivCurrentMsgId) : null;
+            ivCurrentPrompt = (msg && msg.imageData && (msg.imageData.genPrompt || msg.imageData.desc)) || '';
+        }
         const rerollBtn = document.getElementById('ivReroll');
-        // 只有能拿到生图提示词（即可重roll）时才显示重roll
-        if (rerollBtn) rerollBtn.style.display = ivCurrentPrompt ? 'flex' : 'none';
+        // 只有「单图（或文字图）且能拿到生图提示词」时才显示重roll（多图整体重roll无意义）
+        if (rerollBtn) rerollBtn.style.display = (ivCurrentPrompt && ivList.length <= 1) ? 'flex' : 'none';
+        const dlBtn = document.getElementById('ivDownload');
+        if (dlBtn) dlBtn.style.display = 'flex';
         viewer.classList.add('active');
     }
     function closeImageViewer() {
@@ -2654,29 +2744,80 @@
 
     // 保存：优先走系统分享（iOS 分享面板里有「存储图像」→ 直接存进相册），否则直接下载，
     // 都不行时退回底部半屏弹层让用户长按保存（不再跳进 iOS 那个关不掉的图片页）。
-    async function downloadImage() {
-        if (!ivCurrentSrc) return;
-        let blob = null;
-        try { const r = await fetch(ivCurrentSrc); if (r.ok) blob = await r.blob(); } catch (e) { blob = null; }
-        if (blob && navigator.canShare) {
+    async function shareOrDownloadBlob(blob) {
+        if (!blob) return false;
+        if (navigator.canShare) {
             try {
                 const type = blob.type || 'image/png';
                 const ext = (type.indexOf('jpeg') > -1 || type.indexOf('jpg') > -1) ? 'jpg' : 'png';
                 const file = new File([blob], 'nano_' + Date.now() + '.' + ext, { type: type });
-                if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
-            } catch (e) { if (e && e.name === 'AbortError') return; }
+                if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return true; }
+            } catch (e) { if (e && e.name === 'AbortError') return true; }
         }
-        if (blob) {
+        try {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'nano_' + Date.now() + '.png';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) {} }, 4000);
+            return true;
+        } catch (e) { return false; }
+    }
+    // 把「文字图」渲染成一张淡粉方块 + 黑灰艺术字的 PNG，便于保存
+    function renderTextImageBlob(text) {
+        return new Promise(function (resolve) {
             try {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'nano_' + Date.now() + '.png';
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) {} }, 4000);
-                return;
-            } catch (e) {}
+                const S = 1024;
+                const cv = document.createElement('canvas');
+                cv.width = S; cv.height = S;
+                const ctx = cv.getContext('2d');
+                if (!ctx) { resolve(null); return; }
+                const g = ctx.createLinearGradient(0, 0, S, S);
+                g.addColorStop(0, '#fff8fb'); g.addColorStop(1, '#ffeef5');
+                ctx.fillStyle = g;
+                const r = 90;
+                ctx.beginPath();
+                ctx.moveTo(6 + r, 6);
+                ctx.arcTo(S - 6, 6, S - 6, S - 6, r);
+                ctx.arcTo(S - 6, S - 6, 6, S - 6, r);
+                ctx.arcTo(6, S - 6, 6, 6, r);
+                ctx.arcTo(6, 6, S - 6, 6, r);
+                ctx.closePath();
+                ctx.fill();
+                ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke();
+                const font = 'italic 800 84px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+                ctx.font = font;
+                ctx.fillStyle = '#3a3a3c';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const maxW = S - 200;
+                const lines = [];
+                let cur = '';
+                Array.from(String(text)).forEach(function (ch) {
+                    if (ch === '\n') { lines.push(cur); cur = ''; return; }
+                    const test = cur + ch;
+                    if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = ch; }
+                    else cur = test;
+                });
+                lines.push(cur);
+                const lh = 104;
+                let y = S / 2 - (lines.length - 1) * lh / 2;
+                lines.forEach(function (ln) { ctx.fillText(ln, S / 2, y); y += lh; });
+                cv.toBlob(function (b) { resolve(b); }, 'image/png');
+            } catch (e) { resolve(null); }
+        });
+    }
+    async function downloadImage() {
+        // 文字图：渲染成 PNG 再分享/下载（和普通图片同一套保存流程）
+        if (!ivCurrentSrc && ivCurrentText) {
+            const b = await renderTextImageBlob(ivCurrentText);
+            if (b && await shareOrDownloadBlob(b)) return;
+            return;
         }
+        if (!ivCurrentSrc) return;
+        let blob = null;
+        try { const r = await fetch(ivCurrentSrc); if (r.ok) blob = await r.blob(); } catch (e) { blob = null; }
+        if (blob && await shareOrDownloadBlob(blob)) return;
         // 兜底：底部半屏 + 长按保存
         const si = document.getElementById('ivSaveImg');
         if (si) si.src = ivCurrentSrc;
@@ -2704,6 +2845,25 @@
     if (ivClose) ivClose.addEventListener('click', closeImageViewer);
     if (ivDownloadBtn) ivDownloadBtn.addEventListener('click', downloadImage);
     if (ivRerollBtn) ivRerollBtn.addEventListener('click', rerollCurrentImage);
+    // 多图左右翻看：按钮 + 手势
+    const ivPrevBtn = document.getElementById('ivPrev');
+    const ivNextBtn = document.getElementById('ivNext');
+    if (ivPrevBtn) ivPrevBtn.addEventListener('click', function (e) { e.stopPropagation(); ivShow(-1); });
+    if (ivNextBtn) ivNextBtn.addEventListener('click', function (e) { e.stopPropagation(); ivShow(1); });
+    (function () {
+        const viewer = document.getElementById('imageViewer');
+        if (!viewer) return;
+        let sx = 0, sy = 0, tracking = false;
+        viewer.addEventListener('touchstart', function (e) {
+            if (e.touches && e.touches.length === 1) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true; }
+        }, { passive: true });
+        viewer.addEventListener('touchend', function (e) {
+            if (!tracking) return; tracking = false;
+            const t = (e.changedTouches && e.changedTouches[0]); if (!t) return;
+            const dx = t.clientX - sx, dy = t.clientY - sy;
+            if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) ivShow(dx < 0 ? 1 : -1);
+        }, { passive: true });
+    })();
     [['ivRerollGo', doReroll], ['ivRerollCancel', function () { closeIvSheet('ivRerollSheet'); }],
      ['ivRerollClose', function () { closeIvSheet('ivRerollSheet'); }],
      ['ivSaveCancel', function () { closeIvSheet('ivSaveSheet'); }],
@@ -2744,6 +2904,28 @@
         try {
             void messageContainer.offsetHeight;
         } catch (e) {}
+    }
+
+    // 停止生成：中止当前 API 请求、清掉「输入中」与断点标记，之后可重新生成。
+    function stopChatGeneration(silent) {
+        genCancelled = true;
+        try { window.dispatchEvent(new Event('nanoAbortGeneration')); } catch (e) {}
+        try { if (currentChatAbort) currentChatAbort.abort(); } catch (e) {}
+        currentChatAbort = null;
+        if (currentChatAbortTimer) { clearTimeout(currentChatAbortTimer); currentChatAbortTimer = null; }
+        try { clearChatRequest(); } catch (e) {}
+        try { chatPendingSet(false); } catch (e) {}
+        try { hideTyping(); } catch (e) {}
+        isProcessingApi = false;
+        isWaitingForReply = false;
+        try { updateSendButtonMode(); } catch (e) {}
+        if (!silent) { try { if (typeof showToast === 'function') showToast('已停止生成'); } catch (e) {} }
+    }
+    if (typingStop) {
+        typingStop.addEventListener('click', function (e) {
+            try { e.stopPropagation(); e.preventDefault(); } catch (err) {}
+            stopChatGeneration();
+        });
     }
 
     function addMessage(type, text, time, status, recalled, isCard, cardData, transcript, translation, quote, isVoice, voiceData, isImage, imageData) {
@@ -4161,7 +4343,8 @@
             (allCharacters || []).forEach(function (c) {
                 if (!c || !c.name) return;
                 if (String(c.id) === String(chatId) || c.name === cur.name) return;
-                if (currentUser && c.bindUser && String(c.bindUser) !== String(currentUser.id)) return;
+                // 只让「绑定到当前用户」的角色发朋友圈，避免把其他用户的角色混进同一个朋友圈
+                if (currentUser && (!c.bindUser || String(c.bindUser) !== String(currentUser.id))) return;
                 others.push({ id: c.id, name: c.name, avatar: c.avatar || '' });
             });
         } catch (e) {}
@@ -4198,10 +4381,13 @@
         const sys = '下面这几位是真实的人，彼此是朋友/熟人，他们的动态会出现在同一个朋友圈里：' + authorNames + '。\n'
             + '请为其中 3~4 个人各写一条朋友圈动态（可以是同一天的不同时间段：早晨/午后/傍晚/深夜），每个人只写一条，'
             + '内容贴合各自的人设、身份和当天心情，彼此不要重复、不要互相复述；有生活感、有细节；禁止 AI 腔、禁止解释、禁止出戏。\n'
+            + '【重要 · 朋友圈不是聊天】这是发在朋友圈的动态，不是私聊：不要对任何人说话，不要提问，不要出现「你要不要/你去吗/在吗/一起吃吗」这类约人或聊天的语气；'
+            + '只分享自己的日常与心情（吃了什么、去了哪里、看到什么、开心难过、恋爱或琐事），像真人随手发的一条动态。\n'
             + '只输出一个 JSON 数组，不要多余内容：[{"author":"发动态的人名（必须是：' + authorNames + '之一）","text":"动态文案","wantImage":true 或 false,"imagePrompt":"若想配图，描述这张照片的画面；不配图则留空","location":"地点或空字符串"}]';
         const userMsg = '【朋友圈成员与人设】\n' + authorInfo + '\n\n'
             + (mem ? ('【最近发生的事】\n' + mem + '\n\n') : '')
-            + '【现在】' + timeStr + '（' + uName + '在他们的好友里）。请在同一个 JSON 数组里，为其中 3~4 个人各输出一条自然的朋友圈动态。';
+            + '【现在】' + timeStr + '（' + uName + '在他们的好友里，但朋友圈动态不是说给 ' + uName + ' 听的，只是他们各自的日常分享）。'
+            + '请在同一个 JSON 数组里，为其中 3~4 个人各输出一条自然的朋友圈动态。';
         suppressApiAlerts = true;
         let content = null;
         try { content = await callMainApiRaw([{ role: 'system', content: sys }, { role: 'user', content: userMsg }], 1400, 0.95); }
@@ -4353,6 +4539,8 @@
     // 随机主动生成一张照片直接发给用户（生图；没有生图能力就不发）
     async function postAutoImage() {
         if (isProcessingApi) return;
+        // 每天最多 3 张，且只在你最近聊过天时才主动发图；很久没聊就不打扰。
+        if (!canSendChatPhoto()) return;
         isProcessingApi = true;
         try {
             const obj = await generateAutoMoment();
@@ -4365,10 +4553,48 @@
             if (!url) return;
             addMessage('left', '', nowHHMM(), null, false, false, null, null, null, null, false, null, true, { url: url, desc: prompt });
             saveMessages();
+            bumpChatPhotoCount();
             recordAutoMomentTime();
             try { notifyCharMessage('[照片] ' + prompt.slice(0, 40)); } catch (e) {}
             try { if (window.parent !== window) window.parent.postMessage({ type: 'NANO_GEN_NOTIFY', title: '收到新照片', body: (displayName || '') + ' 发来一张照片' }, '*'); } catch (e) {}
         } finally { isProcessingApi = false; }
+    }
+
+    // ===== 主动发图频率控制 =====
+    // 规则：只有「最近 6 小时内聊过天」才考虑主动发图；且每个角色每天最多 3 张，
+    // 避免频繁发无用图片，也避免很久没聊还硬发照片。
+    const CHAT_PHOTO_MAX_PER_DAY = 3;
+    const CHAT_PHOTO_RECENT_MS = 6 * 3600 * 1000;
+    function lastUserChatTime() {
+        try {
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const m = messages[i];
+                if (m && m.type === 'right' && !m.recalled) return Number(m.ts) || 0;
+            }
+        } catch (e) {}
+        return 0;
+    }
+    function isUserRecentlyChatting() {
+        const t = lastUserChatTime();
+        return !!t && (Date.now() - t) < CHAT_PHOTO_RECENT_MS;
+    }
+    function chatPhotoDayKey() { return 'nano_chat_photo_day_' + chatId; }
+    function chatPhotoCountToday() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(chatPhotoDayKey()) || 'null');
+            const day = new Date().toISOString().slice(0, 10);
+            if (raw && raw.day === day) return Number(raw.count) || 0;
+        } catch (e) {}
+        return 0;
+    }
+    function bumpChatPhotoCount() {
+        try {
+            const day = new Date().toISOString().slice(0, 10);
+            localStorage.setItem(chatPhotoDayKey(), JSON.stringify({ day: day, count: chatPhotoCountToday() + 1 }));
+        } catch (e) {}
+    }
+    function canSendChatPhoto() {
+        return isUserRecentlyChatting() && chatPhotoCountToday() < CHAT_PHOTO_MAX_PER_DAY;
     }
 
     // ===== 聊天中偶尔主动发一张照片（像现实情侣随手分享，不用对方开口要）=====
@@ -4411,6 +4637,7 @@
             addMessage('left', caption, nowHHMM(), null, false, false, null, null, null, null, false, null, true, { url: url, desc: prompt, genPrompt: prompt });
             saveMessages();
             try { localStorage.setItem('nano_last_chat_photo_' + chatId, String(Date.now())); } catch (e) {}
+            bumpChatPhotoCount();
             try { notifyCharMessage('[照片] ' + (caption || prompt).slice(0, 40)); } catch (e) {}
         } finally { isProcessingApi = false; }
     }
@@ -4422,6 +4649,8 @@
             if (!(ai === true || ai === 'true' || ai === 1 || ai === '1')) return;
             const soc = getChatSetting('autoSocial', false);
             if (!(soc === true || soc === 'true' || soc === 1 || soc === '1')) return;
+            // 每天最多 3 张，且只在你最近聊过天时才发图
+            if (!canSendChatPhoto()) return;
             let last = 0;
             try { last = parseInt(localStorage.getItem('nano_last_chat_photo_' + chatId) || '0', 10) || 0; } catch (e) {}
             if (Date.now() - last < 40 * 60 * 1000) return;
@@ -4456,7 +4685,9 @@
         try {
             const last = parseInt(localStorage.getItem('nano_last_auto_moment_' + chatId) || '0', 10) || 0;
             const intervalH = Math.max(0.5, parseFloat(getChatSetting('autoMomentInterval', 24)) || 24);
-            const minGap = Math.max(30 * 60 * 1000, intervalH * 0.3 * 3600 * 1000);
+            // 距上次不足「间隔的 85%」就不再补发，默认 24h → 约 20.4h，
+            // 保证「一天只发一次」而不是每次打开聊天都触发。
+            const minGap = Math.max(30 * 60 * 1000, intervalH * 0.85 * 3600 * 1000);
             return (Date.now() - last) > minGap;
         } catch (e) { return true; }
     }
@@ -4464,11 +4695,16 @@
         lastAutoMomentRunAt = Date.now();
         if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
         try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel(autoMomentTaskId()); } catch (e) {}
+        // 硬性频率保护：距上次主动动态不足间隔的 85% 就跳过本轮（仅重排，不再发），
+        // 防止切页/多端调度导致一天多次发朋友圈。
+        try {
+            if (!shouldDoFirstAutoMoment()) { scheduleNextAutoMoment(); return; }
+        } catch (e) {}
         try {
             // 一次 API 调用生成 3~4 条朋友圈
             await postAutoMomentBatch();
             // 社交活跃度开启时，偶尔再直接给用户发一张照片
-            if (getChatSetting('autoSocial', false) && Math.random() < 0.5) {
+            if (getChatSetting('autoSocial', false) && Math.random() < 0.35) {
                 try { await postAutoImage(); } catch (e) {}
             }
         } catch (e) {}
@@ -4478,7 +4714,8 @@
         if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
         if (!window.__autoMomentEnabled) return;
         const baseH = window.__autoMomentHours || 24;
-        const randH = baseH * (0.5 + Math.random());          // 0.5x ~ 1.5x
+        // 0.85x ~ 1.2x：两次主动动态之间至少间隔约一个「间隔」，避免一天多次触发。
+        const randH = baseH * (0.85 + Math.random() * 0.35);
         let ms = Math.max(5 * 60 * 1000, Math.round(randH * 3600 * 1000));
         // 刚开启时先来个 1.5~3 分钟内的首次触发，避免要等好几个小时才看得到
         if (first) ms = Math.min(ms, 90 * 1000 + Math.round(Math.random() * 90 * 1000));
@@ -4522,6 +4759,26 @@
         const d = e && e.detail;
         if (!d || !d.task) return;
         try { handleScheduledTask(d.task); } catch (err) {}
+    });
+    // 外壳重新打开聊天浮层时：若并没有正在进行的生成，却还残留「输入中」标记，则清掉，
+    // 避免切换会话后回到该聊天一直显示「正在输入」。
+    window.addEventListener('message', function (e) {
+        const d = e && e.data;
+        if (!d || d.type !== 'nanoOverlayOpen') return;
+        if (isProcessingApi || isWaitingForReply) return;
+        try {
+            if (chatPendingGet()) {
+                const ts = parseInt(chatPendingGet(), 10) || 0;
+                const stored = loadStoredChatRequest();
+                // 只有「请求体已丢失 / 标记过期」才清；否则保留，让 init 正常续生成
+                if (!stored || !stored.token || (ts && Date.now() - ts > 15 * 60 * 1000)) {
+                    clearChatRequest();
+                    chatPendingSet(false);
+                    hideTyping();
+                    updateSendButtonMode();
+                }
+            }
+        } catch (err) {}
     });
     // 本 frame 被卸载（切换聊天 / 关闭）时，清掉自己注册的到期任务，避免对已离开的会话误推送
     window.addEventListener('pagehide', function () {
@@ -5035,9 +5292,19 @@
                 }
             }
         } catch (e) {}
+        // 锁脸只锁「长相」：明确允许任意角度/姿势/构图，避免每次都同一机位同一动作。
+        let faceNote = '';
+        try {
+            const fr = getChatSetting('faceRef', '');
+            if (fr && fr.trim()) {
+                faceNote = '【锁脸说明】提供的人物参考图只用于保持长相（五官、脸型、肤色、发色）一致；请完全忽略参考图的姿势、角度、表情、背景与构图。'
+                    + '允许任意镜头——正面/侧面/背影、俯拍/仰拍/过肩、近景/半身/全身，任意姿态与情绪、任意场景与光线，保持自然、动态、多变，不要把人物固定在同一动作或同一机位。';
+            }
+        } catch (e) {}
         const parts = [];
         if (basePrompt) parts.push(basePrompt);
         if (subject) parts.push(subject);
+        if (faceNote) parts.push(faceNote);
         if (desc) parts.push(desc);
         return parts.join('\n');
     }
@@ -5050,6 +5317,22 @@
                /(画|绘制|生成).{0,8}(图片|图|画|照片|壁纸|插画|头像|图像|图案)/.test(t) ||
                /(生成|画|来).{0,8}(图片|照片|壁纸|插画|头像|图|画)/.test(t) ||
                /(帮我|给我|请|来).{0,8}(图片|图|画|照片|壁纸|插画|头像)/.test(t);
+    }
+
+    // 用户是否在要「文字图」（白底黑字那种）
+    function isTextImageRequest(text) {
+        if (!text) return false;
+        return /文字图|文字图片|文字截图|文字图片/.test(String(text));
+    }
+    // 从「发张写着我爱你的文字图」这类请求里尽量抽出要展示的文字
+    function deriveTextImageContent(text) {
+        let t = String(text || '').trim();
+        t = t.replace(/(帮我|给我|请|麻烦|发|来|生成|做|画|要|一张|一个|个|张)/g, ' ')
+             .replace(/文字图|文字图片|文字截图/g, ' ')
+             .replace(/[，,。.!！?？:：、]/g, ' ')
+             .replace(/\s+/g, ' ')
+             .trim();
+        return t || String(text || '').trim() || '文字图片';
     }
 
     // ===== 调用生图 API =====
@@ -5150,20 +5433,54 @@
     function loadStoredChatRequest() { try { const raw = localStorage.getItem(chatReqKey()); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
     function clearChatRequest() { try { localStorage.removeItem(chatReqKey()); } catch (e) {} }
 
-    // 优先「本页直接 fetch」（与线下模式同一套，手机端最可靠）；
-    // 只有网络层失败时才回退到父窗口代理（老逻辑，用于极端兼容场景）。
+    // 嵌入聊天 iframe 时优先交给父页面发起（切页/离开也能后台生成、各会话互不污染），
+    // 父页面通道失败再本页直接 fetch 兜底；顶层页面直接 fetch。
     function sendChatRequest(payload) {
-        return fetch(payload.url, { method: payload.method, headers: payload.headers, body: payload.body })
-            .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }); })
-            .catch(function (err) { return { ok: false, status: 0, error: String((err && err.message) || err), __netErr: true }; })
-            .then(function (res) {
-                if (res && res.ok) return res;
-                // HTTP 错误（服务器已响应）：直接返回给上层显示，不做无谓重试
-                if (res && res.status && !res.__netErr) return res;
-                // 网络层失败：有父窗口时回退父窗口代理
-                if (window.parent === window) return res;
-                return sendChatRequestViaParent(payload, (res && res.error) || '');
+        let ctrl = null;
+        try {
+            if (typeof AbortController !== 'undefined') {
+                ctrl = new AbortController();
+                currentChatAbort = ctrl;
+            }
+        } catch (e) {}
+        if (currentChatAbortTimer) { clearTimeout(currentChatAbortTimer); currentChatAbortTimer = null; }
+        if (ctrl) {
+            const cur = ctrl;
+            currentChatAbortTimer = setTimeout(function () {
+                try { currentChatAbortTimer = null; cur.abort(); } catch (e) {}
+            }, CHAT_GEN_TIMEOUT);
+        }
+        const cleanup = function () {
+            if (currentChatAbortTimer) { clearTimeout(currentChatAbortTimer); currentChatAbortTimer = null; }
+            if (currentChatAbort === ctrl) currentChatAbort = null;
+            try { if (abortListener) window.removeEventListener('nanoAbortGeneration', abortListener); } catch (e) {}
+        };
+        const abortListener = function () { try { if (ctrl) ctrl.abort(); } catch (e) {} };
+        try { window.addEventListener('nanoAbortGeneration', abortListener); } catch (e) {}
+
+        const directSend = function () {
+            return fetch(payload.url, { method: payload.method, headers: payload.headers, body: payload.body, signal: ctrl ? ctrl.signal : undefined })
+                .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }); })
+                .catch(function (err) {
+                    const aborted = !!(ctrl && ctrl.signal && ctrl.signal.aborted) || !!(err && (err.name === 'AbortError' || /abort/i.test(String((err && err.message) || ''))));
+                    return { ok: false, status: 0, error: aborted ? '已停止生成' : String((err && err.message) || err), __netErr: !aborted, aborted: aborted };
+                });
+        };
+
+        // 嵌入聊天 iframe 时：优先交给父页面发起。这样切换到别的会话或关掉浮层时，本会话的回复
+        // 仍在父页面后台完成、按 token 缓存结果，各会话互不污染；回到本会话再用同一 token 取回。
+        if (window.parent !== window) {
+            return sendChatRequestViaParent(payload, '').then(function (r) {
+                if (r && r.ok) { cleanup(); return r; }
+                if (r && r.aborted) { cleanup(); return r; }
+                if (r && r.status && r.status >= 400) { cleanup(); return r; } // 服务器已响应，直接抛给上层
+                if (genCancelled) { cleanup(); return r; }
+                // 父页面通道失败（超时/网络/未取到结果）→ 本页直接 fetch 兜底
+                return directSend().then(function (r2) { cleanup(); return r2; });
             });
+        }
+        // 顶层页面（没有外壳）：直接请求
+        return directSend().then(function (res) { cleanup(); return res; });
     }
 
     function sendChatRequestViaParent(payload, firstErr) {
@@ -5171,13 +5488,17 @@
             const resultKey = 'chat_api_result_' + payload.token;
             let settled = false;
             let poll = null;
+            let capTimer = null;
             function finish(res) {
                 if (settled) return;
                 settled = true;
                 if (poll) clearInterval(poll);
+                if (capTimer) { clearTimeout(capTimer); capTimer = null; }
                 window.removeEventListener('message', onMsg);
+                try { window.removeEventListener('nanoAbortGeneration', onAbort); } catch (e) {}
                 resolve(res);
             }
+            function onAbort() { finish({ ok: false, status: 0, aborted: true, error: '已停止生成' }); }
             function takeResult() {
                 try {
                     const raw = localStorage.getItem(resultKey);
@@ -5192,6 +5513,9 @@
             }
             if (takeResult()) return;
             window.addEventListener('message', onMsg);
+            try { window.addEventListener('nanoAbortGeneration', onAbort); } catch (e) {}
+            // 上限：父页面通道迟迟没结果就放弃，交给本页直接 fetch 兜底（避免永久「输入中」）
+            capTimer = setTimeout(function () { finish({ ok: false, status: 0, error: firstErr || '请求超时' }); }, 120000);
             try {
                 window.parent.postMessage({
                     type: 'chatApiFetch', token: payload.token, resultKey: resultKey,
@@ -5203,7 +5527,7 @@
             poll = setInterval(function() {
                 tries++;
                 if (takeResult()) return;
-                if (tries > 900) finish({ ok: false, status: 0, error: firstErr || '请求超时' });
+                if (tries > 115) finish({ ok: false, status: 0, error: firstErr || '请求超时' });
             }, 1000);
         });
     }
@@ -5223,7 +5547,7 @@
             // 否则模型只能看到「用户发送了一张图片」这类文字，识别不了图片内容。
             function pickImageUrl(m) {
                 if (!m || !m.isImage || !m.imageData) return null;
-                const u = m.imageData.url;
+                const u = m.imageData.url || (m.imageData.urls && m.imageData.urls[0]);
                 return (typeof u === 'string' && u.indexOf('data:image') === 0) ? u : null;
             }
             let userMessages = [];
@@ -5279,6 +5603,15 @@
                     + '\n请自然衔接这段线下的进展，继续线上聊天。';
                 offlineRoundHint = null;
             }
+            // 可编辑的角色扮演 Prompt 模板（js/roleplay-prompt.js），用户可自行修改
+            try {
+                const RP = window.NanoRoleplayPrompt;
+                if (RP && RP.enabled !== false && typeof RP.build === 'function') {
+                    __sys = String(RP.build(__sys) || __sys)
+                        .replace(/\{\{char\}\}/g, displayName || chatName || '角色')
+                        .replace(/\{\{user\}\}/g, currentUserName || '用户');
+                }
+            } catch (e) {}
             history.push({ role: 'system', content: __sys });
 
             let previousMessages = [];
@@ -6285,6 +6618,10 @@
                         } else if (tag.kind === 'call') {
                             // 角色主动来电：直接弹出真实来电页面（无冷却，不再先插卡片）
                             triggerIncomingCall('通话');
+                        } else if (tag.kind === 'textimage') {
+                            // 角色主动发「文字图」：白底黑字，不调用生图 API
+                            addMessage('left', '', timeStr, null, false, false, null, null, null,
+                                null, false, null, true, { textImage: true, desc: tag.payload || '' });
                         } else if (tag.kind === 'image') {
                             const imgPrompt = buildImagePrompt(tag.payload || '一张图片');
                             const allowImage = getChatSetting('allowImage', false);
@@ -6294,7 +6631,7 @@
                                     addMessage('left', '', timeStr, null, false, false, null, null, null,
                                         null, false, null, true, { url: realUrl, desc: tag.payload || '', genPrompt: tag.payload || '' });
                                 } catch (imgErr) {
-                                    showAlert('生图失败', String(imgErr));
+                                    // 生图失败：自动退化成文字图，别让角色「发不出图」
                                     addMessage('left', '', timeStr, null, false, false, null, null, null,
                                         null, false, null, true, { textImage: true, desc: tag.payload || '' });
                                 }
@@ -6588,7 +6925,14 @@
     async function resumeChatReply() {
         if (isProcessingApi) return;
         const stored = loadStoredChatRequest();
-        if (!stored || !stored.token) { chatPendingSet(false); return; }
+        if (!stored || !stored.token) {
+            clearChatRequest();
+            chatPendingSet(false);
+            hideTyping();
+            isWaitingForReply = false;
+            updateSendButtonMode();
+            return;
+        }
         // 过期请求保护：若这条断点续生成对应的已不是当前最近一条用户消息，
         // 说明用户之后又发了新问题，旧请求不能再用，否则纳米会回答很久以前的问题。
         try {
@@ -6602,13 +6946,16 @@
                 return;
             }
         } catch (e) {}
+        genCancelled = false;
         isProcessingApi = true;
         showTyping();
         sendBtn.classList.add('disabled');
         sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         try {
             const result = await sendChatRequest(stored);
+            if (genCancelled) return;
             if (!result || !result.ok) {
+                if (result && result.aborted) return;
                 if (result && result.error) showAlert('网络错误', '无法连接 API 服务器\n' + result.error);
                 return;
             }
@@ -6618,6 +6965,7 @@
                 content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
             } catch (e) {}
             if (!content) return;
+            if (genCancelled) return;
             const lastUserMsg = [...messages].reverse().find(m => m.type === 'right' && !m.recalled) || null;
             await processReply(content, lastUserMsg);
         } catch (error) {
@@ -6660,6 +7008,7 @@
             return;
         }
 
+        genCancelled = false;
         isProcessingApi = true;
         chatPendingSet(true);
         showTyping();
@@ -6667,6 +7016,15 @@
         sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
         try {
+            // 用户明确要「文字图」：直接发文字图，不需要生图 API
+            if (isTextImageRequest(lastUserMsg.text)) {
+                const now = new Date();
+                const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+                addMessage('left', '', timeStr, null, false, false, null, null, null, null, false, null, true,
+                    { textImage: true, desc: deriveTextImageContent(lastUserMsg.text) });
+                saveMessages();
+                return;
+            }
             if (getChatSetting('allowImage', false) && isImageRequest(lastUserMsg.text)) {
                 const now = new Date();
                 const h = String(now.getHours()).padStart(2, '0');
@@ -6675,9 +7033,11 @@
                 try {
                     const imgPrompt = buildImagePrompt(lastUserMsg.text);
                     const realUrl = await generateImage(imgPrompt);
+                    if (genCancelled) return;
                     addMessage('left', '', timeStr, null, false, false, null, null, null, null, false, null, true, { url: realUrl, desc: lastUserMsg.text, genPrompt: lastUserMsg.text });
                 } catch (imgErr) {
-                    showAlert('生图失败', String(imgErr));
+                    // 生图失败：自动退化成文字图
+                    if (genCancelled) return;
                     addMessage('left', '', timeStr, null, false, false, null, null, null, null, false, null, true, { textImage: true, desc: lastUserMsg.text });
                 }
                 saveMessages();
@@ -6685,6 +7045,7 @@
             }
 
             const reply = await callApi(describeMsgForAI(lastUserMsg) || lastUserMsg.text);
+            if (genCancelled) return;
             if (!reply) return;
             await processReply(reply, lastUserMsg);
         } catch (error) {
@@ -8257,8 +8618,19 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
             // 断点续生成：上次离开时回复还没生成完，回到该聊天后继续加载
             try {
                 if (chatPendingGet()) {
-                    showTyping();
-                    setTimeout(function() { resumeChatReply(); }, 400);
+                    const __pendTs = parseInt(chatPendingGet(), 10) || 0;
+                    const __stored = loadStoredChatRequest();
+                    // 进程被杀/请求丢失会留下永远清不掉的「输入中」：请求体缺失或标记过期就直接清掉，不再卡住。
+                    if (!__stored || !__stored.token || (__pendTs && Date.now() - __pendTs > 15 * 60 * 1000)) {
+                        clearChatRequest();
+                        chatPendingSet(false);
+                        hideTyping();
+                        isWaitingForReply = false;
+                        updateSendButtonMode();
+                    } else {
+                        showTyping();
+                        setTimeout(function() { resumeChatReply(); }, 400);
+                    }
                 } else {
                     updateSendButtonMode();
                 }
