@@ -289,11 +289,15 @@
         });
     }
 
-    // 酒馆触发规则：常驻永远读；有关键词的按关键词命中；无关键词或关关键词按全文常驻
+    // 酒馆触发规则：常驻永远读；关键词命中才读；向量模式（本端无向量检索，退化为「有关键词按关键词，否则常驻」）
     function shouldIncludeEntry(entry, recentText) {
         if (entry.enabled === false) return false;
         if (!entry.content || !String(entry.content).trim()) return false;
         if (entry.permanent === true) return true;
+        if (entry.vectorEnabled === true) {
+            if (!(entry.keywords || '').trim()) return true;
+            return entryKeywordHit(entry, recentText);
+        }
         if (entry.keywordEnabled !== false) {
             if (!(entry.keywords || '').trim()) return true;
             return entryKeywordHit(entry, recentText);
@@ -327,7 +331,17 @@
             }
         } catch (e) {}
         const front = [], middle = [], back = [];
-        allWorldbooks.forEach(function(w) {
+        // 内置世界书（性格与情绪）优先，且可被 nano_builtin_wb_off=1 关闭
+        const wbList = (function () {
+            const builtin = window.NanoBuiltinWorldbook;
+            if (!builtin) return allWorldbooks;
+            try { if (localStorage.getItem('nano_builtin_wb_off') === '1') return allWorldbooks; } catch (e) {}
+            const norm = normalizeChatWorldbook(builtin);
+            if (!norm) return allWorldbooks;
+            if (allWorldbooks.some(function (w) { return w && String(w.id) === String(norm.id); })) return allWorldbooks;
+            return [norm].concat(allWorldbooks);
+        })();
+        wbList.forEach(function(w) {
             if (!w) return;
             const scope = w.scope || 'global';
             const boundList = Array.isArray(w.boundCharacters) ? w.boundCharacters : [];
@@ -594,6 +608,7 @@
         prompt += '2. 不油腻：禁止霸总台词与土味情话，禁止“小姑娘、小东西、小丫头、小可爱、姑娘、丫头、女人、低吼一声、揉进骨血、你是我的、逃不掉、宠你、乖”等油腻或人机感表达；不强行撩、不刻意讨好、不刻意煽情。禁止“过来让我抱一下 / 让我抱抱 / 过来抱抱 / 来抱一下 / 抱一下 / 抱抱我 / 过来亲一下 / 亲一下 / 摸摸头 / 揉揉头”这类撒娇求抱、索要肢体亲昵的话术。\n';
         prompt += '2.1 平等与尊重（全局铁律）：你和对方是平等的——无论亲情、友情还是爱情，爱都是相互的、平等的，没有谁上谁下。严禁用命令式、上位者、施舍式的语气表达喜爱或索取亲昵，例如“过来我抱”“过来抱一下”“过来亲一下”“给我个拥抱”“乖，过来”等命令式索抱索亲话术；想亲近就用平等的商量/表达：“想抱抱你”“可以抱一下吗”“好想见你”，而不是命令对方过来。\n';
         prompt += '2.2 禁止「咯噔文学」：不要用“突然/忽然/猛地/刹那间/一瞬间”制造一惊一乍的戏剧化转折，不要写“心里一下子就空了/凉了/明白了”“仿佛全世界都安静了”“空气突然安静”“心口猛地一紧”“脑子嗡的一声”这类强行煽情、故作深情的句子。情绪要平实、具体、贴近日常，别用网文腔拔高。正文和心声都适用。\n';
+        prompt += '2.3 严禁复读与死循环（全局铁律，最高优先级之一）：严禁反复、重复地谈论同一件事、提同一个要求或表达同一个情绪。一旦某个话题、请求或情绪对方已经明确回应过（同意、拒绝、敷衍、岔开，或说了“不想再提/别说了”），就**翻篇**，绝不揪住不放、不每轮重提、不换着说法复述同一层意思。禁止同一条消息里堆叠意思相近的句子，禁止连续多轮重复同一个诉求——例如你邀请对方去某地、对方已经拒绝，你就不能再反复说“我会一直等你”“你什么时候来”“我一直在这儿等你”，每一句都重复是严重违规。每一轮都要推进话题、给出新的信息或真实反应，而不是原地打转；确实没话说就自然收住，宁可少说，也不要复读。\n';
         prompt += '3. 不催人：禁止催促、命令、安排对方的生活（起床、吃饭、睡觉、喝水、吃药、吹头发、早点休息等）。关心可以有，但绝不反复催办、管教，也不替对方做决定。\n';
         prompt += '4. 不 OOC、不出戏：不脱离设定、不跳戏、不替对方说话；任何情况下都不承认自己是 AI、模型或程序，被问到时以' + charName + '的身份自然回应。\n\n';
         prompt += '【亲密与性 · 分寸（中庸之道）】\n';
@@ -4204,31 +4219,40 @@
     async function generateProactiveMessage() {
         suppressApiAlerts = true;
         try {
-            // 一次 API 调用同时产出「消息正文 + 心声」。
-            // 明确要求顺着最近的聊天往下接，禁止汇报无关的日常流水账（上课/下课、做卷子等）。
-            const reply = await callApi(
-                '（现在没有对方的新消息。请顺着你们最近正在聊的内容，主动给对方发一条自然、简短的日常消息：'
-                + '接住上一次的话题、情绪或还没说完的事，就像真人随手拿起手机发出的那一条。'
-                + '禁止汇报与话题无关的日常进度流水账（例如上课/下课、写作业/做卷子、吃饭睡觉、我在做某事等），'
-                + '禁止问“在吗”，禁止编造不存在的日程，禁止括号旁白，禁止复述设定或系统提示。'
-                + '只输出这一条消息正文（一两句即可），随后另起一行输出心声，格式为 [heart:此刻的一句心理状态]。）'
-            );
+            // 一次调用同时产出：思维链 + 心声 + 1~3 条气泡；必须和上下文强相关
+            let cotOn = false;
+            try { const p = getChatSetting('cotPrompt', ''); const s = getChatSetting('cotEnabled', null); cotOn = (s === null || s === undefined) ? !!p : !!s; } catch (e) {}
+            let instr = '（现在没有对方的新消息。请你以角色身份，主动给对方发消息。）\n【硬性要求】\n';
+            instr += '- 必须和你们【最近的聊天】强相关：接住上一次的话题、情绪或还没说完的事，或就你们最近聊过的内容/约定/共同经历发起；不要凭空另起无关话题。\n';
+            instr += '- 严禁口水话与空话：禁止“在吗/在干嘛/吃了吗/睡了吗/忙不忙”“想你了”却没有下文这类没信息量的句子；禁止汇报与话题无关的日常流水账（上课/下课/写作业/做卷子/吃饭睡觉等）；禁止编造不存在的日程；禁止括号旁白；禁止复述设定或系统提示。\n';
+            instr += '- 每一句都要有具体的信息或真实的情绪，让对方接得住；可以是分享一件刚好发生的小事、想起某个约定、追问上一轮没说完的点。\n';
+            if (cotOn) instr += '- 第一个字符必须是 [think]，用 [/think] 收尾：先完成思考，再说话；思考不得出现在结尾，也不得重复输出。\n';
+            instr += '输出格式（严格）：\n';
+            if (cotOn) instr += '[think]……你的思考……[/think]\n';
+            instr += '每行一条气泡，共 1~3 条，每条 1~2 句、口语自然。\n';
+            instr += '最后另起一行输出心声：[heart:此刻印象||心声独白]（心声独白 90 字以上、平实口语、禁止煽情浮夸）。';
+            const reply = await callApi(instr);
             if (!reply) return null;
-            let body = stripThinkBlocks(reply);
+            let body = String(reply);
+            // 提取思维链
+            let think = '';
+            const THINK_W = 'think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链';
+            body = body.replace(new RegExp('\\[\\s*(?:' + THINK_W + ')\\s*\\]([\\s\\S]*?)\\[\\s*\\/\\s*(?:' + THINK_W + ')\\s*\\]', 'gi'), function (m, inner) { if (!think && inner && String(inner).trim()) think = String(inner).trim(); return ' '; });
+            body = body.replace(new RegExp('\\[\\s*(?:' + THINK_W + ')\\s*\\]([\\s\\S]*)$', 'i'), function (m, inner) { if (!think && inner && String(inner).trim()) think = String(inner).trim(); return ' '; });
+            body = body.replace(new RegExp('\\[\\s*\\/?\\s*(?:' + THINK_W + ')\\s*\\]', 'gi'), ' ');
+            // 提取心声
             let heart = null;
             const hm = body.match(/\[(?:heart|心声)\s*:\s*([\s\S]*?)\]/i);
             if (hm) {
                 const hp = String(hm[1] || '').trim();
                 const sep = hp.indexOf('||');
-                heart = sep !== -1
-                    ? { subject: hp.slice(0, sep).trim(), thought: hp.slice(sep + 2).trim() }
-                    : { subject: '', thought: hp };
+                heart = sep !== -1 ? { subject: hp.slice(0, sep).trim(), thought: hp.slice(sep + 2).trim() } : { subject: '', thought: hp };
                 body = body.replace(hm[0], '');
             }
             const cleaned = (extractTagsFromText(body).cleanedText || '').trim();
-            const line = String(cleaned).split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).join(' ').slice(0, 200);
-            if (!line) return null;
-            return { line: line, heart: heart };
+            const bubbles = String(cleaned).split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 3);
+            if (!bubbles.length) return null;
+            return { bubbles: bubbles, heart: heart, think: think, cotOn: cotOn };
         } catch (e) { return null; } finally { suppressApiAlerts = false; }
     }
 
@@ -4257,19 +4281,20 @@
             isProcessingApi = true;
             try {
                 const out = await generateProactiveMessage();
-                const line = out && out.line;
-                if (!line) return;
-                addMessage('left', line, nowHHMM(), null, false, false, null, null, null, null);
-                // 心声来自同一次 API 调用，挂到本轮刚发出的这条消息上
+                if (!out || !out.bubbles || !out.bubbles.length) return;
+                const beforeIds = {}; messages.forEach(function (m) { if (m && m.id) beforeIds[m.id] = 1; });
+                if (out.cotOn && out.think) pendingTurnThink = out.think;
+                for (let i = 0; i < out.bubbles.length; i++) {
+                    if (i > 0) await new Promise(r => setTimeout(r, 420));
+                    addMessage('left', out.bubbles[i], nowHHMM(), null, false, false, null, null, null, null);
+                }
+                // 心声：挂到本轮新加的消息上
                 if (out.heart && (out.heart.subject || out.heart.thought)) {
-                    for (let i = messages.length - 1; i >= 0; i--) {
-                        const m = messages[i];
-                        if (m.type === 'left' && m.turn === currentTurn) { m.heart = out.heart; }
-                    }
+                    messages.forEach(function (m) { if (m && m.type === 'left' && !beforeIds[m.id]) m.heart = out.heart; });
                 }
                 saveMessages();
                 renderMessages();
-                notifyCharMessage(String(line).slice(0, 60));
+                notifyCharMessage(String(out.bubbles[0]).slice(0, 60));
             } catch (e) {
             } finally { isProcessingApi = false; }
         })();
@@ -4602,11 +4627,14 @@
                 try { url = await generateImage(buildImagePrompt(prompt)); } catch (e) {}
             }
             if (!url) return;
+            // 不孤零零甩一张图：先把想说的话发出来
+            const capText = String((obj && obj.text) || '').slice(0, 120);
+            if (capText) addMessage('left', capText, nowHHMM(), null, false, false, null, null, null, null);
             addMessage('left', '', nowHHMM(), null, false, false, null, null, null, null, false, null, true, { url: url, desc: prompt });
             saveMessages();
             bumpChatPhotoCount();
             recordAutoMomentTime();
-            try { notifyCharMessage('[照片] ' + prompt.slice(0, 40)); } catch (e) {}
+            try { notifyCharMessage('[照片] ' + (capText || prompt).slice(0, 40)); } catch (e) {}
             try { if (window.parent !== window) window.parent.postMessage({ type: 'NANO_GEN_NOTIFY', title: '收到新照片', body: (displayName || '') + ' 发来一张照片' }, '*'); } catch (e) {}
         } finally { isProcessingApi = false; }
     }
@@ -4659,7 +4687,13 @@
                 .map(function (m) { return (m.type === 'right' ? uName : (displayName || '我')) + '：' + (m.text || (m.isImage ? '[图片]' : '')); }).join('\n');
         } catch (e) {}
         const sys = '你是「' + (displayName || charName || '角色') + '」，一个真实的人。你想在聊天时随手给对方分享一张照片（像现实里的情侣/好朋友那样：可能是此刻的你、你眼前看到的东西、日常的一角）。'
-            + '只输出一个 JSON，不要多余内容：{"caption":"一句自然的配文（可留空）","imagePrompt":"照片画面描述，具体、有画面感，适合直接用来生成图片"}';
+            + '照片必须和你们最近的聊天、此刻的时间与情境强相关；绝不能发一张和上下文毫无关系、没有信息量的图。'
+            + '只输出一个 JSON，不要多余内容：'
+            + '{"think":"先想清楚对方此刻在聊什么、你要发什么、为什么发（一句话即可）",'
+            + '"heart":"此刻印象||心声独白（第一人称、平实口语、90字以上的真实念头，禁止煽情浮夸）",'
+            + '"message":"随照片一起说出口的话，1~2 句，和照片及最近聊天强相关，禁止“给你看”“在干嘛”这类口水话",'
+            + '"caption":"可留空的短配文",'
+            + '"imagePrompt":"照片画面描述，具体、有画面感，适合直接用来生成图片"}';
         const userMsg = (setting ? ('【你的人设】\n' + setting.slice(0, 500) + '\n\n') : '')
             + (recent ? ('【最近的聊天】\n' + recent + '\n\n') : '')
             + '【现在】' + nowHHMM() + '。请自然想一张现在就想发给' + uName + '的照片。';
@@ -4685,11 +4719,30 @@
             try { url = await generateImage(buildImagePrompt(prompt)); } catch (e) {}
             if (!url) return;
             const caption = String(obj.caption || '').slice(0, 60);
-            addMessage('left', caption, nowHHMM(), null, false, false, null, null, null, null, false, null, true, { url: url, desc: prompt, genPrompt: prompt });
+            const msgText = String(obj.message || '').slice(0, 160) || caption;
+            // 本轮新加的消息 id：用于把心声挂到新消息上
+            const beforeIds = {}; messages.forEach(function (m) { if (m && m.id) beforeIds[m.id] = 1; });
+            // 思维链（开关开启才展示）
+            let cotOn = false;
+            try { const p = getChatSetting('cotPrompt', ''); const s = getChatSetting('cotEnabled', null); cotOn = (s === null || s === undefined) ? !!p : !!s; } catch (e) {}
+            if (cotOn && obj.think && String(obj.think).trim()) pendingTurnThink = String(obj.think).trim();
+            // 先发一句和照片强相关的话，再发照片——不再只丢一张孤零零的图
+            if (msgText) addMessage('left', msgText, nowHHMM(), null, false, false, null, null, null, null);
+            addMessage('left', '', nowHHMM(), null, false, false, null, null, null, null, false, null, true, { url: url, desc: prompt, genPrompt: prompt });
+            // 心声挂到本轮新加的消息
+            let heartObj = null;
+            if (obj.heart && String(obj.heart).trim()) {
+                const hp = String(obj.heart).trim();
+                const sep = hp.indexOf('||');
+                heartObj = sep !== -1 ? { subject: hp.slice(0, sep).trim(), thought: hp.slice(sep + 2).trim() } : { subject: '', thought: hp };
+            }
+            if (heartObj && (heartObj.subject || heartObj.thought)) {
+                messages.forEach(function (m) { if (m && m.type === 'left' && !beforeIds[m.id]) m.heart = heartObj; });
+            }
             saveMessages();
             try { localStorage.setItem('nano_last_chat_photo_' + chatId, String(Date.now())); } catch (e) {}
             bumpChatPhotoCount();
-            try { notifyCharMessage('[照片] ' + (caption || prompt).slice(0, 40)); } catch (e) {}
+            try { notifyCharMessage('[照片] ' + (msgText || caption || prompt).slice(0, 40)); } catch (e) {}
         } finally { isProcessingApi = false; }
     }
     // 回复后偶尔触发：需开启「允许生图 + 社交活跃度」，与上次相隔 40 分钟以上，每轮约 12% 概率
@@ -5585,6 +5638,102 @@
         });
     }
 
+    // ===== 分享链接（小红书 / 抖音等）自动读取：抓 og 标题/简介作为上下文 =====
+    var LINK_HOST_RE = /(xiaohongshu\.com|xhslink\.com|douyin\.com|iesdouyin\.com)/i;
+    var LINK_URL_RE = /https?:\/\/[^\s"'<>）)】\]]+/ig;
+    function findSharedLinks(text) {
+        var out = [];
+        var s = String(text || '');
+        var m; LINK_URL_RE.lastIndex = 0;
+        while ((m = LINK_URL_RE.exec(s)) !== null) {
+            if (LINK_HOST_RE.test(m[0])) { out.push(m[0]); if (out.length >= 3) break; }
+        }
+        return out;
+    }
+    function _decHtml(s) {
+        return String(s || '')
+            .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&#x27;/gi, "'")
+            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ').trim();
+    }
+    function parseHtmlMeta(html) {
+        html = String(html || '');
+        function pick(re) { var m = html.match(re); return m ? m[1] : ''; }
+        var title = pick(/<meta[^>]+property=["']og:title["'][^>]*content=["']([\s\S]*?)["']/i)
+            || pick(/<meta[^>]+content=["']([\s\S]*?)["'][^>]*property=["']og:title["']/i)
+            || pick(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        var desc = pick(/<meta[^>]+property=["']og:description["'][^>]*content=["']([\s\S]*?)["']/i)
+            || pick(/<meta[^>]+name=["']description["'][^>]*content=["']([\s\S]*?)["']/i)
+            || pick(/<meta[^>]+content=["']([\s\S]*?)["'][^>]*name=["']description["']/i);
+        return { title: _decHtml(title), desc: _decHtml(desc) };
+    }
+    function _cleanLinkText(s) {
+        return String(s || '')
+            .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+            .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .replace(/[ \t]{2,}/g, ' ')
+            .trim();
+    }
+    // 真正读取分享内容：先 r.jina.ai 把分享页转成可读正文（含帖子正文 / 视频文案），失败再回退 CORS 代理解析 HTML
+    function fetchLinkContent(url) {
+        function fromJina() {
+            return fetch('https://r.jina.ai/' + url, { cache: 'no-store' })
+                .then(function (r) { if (!r.ok) throw new Error('http'); return r.text(); })
+                .then(function (txt) {
+                    var t = _cleanLinkText(txt);
+                    var m = t.match(/(?:Markdown Content:|Content:)\s*([\s\S]*)/i);
+                    if (m) t = m[1];
+                    // 去掉 r.jina.ai 的元信息行
+                    t = t.replace(/^(Title|URL Source|Published Time|Markdown Content):.*$/gim, '').trim();
+                    if (t.length < 120) throw new Error('short');
+                    return { title: '', desc: '', content: t.slice(0, 4000) };
+                });
+        }
+        function fromProxy(i) {
+            var proxies = [
+                function (u) { return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); },
+                function (u) { return 'https://corsproxy.io/?url=' + encodeURIComponent(u); }
+            ];
+            if (i >= proxies.length) return Promise.reject(new Error('no proxy'));
+            return fetch(proxies[i](url), { cache: 'no-store' })
+                .then(function (r) { if (!r.ok) throw new Error('http'); return r.text(); })
+                .then(function (html) {
+                    var meta = parseHtmlMeta(html);
+                    // 抖音 / 小红书常把文案放在页面里的 JSON（desc / title）中
+                    var bodyText = '';
+                    var m2 = html.match(/"desc"\s*:\s*"([^"]{6,})"/) || html.match(/"title"\s*:\s*"([^"]{6,})"/);
+                    if (m2) bodyText = _decHtml(String(m2[1]).replace(/\\n/g, ' ').replace(/\\u[\dA-Fa-f]{4}/g, ' '));
+                    var visible = _cleanLinkText(html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' '));
+                    var content = [bodyText, meta.desc, visible].filter(Boolean).join('\n').slice(0, 4000);
+                    if (!meta.title && !content) throw new Error('empty');
+                    return { title: meta.title, desc: meta.desc, content: content };
+                })
+                .catch(function () { return fromProxy(i + 1); });
+        }
+        return fromJina().catch(function () { return fromProxy(0); }).catch(function () { return null; });
+    }
+    async function buildLinkContext(text) {
+        var links = findSharedLinks(text);
+        if (!links.length) return '';
+        var parts = [];
+        for (var i = 0; i < Math.min(links.length, 2); i++) {
+            var c = null;
+            try { c = await fetchLinkContent(links[i]); } catch (e) {}
+            var block = '链接：' + links[i];
+            if (c) {
+                if (c.title) block = '标题：' + c.title + '\n' + block;
+                var body = c.content || c.desc || '';
+                if (body) block += '\n内容 / 文案：\n' + body;
+            }
+            parts.push(block);
+        }
+        return '【' + (currentUserName || '对方') + '分享了一个链接（小红书 / 抖音等），下面是它抓取到的真实内容 / 文案】\n' + parts.join('\n\n') +
+            '\n请先认真读完上面的真实内容（帖子正文 / 视频文案），再以你的角色身份，结合你的人设与你们的关系，自然地点评或接话；不要只看链接，也不要照着原文复述。';
+    }
+
     async function callApi(userMessage, extraContext) {
         const config = await getApiConfig();
         if (!config) {
@@ -5638,6 +5787,19 @@
             userMessages.forEach(function (e, i) { if (e && e.image) __imgIdxs.push(i); });
             const __keepImg = {};
             __imgIdxs.slice(-4).forEach(function (i) { __keepImg[i] = true; });
+
+            // 分享链接（小红书 / 抖音）自动读取：把抓到的标题/简介作为额外上下文喂给模型
+            try {
+                var __linkSrc = '';
+                for (var __li = userMessages.length - 1; __li >= 0; __li--) {
+                    if (userMessages[__li] && userMessages[__li].text && findSharedLinks(userMessages[__li].text).length) { __linkSrc = String(userMessages[__li].text); break; }
+                }
+                if (!__linkSrc) __linkSrc = String(userMessage || '');
+                if (findSharedLinks(__linkSrc).length) {
+                    var __linkCtx = await buildLinkContext(__linkSrc);
+                    if (__linkCtx) extraContext = extraContext ? (extraContext + '\n\n' + __linkCtx) : __linkCtx;
+                }
+            } catch (e) {}
 
             const history = [];
             let __sys = buildSystemPrompt();
@@ -5729,6 +5891,14 @@
                     }
                 } catch (e) {}
             }
+
+            // 世界书「深度再注入」：聊天越长，开头的系统提示越容易被模型忽略；
+            // 把关键设定重新贴到「用户最新消息之前」，确保每一轮都重新读到（recency）。
+            try {
+                const __wbd = getWorldbookText(chatId);
+                const __wbr = ((__wbd.front || '') + (__wbd.middle || '') + (__wbd.back || '')).trim();
+                if (__wbr) history.push({ role: 'system', content: '【世界书 · 关键设定（再次强调 · 优先级最高 · 每一轮都要遵守）】\n' + __wbr.slice(0, 4000) });
+            } catch (e) {}
 
             let __imgBudget = 8; // 一次最多真正带上 8 张图，避免请求体过大
             userMessages.forEach((entry, idx) => {
@@ -8163,10 +8333,12 @@ if (callCard) {
             quote: null, transcript: null, translation: null, favorite: false, turn: null, ts: Date.now()
         };
     }
-    function addCharSaid(text) {
+    function addCharSaid(text, heart) {
         const t = String(text || '').trim();
         if (!t) return false;
-        messages.push(makeCharSaidMsg(t));
+        const msg = makeCharSaidMsg(t);
+        if (heart && (heart.subject || heart.thought)) msg.heart = { subject: String(heart.subject || ''), thought: String(heart.thought || '') };
+        messages.push(msg);
         try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
         return true;
     }
@@ -8174,10 +8346,10 @@ if (callCard) {
         if (!data || !data.text) return;
         if (data.chatId && String(data.chatId) !== String(chatId)) return;
         if (!isStorageReady) {
-            try { sessionStorage.setItem('nano_pending_char_say', JSON.stringify({ chatId: chatId, text: String(data.text), ts: Date.now() })); } catch (e) {}
+            try { sessionStorage.setItem('nano_pending_char_say', JSON.stringify({ chatId: chatId, text: String(data.text), heart: data.heart || null, ts: Date.now() })); } catch (e) {}
             return;
         }
-        addCharSaid(data.text);
+        addCharSaid(data.text, data.heart);
     }
     function consumePendingCharSay() {
         let p = null;
@@ -8185,7 +8357,7 @@ if (callCard) {
         if (!p || !p.text) return;
         if (String(p.chatId || '') !== String(chatId || '')) return;
         try { sessionStorage.removeItem('nano_pending_char_say'); } catch (e) {}
-        addCharSaid(p.text);
+        addCharSaid(p.text, p.heart || null);
     }
 
     // ===== 角色接管手机：把整次「翻看」放进一张卡片 =====
@@ -8629,6 +8801,21 @@ if (data.type === 'NANO_VOICE_CALL_CARD' || data.type === 'NANO_VIDEO_CALL_CARD'
                     }
                     out.groups.push({ id: String(g.id), name: String(g.name || '群聊') });
                 });
+            } catch (e) {}
+            // 最近的对话（供外壳「上线补发」生成强相关消息）与最近活动时间
+            try {
+                var rec = [];
+                for (var mi = messages.length - 1; mi >= 0 && rec.length < 12; mi--) {
+                    var mm = messages[mi];
+                    if (!mm || mm.recalled) continue;
+                    var who = mm.type === 'right' ? (currentUserName || '用户') : (displayName || '我');
+                    var txt = String(mm.text || (mm.isImage ? '[图片]' : (mm.isCard ? '[卡片]' : ''))).trim();
+                    if (txt) rec.unshift(who + '：' + txt);
+                }
+                out.recent = rec.join('\n');
+                var lastTs = 0;
+                for (var mj = messages.length - 1; mj >= 0; mj--) { if (messages[mj] && messages[mj].ts) { lastTs = Number(messages[mj].ts) || 0; break; } }
+                out.lastActivity = lastTs;
             } catch (e) {}
             return out;
         },

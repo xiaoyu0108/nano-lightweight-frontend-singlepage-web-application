@@ -2400,6 +2400,16 @@ async function openSettings(){
       </div>
 
       <div class="st-row">
+        <button class="st-btn" data-act="ios-screen">
+          <div>
+            <div class="st-btn-title">iOS 快捷指令 · 窥屏</div>
+            <div class="st-btn-sub">用快捷指令 / 轻点背面截屏，让 TA 点评你屏幕上的内容（iPhone / iPad）</div>
+          </div>
+          <svg class="st-btn-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <div class="st-row">
         <button class="st-btn" data-act="share">
           <div>
             <div class="st-btn-title">把手机内容分享给 TA</div>
@@ -2496,6 +2506,8 @@ async function openSettings(){
       if(t && t !== window) t.postMessage({ type:"startScreenShare", charId: info.id, charName: info.name, avatar: info.avatar }, "*");
     }catch(e){}
   };
+  const iosScreenBtn = appHost.querySelector('[data-act="ios-screen"]');
+  if (iosScreenBtn) iosScreenBtn.onclick = () => { openScreenSetup(); };
   appHost.querySelector('[data-act="reset-wallpaper"]').onclick = async () => {
     await dataSet(`wallpaper_${currentChar.id}`, "");
     await applyWallpaper(currentChar.id);
@@ -3129,10 +3141,34 @@ function openDoubao(){ return openHostedApp("doubao", "doubao.html", "renderDoub
 function openTaobao(){ return openHostedApp("taobao", "taobao.html", "renderCharShopping"); }
 function openMapcal(){ return openHostedApp("mapcal", "mapcal.html", "renderCharMapCalendar"); }
 
+/* 窥屏配置：内嵌在本 App 内，返回时回到「设置」而不是退出手机 */
+async function openScreenSetup(){
+  currentAppId = "screensetup";
+  const url = "ios-setting.html?chat=" + encodeURIComponent(currentChar.id) + "&name=" + encodeURIComponent(currentChar.name || "");
+  appHost.innerHTML = `<iframe class="app-frame" data-frame src="${url}" title=""></iframe>`;
+  const frame = appHost.querySelector("[data-frame]");
+  if(!frame) return;
+  frame.addEventListener("load", () => {
+    if(!appHost.contains(frame)) return;
+    // 透传安全区像素值，避免内页顶栏顶进灵动岛
+    try{
+      const de = frame.contentDocument && frame.contentDocument.documentElement;
+      if(de){
+        const cs = getComputedStyle(document.documentElement);
+        const top = cs.getPropertyValue("--safe-top").trim();
+        const bot = cs.getPropertyValue("--safe-bottom").trim();
+        if(top) de.style.setProperty("--safe-top", top);
+        if(bot) de.style.setProperty("--safe-bottom", bot);
+      }
+    }catch(e){}
+  });
+}
+
 /* 子页面点返回时关闭当前 App */
 window.addEventListener("message", e => {
   const d = e && e.data;
   if(d && d.type === "phoneAppClose") closeApp();
+  else if(d && d.type === "screenSetupClose"){ try{ openSettings(); }catch(err){} }
 });
 
 /* App 路由 */

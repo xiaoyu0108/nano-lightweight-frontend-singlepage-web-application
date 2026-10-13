@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>窥屏</title>
+  <link rel="stylesheet" href="css/ios-setting.css?v=20261013c">
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+  <script src="js/appearance.js"></script>
+</head>
+<body class="sk">
+  <header class="sk-top">
+    <button class="sk-back" data-back aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <span class="sk-title">窥屏</span>
+    <span class="sk-top-spacer"></span>
+  </header>
+
+  <main class="sk-wrap">
+    <div class="sk-hero">
+      <div class="sk-hero-kicker">iOS 快捷指令</div>
+      <div class="sk-hero-title">让 TA 看看你的屏幕</div>
+      <div class="sk-hero-sub">按一下截屏，TA 会用人设点评你正在看的内容，并写进你们的聊天。</div>
+    </div>
+
+    <div class="sk-missing" id="skMissing" hidden></div>
+
+    <div class="sk-choose">
+      <span class="sk-choose-label">谁来看</span>
+      <div class="sk-choose-pill">
+        <select id="isChar" class="sk-select"></select>
+        <svg class="sk-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+
+    <div class="sk-lead">
+      <span class="sk-lead-dot"></span>
+      <span>推荐 <b>方式 A</b>：Key 不出手机，Nano 用你自己的主 API 完成点评。</span>
+    </div>
+
+    <section class="sk-primary">
+      <div class="sk-line">
+        <span class="sk-line-label">把它粘进快捷指令的「打开 URL」</span>
+      </div>
+      <div class="sk-copy">
+        <code id="isLinkA"></code>
+        <button class="sk-copy-btn" data-copy="isLinkA">复制</button>
+      </div>
+      <div class="sk-note">把链接里的 <b>{{识别文本}}</b> 删掉，改插入「从图像中提取文本」的结果。</div>
+    </section>
+
+    <details class="sk-fold">
+      <summary><span>方式 B · 快捷指令直连 API</span><svg class="sk-fold-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+      <div class="sk-fold-body">
+        <div class="sk-line">
+          <span class="sk-line-label">接口地址</span>
+        </div>
+        <div class="sk-copy"><code id="isUrl2"></code><button class="sk-copy-btn" data-copy="isUrl2">复制</button></div>
+
+        <div class="sk-line">
+          <span class="sk-line-label">请求体 JSON（请求体选「文件」引用它）</span>
+        </div>
+        <div class="sk-copy"><pre id="isBody"></pre><button class="sk-copy-btn" data-copy="isBody">复制</button></div>
+
+        <div class="sk-line">
+          <span class="sk-line-label">回传深链（把 {{模型回复}} 换成回复变量）</span>
+        </div>
+        <div class="sk-copy"><code id="isLinkB"></code><button class="sk-copy-btn" data-copy="isLinkB">复制</button></div>
+        <div class="sk-note">头部加 <b>Authorization: Bearer 你的Key</b> 与 <b>Content-Type: application/json</b>。Key 会存在快捷指令里，注意安全。</div>
+      </div>
+    </details>
+
+    <details class="sk-fold">
+      <summary><span>提示词 · 人设</span><svg class="sk-fold-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+      <div class="sk-fold-body">
+        <textarea id="isPrompt" class="sk-textarea" rows="6" placeholder="角色的性格 / 语气 / 你和 TA 的关系…"></textarea>
+        <div class="sk-note">已自动填入所选角色的人设，可自行删改。</div>
+      </div>
+    </details>
+
+    <details class="sk-fold">
+      <summary><span>完整步骤</span><svg class="sk-fold-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+      <div class="sk-fold-body">
+        <div id="isGuide" class="sk-guide"></div>
+      </div>
+    </details>
+
+    <div class="sk-foot">灵动岛 / 锁屏显示见 <b>docs/ios-shortcuts.md</b></div>
+    <div class="sk-spacer"></div>
+  </main>
+
+  <div class="sk-toast" id="isToast"></div>
+  <script src="js/ios-setting.js?v=20261013e"></script>
+  <script src="swipe-back.js"></script>
+</body>
+</html>

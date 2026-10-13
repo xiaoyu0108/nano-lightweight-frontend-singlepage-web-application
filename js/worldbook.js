@@ -292,11 +292,35 @@
         return null;
     }
 
+    // ============================================================
+    // 内置世界书「性格与情绪」：加载时自动加入世界书列表（可编辑 / 可关闭）。
+    // 关闭：localStorage.setItem('nano_builtin_wb_off','1')
+    // ============================================================
+    function ensureBuiltinWB() {
+        try {
+            var bi = window.NanoBuiltinWorldbook;
+            if (!bi || !bi.entries) return false;
+            try { if (localStorage.getItem('nano_builtin_wb_off') === '1') return false; } catch (e) {}
+            if (!data || !Array.isArray(data.files)) return false;
+            if (data.files.some(function (f) { return f && String(f.id) === String(bi.id); })) return false;
+            var f = JSON.parse(JSON.stringify(bi));
+            if (!Array.isArray(data.groups)) data.groups = [];
+            if (!data.groups.some(function (g) { return g && String(g.id) === '内置'; })) data.groups.push({ id: '内置', name: '内置' });
+            f.group = '内置';
+            f.boundCharacters = [];
+            f.size = Math.max(1, Math.ceil(JSON.stringify(f.entries).length / 1024)) + 'KB';
+            f.ext = 'txt';
+            data.files.unshift(f);
+            return true;
+        } catch (e) { return false; }
+    }
+
     var cachedData = loadDataSync();
 
     if (cachedData) {
         data = cachedData;
         normalizeWorldbookFiles(data);
+        if (ensureBuiltinWB()) { try { saveData(data); } catch (e) {} }
         isLoading = false;
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() { render(); });
@@ -313,6 +337,7 @@
                 if (!same) {
                     data = d;
                     normalizeWorldbookFiles(data);
+                    if (ensureBuiltinWB()) { try { saveData(data); } catch (e) {} }
                     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
                     render();
                 }
@@ -321,6 +346,7 @@
     } else {
         console.log('⏳ localStorage 为空，从 IndexedDB 加载...');
         data = JSON.parse(JSON.stringify(defaultData));
+        ensureBuiltinWB();
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() { render(); });
         } else {
@@ -330,6 +356,7 @@
             if (d && d.groups) {
                 data = d;
                 normalizeWorldbookFiles(data);
+                if (ensureBuiltinWB()) { try { saveData(data); } catch (e) {} }
                 try {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
                     console.log('💾 已写入 localStorage 缓存，共 ' + data.files.length + ' 个世界书');
@@ -338,12 +365,14 @@
                 render();
             } else {
                 data = JSON.parse(JSON.stringify(defaultData));
+                ensureBuiltinWB();
                 saveData(data);
                 isLoading = false;
                 render();
             }
         }).catch(function() {
             data = JSON.parse(JSON.stringify(defaultData));
+            ensureBuiltinWB();
             saveData(data);
             isLoading = false;
             render();

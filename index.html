@@ -1568,7 +1568,7 @@
                 showOverlayFrame();
                 // 同一个页面且已加载过 → 直接复用（切换更快）；正在后台生成 → 也必须复用（否则中断生成）
                 reuseOrLoadOverlayFrame(url);
-                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html', 'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html'];
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'ios-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html', 'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
                 const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
                 if (noOuterHeader) {
@@ -3445,9 +3445,11 @@
 <script src="js/nano-notify.js?v=20261006a"></script>
 <script src="js/nano-push.js"></script>
 <script src="swipe-back.js"></script>
-<script src="js/keep-alive.js?v=20261006a"></script>
+<script src="js/keep-alive.js?v=20261013b"></script>
 <script src="js/char-takeover.js?v=20261009a"></script>
-<script src="js/screen-share.js?v=20261003p"></script>
+<script src="js/screen-share.js?v=20261013a"></script>
+<script src="js/ios-bridge.js?v=20261013a"></script>
+<script src="js/online-catchup.js?v=20261013a"></script>
 </div>
     <!-- 小号试探：居中弹窗（不暴露是谁）-->
     <div class="alt-probe-overlay" id="altProbeOverlay">

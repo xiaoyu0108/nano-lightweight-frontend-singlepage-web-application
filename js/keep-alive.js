@@ -57,6 +57,7 @@
     var unlocked = false;
     var restarting = false;
     var mediaSet = false;
+    var npActive = false;          // 是否正在用「正在播放」展示 TA 的点评（灵动岛/锁屏）
     var lastTick = 0;
     var fallbackTimer = null;
     var pendingAck = {};
@@ -132,7 +133,7 @@
 
             // 【核心】用音频播放进度驱动心跳：后台 setInterval 会被降权，timeupdate 不会
             audioEl.addEventListener('timeupdate', function () {
-                if (!enabled()) return;
+                if (!enabled() && !npActive) return;
                 tick();
                 // 关键修复：防止 iOS 后台播放结束前无法自动 loop，提前 0.4 秒手动倒回
                 var d = audioEl.duration;
@@ -144,11 +145,11 @@
             // 只处理「真的停了」的情况；不要监听 suspend/stalled（缓冲时也会触发，会闪）
             ['pause', 'ended'].forEach(function (ev) {
                 audioEl.addEventListener(ev, function () {
-                    if (!enabled() || restarting) return;
+                    if ((!enabled() && !npActive) || restarting) return;
                     restarting = true;
                     setTimeout(function () {
                         restarting = false;
-                        if (!enabled() || !audioEl.paused) return;
+                        if ((!enabled() && !npActive) || !audioEl.paused) return;
                         play();
                     }, 1200);
                 });
@@ -157,24 +158,35 @@
         return audioEl;
     }
 
+    var DEFAULT_ART = [
+        { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }
+    ];
+    function applyMetadata(meta) {
+        try {
+            if (!navigator.mediaSession || typeof window.MediaMetadata !== 'function') return;
+            meta = meta || {};
+            var art = meta.artwork;
+            if (typeof art === 'string' && art) art = [{ src: art, sizes: '512x512', type: 'image/png' }];
+            if (!Array.isArray(art) || !art.length) art = DEFAULT_ART;
+            navigator.mediaSession.metadata = new window.MediaMetadata({
+                title: meta.title || 'Nano 保活中',
+                artist: meta.artist || '定时生成 / 自动消息继续运行',
+                album: meta.album || 'Nano',
+                artwork: art
+            });
+        } catch (e) {}
+    }
     function setMediaSession() {
         try {
             if (!navigator.mediaSession || typeof window.MediaMetadata !== 'function') return;
             try { navigator.mediaSession.playbackState = 'playing'; } catch (e) {}
-            if (mediaSet) return;                 // 只设一次，避免元数据反复刷新导致灵动岛闪烁
-            mediaSet = true;
-            navigator.mediaSession.metadata = new window.MediaMetadata({
-                title: 'Nano 保活中',
-                artist: '定时生成 / 自动消息继续运行',
-                album: 'Nano',
-                artwork: [
-                    { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-                    { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }
-                ]
-            });
             // 锁屏 / 灵动岛上的按钮：暂停不生效，播放会立刻续上
             try { navigator.mediaSession.setActionHandler('pause', function () {}); } catch (e) {}
             try { navigator.mediaSession.setActionHandler('play', function () { play(); }); } catch (e) {}
+            if (npActive || mediaSet) return;     // 正在展示点评时不覆盖；默认元数据也只设一次
+            mediaSet = true;
+            applyMetadata(null);
         } catch (e) {}
     }
 
@@ -201,6 +213,30 @@
             var p = a.play();
             if (p && p.catch) p.catch(function () {});
         } catch (e) {}
+    }
+
+    // ===== 灵动岛 / 锁屏「正在播放」：用保活音频 + MediaSession 展示 TA 的最新一句点评 =====
+    // 说明：这占的是系统「媒体播放器」的位置（像音乐 App），只能显示 标题/艺术家/封面 + 播放控制，
+    // 不能自定义界面或放按钮；且必须让（静音）音频真的在播放，通常需要保活已开启、或用户先触摸过页面。
+    // 真·自定义灵动岛仍需原生 App（ActivityKit），见 docs/ios-shortcuts.md。
+    function setNowPlaying(o) {
+        o = o || {};
+        npActive = true;
+        try { ensureAudio(); bindUnlock(); } catch (e) {}
+        play();
+        applyMetadata({
+            title: o.title || 'TA',
+            artist: o.artist || o.text || '正在看你屏幕上的内容',
+            album: o.album || 'Nano',
+            artwork: o.artwork
+        });
+        try { if (navigator.mediaSession) navigator.mediaSession.playbackState = 'playing'; } catch (e) {}
+        return true;
+    }
+    function clearNowPlaying() {
+        npActive = false;
+        mediaSet = false;
+        applyMetadata(null);
     }
 
     function isRunning() {
@@ -409,6 +445,7 @@
 
     function stop() {
         setFlag(false);
+        npActive = false;
         stopLoop();
         releaseWakeLock();
         try { if (navigator.mediaSession) navigator.mediaSession.playbackState = 'paused'; } catch (e) {}
@@ -485,6 +522,8 @@
         clear: clear,
         runDue: function () { if (isTop) runDueTasks(Date.now()); },
         onDue: onDue,
+        setNowPlaying: setNowPlaying,
+        clearNowPlaying: clearNowPlaying,
         // 主框架消息处理用
         apply: function (on) { on ? enableLocal() : stop(); },
         unlockAudio: bindUnlock

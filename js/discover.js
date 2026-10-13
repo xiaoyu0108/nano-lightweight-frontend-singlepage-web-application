@@ -187,7 +187,8 @@
     music:   { url: 'music.html', title: 'Music' },
     memorypalace: { url: 'memory palace.html', title: 'Memory Palace', showBack: true },
     imessage: { url: 'imessage.html', title: 'iMessage', showBack: true },
-    appstore: { url: 'appstore.html', title: 'App Store', showBack: true }
+    appstore: { url: 'appstore.html', title: 'App Store', showBack: true },
+    screenpeek: { url: 'ios-setting.html', title: '窥屏', showBack: true }
   };
 
   Array.prototype.forEach.call(document.querySelectorAll('.entry[data-app]'), function (el) {
