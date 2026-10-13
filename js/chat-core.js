@@ -8352,6 +8352,15 @@ if (callCard) {
         addCharSaid(data.text, data.heart);
     }
     function consumePendingCharSay() {
+        // 屏幕共享暂存的点评（可能多条）：进入该角色私聊时补发，保证点评落在私聊里
+        try {
+            var sk = 'nano_screen_pending_' + String(chatId || '');
+            var sarr = JSON.parse(sessionStorage.getItem(sk) || '[]');
+            if (Array.isArray(sarr) && sarr.length) {
+                try { sessionStorage.removeItem(sk); } catch (e) {}
+                sarr.forEach(function (t) { if (t) addCharSaid(String(t)); });
+            }
+        } catch (e) {}
         let p = null;
         try { p = JSON.parse(sessionStorage.getItem('nano_pending_char_say') || 'null'); } catch (e) {}
         if (!p || !p.text) return;
@@ -8479,6 +8488,18 @@ if (callCard) {
         // 角色接管手机：角色亲自发的一条消息，须在 chatId 过滤之前处理
         if (data.type === 'NANO_CHAR_SAY') {
             handleCharSay(data);
+            return;
+        }
+
+        // 屏幕共享「快速回复」弹窗 / 屏幕速聊合并：把用户输入作为用户消息落进私聊
+        if (data.type === 'NANO_USER_SAY') {
+            if (data.chatId && String(data.chatId) !== String(chatId)) return;
+            var __userSay = String(data.text || '').trim();
+            if (__userSay) {
+                try { addMessage('right', __userSay, nowHHMM(), null, false, false, null, null, null, null); } catch (e) {}
+                // silent=true 时只补历史（如屏幕速聊合并），不再触发一次回复
+                if (!data.silent) { try { isWaitingForReply = true; triggerReply(); } catch (e) {} }
+            }
             return;
         }
 

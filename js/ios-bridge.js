@@ -150,18 +150,65 @@
         // 等外壳初始化 + chat_inner 可被唤起后再处理
         setTimeout(drain, 1600);
         setTimeout(drain, 4200);
+        // 屏幕速聊：回前台后补拉并合并暂存轮次
+        setTimeout(function () { try { pullPeek(); } catch (e) {} }, 2600);
+    }
+
+    // 屏幕速聊：拉取服务端暂存的轮次，按顺序合并进该角色「唯一」的聊天
+    async function pullPeek() {
+        var base = '', token = '', chat = '';
+        try { base = localStorage.getItem('nano_peek_url') || ''; } catch (e) {}
+        try { token = localStorage.getItem('nano_peek_token') || ''; } catch (e) {}
+        try { chat = localStorage.getItem('nano_peek_chat') || ''; } catch (e) {}
+        if (!base || !chat) return;
+        base = String(base).trim().replace(/\/+$/, '');
+        if (/\/peek$/i.test(base)) base = base.replace(/\/peek$/i, '');
+        var sh = window.__nanoShell;
+        if (!sh) return;
+        var r;
+        try { r = await fetch(base + '/peek/pending?chatId=' + enc(chat) + '&token=' + enc(token), { cache: 'no-store' }); } catch (e) { return; }
+        if (!r.ok) return;
+        var data = null;
+        try { data = await r.json(); } catch (e) {}
+        var turns = (data && Array.isArray(data.turns)) ? data.turns : [];
+        if (!turns.length) return;
+        try { if (sh.open) sh.open('chat_inner.html?chat=' + enc(chat) + '&name=' + enc(''), '', 'main'); } catch (e) {}
+        await new Promise(function (res) { setTimeout(res, 1100); });
+        for (var i = 0; i < turns.length; i++) {
+            var t = turns[i] || {};
+            if (t.user && t.user !== '[图片]') {
+                try { sh.postToChat({ type: 'NANO_USER_SAY', chatId: String(chat), text: String(t.user), silent: true }); } catch (e) {}
+                await new Promise(function (res) { setTimeout(res, 400); });
+            }
+            if (t.char) {
+                try { sh.postToChat({ type: 'NANO_CHAR_SAY', chatId: String(chat), text: String(t.char) }); } catch (e) {}
+                await new Promise(function (res) { setTimeout(res, 400); });
+            }
+        }
+        try {
+            await fetch(base + '/peek/ack', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatId: String(chat), token: token })
+            });
+        } catch (e) {}
     }
 
     window.NanoIOSBridge = {
-        version: '20261013a',
+        version: '20261013b',
         queue: function (item) { var l = loadPending(); l.push(item || {}); savePending(l); },
         drain: drain,
+        pullPeek: pullPeek,
         comment: function (info, text) { try { window.ScreenShare.commentText(info, text); } catch (e) {} },
         inject: function (info, reply) { injectReply(info, reply); }
     };
 
     // 页面重新可见时兜底处理一次（例如从后台切回）
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) setTimeout(drain, 800); });
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+            setTimeout(drain, 800);
+            setTimeout(function () { try { pullPeek(); } catch (e) {} }, 1400);
+        }
+    });
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();

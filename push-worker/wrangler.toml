@@ -15,3 +15,12 @@ crons = ["*/5 * * * *"]
 [vars]
 REMIND_TIMES = "09:00,12:30,20:00,23:00"
 REMIND_TEXT = "有人想你了，点开看看～"
+
+# ── 屏幕速聊（iOS 快捷指令）──
+# 敏感项用 secret 设置，不要写进本文件（会进版本库）：
+#   wrangler secret put PEEK_TOKEN      # 与 ios-setting 页面生成的「令牌」一致
+#   wrangler secret put PEEK_API_KEY    # 你的主模型 API Key（只存在服务端）
+# 非敏感的地址/模型也可以放这里：
+# [vars]
+# PEEK_API_URL = "https://api.openai.com/v1"
+# PEEK_MODEL = "gpt-4o-mini"

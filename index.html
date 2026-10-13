@@ -1815,6 +1815,17 @@
                     setTimeout(function () { try { openNotifyTarget(openTarget); } catch (e) {} }, 900);
                 }
             }
+            // 通知里「直接回复」后冷启动：带 chatId + 回复文本
+            const ssReplyChat = params.get('ssreply');
+            const ssReplyText = params.get('sstext');
+            if (ssReplyChat && ssReplyText) {
+                try {
+                    params.delete('ssreply'); params.delete('sstext');
+                    const qs2 = params.toString();
+                    history.replaceState(null, '', location.pathname + (qs2 ? ('?' + qs2) : '') + location.hash);
+                } catch (e) {}
+                setTimeout(function () { try { nanoScreenReplySend(ssReplyChat, ssReplyText); } catch (e) {} }, 1100);
+            }
         } catch (e) {}
 
         overlayBack.addEventListener('click', closeFullscreen);
@@ -2226,6 +2237,8 @@
         function openNotifyTarget(target) {
             target = String(target || '');
             if (!target) return;
+            // 屏幕共享点评通知：点通知只在底部弹一个「快速回复」输入框，不打开整个聊天
+            if (target.indexOf('ss-reply:') === 0) { showScreenReplyPopup(target.slice(9)); return; }
             if (target === 'moments') { openFullscreen('moments.html', 'Moments', false, 'discover'); return; }
             if (target === 'ins') { openFullscreen('ins.html?v=14', 'Instagram', false, 'discover'); return; }
             if (target === 'halo') { openFullscreen('halo.html', 'Halo', false, 'discover'); return; }
@@ -2266,6 +2279,58 @@
                     musicFrame.contentWindow.postMessage(msg, '*');
                 }
             } catch (e) {}
+        }
+
+        // ===== 屏幕共享：点通知后的「快速回复」弹窗 =====
+        function escSS(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+        function nanoScreenReplySend(chatId, text) {
+            text = String(text || '').trim();
+            if (!chatId || !text) return;
+            try {
+                if (window.__nanoShell && __nanoShell.postToChat) {
+                    window.__nanoShell.postToChat({ type: 'NANO_USER_SAY', chatId: String(chatId), text: text });
+                    return;
+                }
+            } catch (e) {}
+            try {
+                if (window.__nanoShell && __nanoShell.open) {
+                    window.__nanoShell.open('chat_inner.html?chat=' + encodeURIComponent(chatId) + '&name=' + encodeURIComponent('聊天'), '', 'main');
+                    setTimeout(function () { try { window.__nanoShell.postToChat({ type: 'NANO_USER_SAY', chatId: String(chatId), text: text }); } catch (e) {} }, 1100);
+                }
+            } catch (e) {}
+        }
+        function showScreenReplyPopup(chatId) {
+            var old = document.getElementById('ssReplyOverlay');
+            if (old) { try { old.remove(); } catch (e) {} }
+            var name = 'TA';
+            try {
+                var info = JSON.parse(sessionStorage.getItem('last_chat_info') || 'null');
+                if (info && String(info.chatId) === String(chatId) && info.chatName) name = info.chatName;
+            } catch (e) {}
+            var el = document.createElement('div');
+            el.id = 'ssReplyOverlay';
+            el.style.cssText = 'position:fixed;inset:0;z-index:100600;background:rgba(40,25,32,.38);display:flex;align-items:flex-end;justify-content:center;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom))';
+            el.innerHTML =
+                '<div style="width:min(94vw,440px);background:linear-gradient(180deg,#fff7fb,#fffdf4);border-radius:20px;box-shadow:0 20px 60px rgba(120,70,90,.32);padding:16px 16px 14px">' +
+                    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
+                        '<div style="font-size:14px;font-weight:800;color:#b23a5b">回复 ' + escSS(name) + '</div>' +
+                        '<button id="ssReplyClose" style="margin-left:auto;border:0;background:#ffe1ea;color:#b23a5b;border-radius:12px;padding:6px 12px;font-size:12px;font-weight:700">关闭</button>' +
+                    '</div>' +
+                    '<textarea id="ssReplyInput" placeholder="说点什么…" rows="3" style="width:100%;box-sizing:border-box;border:1px solid rgba(210,160,180,.4);border-radius:14px;padding:11px 12px;font-size:15px;line-height:1.5;color:#4a353f;background:#fff;resize:none;outline:none;font-family:inherit"></textarea>' +
+                    '<button id="ssReplySend" style="margin-top:10px;width:100%;height:44px;border:0;border-radius:14px;background:linear-gradient(120deg,#ffb0cd,#ef8fb8);color:#fff;font-size:15px;font-weight:800">发送</button>' +
+                '</div>';
+            document.body.appendChild(el);
+            var ta = el.querySelector('#ssReplyInput');
+            var close = function () { try { el.remove(); } catch (e) {} };
+            el.querySelector('#ssReplyClose').onclick = close;
+            el.addEventListener('click', function (e) { if (e.target === el) close(); });
+            el.querySelector('#ssReplySend').onclick = function () {
+                var t = String(ta.value || '').trim();
+                if (!t) return;
+                nanoScreenReplySend(chatId, t);
+                close();
+            };
+            setTimeout(function () { try { ta.focus(); } catch (e) {} }, 80);
         }
 
         function openMusicFromBall() {
@@ -3018,6 +3083,12 @@
                 return;
             }
 
+            // 通知里「直接回复」拿到文本（Android 网页通知的文本动作）：落进私聊
+            if (data.type === 'notifyReply') {
+                try { nanoScreenReplySend(data.chatId || '', data.text || ''); } catch (e) {}
+                return;
+            }
+
             if (data.type === 'keepAlive') {
                 try { localStorage.setItem('nano_keep_alive', data.enabled ? '1' : '0'); } catch (e) {}
                 if (data.enabled && navigator.wakeLock && navigator.wakeLock.request) {
@@ -3442,13 +3513,13 @@
     <script src="js/api-float.js?v=20261013a"></script>
 <script src="js/mem-link.js?v=20261006a"></script>
 <script src="js/aux-memory.js"></script>
-<script src="js/nano-notify.js?v=20261006a"></script>
+<script src="js/nano-notify.js?v=20261013a"></script>
 <script src="js/nano-push.js"></script>
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js?v=20261013b"></script>
 <script src="js/char-takeover.js?v=20261009a"></script>
-<script src="js/screen-share.js?v=20261013a"></script>
-<script src="js/ios-bridge.js?v=20261013a"></script>
+<script src="js/screen-share.js?v=20261013e"></script>
+<script src="js/ios-bridge.js?v=20261013b"></script>
 <script src="js/online-catchup.js?v=20261013a"></script>
 </div>
     <!-- 小号试探：居中弹窗（不暴露是谁）-->

@@ -7,10 +7,10 @@
 // ============================================================
 (function () {
     'use strict';
-    var VERSION = '20261003p';
+    var VERSION = '20261013a';
     try { console.log('[ScreenShare] build ' + VERSION + ' loaded'); } catch (e) {}
 
-    var INTERVAL = 10000; // 每 10 秒看一帧
+    var INTERVAL = 30000; // 每 30 秒看一帧（一次截图 = 一次 API 调用：看一次 + 输出回复）
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
     function enc(s) { return encodeURIComponent(String(s == null ? '' : s)); }
     function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
@@ -184,7 +184,7 @@
         // 同时弹一条系统通知，并把它写进标签页标题：切到别的窗口/标签、看不到小窗时也能看到 TA 的点评
         try {
             if (window.NanoNotify && SS.info) {
-                window.NanoNotify.notify(SS.info.name || 'TA', p.main || String(text || ''), { icon: SS.info.avatar || '', channel: 'chat', force: true });
+                window.NanoNotify.notify(SS.info.name || 'TA', p.main || String(text || ''), { icon: SS.info.avatar || '', channel: 'chat', force: true, target: 'ss-reply:' + String(SS.info.id), reply: true });
             }
             document.title = '💬 ' + (p.main || String(text || '')).slice(0, 24) + ' · Nano';
         } catch (e) {}
@@ -273,14 +273,29 @@
         }
         return bubbles.slice(0, 3);
     }
-    // 展示气泡 + 写进聊天 + 通知
+    // 把点评送进「私聊」：优先让聊天写入角色消息；外壳/会话不可用时先暂存，等打开该私聊时补发
+    function deliverToPrivateChat(bubbles) {
+        if (!bubbles || !bubbles.length || !SS.info) return;
+        try {
+            var s = shell();
+            if (s && s.postToChat) {
+                bubbles.forEach(function (b) { s.postToChat({ type: 'NANO_CHAR_SAY', chatId: String(SS.info.id), text: String(b) }); });
+                return;
+            }
+        } catch (e) {}
+        try {
+            var key = 'nano_screen_pending_' + String(SS.info.id);
+            var arr = [];
+            try { arr = JSON.parse(sessionStorage.getItem(key) || '[]') || []; } catch (e) {}
+            bubbles.forEach(function (b) { arr.push(String(b)); });
+            sessionStorage.setItem(key, JSON.stringify(arr.slice(-20)));
+        } catch (e) {}
+    }
+    // 展示气泡 + 写进私聊 + 通知
     function emitBubbles(bubbles) {
         bubbles.forEach(addBubble);
         if (bubbles.length) {
-            try {
-                var s = shell();
-                if (s && s.postToChat) bubbles.forEach(function (b) { s.postToChat({ type: 'NANO_CHAR_SAY', chatId: String(SS.info.id), text: String(b) }); });
-            } catch (e) {}
+            deliverToPrivateChat(bubbles);
             setStatus('刚刚点评了 ' + bubbles.length + ' 句');
             // 让 TA 的点评同时出现在锁屏 / 灵动岛的「正在播放」里（复用保活音频）
             try {
@@ -389,13 +404,13 @@
         if (screenOk) {
             // 电脑 Chrome / Edge 能真正共享屏幕，保留完整流程。
             title = '让「' + escHtml(info.name) + '」看你真实的屏幕？';
-            desc = '会请求屏幕共享权限（建议选「整个屏幕」，这样你切换窗口 TA 也能看到），TA 定时截帧并用你配置的「能识图的模型」点评。可随时停止。';
+            desc = '会请求屏幕共享权限（建议选「整个屏幕」，这样你切换窗口 TA 也能看到）。TA 每 30 秒看一次，每次只调用一次模型，并把点评直接发进你们的私聊。可随时停止。';
             actions = '<button class="ss-cancel">取消</button><button class="ss-ok">开始共享</button>';
         } else {
-            // iOS / 隐私浏览器等拿不到录屏接口：不做「截图 / 摄像头」这种替代（那是视频聊天的事），直接说明不支持。
-            title = '当前环境不支持屏幕共享';
-            desc = '这个浏览器没有提供网页录屏接口（iOS 网页端通常不支持，http:// 不安全环境也不会有授权弹窗）。想看真实屏幕请用电脑 Chrome / Edge 打开。';
-            actions = '<button class="ss-cancel">知道了</button>';
+            // iOS / 隐私浏览器等拿不到录屏接口：直接引导到「屏幕速聊」（快捷指令 + 服务端）
+            title = 'iOS 上请用「屏幕速聊」';
+            desc = 'iOS 的网页端拿不到录屏接口，无法在这里直接共享屏幕。改用它：在任意 App 里双击「辅助触控」→ 快捷指令截屏 → TA 的回复直接弹在系统窗口里，可继续打字；回到小手机后这几轮会自动合并进聊天。';
+            actions = '<button class="ss-cancel">知道了</button><button class="ss-ios">去配置「屏幕速聊」</button>';
         }
         var el = document.createElement('div'); el.className = 'ss-confirm';
         el.innerHTML = '<div class="ss-dialog"><h3>' + title + '</h3><p>' + desc + '</p>' +
@@ -406,6 +421,15 @@
         var askNotify = function () { try { if (window.NanoNotify && NanoNotify.ensurePermission) NanoNotify.ensurePermission(); } catch (e) {} };
         var c = el.querySelector('.ss-cancel'); if (c) c.onclick = close;
         var ok = el.querySelector('.ss-ok'); if (ok) ok.onclick = function () { askNotify(); close(); doStart(info); };
+        var iosBtn = el.querySelector('.ss-ios');
+        if (iosBtn) iosBtn.onclick = function () {
+            close();
+            try {
+                var sh = shell();
+                var url = 'ios-setting.html?chat=' + encodeURIComponent(info.id) + '&name=' + encodeURIComponent(info.name);
+                if (sh && sh.open) sh.open(url, '窥屏', 'more');
+            } catch (e) {}
+        };
     }
 
     async function runStream(info, stream, mode) {
@@ -424,6 +448,16 @@
         if (!SS.cfg || !SS.cfg.mainUrl || !SS.cfg.mainKey || !SS.cfg.mainModel) { setStatus('主 API 未配置'); addLine('主 API 未配置，无法点评。', true); }
         setStatus(SS.mode === 'camera' ? '正在看你的镜头…' : '盯着你的屏幕…');
         addLine(SS.mode === 'camera' ? '（TA 开始看你的镜头了）' : '（TA 开始看你的屏幕了）');
+        // 在私聊里留一条系统提示：让他知道「你已经把屏幕共享给 TA（窥屏）」
+        try {
+            var __sN = shell();
+            if (__sN && __sN.postToChat) {
+                __sN.postToChat({
+                    type: 'NANO_SYS_NOTICE', chatId: String(info.id),
+                    text: (SS.mode === 'camera' ? '你打开了镜头共享，TA 正在看你' : '你打开了屏幕共享，TA 正在看你的屏幕（窥屏中）')
+                });
+            }
+        } catch (e) {}
         try {
             stream.getVideoTracks()[0].addEventListener('ended', function () {
                 setStatus('已结束（点评已收进聊天卡片）');
@@ -478,6 +512,8 @@
     function stop() {
         if (!SS.active) return;
         postCard();
+        // 私聊里补一条结束提示
+        try { var __sS = shell(); if (__sS && __sS.postToChat && SS.info) __sS.postToChat({ type: 'NANO_SYS_NOTICE', chatId: String(SS.info.id), text: '你结束了屏幕共享' }); } catch (e) {}
         SS.active = false;
         try { if (SS.timer) clearInterval(SS.timer); } catch (e) {}
         SS.timer = null;

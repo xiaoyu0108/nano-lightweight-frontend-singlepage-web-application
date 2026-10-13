@@ -345,6 +345,10 @@
         };
         if (icon) payload.icon = icon;
         if (badge) payload.badge = badge;
+        // Android 网页通知支持「文本动作」：下拉/长按通知可直接输入回复（iOS 不支持，忽略即可）
+        if (opts.reply && String(opts.target || '').indexOf('ss-reply:') === 0) {
+            try { payload.actions = [{ action: 'reply', type: 'text', title: '回复', placeholder: '回复 TA…' }]; } catch (e) {}
+        }
         function legacy() {
             try {
                 var n = new Notification(title || 'Nano', payload);

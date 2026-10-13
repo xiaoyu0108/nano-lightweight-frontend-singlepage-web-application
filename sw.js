@@ -8,7 +8,7 @@
    “后台回复”依赖页面常驻 + 音频保活；真正的“关闭也能收到”需要服务端配合（见 push 事件）。 */
 'use strict';
 
-var CACHE = 'nano-static-v54';
+var CACHE = 'nano-static-v55';
 var STATIC_RE = /\.(css|js|png|jpg|jpeg|webp|svg|gif|ico|woff2?|ttf|mp3)$/i;
 var HTML_FRESH_MS = 0;                // 0：每次打开都联网取最新 HTML（断网/超时再用缓存）
 var NET_TIMEOUT_MS = 1500;            // 有缓存时，网络最多等 1.5 秒，超时先上缓存
@@ -119,28 +119,56 @@ self.addEventListener('push', function (event) {
         }
     } catch (e) {}
     event.waitUntil(
-        self.registration.showNotification(data.title || 'Nano', {
-            body: data.body || '',
-            tag: data.tag || ('nano-push-' + Date.now()),
-            data: { target: data.target || '' }
-        })
+        self.registration.showNotification(data.title || 'Nano', (function () {
+            var o = {
+                body: data.body || '',
+                tag: data.tag || ('nano-push-' + Date.now()),
+                data: { target: data.target || '' }
+            };
+            if (data.reply && String(data.target || '').indexOf('ss-reply:') === 0) {
+                o.actions = [{ action: 'reply', type: 'text', title: '回复', placeholder: '回复 TA…' }];
+            }
+            return o;
+        })())
     );
 });
 
 self.addEventListener('notificationclick', function (event) {
+    var pdata = event.notification.data || {};
+    var ptarget = pdata.target || '';
+    // 「通知内直接回复」（Android 网页通知的文本动作）：把文本回传页面，不用打开输入页
+    if (event.action === 'reply' && event.reply) {
+        event.notification.close();
+        var rChat = ptarget.indexOf('ss-reply:') === 0 ? ptarget.slice(9) : (pdata.chatId || '');
+        event.waitUntil(
+            self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+                for (var i = 0; i < list.length; i++) {
+                    var c = list[i];
+                    if ('focus' in c) {
+                        try { c.postMessage({ type: 'notifyReply', chatId: rChat, text: String(event.reply) }); } catch (e) {}
+                        return c.focus();
+                    }
+                }
+                if (self.clients.openWindow) {
+                    return self.clients.openWindow('./index.html?ssreply=' + encodeURIComponent(rChat) + '&sstext=' + encodeURIComponent(String(event.reply)));
+                }
+            })
+        );
+        return;
+    }
     event.notification.close();
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
             for (var i = 0; i < list.length; i++) {
                 var c = list[i];
                 if ('focus' in c) {
-                    try { c.postMessage({ type: 'notifyOpen', target: (event.notification.data && event.notification.data.target) || '' }); } catch (e) {}
+                    try { c.postMessage({ type: 'notifyOpen', target: ptarget }); } catch (e) {}
                     return c.focus();
                 }
             }
             if (self.clients.openWindow) {
                 // 应用已被关闭：把目标带在 URL 上，冷启动后 index.html 会自己跳转
-                var t = (event.notification.data && event.notification.data.target) || '';
+                var t = ptarget;
                 return self.clients.openWindow('./index.html' + (t ? ('?open=' + encodeURIComponent(t)) : ''));
             }
         })

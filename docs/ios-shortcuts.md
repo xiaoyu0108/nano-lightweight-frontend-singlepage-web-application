@@ -119,7 +119,71 @@
 
 ---
 
-## Part 3 — 灵动岛 / 锁屏实时显示（需要原生 App）
+## Part 2.5 — 屏幕速聊（快捷指令 + 服务端，任意 App 内连续对话）
+
+这是「窥屏」体验最好的一种：**不用打开 Nano**，在任意 App 里双击「辅助触控」跑快捷指令，
+截屏发到你的服务端，角色回复直接弹在系统窗口里，你还能在那个窗口继续打字，来回连续对话；
+等你回到 Nano，这几轮会**按顺序自动合并**进该角色唯一的聊天。
+
+它的关键是：**模型 Key 只存在服务端**，快捷指令里不放 Key；对话轮次先暂存在服务端，App 回到前台再拉取合并。
+
+### 架构
+
+```
+辅助触控双击 → 快捷指令(截屏) → POST 你的服务端 /peek
+        → 服务端用保存的 Key 调主模型 → 返回角色回复
+        → 快捷指令用「显示提醒」弹出，可继续「要求输入」循环
+        → 轮次暂存在服务端 → Nano 回到前台 GET /peek/pending 合并 → POST /peek/ack
+```
+
+### 服务端（本仓库 `push-worker/`）
+
+已内置这些路由（Cloudflare Worker）：
+
+| 路由 | 作用 |
+| --- | --- |
+| `POST /peek` | 令牌校验 → 收 `{chatId, system, text?, image?}` → 用服务端 Key 调模型 → 返回 `{ok, reply}`，并把这一轮暂存 |
+| `GET /peek/pending?chatId=&token=` | App 拉取暂存轮次 `{ok, turns:[{user, char, ts}]}` |
+| `POST /peek/ack` | App 合并完后清空暂存 |
+
+配置（用 secret，别写进仓库）：
+
+```bash
+wrangler secret put PEEK_TOKEN      # 与 ios-setting 页面生成的「令牌」一致
+wrangler secret put PEEK_API_KEY    # 你的主模型 Key（只在服务端）
+# 非敏感项可放 wrangler.toml 的 [vars]
+# PEEK_API_URL = "https://api.openai.com/v1"
+# PEEK_MODEL   = "gpt-4o-mini"
+```
+
+`PEEK_TOKEN` 未设置时接口放行（仅建议本地调试）；生产务必设置。
+
+### Nano 侧
+
+在 **查手机 → 设置 → iOS 快捷指令 · 窥屏 → 方式 C** 里：填「服务端地址」、复制「令牌 / 接口地址 / 人设」，
+点「保存配置」。之后 `js/ios-bridge.js` 会在 App 启动和回到前台时自动拉取并合并轮次。
+
+### 快捷指令搭建
+
+1. 加 **截屏** → **Base64 编码**（关闭「行长度换行」）。
+2. 加 **获取 URL 内容**：POST 到 `https://你的worker/peek`；头部 `X-Peek-Token: 你的令牌`；
+   请求体选 **文件**，引用一个 **文本** 动作：
+
+   ```json
+   {"chatId":"<角色ID>","system":"<你的人设>","image":"data:image/jpeg;base64,<截图base64>"}
+   ```
+
+3. **获取字典值** 取 `reply` → **显示提醒** 弹出。
+4. **要求输入** 拿到你打的字，把 `image` 换成 `text` 再发一轮 → 循环，就是连续对话。
+
+### 触发
+
+设置 → 辅助功能 → 触控 → 辅助触控 → 轻点两下 → 选这个快捷指令。首次运行允许「截屏 / 访问网络 / 显示提醒」。
+
+> 隐私：截图只在使用时经你的服务端转发给模型，不写入数据库（Worker 只暂存文本轮次，7 天过期）。
+
+---
+
 
 **纯快捷指令开不了灵动岛。** 灵动岛 / 锁屏实时活动是 iOS 的 **Live Activity**，只能由原生 App 用 **ActivityKit** 创建和更新。因此需要一个小 App（可以把你现有的 Web 前端用 `WKWebView` 套壳，逻辑复用）。
 

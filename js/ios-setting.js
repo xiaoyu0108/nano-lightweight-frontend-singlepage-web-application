@@ -86,6 +86,38 @@
             return cfg || null;
         });
     }
+    /* ---------------- 屏幕速聊（快捷指令 + 服务端） ---------------- */
+    var PEEK_URL_KEY = 'nano_peek_url', PEEK_TOKEN_KEY = 'nano_peek_token', PEEK_CHAT_KEY = 'nano_peek_chat';
+    function getPeekToken() {
+        var t = '';
+        try { t = localStorage.getItem(PEEK_TOKEN_KEY) || ''; } catch (e) {}
+        if (!t) {
+            t = 'pk_' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+            try { localStorage.setItem(PEEK_TOKEN_KEY, t); } catch (e) {}
+        }
+        return t;
+    }
+    function renderPeek() {
+        var url = '';
+        try { url = localStorage.getItem(PEEK_URL_KEY) || ''; } catch (e) {}
+        if ($('isPeekUrl')) $('isPeekUrl').value = url;
+        if ($('isPeekToken')) $('isPeekToken').textContent = getPeekToken();
+        var base = String(url).trim().replace(/\/+$/, '');
+        if (/\/peek$/i.test(base)) base = base.replace(/\/peek$/i, '');
+        if ($('isPeekEndpoint')) $('isPeekEndpoint').textContent = base ? (base + '/peek') : '（先填服务端地址）';
+        if ($('isPeekSystem')) {
+            var c = currentChar();
+            $('isPeekSystem').textContent = c ? ('你是「' + charName() + '」。' + (persona() || '')) : '（先创建角色）';
+        }
+    }
+    function savePeek() {
+        try { localStorage.setItem(PEEK_URL_KEY, String($('isPeekUrl').value || '').trim()); } catch (e) {}
+        try { localStorage.setItem(PEEK_TOKEN_KEY, getPeekToken()); } catch (e) {}
+        try { localStorage.setItem(PEEK_CHAT_KEY, String(selectedId || '')); } catch (e) {}
+        renderPeek();
+        toast('配置已保存');
+    }
+
     function endpoint(raw) {
         var s = String(raw || '').trim().replace(/\/+$/, '');
         if (!s) return '';
@@ -178,6 +210,7 @@
         renderMissing();
         renderGenerated();
         renderGuide();
+        renderPeek();
     }
 
     /* ---------------- 事件 ---------------- */
@@ -202,6 +235,10 @@
             refresh();
         });
         $('isPrompt').addEventListener('input', refresh);
+        var peekSave = $('isPeekSave');
+        if (peekSave) peekSave.addEventListener('click', savePeek);
+        var peekUrl = $('isPeekUrl');
+        if (peekUrl) peekUrl.addEventListener('change', function () { try { localStorage.setItem(PEEK_URL_KEY, String(peekUrl.value || '').trim()); } catch (e) {} renderPeek(); });
         document.querySelectorAll('[data-copy]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var el = $(btn.getAttribute('data-copy'));
