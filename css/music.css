@@ -1425,3 +1425,156 @@ html, body {
 }
 .netease-qr-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .netease-qr-user-name { font-size: 14px; font-weight: 500; color: #1c1c1e; }
+
+/* ===== 音乐设置：整页，沿用 App 的风格与色系（无外层卡片包裹） ===== */
+#actionOverlay {
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+  background: var(--bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+#actionOverlay .action-sheet.music-settings {
+  max-width: 430px;
+  width: 100%;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  animation: none;
+}
+.music-set-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(10px + var(--safe-top, env(safe-area-inset-top, 0px))) 12px 10px;
+  border-bottom: 0.5px solid var(--separator);
+}
+.music-set-back {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gray-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+}
+.music-set-back:active { background: var(--gray-6); }
+.music-set-back svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.music-set-title { flex: 1; text-align: center; font-size: 17px; font-weight: 600; letter-spacing: -0.3px; color: var(--gray-1); }
+.music-set-done {
+  flex: none;
+  min-width: 40px;
+  border: none;
+  background: transparent;
+  color: var(--red);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 6px;
+  border-radius: 10px;
+}
+.music-set-done:active { opacity: 0.5; }
+
+.music-set-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 16px calc(32px + env(safe-area-inset-bottom, 0px));
+}
+.music-set-body::-webkit-scrollbar { display: none; }
+
+.music-set-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-3);
+  letter-spacing: 0.3px;
+  padding: 18px 4px 4px;
+}
+.music-set-section-label:first-child { padding-top: 8px; }
+
+/* 设置行：直接铺在页面底色上，不套卡片，仅用分隔线区分 */
+.action-sheet-btn.music-set-row,
+.music-set-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 15px 4px;
+  border: none;
+  background: transparent;
+  border-bottom: 0.5px solid var(--separator);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--gray-1);
+}
+.action-sheet-btn.music-set-row:active { background: rgba(0, 0, 0, 0.03); }
+.music-set-row.static { cursor: default; }
+.music-set-row .music-set-ico {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  stroke: var(--gray-3);
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.music-set-label { flex: 1; font-size: 16px; color: var(--gray-1); }
+.music-set-chevron {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  stroke: var(--gray-4);
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.music-set-row.danger .music-set-label { color: var(--red); }
+.music-set-row.danger .music-set-ico { stroke: var(--red); }
+
+/* 开关滑阻器 */
+.music-switch { position: relative; width: 51px; height: 31px; flex: none; }
+.music-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.music-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--gray-5);
+  transition: background 0.25s;
+}
+.music-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.music-switch input:checked ~ .music-switch-track { background: var(--red); }
+.music-switch input:checked ~ .music-switch-track .music-switch-thumb { transform: translateX(20px); }

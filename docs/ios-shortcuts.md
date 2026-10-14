@@ -153,9 +153,11 @@
 
 | 路由 | 作用 |
 | --- | --- |
-| `POST /peek` | 令牌校验 → 收 `{chatId, system, text?, image?}` → 用服务端 Key 调模型 → 返回 `{ok, reply}`，并把这一轮暂存 |
+| `POST /peek` | 令牌校验 → 收 `{chatId, system, text?, image?}` → 用服务端 Key 调模型 → 返回 `{ok, reply}`，并把这一轮暂存；若已配置 VAPID 且 App 已订阅，会顺带用 Web Push 推一条通知 |
 | `GET /peek/pending?chatId=&token=` | App 拉取暂存轮次 `{ok, turns:[{user, char, ts}]}` |
 | `POST /peek/ack` | App 合并完后清空暂存 |
+
+> **点通知打开的是「添加到主屏幕」的 Nano，不是 Safari。** iOS 里只有 Web Push 通知能唤起已安装的主屏 PWA（`sw.js` 的 `notificationclick` 会聚焦/冷启动 App）。所以想在手机上「啪一下就在主屏 Nano 里看到」，就让 `/peek` 顺手发一条推送：在 Worker 配好 `VAPID_*`，在 Nano 里执行一次 `NanoPush.setup(worker地址, VAPID公钥)` + `NanoPush.enable()`，之后点通知即进 App。
 
 ### 部署 `push-worker`（一步步来，约 5 分钟）
 
@@ -178,6 +180,12 @@
    ```bash
    wrangler secret put PEEK_TOKEN      # 必须与 ios-setting 方式 C 里显示的「令牌」完全一致
    wrangler secret put PEEK_API_KEY    # 你的主模型 Key（只存在服务端，不进快捷指令）
+   ```
+   可选：想「点通知就打开主屏的 Nano」（见上方说明），再加这三个 VAPID 变量（App 里也要 `NanoPush.enable()`）：
+   ```bash
+   wrangler secret put VAPID_SUBJECT   # 例如 mailto:you@example.com
+   wrangler secret put VAPID_PUBLIC
+   wrangler secret put VAPID_PRIVATE
    ```
    接口 / 模型这两个非敏感项，取消注释并填进 `wrangler.toml` 的 `[vars]`：
    ```toml

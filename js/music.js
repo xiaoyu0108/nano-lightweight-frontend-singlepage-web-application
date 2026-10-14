@@ -2634,9 +2634,12 @@
   $('moreBtn').addEventListener('click', function() {
     var endDuoBtn = document.getElementById('actionEndDuo');
     if (endDuoBtn) endDuoBtn.style.display = duoActive ? '' : 'none';
+    if (actionFloatBall) actionFloatBall.checked = !!floatBallEnabled;
     actionOverlay.classList.add('show');
   });
   actionCancel.addEventListener('click', function() { actionOverlay.classList.remove('show'); });
+  var actionSheetBack = $('actionSheetBack');
+  if (actionSheetBack) actionSheetBack.addEventListener('click', function() { actionOverlay.classList.remove('show'); });
   actionOverlay.addEventListener('click', function(e) {
     if (e.target === actionOverlay) actionOverlay.classList.remove('show');
   });
@@ -2662,16 +2665,16 @@
     this.value = '';
   });
 
-  actionFloatBall.addEventListener('click', function() {
-    actionOverlay.classList.remove('show');
-    openConfirm('悬浮球', floatBallEnabled ? '是否关闭音乐悬浮球？' : '是否开启音乐悬浮球？', function() {
-      floatBallEnabled = !floatBallEnabled;
+  if (actionFloatBall) {
+    actionFloatBall.checked = !!floatBallEnabled;
+    actionFloatBall.addEventListener('change', function() {
+      floatBallEnabled = !!this.checked;
       try { localStorage.setItem('nano_music_float_ball', floatBallEnabled ? '1' : '0'); } catch(e) {}
       if (floatBallEnabled) showBall();
       else hideBall();
       showToast(floatBallEnabled ? '悬浮球已开启' : '悬浮球已关闭');
     });
-  });
+  }
 
   // 重置背景（只清背景图）
   var actionResetBg = $('actionResetBg');

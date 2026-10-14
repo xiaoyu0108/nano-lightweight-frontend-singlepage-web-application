@@ -899,7 +899,7 @@
 
         const gPronoun = getGenderPronoun(gender);
         prompt += '\n【心声 · 手记（每次回复必须附带，强制项，不可省略，两段都不可为空）】\n';
-        prompt += '在本轮消息的最后单独输出一行，格式严格为 [heart:此刻印象||心声独白]：\n';
+        prompt += '在本轮回复里单独输出一行，格式严格为 [heart:此刻印象||心声独白]（若下面还有「附加板块」要求，则在这一行之后继续输出板块）：\n';
         prompt += '- 此刻印象：0-30字，第三人称电影感画面，写你此刻在哪、穿什么、在做什么动作。' +
             (gender && gender !== '未知' ? ('（你性别' + gender + '，但文字里不要写出性别字）') : '') +
             '。【严禁】以“男/女/他/她/男人/女人/男的/女的”等性别或人称词开头或作前缀（例如绝不能写“男靠在窗边”“女穿着衬衫”），必须直接以画面开头，例如“坐在窗边，白衬衫微敞，指尖轻叩桌面”。不要用关联词。【严禁】霸总/AI 网文腔的生理特写：低吼、揉碎、掐腰、红着眼、哑声、眸色一沉、危险地眯眼、喉结滚动等，也不要写身体部位特写或性暗示。\n';
@@ -917,6 +917,11 @@
             if (heartBuiltin) {
                 prompt += '\n【心声 · 内置要求（必须遵守，优先级高于上面的通用示例）】\n' + heartBuiltin + '\n';
             }
+        } catch (e) {}
+        // 心声「附加板块」（评论区等）：用户在心声美化里新增的板块，生成时必须一并输出
+        try {
+            const secBlock = heartSectionsPromptBlock();
+            if (secBlock) prompt += '\n' + secBlock + '\n';
         } catch (e) {}
 
         if (isForeign) {
@@ -990,7 +995,7 @@
         if (coupleAnnivNotice) prompt += '\n' + coupleAnnivNotice + '\n';
         prompt += '\n【回复前自检】1) 这段话像不像【角色人设】里的人会说的？2) 有没有违背或漏掉【世界书】里相关设定？3) 有没有用到最近的【长期记忆】？4) 有没有开黄腔、性暗示或露骨内容？有就删掉重写。答不上来就重新组织，再输出。\n';
         prompt += '\n现在开始和' + user + '对话。做你自己，自然一点。';
-        prompt += ' 再次强调：每一轮回复都必须以 [heart:此刻印象||心声独白] 结尾，两段都要写内容，不可省略。';
+        prompt += ' 再次强调：每一轮回复都必须输出 [heart:此刻印象||心声独白]，两段都要写内容，不可省略；若有「附加板块」，也要在每个板块的 [section:名]...[/section] 里写全。';
 
         return prompt;
     }
@@ -2007,7 +2012,8 @@
       subject: subjectText,
       message: thoughtText,
       avatar: charAvatar,
-      time: msg.time || ''
+      time: msg.time || '',
+      sections: (msg.heart && Array.isArray(msg.heart.sections)) ? msg.heart.sections : []
     });
   } else {
     console.warn('[Chat] __heart 未加载');
@@ -2735,6 +2741,59 @@
         cleaned = text.replace(/\[(transfer|gift|voice|call|heart|image|textimage|text-image|文字图|文字图片|reply|creategroup|inviteme|acceptinvite|rejectinvite|familycard|亲属卡|takeout|外卖|location|定位|act|动描|altprobe|小号|emoji|sticker|表情包|表情|anniv|纪念日|微信号|wechat)\s*:\s*[^\]]*?(?:\]|$)/gi, '').trim();
 
         return { tags: results, cleanedText: cleaned };
+    }
+
+    // ===== 心声「附加板块」（评论区等）：配置读取 / 提示词 / 从回复里解析 =====
+    function heartSectionsConfig() {
+        try {
+            const a = JSON.parse(localStorage.getItem('nano_heart_sections') || '[]');
+            return Array.isArray(a) ? a.filter(function (s) { return s && s.name; }) : [];
+        } catch (e) { return []; }
+    }
+    function heartSectionsPromptBlock() {
+        // 优先用心声模块暴露的实现，保证提示词格式与解析一致
+        try {
+            if (window.__heart && window.__heart.sections && typeof window.__heart.sections.promptBlock === 'function') {
+                return window.__heart.sections.promptBlock() || '';
+            }
+        } catch (e) {}
+        const list = heartSectionsConfig().filter(function (s) { return s.name && s.prompt; });
+        if (!list.length) return '';
+        const L = [];
+        L.push('【心声 · 附加板块（必须输出，放在 [heart:...] 之后；每个板块都要写，不可省略）】');
+        L.push('格式严格为（板块内容可多行）：');
+        L.push('[section:板块名]');
+        L.push('板块内容');
+        L.push('[/section]');
+        L.push('各板块要求：');
+        list.forEach(function (s) { L.push('- ' + s.name + '：' + s.prompt); });
+        return L.join('\n');
+    }
+    function extractHeartSections(text) {
+        const sections = [];
+        let src = String(text || '');
+        if (!src) return { text: src, sections: sections };
+        src = src.replace(/\[(?:section|板块)\s*:\s*([^\]\n]+)\]([\s\S]*?)\[\/\s*(?:section|板块)\s*\]/gi, function (m, name, content) {
+            name = String(name || '').trim();
+            content = String(content || '').trim();
+            if (name && content) sections.push({ name: name, content: content });
+            return ' ';
+        });
+        // 容错：末尾未闭合的 [section:名] 一直吃到结尾
+        src = src.replace(/\[(?:section|板块)\s*:\s*([^\]\n]+)\]\s*([\s\S]*)$/i, function (m, name, content) {
+            name = String(name || '').trim();
+            content = String(content || '').trim();
+            if (name && content) sections.push({ name: name, content: content });
+            return ' ';
+        });
+        src = src.replace(/\[\/?(?:section|板块)(?:\s*:[^\]\n]*)?\]/gi, ' ');
+        return { text: src, sections: sections };
+    }
+    function heartWithSections(h) {
+        if (!h) return h;
+        const o = { subject: h.subject || '', thought: h.thought || '' };
+        if (Array.isArray(h.sections) && h.sections.length) o.sections = h.sections;
+        return o;
     }
 
     // ===== 核心功能函数 =====
@@ -4233,6 +4292,8 @@
             if (cotOn) instr += '[think]……你的思考……[/think]\n';
             instr += '每行一条气泡，共 1~3 条，每条 1~2 句、口语自然。\n';
             instr += '最后另起一行输出心声：[heart:此刻印象||心声独白]（心声独白 90 字以上、平实口语、禁止煽情浮夸）。';
+            const secP = heartSectionsPromptBlock();
+            if (secP) instr += '\n' + secP;
             const reply = await callApi(instr);
             if (!reply) return null;
             let body = String(reply);
@@ -4251,6 +4312,10 @@
                 heart = sep !== -1 ? { subject: hp.slice(0, sep).trim(), thought: hp.slice(sep + 2).trim() } : { subject: '', thought: hp };
                 body = body.replace(hm[0], '');
             }
+            // 附加板块：从正文里抽出 [section:名]...[/section]，挂到心声上
+            const secMain = extractHeartSections(body);
+            body = secMain.text;
+            if (heart && secMain.sections.length) heart = heartWithSections({ subject: heart.subject, thought: heart.thought, sections: secMain.sections });
             const cleaned = (extractTagsFromText(body).cleanedText || '').trim();
             const bubbles = String(cleaned).split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 3);
             if (!bubbles.length) return null;
@@ -6698,6 +6763,10 @@
             }
             replyBody = reply.replace(heartMatch[0], '').trim();
         }
+        // 附加板块：从正文里抽出 [section:名]...[/section]，挂到本轮心声上
+        const secRound = extractHeartSections(replyBody);
+        replyBody = secRound.text.trim();
+        if (roundHeart && secRound.sections.length) roundHeart.sections = secRound.sections;
 
         // 思维链：**全局**提取并移除所有 [think]...[/think]（兼容 <think>、【思考】、全角括号等写法），
         // 第一段非空内容挂到本轮第一条角色气泡上方的可折叠区
@@ -6837,7 +6906,7 @@
                 for (let i = messages.length - 1; i >= 0; i--) {
                     const m = messages[i];
                     if (m.type === 'left' && m.turn === currentTurn) {
-                        m.heart = { subject: roundHeart.subject, thought: roundHeart.thought };
+                        m.heart = heartWithSections(roundHeart);
                     }
                 }
             }
@@ -6965,7 +7034,7 @@
                 for (let i = messages.length - 1; i >= 0; i--) {
                     const m = messages[i];
                     if (m.type === 'left' && m.turn === currentTurn) {
-                        m.heart = { subject: roundHeart.subject, thought: roundHeart.thought };
+                        m.heart = heartWithSections(roundHeart);
                     }
                 }
             }
@@ -8344,7 +8413,7 @@ if (callCard) {
         const t = String(text || '').trim();
         if (!t) return false;
         const msg = makeCharSaidMsg(t);
-        if (heart && (heart.subject || heart.thought)) msg.heart = { subject: String(heart.subject || ''), thought: String(heart.thought || '') };
+        if (heart && (heart.subject || heart.thought || (Array.isArray(heart.sections) && heart.sections.length))) msg.heart = heartWithSections(heart);
         messages.push(msg);
         try { renderMessages(); saveMessages(); scrollToBottom(); } catch (e) {}
         return true;

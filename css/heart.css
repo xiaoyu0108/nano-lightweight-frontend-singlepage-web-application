@@ -215,6 +215,30 @@ button, input, textarea { font: inherit; outline: none; }
 }
 .iv-extra-text:empty { display: none; }
 
+/* ----- 附加板块（评论区等，有内容才显示） ----- */
+.iv-sections { display: none; position: relative; z-index: 2; }
+.iv-section {
+  padding: 14px 22px;
+  border-top: 1px solid var(--iv-separator);
+  background: rgba(255, 255, 255, 0.10);
+}
+.iv-section-title {
+  color: var(--iv-secondary);
+  font-size: 10px; font-weight: 600; letter-spacing: 1.8px;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.iv-section-body {
+  color: #1c1c1e;
+  font-size: 15px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+}
+/* 有附加板块时，内容区不再是卡片底，底角交给附加板块 */
+.nano-voice-modal.has-sections .iv-content { border-radius: 0; }
+.nano-voice-modal.has-sections .iv-sections {
+  border-radius: 0 0 var(--iv-radius) var(--iv-radius);
+  overflow: hidden;
+}
+
 /* 底部按钮（位于心声卡片外部下侧） */
 .iv-content-actions {
   position: relative;
@@ -407,6 +431,39 @@ button, input, textarea { font: inherit; outline: none; }
 .iv-btn-restore { color: #ff9500; }
 .iv-custom-foot .iv-btn-action { font-size: 14px; padding: 0 4px; flex: 1; }
 .iv-custom-foot .iv-divider { display: none; }
+
+/* ===== 附加板块编辑器（美化面板） ===== */
+.iv-section-empty {
+  font-size: 12.5px; color: var(--iv-secondary); line-height: 1.6;
+  padding: 2px 0 6px;
+}
+.iv-section-item {
+  border: 1px solid var(--iv-separator);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.iv-section-item .iv-section-name,
+.iv-section-item .iv-section-prompt {
+  width: 100%;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 13px; font-family: inherit; color: #1c1c1e; outline: none;
+}
+.iv-section-item .iv-section-name:focus,
+.iv-section-item .iv-section-prompt:focus { border-color: rgba(0, 122, 255, 0.5); background: #fff; }
+.iv-section-item .iv-section-prompt { min-height: 54px; resize: vertical; line-height: 1.45; }
+.iv-section-item .iv-section-del {
+  align-self: flex-end;
+  border: none; border-radius: 8px;
+  background: rgba(255, 59, 48, 0.10); color: #ff3b30;
+  font-size: 12px; padding: 5px 10px; cursor: pointer;
+}
+.iv-section-item .iv-section-del:active { opacity: 0.6; }
 
 /* 动画 */
 @keyframes ivFade { from { opacity: 0; } to { opacity: 1; } }

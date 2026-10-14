@@ -46,54 +46,57 @@
         </div>
     </div>
 
-    <!-- 编辑弹窗 -->
+    <!-- 编辑弹窗（整页：顶栏返回 + 标题 + 保存） -->
     <div class="modal-overlay" id="editModal">
         <div class="modal-card">
-            <div class="modal-title" id="editTitle">新增人设</div>
+            <div class="edit-topbar">
+                <button class="edit-topbar-back" id="editCancel" type="button" aria-label="返回">
+                    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <span class="edit-topbar-title" id="editTitle">新增人设</span>
+                <button class="edit-topbar-save" id="editSave" type="button">保存</button>
+            </div>
 
-            <div class="avatar-center">
-                <div class="avatar-picker" id="avatarPicker">
-                    <span id="avatarPlaceholder">+</span>
-                    <img id="avatarPreview" style="display:none;" alt="头像">
+            <div class="edit-body">
+                <div class="avatar-center">
+                    <div class="avatar-picker" id="avatarPicker">
+                        <span id="avatarPlaceholder">+</span>
+                        <img id="avatarPreview" style="display:none;" alt="头像">
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label>名字</label>
-                <input type="text" id="inputName" placeholder="输入名字">
-            </div>
+                <div class="form-group">
+                    <label>名字</label>
+                    <input type="text" id="inputName" placeholder="输入名字">
+                </div>
 
-            <div class="form-group">
-                <label>微信号</label>
-                <input type="text" id="inputWechat" placeholder="输入微信号">
-            </div>
+                <div class="form-group">
+                    <label>微信号</label>
+                    <input type="text" id="inputWechat" placeholder="输入微信号">
+                </div>
 
-            <div class="form-group">
-                <label>性别</label>
-                <select id="inputGender">
-                    <option value="男">男</option>
-                    <option value="女">女</option>
-                    <option value="其他">其他</option>
-                </select>
-            </div>
+                <div class="form-group">
+                    <label>性别</label>
+                    <select id="inputGender">
+                        <option value="男">男</option>
+                        <option value="女">女</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
 
-            <div class="form-group">
-                <label>
-                    <span>设定</span>
-                    <span class="import-icon" id="importBtn" title="导入设定文件">
-                        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
-                    </span>
-                </label>
-                <textarea id="inputSetting" placeholder="输入设定..."></textarea>
-            </div>
-
-            <div class="form-actions">
-                <button class="form-btn" id="editCancel" data-close>取消</button>
-                <button class="form-btn primary" id="editSave">保存</button>
+                <div class="form-group">
+                    <label>
+                        <span>设定</span>
+                        <span class="import-icon" id="importBtn" title="导入设定文件">
+                            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </span>
+                    </label>
+                    <textarea id="inputSetting" placeholder="输入设定..."></textarea>
+                </div>
             </div>
         </div>
     </div>

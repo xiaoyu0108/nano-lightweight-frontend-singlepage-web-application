@@ -137,7 +137,8 @@ html, body {
     flex-direction: column;
     overflow: hidden;
     position: relative;
-    padding-bottom: 80px;
+    /* 给底部悬浮按钮预留足够空间，卡片滚到底也不会被按钮遮挡 */
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
 .card-grid {
@@ -899,3 +900,248 @@ body .bottom-actions {
 body .bottom-actions .action-btn {
     flex-shrink: 0;
 }
+
+/* ============================================================
+   展示卡片 · 白底 + 柔粉点缀（覆盖默认配色）
+   ============================================================ */
+html, body { background: #ffffff; }
+.app-container { background: #ffffff; }
+
+/* 顶栏 */
+.nav-bar .page-back {
+    background: #ffffff;
+    color: #4a4a52;
+    box-shadow: 0 2px 8px rgba(20, 20, 40, 0.05);
+}
+.nav-bar .page-back:active { background: #f1f1f5; }
+.nav-bar .page-title { color: #26262b; font-weight: 650; }
+.nav-bar .edit-btn.cancel-btn { background: #f2f2f5; color: #ff7fae; }
+.nav-bar .edit-btn.danger { background: rgba(255, 112, 136, 0.10); color: #ff5478; }
+
+/* 角色卡片：干净白卡 + 柔粉点缀 */
+.card-grid { gap: 12px; }
+.character-card {
+    background: #ffffff;
+    border: 1px solid #f3eef6;
+    border-radius: 20px;
+    box-shadow: 0 6px 18px rgba(255, 158, 194, 0.08);
+    padding: 18px 12px 15px;
+}
+.character-card:active { background: #fff8fc; }
+.character-card.selected {
+    border-color: #ffc9dc;
+    background: #fff8fc;
+    box-shadow: 0 8px 22px rgba(255, 158, 194, 0.20);
+}
+.character-card .card-avatar {
+    position: relative;
+    z-index: 1;
+    width: 66px;
+    height: 66px;
+    background: #fff1f7;
+    color: #ff7fae;
+    border: none;
+    box-shadow: 0 4px 12px rgba(255, 158, 194, 0.14);
+}
+.character-card .card-name {
+    position: relative;
+    z-index: 1;
+    color: #26262b;
+    font-weight: 650;
+    margin-top: 4px;
+}
+.character-card .card-badge {
+    background: #ff9ec2;
+    box-shadow: 0 2px 8px rgba(255, 158, 194, 0.35);
+}
+.character-card .card-check { background: #ff9ec2; box-shadow: 0 2px 8px rgba(255, 158, 194, 0.4); }
+
+/* 空状态 */
+.empty-state .empty-icon { color: #dcdce3; }
+.empty-state .empty-title { color: #26262b; }
+.empty-state .empty-desc { color: #a4a4ae; }
+
+/* 存储警告 */
+.storage-warning { background: #fff4e5; color: #b26a00; }
+
+/* 底部圆形按钮 */
+body .bottom-actions { bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important; }
+.bottom-actions .action-btn {
+    background: #ffffff;
+    color: #6b6b74;
+    border: 1px solid #f3eef6;
+    box-shadow: 0 6px 18px rgba(20, 20, 40, 0.08);
+}
+.bottom-actions .action-btn.add-btn {
+    background: #ff9ec2;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 8px 20px rgba(255, 158, 194, 0.34);
+}
+.bottom-actions .action-btn.add-btn:active { background: #f98bb4; }
+.bottom-actions .action-btn.import-btn { color: #6b6b74; }
+.bottom-actions .action-btn.edit-btn.active {
+    color: #ffffff;
+    background: #ff9ec2;
+    border-color: transparent;
+}
+
+/* 弹窗通用 */
+.modal-overlay { background: rgba(30, 22, 32, 0.30); }
+.modal-card {
+    background: #ffffff;
+    border: 1px solid #f0f0f4;
+    box-shadow: 0 24px 60px rgba(20, 20, 40, 0.14);
+}
+.modal-title { color: #26262b; border-bottom-color: #f0f0f4; }
+.form-group label { color: #a4a4ae; }
+.form-group label .import-icon { color: #ff9ec2; }
+.form-group input,
+.form-group select,
+.form-group textarea {
+    background: #f7f7fa;
+    border: 1px solid #ececf1;
+    color: #26262b;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #ffc9dc;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(255, 158, 194, 0.18);
+}
+.avatar-picker {
+    background: #f7f7fa;
+    color: #9a9aa6;
+    border: 2px dashed #e6e6ec;
+}
+.form-actions, .modal-actions { border-top-color: #f0f0f4; }
+.form-actions .form-btn, .modal-btn { background: #f2f2f5; color: #4a4a52; border: none; }
+.form-actions .form-btn.primary, .modal-btn.primary { background: #ff9ec2; color: #ffffff; }
+.modal-btn.danger { background: #ff7088; }
+
+/* 世界书标签 / 按钮 */
+.worldbook-tag { background: #fdf0f6; color: #ff7fae; }
+.worldbook-tag .wb-remove { color: #ff7fae; }
+.worldbook-add-row .btn-add-wb,
+.worldbook-add-row .btn-select-all { background: #f2f2f5; color: #4a4a52; }
+.worldbook-add-row .btn-select-all { background: #ff9ec2; color: #ffffff; }
+.worldbook-add-row select,
+.worldbook-group-bind-row select { background: #f7f7fa; border-color: #ececf1; color: #26262b; }
+.worldbook-group-bind-row .btn-bind-group { background: #ff9ec2; }
+
+/* 头像弹窗 */
+.avatar-inset-card { background: #f7f7fa; border: none; }
+.avatar-form-row { border-bottom-color: #ececf1; }
+.avatar-row-label { color: #26262b; }
+.avatar-action-link, .avatar-url-input { color: #ff7fae; }
+.avatar-thumb { background: #ececf1; }
+.avatar-reset-btn { background: rgba(255, 112, 136, 0.10); color: #ff7088; }
+.avatar-modal-footer { background: #fafafc; border-top-color: #ececf1; }
+.avatar-footer-btn { color: #ff7fae; }
+.avatar-footer-btn.cancel { border-right-color: #ececf1; }
+
+/* iOS 风格弹窗 */
+.ios-alert-card { background: #ffffff; }
+.ios-alert-title { color: #26262b; }
+.ios-alert-message { color: #a4a4ae; }
+.ios-alert-footer { border-top-color: #ececf1; }
+.ios-alert-btn.cancel { color: #ff7fae; border-right-color: #ececf1; }
+.ios-alert-btn.confirm { color: #ff7fae; }
+.ios-alert-btn.destructive { color: #ff5478; }
+
+/* ============================================================
+   编辑整页化：顶栏「返回 + 标题 + 保存」，正文内部滚动
+   ============================================================ */
+#editModal {
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    align-items: stretch;
+    justify-content: center;
+    padding: 0;
+    z-index: 12000;
+}
+#editModal .modal-card {
+    width: 100%;
+    max-width: 430px;
+    height: 100%;
+    max-height: none;
+    margin: 0 auto;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: #ffffff;
+    padding: 0;
+    animation: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.edit-topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: calc(10px + var(--safe-top, 0px)) 14px 10px;
+    border-bottom: 1px solid #f0f0f4;
+    background: #ffffff;
+    z-index: 6;
+}
+.edit-topbar-back {
+    width: 38px;
+    height: 38px;
+    flex: none;
+    border-radius: 50%;
+    border: none;
+    background: #ffffff;
+    color: #4a4a52;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(20, 20, 40, 0.06);
+}
+.edit-topbar-back:active { background: #f1f1f5; }
+.edit-topbar-back svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.edit-topbar-title {
+    flex: 1;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 650;
+    color: #26262b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.edit-topbar-save {
+    flex: none;
+    padding: 6px 4px;
+    border: none;
+    background: transparent;
+    color: #ff7fae;
+    font-size: 15px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.edit-topbar-save:active { opacity: 0.5; }
+.edit-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 18px 18px calc(28px + env(safe-area-inset-bottom, 0px));
+}
+.edit-body::-webkit-scrollbar { width: 0; }
+#editModal .form-group:last-child { margin-bottom: 0; }
+/* 编辑页内再打开的弹窗（换头像 / 提示）要盖在编辑页之上 */
+#avatarModal, #infoModal, #deleteConfirmModal { z-index: 13000; }

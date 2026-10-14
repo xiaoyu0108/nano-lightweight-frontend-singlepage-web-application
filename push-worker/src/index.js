@@ -131,6 +131,15 @@ export default {
       if (!reply) return json({ ok: false, error: 'model' }, 502);
       history.push({ user: text || '[图片]', char: reply, ts: Date.now() });
       await peekSave(env, chatId, history);
+      // 顺手把这条点评用 Web Push 推到已订阅的主屏 App：
+      // 点通知会打开你「添加到主屏幕」的那个 Nano（sw.js 的 notificationclick），而不是 Safari。
+      // 需要配置 VAPID_SUBJECT / VAPID_PUBLIC / VAPID_PRIVATE，且 App 已 NanoPush.enable()，否则自动跳过。
+      try {
+        var __subs = await getSubs(env);
+        if (__subs.length) {
+          await pushAll(__subs, { title: '窥屏', body: String(reply).slice(0, 120), target: 'chat:' + chatId, tag: 'peek-' + chatId }, env);
+        }
+      } catch (e) {}
       return json({ ok: true, reply: reply });
     }
 

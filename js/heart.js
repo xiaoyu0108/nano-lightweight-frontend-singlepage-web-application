@@ -125,30 +125,63 @@ function setupThoughtExpand(el) {
   el.dataset.full = (el.textContent || '').trim();
 }
 
-  // ===== 默认模板（高度可 DIY）=====
-  const DEFAULT_CSS = `/* ============================================================
-   默认 · 头像居左（iOS 邮件风）— 这就是「内置美化」的初始样式
+  // ===== 默认模板（唯一内置模板；改完点「应用」，点「还原」恢复本模板）=====
+  const DEFAULT_CSS = `/* nano-heart-default:v3
+   ============================================================
+   心声卡片 · 默认完整模板（头像居左 · iOS 邮件风）
    ------------------------------------------------------------
-   「还原」= 回到下面这套初始样式；想任意改造，直接在本框里写 CSS 覆盖即可。
-   所有元素都能隐藏 / 移动 / 放大缩小 / 换图 / 换字，JS 写入的挂点：
-     #ivAvatar(.iv-avatar) 头像 · #ivSender(.iv-name) 昵称 · .iv-caption 发送人小字
-     #ivRecipient 收件人 · #ivTime 时间 · #ivSubject(.iv-subject) 此刻印象
-     #ivThought(.iv-thought) 心声正文 · #ivExtraText 附加文字
-     #ivDecoTop / #ivDecoBottom 顶/底装饰层 · .iv-header/.iv-meta/.iv-content 结构容器
-   ---- 常用改法（复制需要的行，改完点「应用 CSS」）----
-   ① 隐藏任意文字 / 头像：选择器加 display:none !important;
-      例：.nano-voice-modal .iv-caption { display:none !important; }   隐藏“发送人”小字
-    ② 头像随意换位置：优先用 transform:translate() 做小位移；要放角落就用
-       .nano-voice-modal .iv-avatar{ position:absolute; left:auto; right:14px; top:12px; }
-       父级 .iv-header 已是 position:relative。别用 position:fixed（会相对全屏乱飞），也别超出卡片边界（.nano-voice-modal 有 overflow 裁切，超出的会被藏住）。
-   ③ 重排顶栏 / 内容区：给容器 display:flex; flex-direction:column/reverse; 用 order 调整先后。
-   ④ 头像大小 / 圆角：改 --iv-avatar-size / --iv-avatar-radius（见下）。
-   ⑤ 加一行文字：.iv-extra-text{display:block} + .iv-extra-text::before{content:"文案"}
-      （换行写 "\\A" 并配 white-space:pre-wrap）。
-   ⑥ 加装饰 / 角标 / 水印：.iv-deco-top/.iv-deco-bottom 设 display:block 后
-      配 ::before{content:url("图片地址")}；.iv-content::after{content:"Nano";position:absolute;right:16px;bottom:12px;opacity:.35;}
-   ⑦ 换字体 / 配色 / 宽度：font-family / color / background / width 任意改。
-   想恢复：点「还原」即可回到下面这套初始样式。
+   这张卡片的所有东西都能靠 CSS 改：隐藏 / 移动 / 缩放 / 换图 / 换字 /
+   换字体配色 / 重排布局。JS 只负责往下面这些挂点里写数据：
+     #ivAvatar (.iv-avatar)          头像图片
+     .iv-avatar-fallback             头像兜底字母（无图时显示）
+     #ivSender (.iv-name)            发送人昵称
+     .iv-caption                     “发送人”小字
+     #ivRecipient (.user-name)       收件人
+     #ivTime                         时间
+     #ivSubject (.iv-subject)        “此刻 · 印象”主题
+     .iv-subject-text                主题正文
+     #ivThought (.iv-thought)        心声正文
+     #ivExtraText (.iv-extra-text)   附加文字（默认空）
+     #ivDecoTop / #ivDecoBottom      顶 / 底装饰层（默认隐藏）
+     #ivSections / .iv-section / .iv-section-title / .iv-section-body  附加板块（评论区等，有内容才显示）
+     .iv-header / .iv-sender / .iv-sender-info / .iv-meta / .iv-content  结构容器
+   注意：只改样式，不要删这些元素；不要写 <script>。
+   ============================================================
+   ---- 改法大全（复制需要的行，改完点「应用」）----
+   【1. 隐藏任意元素】加 display:none !important;
+     .nano-voice-modal .iv-caption { display:none !important; }   /* 隐藏“发送人”小字 */
+     .nano-voice-modal .iv-meta    { display:none !important; }   /* 隐藏收件人/时间 */
+     .nano-voice-modal .iv-avatar  { display:none !important; }   /* 隐藏头像 */
+     .nano-voice-modal .iv-subject { display:none !important; }   /* 隐藏此刻·印象 */
+   【2. 头像大小 / 圆角 / 位置】
+     大小圆角改变量：.nano-voice-modal{ --iv-avatar-size:72px; --iv-avatar-radius:50%; }
+     居中小位移：.nano-voice-modal .iv-avatar{ transform:translate(0, -6px); }
+     放到右上角：.nano-voice-modal .iv-avatar{ position:absolute; right:14px; top:12px; left:auto; }
+       （父级 .iv-header 已是 position:relative；别用 position:fixed，也别超卡片边界，超出的会被裁掉）
+   【3. 头像 / 名字位置互换，或整行改版式】
+     头像居右：.nano-voice-modal .iv-sender{ flex-direction:row-reverse; }
+               .nano-voice-modal .iv-sender-info{ margin-left:0; margin-right:14px; text-align:right; }
+     居中大头像：.nano-voice-modal .iv-sender{ flex-direction:column; align-items:center; text-align:center; }
+               .nano-voice-modal .iv-sender-info{ flex:none; margin:12px 0 0; text-align:center; }
+   【4. 重排内容区顺序】父级 display:flex; flex-direction:column; 再用 order 调先后
+     .nano-voice-modal .iv-content{ display:flex; flex-direction:column; }
+     .nano-voice-modal .iv-content-label{ order:1; } .nano-voice-modal .iv-thought{ order:2; }
+   【5. 加一行文字 / 角标 / 水印】
+     附加文字：.nano-voice-modal .iv-extra-text{ display:block; }
+               .nano-voice-modal .iv-extra-text::before{ content:"—— 仅你可见"; }
+               /* 需要换行时写 "\\A" 并配 white-space:pre-wrap */
+     角标：.nano-voice-modal .iv-content::after{ content:"Nano"; position:absolute; right:16px; bottom:12px; opacity:.35; }
+   【6. 加装饰贴图】把装饰层设为 display:block 后用 ::before 放图（也可直接往 #ivDecoTop / #ivDecoBottom 里放 <img>）
+     .nano-voice-modal .iv-deco-top{ display:block; }
+     .nano-voice-modal .iv-deco-top::before{ content:url("https://图片地址"); display:block; margin:0 auto; }
+   【7. 换字体 / 配色 / 宽度 / 圆角 / 阴影】
+     字体族：--iv-sans / --iv-serif；大小颜色：.iv-name / .iv-thought 的 font-size、color
+     卡片：.nano-voice-modal 的 width、max-width、background、border-radius、box-shadow
+   【8. 换可交互按钮的图标 / 位置（功能不变）】别删按钮，只换图案：
+     .nano-voice-modal .某个按钮 > svg { display:none; }
+     .nano-voice-modal .某个按钮{ background:url("https://新图标.svg") center/22px no-repeat; }
+   【9. 整页遮罩】改 .nano-voice-layer 的 background（这是卡片外的遮罩层）。
+   想恢复默认：点底部「还原」。
    ============================================================ */
 .nano-voice-modal {
   --iv-avatar-size: 72px;
@@ -274,76 +307,17 @@ function setupThoughtExpand(el) {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), inset 0 1px 1px rgba(255, 255, 255, 0.7);
 }`;
 
-  // ===== 内置模板 2：经典 · 左头像 iOS邮件（旧版默认外观） =====
-  const CLASSIC_CSS = `/* 经典 · 左头像 iOS邮件 */
-.nano-voice-modal { --iv-avatar-size: 48px; --iv-avatar-radius: 50%; }
-.iv-header { padding: 18px 22px 14px; text-align: left; }
-.iv-sender { flex-direction: row; align-items: center; }
-.iv-sender-info { flex: 1; margin-left: 14px; margin-top: 0; text-align: left; }
-.iv-name { font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.iv-unread { margin-left: 12px; margin-top: 0; }
-.iv-meta { grid-template-columns: 48px 1fr; justify-content: start; column-gap: 0; }
-.iv-subject { text-align: left; }
-.iv-subject-text { text-align: left; }
-.iv-content { min-height: 240px; padding: 18px 22px 24px; }`;
-
-  // ===== 内置模板 3：极简 · 无边框 =====
-  const MINIMAL_CSS = `/* 极简 · 无边框 */
-.nano-voice-modal {
-  --iv-avatar-size: 56px;
-  background: #ffffff;
-  border: none;
-  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.10);
-}
-.iv-header, .iv-subject, .iv-content { background: transparent; }
-.iv-header { border-bottom: 1px solid rgba(60, 60, 67, 0.08); }
-.iv-subject { border-bottom: 1px solid rgba(60, 60, 67, 0.08); }
-.iv-thought { font-family: var(--iv-sans); }`;
-
-  // ===== 内置模板 4：自由排版 · 任意移动 / 隐藏文字 / 头像大小位置 =====
-  const FREE_CSS = `/* 自由排版 · 任意移动 / 隐藏文字 / 头像大小位置
-   改下面这些变量就能自由摆放（px / % / vw 都行）：
-     --iv-card-x / --iv-card-y      整张卡片相对居中位置的偏移
-     --iv-avatar-size               头像大小
-     --iv-avatar-x / --iv-avatar-y  头像相对位置偏移
-   隐藏文字：把对应变量设为 none 即可
-     --iv-caption-display   “发送人”小字
-     --iv-name-display      昵称
-     --iv-meta-display      收件人 / 时间信息
-     --iv-subject-display   “此刻 · 印象”主题
-*/
-.nano-voice-modal{
-  --iv-card-x: 0px;
-  --iv-card-y: 0px;
-  --iv-avatar-size: 72px;
-  --iv-avatar-x: 0px;
-  --iv-avatar-y: 0px;
-  --iv-caption-display: block;
-  --iv-name-display: block;
-  --iv-meta-display: grid;
-  --iv-subject-display: block;
-  position: relative;
-  left: var(--iv-card-x);
-  top: var(--iv-card-y);
-  overflow: visible;
-}
-.iv-sender { position: relative; }
-.iv-avatar { transform: translate(var(--iv-avatar-x), var(--iv-avatar-y)); }
-.iv-caption { display: var(--iv-caption-display); }
-.iv-name { display: var(--iv-name-display); }
-.iv-meta { display: var(--iv-meta-display); }
-.iv-subject { display: var(--iv-subject-display); }`;
-
-  // ===== 内置模板列表（首次自动写入，且在模板管理里不可删除/改名） =====
+  // ===== 内置模板：只保留一个「完整」默认模板 =====
+  // 它是唯一内置、不可删除/改名的预设；所有视觉都能在本模板里改，改完点「应用」即可。
+  // 想保留自己的版本：改完在下面「模板名称」里起个名，点「保存」另存为普通预设。
   const BUILTIN_TEMPLATES = [
-    { id: 'default', name: '默认 · 头像居左', css: DEFAULT_CSS },
-    { id: 'builtin_classic', name: '经典 · 左头像 iOS邮件', css: CLASSIC_CSS },
-    { id: 'builtin_minimal', name: '极简 · 无边框', css: MINIMAL_CSS },
-    { id: 'builtin_free', name: '自由排版 · 可移动/隐藏', css: FREE_CSS }
+    { id: 'default', name: '默认模板（完整）', css: DEFAULT_CSS }
   ];
   function isBuiltinTemplate(id) {
     return BUILTIN_TEMPLATES.some(function (b) { return b.id === id; });
   }
+  // 旧版内置模板 id：初始化时清掉，避免继续占用「内置」名额
+  const LEGACY_BUILTIN_IDS = ['builtin_classic', 'builtin_minimal', 'builtin_free'];
 
   // ===== IndexedDB 工具 =====
   const DB_NAME = 'NanoVoiceDB';
@@ -403,19 +377,22 @@ function setupThoughtExpand(el) {
     const all = await getAllTemplates();
     const byId = {};
     all.forEach(function (t) { byId[t.id] = t; });
-    // 内置模板：缺失才补齐，绝不覆盖用户自己保存的模板
-    for (var i = 0; i < BUILTIN_TEMPLATES.length; i++) {
-      var b = BUILTIN_TEMPLATES[i];
-      if (!byId[b.id]) await saveTemplate(b.id, b.name, b.css);
+    // 清掉旧版内置模板：现在只保留一个「完整」默认模板
+    for (var k = 0; k < LEGACY_BUILTIN_IDS.length; k++) {
+      if (byId[LEGACY_BUILTIN_IDS[k]]) {
+        try { await deleteTemplate(LEGACY_BUILTIN_IDS[k]); } catch (e) {}
+      }
     }
-    // 旧版默认模板（狂野草书 / 老 iOS邮件 / 居中大头像）统一升级为新的「头像居左」默认模板
+    // 默认模板：带版本标记；缺失或是老版本时写入最新的「完整模板」
     const def = byId['default'];
-    if (def) {
-      const css = String(def.css || '');
-      const isOld = css.indexOf('头像居左') === -1 ||
-        css.indexOf('狂野草书') !== -1 || css.indexOf('Snell Roundhand') !== -1;
-      if (isOld) await saveTemplate('default', '默认 · 头像居左', DEFAULT_CSS);
+    if (!def) {
+      await saveTemplate('default', BUILTIN_TEMPLATES[0].name, DEFAULT_CSS);
+      return;
     }
+    const css = String(def.css || '');
+    const isOld = css.indexOf('nano-heart-default:v3') === -1 ||
+      css.indexOf('狂野草书') !== -1 || css.indexOf('Snell Roundhand') !== -1;
+    if (isOld) await saveTemplate('default', BUILTIN_TEMPLATES[0].name, DEFAULT_CSS);
   }
 
   // ===== 渲染下拉列表 =====
@@ -504,89 +481,149 @@ function setupThoughtExpand(el) {
     try { return localStorage.getItem('nano_voice_applied_css') || ''; } catch (e) { return ''; }
   }
 
-  // ===== 快捷 DIY =====
-  function quickCfgGet() {
-    try { return JSON.parse(localStorage.getItem('nano_voice_quick') || '{}') || {}; } catch (e) { return {}; }
-  }
-  function quickCfgSet(o) {
-    try { localStorage.setItem('nano_voice_quick', JSON.stringify(o || {})); } catch (e) {}
-  }
-  function applyQuick() {
-    const c = quickCfgGet();
-    let css = '';
-    if (c.hideAvatar) css += '.nano-voice-modal .iv-avatar{display:none !important;}\n';
-    if (c.hideName) css += '.nano-voice-modal .iv-name{display:none !important;}\n';
-    if (c.hideCaption) css += '.nano-voice-modal .iv-caption{display:none !important;}\n';
-    if (c.hideSubject) css += '.nano-voice-modal .iv-subject{display:none !important;}\n';
-    if (c.hideMeta) css += '.nano-voice-modal .iv-meta{display:none !important;}\n';
-    if (c.hideUnread) css += '.nano-voice-modal .iv-unread{display:none !important;}\n';
-    if (c.avatarRight) css += '.iv-sender{flex-direction:row-reverse;}\n.iv-sender-info{margin-left:0;margin-right:14px;text-align:right;}\n.iv-unread{margin-left:0;margin-right:12px;}\n';
-    let tag = document.getElementById('nanoVoiceQuickCSS');
-    if (!tag) {
-      tag = document.createElement('style');
-      tag.id = 'nanoVoiceQuickCSS';
-      document.body.appendChild(tag);
-    }
-    tag.textContent = css;
-    // 自定义「美化 / 取消」按钮文案
-    const bf = $('ivBeautify'), ex = $('ivExit');
-    if (bf) {
-      if (c.beautifyLabel) { if (!bf.dataset.icon) bf.dataset.icon = bf.innerHTML; bf.textContent = c.beautifyLabel; }
-      else if (bf.dataset.icon) { bf.innerHTML = bf.dataset.icon; delete bf.dataset.icon; }
-    }
-    if (ex) {
-      if (c.exitLabel) { if (!ex.dataset.icon) ex.dataset.icon = ex.innerHTML; ex.textContent = c.exitLabel; }
-      else if (ex.dataset.icon) { ex.innerHTML = ex.dataset.icon; delete ex.dataset.icon; }
-    }
-    // 内置提示词
+  // ===== 内置提示词（AI 生成心声时必读；CSS 模板无法表达，单独存 localStorage） =====
+  const BUILTIN_PROMPT_KEY = 'nano_heart_builtin_prompt';
+  function loadBuiltinPrompt() {
     const bp = $('ivBuiltinPrompt');
-    if (bp) bp.value = (function () { try { return localStorage.getItem('nano_heart_builtin_prompt') || ''; } catch (e) { return ''; } })();
-    // 折叠设置变化后，立刻按新设置重排当前心声（换行/加行是否完整显示）
-    const th = $('ivThought');
-    if (th && (th.textContent || '').trim()) setupThoughtExpand(th);
-    // 面板控件回填
-    const sa = $('ivShowAvatar'), sn = $('ivShowName'), ar = $('ivAvatarRight');
-    if (sa) sa.checked = !c.hideAvatar;
-    if (sn) sn.checked = !c.hideName;
-    if (ar) ar.checked = !!c.avatarRight;
-    const sc = $('ivShowCaption');
-    if (sc) sc.checked = !c.hideCaption;
-    const ss = $('ivShowSubject'), sm = $('ivShowMeta');
-    if (ss) ss.checked = !c.hideSubject;
-    if (sm) sm.checked = !c.hideMeta;
-    const hu = $('ivHideUnread');
-    if (hu) hu.checked = !!c.hideUnread;
-    const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
-    if (bl) bl.value = c.beautifyLabel || '';
-    if (el) el.value = c.exitLabel || '';
+    if (!bp) return;
+    try { bp.value = localStorage.getItem(BUILTIN_PROMPT_KEY) || ''; } catch (e) { bp.value = ''; }
   }
-  function bindQuick() {
-    const save = async function () {
-      const c = quickCfgGet();
-      const sa = $('ivShowAvatar'), sn = $('ivShowName'), ar = $('ivAvatarRight');
-      c.hideAvatar = sa ? !sa.checked : false;
-      c.hideName = sn ? !sn.checked : false;
-      c.avatarRight = ar ? !!ar.checked : false;
-      const sc = $('ivShowCaption');
-      c.hideCaption = sc ? !sc.checked : false;
-      const ss = $('ivShowSubject'), sm = $('ivShowMeta');
-      c.hideSubject = ss ? !ss.checked : false;
-      c.hideMeta = sm ? !sm.checked : false;
-      const hu = $('ivHideUnread');
-      c.hideUnread = hu ? !!hu.checked : false;
-      const bl = $('ivBeautifyLabel'), el = $('ivExitLabel');
-      c.beautifyLabel = bl ? bl.value.trim() : '';
-      c.exitLabel = el ? el.value.trim() : '';
-      quickCfgSet(c);
-      try {
-        const bp = $('ivBuiltinPrompt');
-        localStorage.setItem('nano_heart_builtin_prompt', bp ? bp.value.trim() : '');
-      } catch (e) {}
-      applyQuick();
-      if (window.console) console.log('[Heart] 快捷 DIY 已保存');
+  function bindBuiltinPrompt() {
+    const bp = $('ivBuiltinPrompt');
+    if (!bp) return;
+    const save = function () {
+      try { localStorage.setItem(BUILTIN_PROMPT_KEY, bp.value.trim()); } catch (e) {}
     };
-    const qs = $('ivQuickSave');
-    if (qs) qs.addEventListener('click', save);
+    bp.addEventListener('input', save);
+    bp.addEventListener('change', save);
+  }
+
+  // ===== 附加板块（评论区等）：用户自定义，AI 每轮生成，心声卡片里多渲染一块 =====
+  const SECTIONS_KEY = 'nano_heart_sections';
+  function getSections() {
+    try {
+      const a = JSON.parse(localStorage.getItem(SECTIONS_KEY) || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function saveSections(arr) {
+    try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(arr || [])); } catch (e) {}
+  }
+  // 生成 AI 提示词：要求每轮在 [heart:...] 之后输出各板块
+  function sectionsPromptBlock() {
+    const list = getSections().filter(function (s) { return s && s.name && s.prompt; });
+    if (!list.length) return '';
+    const L = [];
+    L.push('【心声 · 附加板块（必须输出，放在 [heart:...] 之后；每个板块都要写，不可省略）】');
+    L.push('格式严格为（板块内容可多行）：');
+    L.push('[section:板块名]');
+    L.push('板块内容');
+    L.push('[/section]');
+    L.push('各板块要求：');
+    list.forEach(function (s) { L.push('- ' + s.name + '：' + s.prompt); });
+    return L.join('\n');
+  }
+  // 从文本里抽取并移除 [section:名]...[/section] 块
+  function parseSections(text) {
+    const sections = [];
+    let src = String(text || '');
+    if (!src) return { text: src, sections: sections };
+    src = src.replace(/\[(?:section|板块)\s*:\s*([^\]\n]+)\]([\s\S]*?)\[\/\s*(?:section|板块)\s*\]/gi, function (m, name, content) {
+      name = String(name || '').trim();
+      content = String(content || '').trim();
+      if (name && content) sections.push({ name: name, content: content });
+      return ' ';
+    });
+    // 容错：末尾未闭合的 [section:名] 一直吃到结尾
+    src = src.replace(/\[(?:section|板块)\s*:\s*([^\]\n]+)\]\s*([\s\S]*)$/i, function (m, name, content) {
+      name = String(name || '').trim();
+      content = String(content || '').trim();
+      if (name && content) sections.push({ name: name, content: content });
+      return ' ';
+    });
+    src = src.replace(/\[\/?(?:section|板块)(?:\s*:[^\]\n]*)?\]/gi, ' ');
+    return { text: src, sections: sections };
+  }
+  // 渲染到卡片
+  function renderSections(list) {
+    const box = $('ivSections');
+    const modal = $('nanoVoiceModal');
+    if (!box) return;
+    box.innerHTML = '';
+    const sec = Array.isArray(list) ? list.filter(function (s) { return s && (s.content || s.name); }) : [];
+    if (!sec.length) {
+      box.style.display = 'none';
+      if (modal) modal.classList.remove('has-sections');
+      return;
+    }
+    sec.forEach(function (s) {
+      const item = document.createElement('div');
+      item.className = 'iv-section';
+      const title = document.createElement('div');
+      title.className = 'iv-section-title';
+      title.textContent = s.name || '';
+      const body = document.createElement('div');
+      body.className = 'iv-section-body';
+      body.textContent = s.content || '';
+      item.appendChild(title);
+      item.appendChild(body);
+      box.appendChild(item);
+    });
+    box.style.display = 'block';
+    if (modal) modal.classList.add('has-sections');
+  }
+  // 美化面板里的板块编辑器
+  function renderSectionEditor() {
+    const list = getSections();
+    const wrap = $('ivSectionList');
+    if (!wrap) return;
+    Array.prototype.slice.call(wrap.querySelectorAll('.iv-section-item')).forEach(function (n) { n.remove(); });
+    const empty = $('ivSectionEmpty');
+    if (empty) empty.style.display = list.length ? 'none' : 'block';
+    list.forEach(function (s) {
+      const item = document.createElement('div');
+      item.className = 'iv-section-item';
+      const name = document.createElement('input');
+      name.type = 'text';
+      name.className = 'iv-section-name';
+      name.placeholder = '板块名，如：评论区';
+      name.maxLength = 12;
+      name.value = s.name || '';
+      const prompt = document.createElement('textarea');
+      prompt.className = 'iv-section-prompt';
+      prompt.placeholder = '生成要求：视角 / 条数 / 字数 / 主题，如：以粉丝视角写 5 条评论，每条 20 字，围绕本条心声调侃或共鸣';
+      prompt.value = s.prompt || '';
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'iv-section-del';
+      del.textContent = '删除';
+      name.addEventListener('input', function () { s.name = name.value.trim(); saveSections(list); });
+      prompt.addEventListener('input', function () { s.prompt = prompt.value.trim(); saveSections(list); });
+      del.addEventListener('click', function () {
+        const idx = list.indexOf(s);
+        if (idx > -1) list.splice(idx, 1);
+        saveSections(list);
+        renderSectionEditor();
+      });
+      item.appendChild(name);
+      item.appendChild(prompt);
+      item.appendChild(del);
+      wrap.appendChild(item);
+    });
+  }
+  function bindSections() {
+    const add = $('ivAddSection');
+    if (add) add.addEventListener('click', function () {
+      const list = getSections();
+      list.push({ id: 'sec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: '', prompt: '' });
+      saveSections(list);
+      renderSectionEditor();
+      const wrap = $('ivSectionList');
+      const items = wrap ? wrap.querySelectorAll('.iv-section-item') : [];
+      const last = items[items.length - 1];
+      if (last) { const inp = last.querySelector('.iv-section-name'); if (inp) inp.focus(); }
+    });
+    renderSectionEditor();
   }
 
   // ===== 关闭弹窗 =====
@@ -650,6 +687,9 @@ function setupThoughtExpand(el) {
       if (avatar) avatar.hidden = true;
     }
 
+    // 附加板块（评论区等）
+    renderSections(data.sections);
+
     // 显示弹窗
     layer.classList.add('active');
   }
@@ -667,8 +707,9 @@ function setupThoughtExpand(el) {
     // 这样直接改 css/heart.css 也能生效（不再被默认模板强制覆盖）
     const appliedCss = loadAppliedCss();
     if (appliedCss) applyCustomCSS(appliedCss);
-    applyQuick();
-    bindQuick();
+    loadBuiltinPrompt();
+    bindBuiltinPrompt();
+    bindSections();
 
     // ===== 事件绑定 =====
     $('ivExit').addEventListener('click', closeVoice);
@@ -837,7 +878,7 @@ function setupThoughtExpand(el) {
       document.querySelector('.iv-thought').style.cssText = '';
       document.querySelector('.nano-voice-modal').style.cssText = '';
       // 同步把 CSS 覆盖输入栏恢复为「最新的内置模板」代码（旧版默认模板会升级过来）
-      await saveTemplate('default', '默认 · 头像居左', DEFAULT_CSS);
+      await saveTemplate('default', BUILTIN_TEMPLATES[0].name, DEFAULT_CSS);
       const all = await getAllTemplates();
       const defaultTpl = all.find(t => t.id === 'default');
       if (defaultTpl) {
@@ -958,6 +999,13 @@ function setupThoughtExpand(el) {
     getImpressionPrompt: function(charName) {
       return buildImpressionPrompt(charName || '角色');
     },
+    // 附加板块（评论区等）：给外部读取 / 写入 / 拼提示词 / 解析用
+    sections: {
+      list: getSections,
+      save: saveSections,
+      promptBlock: sectionsPromptBlock,
+      parse: parseSections
+    },
     // 更新数据（不打开弹窗）
     update: function(data) {
       if (data.from) {
@@ -979,6 +1027,9 @@ function setupThoughtExpand(el) {
       if (data.to) {
         const el = $('ivRecipient');
         if (el) el.textContent = data.to;
+      }
+      if (data.sections) {
+        renderSections(data.sections);
       }
       if (data.avatar) {
         const avatar = $('ivAvatar');
