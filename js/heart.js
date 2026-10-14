@@ -28,7 +28,8 @@ JS 会写入文本/图片的挂点（请保留这些 id 或类名，只改样式
   .iv-sender / .iv-header / .iv-meta / .iv-content / .iv-custom-foot   结构容器
 可用的重构手段：
   1) 隐藏：selector{display:none !important}
-  2) 任意移动：给元素 position:absolute/fixed; left/top/right/bottom/transform；父级需 position:relative 且 overflow:visible
+  2) 任意移动：给元素 position:absolute; left/top/right/bottom/transform；父级需 position:relative 且允许溢出（overflow:visible）。注意 .nano-voice-modal 有 overflow 裁切：元素超出卡片会被「藏起来」。
+     【重要·避免翻车】不要用 position:fixed——那是相对整块屏幕定位，元素会「满屏乱飞」；做小范围位移优先用 transform:translate()。也绝不要让元素盖住底部「美化 / 取消」两个按钮（它们在卡片外、z-index 已抬高，DIY 里别用更大的 z-index 去覆盖）。
   3) 重排：父级 display:flex; flex-direction:column/reverse；用 order 调整顺序
   4) 换头像/图片：selector::before{content:url("图片地址")} 或改 background-image
   5) 加文字/角标/水印：selector::after{content:"文案"}
@@ -126,7 +127,7 @@ function setupThoughtExpand(el) {
 
   // ===== 默认模板（高度可 DIY）=====
   const DEFAULT_CSS = `/* ============================================================
-   默认 · 居中大头像（iOS 邮件风）— 这就是「内置美化」的初始样式
+   默认 · 头像居左（iOS 邮件风）— 这就是「内置美化」的初始样式
    ------------------------------------------------------------
    「还原」= 回到下面这套初始样式；想任意改造，直接在本框里写 CSS 覆盖即可。
    所有元素都能隐藏 / 移动 / 放大缩小 / 换图 / 换字，JS 写入的挂点：
@@ -137,10 +138,9 @@ function setupThoughtExpand(el) {
    ---- 常用改法（复制需要的行，改完点「应用 CSS」）----
    ① 隐藏任意文字 / 头像：选择器加 display:none !important;
       例：.nano-voice-modal .iv-caption { display:none !important; }   隐藏“发送人”小字
-   ② 头像随意换位置（不只是平移，可放任意角落 / 固定到屏幕）：
-      .nano-voice-modal .iv-avatar{ position:absolute !important; left:auto; right:14px; top:-28px; }
-      想固定在屏幕某处：把 position 改成 fixed，left/top 填像素或百分比。
-      父级 .iv-header 需 position:relative、overflow:visible（默认已满足）。
+    ② 头像随意换位置：优先用 transform:translate() 做小位移；要放角落就用
+       .nano-voice-modal .iv-avatar{ position:absolute; left:auto; right:14px; top:12px; }
+       父级 .iv-header 已是 position:relative。别用 position:fixed（会相对全屏乱飞），也别超出卡片边界（.nano-voice-modal 有 overflow 裁切，超出的会被藏住）。
    ③ 重排顶栏 / 内容区：给容器 display:flex; flex-direction:column/reverse; 用 order 调整先后。
    ④ 头像大小 / 圆角：改 --iv-avatar-size / --iv-avatar-radius（见下）。
    ⑤ 加一行文字：.iv-extra-text{display:block} + .iv-extra-text::before{content:"文案"}
@@ -173,14 +173,14 @@ function setupThoughtExpand(el) {
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
-/* 头像居中 + 昵称独立成行（想恢复左对齐就删掉这一段） */
-.iv-sender { flex-direction: column; align-items: center; text-align: center; }
-.iv-sender-info { flex: none; margin-left: 0; margin-top: 12px; text-align: center; }
-.iv-name { white-space: normal; overflow-wrap: anywhere; font-size: 22px; }
-.iv-unread { margin-left: 0; margin-top: 10px; }
-.iv-meta { grid-template-columns: auto auto; justify-content: center; column-gap: 6px; }
-.iv-subject { text-align: center; }
-.iv-subject-text { text-align: center; }
+/* 头像居左 · 昵称在右（想改回「居中大头像」：把 .iv-sender 改成 flex-direction:column; align-items:center; 再给 .iv-sender-info 换成 margin-top:12px; text-align:center） */
+.iv-sender { flex-direction: row; align-items: center; }
+.iv-sender-info { flex: 1 1 auto; margin-left: 14px; margin-top: 0; text-align: left; }
+.iv-name { white-space: normal; overflow-wrap: anywhere; font-size: 20px; }
+.iv-unread { margin-left: auto; margin-top: 0; }
+.iv-meta { grid-template-columns: auto auto; justify-content: flex-start; column-gap: 6px; }
+.iv-subject { text-align: left; }
+.iv-subject-text { text-align: left; }
 .iv-content { min-height: 200px; padding: 20px 24px 26px; }
 /* DIY 装饰层 / 附加文字（默认空不占位；填了内容或加 .on 才显示）。
    注意：若用 CSS 的 ::after/::before 追加装饰，请把 .iv-deco-top / .iv-deco-bottom 设为 display:block。 */
@@ -336,7 +336,7 @@ function setupThoughtExpand(el) {
 
   // ===== 内置模板列表（首次自动写入，且在模板管理里不可删除/改名） =====
   const BUILTIN_TEMPLATES = [
-    { id: 'default', name: '默认 · 居中大头像', css: DEFAULT_CSS },
+    { id: 'default', name: '默认 · 头像居左', css: DEFAULT_CSS },
     { id: 'builtin_classic', name: '经典 · 左头像 iOS邮件', css: CLASSIC_CSS },
     { id: 'builtin_minimal', name: '极简 · 无边框', css: MINIMAL_CSS },
     { id: 'builtin_free', name: '自由排版 · 可移动/隐藏', css: FREE_CSS }
@@ -408,13 +408,13 @@ function setupThoughtExpand(el) {
       var b = BUILTIN_TEMPLATES[i];
       if (!byId[b.id]) await saveTemplate(b.id, b.name, b.css);
     }
-    // 旧版默认模板（狂野草书 / 老 iOS邮件）统一升级为新的「居中大头像」默认模板
+    // 旧版默认模板（狂野草书 / 老 iOS邮件 / 居中大头像）统一升级为新的「头像居左」默认模板
     const def = byId['default'];
     if (def) {
       const css = String(def.css || '');
-      const isOld = css.indexOf('居中大头像') === -1 ||
+      const isOld = css.indexOf('头像居左') === -1 ||
         css.indexOf('狂野草书') !== -1 || css.indexOf('Snell Roundhand') !== -1;
-      if (isOld) await saveTemplate('default', '默认 · 居中大头像', DEFAULT_CSS);
+      if (isOld) await saveTemplate('default', '默认 · 头像居左', DEFAULT_CSS);
     }
   }
 
@@ -837,7 +837,7 @@ function setupThoughtExpand(el) {
       document.querySelector('.iv-thought').style.cssText = '';
       document.querySelector('.nano-voice-modal').style.cssText = '';
       // 同步把 CSS 覆盖输入栏恢复为「最新的内置模板」代码（旧版默认模板会升级过来）
-      await saveTemplate('default', '默认 · 居中大头像', DEFAULT_CSS);
+      await saveTemplate('default', '默认 · 头像居左', DEFAULT_CSS);
       const all = await getAllTemplates();
       const defaultTpl = all.find(t => t.id === 'default');
       if (defaultTpl) {

@@ -35,7 +35,7 @@ window.NANO_ASSISTANT_KB = {
       id: 'heart', name: '心声美化',
       storage: 'localStorage: nano_voice_applied_css（同时写心声模板库 NanoVoiceDB/templates，预设名可直接用 name 覆盖更新）',
       target: 'heart',
-      desc: '心声弹层，高度可 DIY。根容器 .nano-voice-modal；头像大小/圆角用变量 --iv-avatar-size / --iv-avatar-radius；头像居中：.iv-sender{flex-direction:column;align-items:center;text-align:center}；昵称换行：.iv-sender{flex-wrap:wrap} + .iv-sender-info{flex:1 1 100%}。装饰层 .iv-deco-top / .iv-deco-bottom（默认 display:none；用伪元素加内容前先设 display:block）和附加文字 .iv-extra-text。加行/换行用 ::after/::before + content（换行写 \\A 并配 white-space:pre）。加贴图可用 content:url("图片地址") 或 #ivDecoTop/#ivDecoBottom。',
+      desc: '心声弹层，高度可 DIY。根容器 .nano-voice-modal；头像大小/圆角用变量 --iv-avatar-size / --iv-avatar-radius；默认头像居左（.iv-sender{flex-direction:row;align-items:center}）；想大头像居中：.iv-sender{flex-direction:column;align-items:center;text-align:center}；昵称换行：.iv-sender{flex-wrap:wrap} + .iv-sender-info{flex:1 1 100%}。移动元素用 position:absolute + transform，父级 .iv-header 已是 position:relative；不要用 position:fixed（会相对全屏乱飞），也别超出卡片（.nano-voice-modal 有 overflow 裁切）。装饰层 .iv-deco-top / .iv-deco-bottom（默认 display:none；用伪元素加内容前先设 display:block）和附加文字 .iv-extra-text。加行/换行用 ::after/::before + content（换行写 \\A 并配 white-space:pre）。加贴图可用 content:url("图片地址") 或 #ivDecoTop/#ivDecoBottom。底部「美化 / 取消」按钮在卡片外的 .iv-content-actions，勿用高 z-index 覆盖。',
       selectors: ['.nano-voice-modal', '.iv-sender', '.iv-sender-info', '.nano-voice-modal .iv-avatar', '.iv-name', '.iv-meta', '.iv-subject', '.iv-subject-text', '.iv-content', '.iv-content-label', '.iv-thought', '.iv-extra-text', '.iv-deco-top', '.iv-deco-bottom', '#ivDecoTop', '#ivDecoBottom', '.iv-unread']
     },
     {

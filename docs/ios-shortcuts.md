@@ -52,6 +52,17 @@
 运行后：TA 看到你屏幕上的内容 → 弹出点评面板 + 发系统通知 → 点评作为角色消息写进对应聊天。
 深链参数会被自动清理，刷新 / 重开不会重复触发。
 
+### ⚠️ iOS 上「打开 URL 没反应 / 打开的是原链接」的原因（很常见）
+
+方式 A 的深链是 `https://你的域名/index.html?...`。iOS 用快捷指令「打开 URL」打开它时，**会打开 Safari，而不是你添加到主屏的那个 PWA**；而 iOS 的「主屏 PWA」和「Safari 标签页」本地存储互相隔离——`js/ios-bridge.js` 把参数写进了 Safari 的 localStorage，PWA 里的聊天读不到，于是看起来“执行了却没反应”。
+
+所以 iPhone 上不要指望深链能唤起 PWA。请改用下面两条**不依赖深链**的路：
+
+- **方式 B**（最省事）：快捷指令自己 POST 你的模型接口拿回复 → 用系统通知显示。Key 会存在快捷指令里。
+- **方式 C · 屏幕速聊**（体验最好）：回复弹在系统窗口、可继续打字，回到 Nano 后自动合并进聊天。见 Part 2.5。
+
+> 电脑 Chrome / Edge 上不存在这个问题：App 内「让 TA 看我的真实屏幕」按钮可以真正共享屏幕。
+
 ### 触发方式（更顺手）
 
 - **轻点背面**：设置 → 辅助功能 → 触控 → 轻点背面 → 轻点两下 → 选「窥屏」。
@@ -146,15 +157,39 @@
 | `GET /peek/pending?chatId=&token=` | App 拉取暂存轮次 `{ok, turns:[{user, char, ts}]}` |
 | `POST /peek/ack` | App 合并完后清空暂存 |
 
-配置（用 secret，别写进仓库）：
+### 部署 `push-worker`（一步步来，约 5 分钟）
 
-```bash
-wrangler secret put PEEK_TOKEN      # 与 ios-setting 页面生成的「令牌」一致
-wrangler secret put PEEK_API_KEY    # 你的主模型 Key（只在服务端）
-# 非敏感项可放 wrangler.toml 的 [vars]
-# PEEK_API_URL = "https://api.openai.com/v1"
-# PEEK_MODEL   = "gpt-4o-mini"
-```
+1. 装好 **Node.js**，在终端执行（只需一次）：
+   ```bash
+   npm i -g wrangler
+   wrangler login          # 浏览器授权你的 Cloudflare 账号
+   ```
+2. 进入本仓库的 worker 目录并装依赖：
+   ```bash
+   cd push-worker
+   npm install
+   ```
+3. **建一个你自己的 KV 命名空间**（`wrangler.toml` 里那个 id 是作者的，务必换成你的）：
+   ```bash
+   wrangler kv namespace create PUSH_KV
+   ```
+   把命令返回的 `id` 填进 `wrangler.toml` 的 `kv_namespaces[0].id`。
+4. 设置密钥（**别写进仓库**）：
+   ```bash
+   wrangler secret put PEEK_TOKEN      # 必须与 ios-setting 方式 C 里显示的「令牌」完全一致
+   wrangler secret put PEEK_API_KEY    # 你的主模型 Key（只存在服务端，不进快捷指令）
+   ```
+   接口 / 模型这两个非敏感项，取消注释并填进 `wrangler.toml` 的 `[vars]`：
+   ```toml
+   [vars]
+   PEEK_API_URL = "https://api.openai.com/v1"
+   PEEK_MODEL   = "gpt-4o-mini"
+   ```
+5. 部署，记下输出里的地址（形如 `https://nano-push.xxxx.workers.dev`）：
+   ```bash
+   wrangler deploy
+   ```
+6. 回到 **查手机 → 设置 → iOS 快捷指令 · 窥屏 → 方式 C**：把上面的地址填进「服务端地址」，点「保存配置」，然后复制「令牌 / 接口地址 / 人设 / system」。
 
 `PEEK_TOKEN` 未设置时接口放行（仅建议本地调试）；生产务必设置。
 
