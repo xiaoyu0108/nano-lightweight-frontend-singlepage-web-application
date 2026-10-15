@@ -128,6 +128,29 @@ button:active{opacity:.55}
 }
 .message.show-thinking .thinking{display:block}
 
+/* ===== 通用状态栏（可折叠 / 展开）=====
+   结构：.nano-status > .nano-status-head(>.nano-status-title + .nano-status-arrow) + .nano-status-body
+   任意状态栏按这个结构写就自带折叠；折叠状态按 data-status 名字记忆（js/nano-status-bar.js）。 */
+.nano-status{
+  margin:9px 18px 0;border:1px solid var(--line,#e9dfe1);border-radius:12px;
+  background:var(--card,#fff);overflow:hidden;text-align:left;
+}
+.nano-status-head{
+  display:flex;align-items:center;justify-content:space-between;width:100%;
+  padding:9px 12px;background:transparent;border:0;cursor:pointer;font:inherit;
+}
+.nano-status-title{font-size:11px;font-weight:700;letter-spacing:.6px;color:#c1aeb1}
+.nano-status-arrow{width:13px;height:13px;color:#cbb9bc;transition:transform .2s;flex:none}
+.nano-status.collapsed .nano-status-arrow{transform:rotate(-90deg)}
+.nano-status-body{
+  padding:0 12px 11px;font-size:12px;line-height:1.6;color:#b8a7a9;
+  white-space:pre-wrap;word-break:break-word;
+}
+.nano-status-body:empty{display:none}
+.nano-status.collapsed .nano-status-body{display:none}
+.nano-status[data-status="心声"] .nano-status-title{color:#c58ea0}
+.nano-status[data-kind="plot"] .nano-status-body{white-space:normal;padding:8px 12px 12px}
+
 .content{
   padding:8px 19px 20px;white-space:pre-wrap;word-break:break-word;
   font-size:15px;line-height:1.9;min-height:0;color:#4f4446;
@@ -167,13 +190,11 @@ button:active{opacity:.55}
 .plot-toggle .arrow{transition:.25s}
 .plot-toggle .arrow.open{transform:rotate(180deg)}
 .plot-options{
-  display:none;
+  display:grid;
   grid-template-columns:1fr 1fr;
   gap:6px;
-  padding-top:8px;
   width:100%;
 }
-.plot-options.open{display:grid}
 .plot-opt{
   font-size:12px;
   padding:8px 12px;

@@ -137,15 +137,14 @@ html, body {
     flex-direction: column;
     overflow: hidden;
     position: relative;
-    /* 给底部悬浮按钮预留足够空间，卡片滚到底也不会被按钮遮挡 */
-    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
 }
 
 .card-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
-    padding: 8px 0 16px 0;
+    /* 底部留白直接放在滚动容器上：卡片滚到底也不会被悬浮按钮遮挡 */
+    padding: 8px 0 calc(104px + env(safe-area-inset-bottom, 0px)) 0;
     overflow-y: auto;
     flex: 1;
     align-content: start;

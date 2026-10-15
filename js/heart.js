@@ -26,6 +26,13 @@ JS 会写入文本/图片的挂点（请保留这些 id 或类名，只改样式
   #ivDecoTop / .iv-deco-top       顶部装饰层（默认隐藏）
   #ivDecoBottom / .iv-deco-bottom 底部装饰层（默认隐藏）
   .iv-sender / .iv-header / .iv-meta / .iv-content / .iv-custom-foot   结构容器
+  #ivSections / .iv-section / .iv-section-title / .iv-section-body      附加板块（评论区/穿搭等，有内容才显示）
+「新增模块 / 附加板块」也写在模板里：加一个注释块，每行一个 [板块名] 生成要求：
+  /* @heart-sections
+  [评论区] 以粉丝视角写 5 条评论，每条 20 字，围绕本条心声调侃或共鸣
+  [穿搭] 写角色此刻的穿着，跟随正文更新
+  */
+每轮 AI 会在 [heart:…] 之后按此输出 [section:板块名]内容[/section]，卡片里多渲染一块。
 可用的重构手段：
   1) 隐藏：selector{display:none !important}
   2) 任意移动：给元素 position:absolute; left/top/right/bottom/transform；父级需 position:relative 且允许溢出（overflow:visible）。注意 .nano-voice-modal 有 overflow 裁切：元素超出卡片会被「藏起来」。
@@ -126,7 +133,7 @@ function setupThoughtExpand(el) {
 }
 
   // ===== 默认模板（唯一内置模板；改完点「应用」，点「还原」恢复本模板）=====
-  const DEFAULT_CSS = `/* nano-heart-default:v3
+  const DEFAULT_CSS = `/* nano-heart-default:v4
    ============================================================
    心声卡片 · 默认完整模板（头像居左 · iOS 邮件风）
    ------------------------------------------------------------
@@ -145,7 +152,18 @@ function setupThoughtExpand(el) {
      #ivDecoTop / #ivDecoBottom      顶 / 底装饰层（默认隐藏）
      #ivSections / .iv-section / .iv-section-title / .iv-section-body  附加板块（评论区等，有内容才显示）
      .iv-header / .iv-sender / .iv-sender-info / .iv-meta / .iv-content  结构容器
-   注意：只改样式，不要删这些元素；不要写 <script>。
+    注意：只改样式，不要删这些元素；不要写 <script>。
+   ============================================================
+   ---- 新增模块 / 附加板块（在正文下面加评论区、穿搭、状态等）----
+   想给心声「新增一块」不用点按钮，直接在本模板里写 @heart-sections 注释块，
+   每行一个板块： [板块名] 生成要求（视角 / 条数 / 字数 / 主题…）
+   每轮 AI 会按这里的要求，在 [heart:…] 之后用
+     [section:板块名] 内容 [/section]
+   输出；卡片里就会多渲染一块（有内容才显示）。板块属于模板，复制 / 导出 /
+   导入模板时会一起带走。渲染节点： #ivSections > .iv-section >（.iv-section-title + .iv-section-body）。
+   下面是板块定义区（现在为空 = 不生成任何板块）。照着写即可，例如：
+     [评论区] 以粉丝视角写 5 条评论，每条 20 字，围绕本条心声调侃或共鸣
+     [穿搭] 写角色此刻的穿着，跟随正文更新
    ============================================================
    ---- 改法大全（复制需要的行，改完点「应用」）----
    【1. 隐藏任意元素】加 display:none !important;
@@ -305,7 +323,16 @@ function setupThoughtExpand(el) {
   border-radius: 50%;
   color: #1c1c1e;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), inset 0 1px 1px rgba(255, 255, 255, 0.7);
-}`;
+}
+
+/* ============================================================
+   附加板块定义区（新增模块写这里）
+   ------------------------------------------------------------
+   每行一个板块：[板块名] 生成要求
+   不写任何以 [ 开头的行 = 不生成板块。示例见本模板顶部说明。
+   ============================================================ */
+/* @heart-sections
+*/`;
 
   // ===== 内置模板：只保留一个「完整」默认模板 =====
   // 它是唯一内置、不可删除/改名的预设；所有视觉都能在本模板里改，改完点「应用」即可。
@@ -390,7 +417,7 @@ function setupThoughtExpand(el) {
       return;
     }
     const css = String(def.css || '');
-    const isOld = css.indexOf('nano-heart-default:v3') === -1 ||
+    const isOld = css.indexOf('nano-heart-default:v4') === -1 ||
       css.indexOf('狂野草书') !== -1 || css.indexOf('Snell Roundhand') !== -1;
     if (isOld) await saveTemplate('default', BUILTIN_TEMPLATES[0].name, DEFAULT_CSS);
   }
@@ -448,6 +475,7 @@ function setupThoughtExpand(el) {
       if (select.value !== id) {
         select.value = id;
       }
+      refreshSectionsFromCss(tpl.css || '');
     }
   }
 
@@ -498,16 +526,64 @@ function setupThoughtExpand(el) {
     bp.addEventListener('change', save);
   }
 
-  // ===== 附加板块（评论区等）：用户自定义，AI 每轮生成，心声卡片里多渲染一块 =====
+  // ===== 附加板块（评论区等）：定义写在「模板」里，AI 每轮生成，心声卡片里多渲染一块 =====
+  // 新增/修改板块不动 UI，直接在模板 CSS 里写一个注释块即可（模板导出/分享会一起带走）：
+  //   /* @heart-sections
+  //   [评论区] 以粉丝视角写 5 条评论，每条 20 字，围绕本条心声调侃或共鸣
+  //   [穿搭] 写角色此刻的穿着，跟随正文更新
+  //   */
+  // 注：块里没有以 [名称] 开头的行就不会产生板块，所以可以在块里写说明文字。
   const SECTIONS_KEY = 'nano_heart_sections';
-  function getSections() {
-    try {
-      const a = JSON.parse(localStorage.getItem(SECTIONS_KEY) || '[]');
-      return Array.isArray(a) ? a : [];
-    } catch (e) { return []; }
-  }
+  let _sections = [];
+  function getSections() { return _sections; }
   function saveSections(arr) {
-    try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(arr || [])); } catch (e) {}
+    _sections = Array.isArray(arr) ? arr : [];
+    try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(_sections)); } catch (e) {}
+  }
+  // 从模板 CSS 解析 /* @heart-sections ... */ 块，每行 [名称] 生成要求
+  function parseTemplateSections(css) {
+    const out = [];
+    const m = String(css || '').match(/\/\*\s*@heart-sections([\s\S]*?)\*\//i);
+    if (!m) return out;
+    m[1].split(/\r?\n/).forEach(function (line) {
+      const t = String(line).replace(/^\s*\*?\s?/, '').trim();
+      if (!t) return;
+      const mm = t.match(/^[\[【]\s*([^\]】]+?)\s*[\]】]\s*[:：]?\s*([\s\S]*)$/);
+      if (mm && mm[1]) out.push({ id: 'sec_' + out.length, name: mm[1].trim(), prompt: (mm[2] || '').trim() });
+    });
+    return out;
+  }
+  // 把板块写回模板 CSS 的 @heart-sections 块（其余内容保留）
+  function writeTemplateSections(css, sections) {
+    const src = String(css || '');
+    const lines = (Array.isArray(sections) ? sections : [])
+      .filter(function (s) { return s && s.name; })
+      .map(function (s) { return '[' + s.name + ']' + (s.prompt ? (' ' + s.prompt) : ''); });
+    const block = '/* @heart-sections\n' + lines.join('\n') + '\n*/';
+    if (/\/\*\s*@heart-sections[\s\S]*?\*\//i.test(src)) {
+      return src.replace(/\/\*\s*@heart-sections[\s\S]*?\*\//i, block);
+    }
+    return (src ? (src.replace(/\s*$/, '') + '\n') : '') + block + '\n';
+  }
+  // 用一段模板 CSS 刷新板块（模板是板块的唯一来源）
+  function refreshSectionsFromCss(css) {
+    saveSections(parseTemplateSections(css));
+  }
+  // 把当前板块（含外部 API 写入）落回当前模板
+  function persistSectionsToTemplate() {
+    (async function () {
+      try {
+        const all = await getAllTemplates();
+        const id = currentTemplateId || 'default';
+        const tpl = all.find(function (t) { return t.id === id; }) || all.find(function (t) { return t.id === 'default'; });
+        if (!tpl) return;
+        const next = writeTemplateSections(tpl.css || '', getSections());
+        if (next !== tpl.css) {
+          await saveTemplate(tpl.id, tpl.name, next);
+          if ($('ivCss') && currentTemplateId === tpl.id) $('ivCss').value = next;
+        }
+      } catch (e) {}
+    })();
   }
   // 生成 AI 提示词：要求每轮在 [heart:...] 之后输出各板块
   function sectionsPromptBlock() {
@@ -572,60 +648,6 @@ function setupThoughtExpand(el) {
     box.style.display = 'block';
     if (modal) modal.classList.add('has-sections');
   }
-  // 美化面板里的板块编辑器
-  function renderSectionEditor() {
-    const list = getSections();
-    const wrap = $('ivSectionList');
-    if (!wrap) return;
-    Array.prototype.slice.call(wrap.querySelectorAll('.iv-section-item')).forEach(function (n) { n.remove(); });
-    const empty = $('ivSectionEmpty');
-    if (empty) empty.style.display = list.length ? 'none' : 'block';
-    list.forEach(function (s) {
-      const item = document.createElement('div');
-      item.className = 'iv-section-item';
-      const name = document.createElement('input');
-      name.type = 'text';
-      name.className = 'iv-section-name';
-      name.placeholder = '板块名，如：评论区';
-      name.maxLength = 12;
-      name.value = s.name || '';
-      const prompt = document.createElement('textarea');
-      prompt.className = 'iv-section-prompt';
-      prompt.placeholder = '生成要求：视角 / 条数 / 字数 / 主题，如：以粉丝视角写 5 条评论，每条 20 字，围绕本条心声调侃或共鸣';
-      prompt.value = s.prompt || '';
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'iv-section-del';
-      del.textContent = '删除';
-      name.addEventListener('input', function () { s.name = name.value.trim(); saveSections(list); });
-      prompt.addEventListener('input', function () { s.prompt = prompt.value.trim(); saveSections(list); });
-      del.addEventListener('click', function () {
-        const idx = list.indexOf(s);
-        if (idx > -1) list.splice(idx, 1);
-        saveSections(list);
-        renderSectionEditor();
-      });
-      item.appendChild(name);
-      item.appendChild(prompt);
-      item.appendChild(del);
-      wrap.appendChild(item);
-    });
-  }
-  function bindSections() {
-    const add = $('ivAddSection');
-    if (add) add.addEventListener('click', function () {
-      const list = getSections();
-      list.push({ id: 'sec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), name: '', prompt: '' });
-      saveSections(list);
-      renderSectionEditor();
-      const wrap = $('ivSectionList');
-      const items = wrap ? wrap.querySelectorAll('.iv-section-item') : [];
-      const last = items[items.length - 1];
-      if (last) { const inp = last.querySelector('.iv-section-name'); if (inp) inp.focus(); }
-    });
-    renderSectionEditor();
-  }
-
   // ===== 关闭弹窗 =====
   function closeVoice() {
     const layer = $('nanoVoiceLayer');
@@ -707,9 +729,10 @@ function setupThoughtExpand(el) {
     // 这样直接改 css/heart.css 也能生效（不再被默认模板强制覆盖）
     const appliedCss = loadAppliedCss();
     if (appliedCss) applyCustomCSS(appliedCss);
+    // 附加板块由「模板」定义：优先取已应用的 CSS，其次取默认模板
+    refreshSectionsFromCss(appliedCss || (defaultTpl ? defaultTpl.css : DEFAULT_CSS));
     loadBuiltinPrompt();
     bindBuiltinPrompt();
-    bindSections();
 
     // ===== 事件绑定 =====
     $('ivExit').addEventListener('click', closeVoice);
@@ -768,6 +791,7 @@ function setupThoughtExpand(el) {
       await renderSelectOnly(id);
       isInternalChange = false;
       $('ivTemplateName').value = '';
+      refreshSectionsFromCss(css);
     });
 
     // 修改模板
@@ -804,6 +828,7 @@ function setupThoughtExpand(el) {
       await renderSelectOnly(id);
       isInternalChange = false;
       $('ivTemplateName').value = '';
+      refreshSectionsFromCss(finalCss);
     });
 
     // 删除模板
@@ -823,6 +848,7 @@ function setupThoughtExpand(el) {
           isInternalChange = false;
           $('ivCss').value = defaultTpl.css;
           currentTemplateId = 'default';
+          refreshSectionsFromCss(defaultTpl.css || '');
         }
         $('ivTemplateName').value = '';
       }
@@ -837,6 +863,14 @@ function setupThoughtExpand(el) {
       const styleTag = document.getElementById('nanoVoiceCustomCSS');
       if (styleTag) styleTag.textContent = '';
       saveAppliedCss('');
+      // 清空覆盖 → 板块回到默认模板的定义
+      (async function () {
+        try {
+          const all = await getAllTemplates();
+          const tpl = all.find(t => t.id === 'default');
+          refreshSectionsFromCss(tpl ? tpl.css : DEFAULT_CSS);
+        } catch (e) {}
+      })();
     });
 
     // 复制模板：把「DIY 配方 + 当前编辑器/预设的 CSS」一起复制到剪贴板，方便交给 AI 改造
@@ -866,6 +900,7 @@ function setupThoughtExpand(el) {
       if (id) {
         await saveCurrentToTemplate();
       }
+      refreshSectionsFromCss(css);
       $('ivCustomize').classList.remove('show');
       setCustomizing(false);
     });
@@ -888,6 +923,7 @@ function setupThoughtExpand(el) {
         await renderSelectOnly('default');
         isInternalChange = false;
       }
+      refreshSectionsFromCss(DEFAULT_CSS);
       $('ivCustomize').classList.remove('show');
       setCustomizing(false);
     });
@@ -900,6 +936,7 @@ function setupThoughtExpand(el) {
       if (d && d.type === 'nanoVoiceCss') {
         applyCustomCSS(d.css || '');
         saveAppliedCss(d.css || '');
+        refreshSectionsFromCss(d.css || '');
         try {
           (async function () {
             await initDefaultTemplate();
@@ -927,13 +964,19 @@ function setupThoughtExpand(el) {
         } catch (e) {}
       }
       try {
-        const blob = new Blob([JSON.stringify({ type: 'heart', name: name, css: css }, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = String(name).replace(/[\\/:*?"<>|]/g, '_') + '.json';
-        a.click();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+        const text = JSON.stringify({ type: 'heart', name: name, css: css }, null, 2);
+        const filename = String(name).replace(/[\\/:*?"<>|]/g, '_') + '.json';
+        if (window.NanoExport) {
+          window.NanoExport.file({ name: filename, text: text });
+        } else {
+          const blob = new Blob([text], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          a.click();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+        }
       } catch (e) { alert('导出失败'); }
     });
     $('ivFileInput').addEventListener('change', function(event) {
@@ -999,12 +1042,14 @@ function setupThoughtExpand(el) {
     getImpressionPrompt: function(charName) {
       return buildImpressionPrompt(charName || '角色');
     },
-    // 附加板块（评论区等）：给外部读取 / 写入 / 拼提示词 / 解析用
+    // 附加板块（评论区等）：定义写在模板里；这里给外部读取 / 写入 / 拼提示词 / 解析用。
+    // save(arr) 会把板块同步写回「当前模板」的 /* @heart-sections */ 块。
     sections: {
       list: getSections,
-      save: saveSections,
+      save: function (arr) { saveSections(arr); persistSectionsToTemplate(); },
       promptBlock: sectionsPromptBlock,
-      parse: parseSections
+      parse: parseSections,
+      parseTemplate: parseTemplateSections
     },
     // 更新数据（不打开弹窗）
     update: function(data) {

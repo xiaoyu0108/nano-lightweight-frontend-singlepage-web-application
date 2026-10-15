@@ -2368,6 +2368,8 @@ document.getElementById("chatFile").onchange = () => handleImport("chat");
    导出当前选中的预设（分享图标；导出 {type,name,css} JSON，可被导入还原）
    ============================================================ */
 function downloadTextFile(filename, text) {
+  // 统一走半屏悬浮窗：iOS 独立窗口里 <a download> 会跳进「存储到文件」全屏页且退不回
+  if (window.NanoExport) { window.NanoExport.file({ name: filename, text: text }); return; }
   try {
     const blob = new Blob([text], { type: "application/json" });
     const url = URL.createObjectURL(blob);

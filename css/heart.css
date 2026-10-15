@@ -432,39 +432,6 @@ button, input, textarea { font: inherit; outline: none; }
 .iv-custom-foot .iv-btn-action { font-size: 14px; padding: 0 4px; flex: 1; }
 .iv-custom-foot .iv-divider { display: none; }
 
-/* ===== 附加板块编辑器（美化面板） ===== */
-.iv-section-empty {
-  font-size: 12.5px; color: var(--iv-secondary); line-height: 1.6;
-  padding: 2px 0 6px;
-}
-.iv-section-item {
-  border: 1px solid var(--iv-separator);
-  border-radius: 12px;
-  padding: 10px;
-  margin-bottom: 8px;
-  display: flex; flex-direction: column; gap: 6px;
-  background: rgba(255, 255, 255, 0.55);
-}
-.iv-section-item .iv-section-name,
-.iv-section-item .iv-section-prompt {
-  width: 100%;
-  border: 1px solid rgba(60, 60, 67, 0.12);
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 8px;
-  padding: 7px 9px;
-  font-size: 13px; font-family: inherit; color: #1c1c1e; outline: none;
-}
-.iv-section-item .iv-section-name:focus,
-.iv-section-item .iv-section-prompt:focus { border-color: rgba(0, 122, 255, 0.5); background: #fff; }
-.iv-section-item .iv-section-prompt { min-height: 54px; resize: vertical; line-height: 1.45; }
-.iv-section-item .iv-section-del {
-  align-self: flex-end;
-  border: none; border-radius: 8px;
-  background: rgba(255, 59, 48, 0.10); color: #ff3b30;
-  font-size: 12px; padding: 5px 10px; cursor: pointer;
-}
-.iv-section-item .iv-section-del:active { opacity: 0.6; }
-
 /* 动画 */
 @keyframes ivFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes ivIn { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }

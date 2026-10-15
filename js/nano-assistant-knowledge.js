@@ -79,7 +79,7 @@ window.NANO_ASSISTANT_KB = {
     beautifyChatAvatar: 'localStorage.beautify_chat_avatar',
     heartCss: 'localStorage.nano_voice_applied_css',
     heartBuiltinPrompt: 'localStorage.nano_heart_builtin_prompt',
-    heartSections: 'localStorage.nano_heart_sections（数组 [{id,name,prompt}]：心声「附加板块」，如评论区；每轮 AI 会按 [section:名]...[/section] 输出，心声卡片里多渲染一块，可用 .iv-section/.iv-section-title/.iv-section-body 美化）',
+    heartSections: '心声「附加板块」（评论区/穿搭等）：定义写在心声模板 CSS 里的注释块 /* @heart-sections 每行 [板块名] 生成要求 */，由它解析后缓存到 localStorage.nano_heart_sections（数组 [{name,prompt}]）。每轮 AI 按此在 [heart:…] 之后输出 [section:名]...[/section]，心声卡片里多渲染一块，可用 .iv-section/.iv-section-title/.iv-section-body 美化。要新增板块就改模板的 @heart-sections 块。',
     translationMode: 'localStorage.nano_trans_separate（1=独立气泡 0=同一气泡）',
     offlineSettings: 'IndexedDB MeetSettingsDB/settings，主记录 id=main_settings，字段 customCSS',
     worldbook: 'IndexedDB nano_worldbook_db/worldbook_data，值结构 {key:"data", value:{groups:[], files:[]}}；files[].entries[] 为条目',

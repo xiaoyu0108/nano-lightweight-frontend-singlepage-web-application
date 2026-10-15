@@ -89,7 +89,7 @@ const CSS_PRESETS_ID = 'css_presets';
 const COT_PRESETS_ID = 'cot_presets';
 const MESSAGES_STORE = 'messages';
 
-let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', predictUser: 'forbid', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '', timeAware: true };
+let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', predictUser: 'forbid', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '', timeAware: true, statusBars: [] };
 let ruleGroups = [];
 let stylePresets = [];
 let cssPresets = [];
@@ -140,6 +140,7 @@ async function loadAllData() {
     const settingsData = await getStoreData('settings');
     const found = settingsData.find(s => s.id === SETTINGS_ID);
     if (found) settings = found;
+    if (!Array.isArray(settings.statusBars)) settings.statusBars = [];
 
     const rulesData = await getStoreData('rules');
     const foundRules = rulesData.find(r => r.id === RULES_ID);
@@ -296,11 +297,12 @@ const INITIAL_CSS = `/* ========================================================
      .message-head > .diary-title      顶部 Diary 条
      .identity-row > button.avatar      头像（点它 = 切换心声）
                      > .nickname        昵称
-     .heart-state   心声（.message.show-heart 时才显示）
-     .thinking      思维链（.message.show-thinking 时才显示）
+     .nano-status   状态栏（可折叠 · 心声 / 思维链 / 自定义 / 剧情推荐 都用它）
+       > .nano-status-head >（.nano-status-title 名称 + .nano-status-arrow 箭头）
+       > .nano-status-body（内容；.nano-status.collapsed 时隐藏）
      .content[data-role=content]        正文
      .time-row > .clock-icon            时间
-     .plot-area > .plot-toggle + .plot-options > .plot-opt   推荐剧情
+     .plot-options > .plot-opt          推荐剧情选项（在 [data-kind=plot] 的状态栏里）
      .actions > .action(编辑/删除) + .action.more-action      卡片底栏
      .more-menu > [data-action=thinking] / [data-action=select]
    (A) 去掉 Diary 卡片包裹、完全重构：
@@ -1017,11 +1019,13 @@ document.getElementById('importFile').addEventListener('change', async function(
 document.getElementById('exportBtn').onclick = function() {
   if (!ruleGroups.length) { showToast('没有可导出的内容'); return; }
   const data = JSON.stringify(ruleGroups, null, 2);
+  const filename = 'rules-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  if (window.NanoExport) { window.NanoExport.file({ name: filename, text: data }); return; }
   const blob = new Blob([data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'rules-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
   showToast('导出成功');
@@ -1392,11 +1396,13 @@ document.getElementById('cssExport').onclick = function() {
     if (p) { name = p.name || name; css = p.content || css; }
   }
   const data = JSON.stringify({ type: 'offline', name: name, css: css }, null, 2);
+  const filename = name.replace(/[\\/:*?"<>|]/g, '_') + '.json';
+  if (window.NanoExport) { window.NanoExport.file({ name: filename, text: data }); return; }
   const blob = new Blob([data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = name.replace(/[\\/:*?"<>|]/g, '_') + '.json';
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
   showToast('已导出预设：' + name);
@@ -1636,6 +1642,8 @@ function updateSummary() {
   if (nsfwSwitch) nsfwSwitch.classList.toggle('on', settings.nsfw === true);
   const timeAwareSwitch = document.getElementById('timeAwareSwitch');
   if (timeAwareSwitch) timeAwareSwitch.classList.toggle('on', settings.timeAware !== false);
+  const sbVal = document.getElementById('statusBarsValue');
+  if (sbVal) sbVal.textContent = (Array.isArray(settings.statusBars) && settings.statusBars.length) ? (settings.statusBars.length + ' 个') : '未设置';
 }
 
 function fillSettings() {
@@ -1698,6 +1706,99 @@ document.getElementById('beautifyOpen').onclick = function() {
   populateCssPresets();
   applyCssPreview(settings.customCSS || '');
   openSheet('beautifySheet');
+};
+
+// ============================================================
+//  15. 状态栏管理（自定义可折叠状态栏）
+//  心声 / 思维链 / 剧情推荐 是内置可折叠状态栏；这里新增自定义的，
+//  AI 每轮按「生成要求」输出 [bar:名称]…[/bar]，卡片里以可折叠状态栏展示。
+// ============================================================
+function renderStatusBars() {
+  const wrap = document.getElementById('statusBarList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  if (!Array.isArray(settings.statusBars)) settings.statusBars = [];
+  const list = settings.statusBars;
+  if (!list.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-size:11px;color:var(--sub);line-height:1.6';
+    empty.textContent = '还没有自定义状态栏。点「+ 新增」加一个，例如「着装」：写角色此刻的穿着，随正文更新。';
+    wrap.appendChild(empty);
+    return;
+  }
+  list.forEach(function (bar, idx) {
+    const item = document.createElement('div');
+    item.style.cssText = 'border:1px solid var(--line2,#eee);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;background:#fff';
+    const name = document.createElement('input');
+    name.className = 'search-input';
+    name.placeholder = '状态栏名，如：着装 / 位置 / 好感度';
+    name.maxLength = 12;
+    name.value = bar.name || '';
+    name.style.height = '34px';
+    const prompt = document.createElement('textarea');
+    prompt.className = 'textarea';
+    prompt.style.minHeight = '60px';
+    prompt.placeholder = '生成要求：写什么、怎么更新，如：一句写角色此刻的穿着，随正文变化';
+    prompt.value = bar.prompt || '';
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between';
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:12px;color:var(--sub)';
+    lbl.textContent = '默认折叠';
+    const sw = document.createElement('div');
+    sw.className = 'switch' + (bar.collapsed ? ' on' : '');
+    sw.appendChild(document.createElement('i'));
+    sw.onclick = function () {
+      bar.collapsed = !bar.collapsed;
+      sw.classList.toggle('on', bar.collapsed);
+      saveSettings(); updateSummary();
+    };
+    row.appendChild(lbl); row.appendChild(sw);
+    const del = document.createElement('button');
+    del.className = 'sheet-btn danger';
+    del.type = 'button';
+    del.textContent = '删除';
+    del.style.alignSelf = 'flex-end';
+    del.onclick = function () {
+      list.splice(idx, 1);
+      saveSettings();
+      renderStatusBars();
+      updateSummary();
+    };
+    name.addEventListener('input', function () { bar.name = name.value.trim(); saveSettings(); updateSummary(); });
+    prompt.addEventListener('input', function () { bar.prompt = prompt.value.trim(); saveSettings(); });
+    item.appendChild(name); item.appendChild(prompt); item.appendChild(row); item.appendChild(del);
+    wrap.appendChild(item);
+  });
+}
+document.getElementById('statusBarsOpen').onclick = function() {
+  renderStatusBars();
+  const ta = document.getElementById('statusBarTemplate');
+  if (ta) ta.value = (window.NanoStatusBar && window.NanoStatusBar.TEMPLATE) || '';
+  openSheet('statusBarsSheet');
+};
+document.getElementById('statusBarAddBtn').onclick = function() {
+  if (!Array.isArray(settings.statusBars)) settings.statusBars = [];
+  settings.statusBars.push({ id: generateId(), name: '', prompt: '', collapsed: false });
+  saveSettings();
+  renderStatusBars();
+  updateSummary();
+  const wrap = document.getElementById('statusBarList');
+  const inputs = wrap ? wrap.querySelectorAll('input') : [];
+  const last = inputs[inputs.length - 1];
+  if (last) last.focus();
+};
+document.getElementById('statusBarTemplateCopy').onclick = function() {
+  const txt = (window.NanoStatusBar && window.NanoStatusBar.TEMPLATE) || '';
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function(){ showToast('已复制模板'); }, function(){ showToast('复制失败'); });
+    } else {
+      const ta = document.createElement('textarea'); ta.value = txt;
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+      showToast('已复制模板');
+    }
+  } catch (e) { showToast('复制失败'); }
 };
 (function bindCssPreview() {
   const ta = document.getElementById('cssText');
