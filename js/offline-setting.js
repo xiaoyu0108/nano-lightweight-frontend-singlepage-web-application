@@ -358,10 +358,20 @@ const INITIAL_CSS = `/* ========================================================
        //     └─ .nano-status-body   内容（折叠时 display:none）
        // 剧情推荐那栏额外带 data-kind="plot"，里面是 .plot-options > .plot-opt 选项按钮。
        // 心声默认展开、思维链与剧情推荐默认折叠；点标题栏即可折叠/展开（状态按名字记住）。
-       // 新增自定义状态栏：推荐直接写在本模板底部的 @status-bars 定义块里（每行 [名称] 生成要求）。
-       // 「线下设置 → 状态栏」里也能加（可选，等价；适合不想改模板时用）。
-       //   AI 每轮用 [bar:名称]内容[/bar] 输出，会自动变成同结构的可折叠状态栏，
-       //   用 .nano-status[data-status="你的名字"] 单独美化。
+       // 新增自定义状态栏（两种方式，等价，都支持 HTML / 开启关闭 / 导入导出）：
+       //   ① 本模板底部的 @status-bars 定义块：每行 [名称] 生成要求（快捷，用默认样式）；
+       //   ② 「线下设置 → 状态栏」：可粘贴**完整 HTML**做条目，支持每条的 开启/关闭、位置、默认折叠，
+       //      以及整组「导出 / 导入」（status-bars.json）。
+       //   AI 每轮用 [bar:名称]内容[/bar] 输出，每轮都会刷新这一条；用 .nano-status[data-status="名字"] 美化。
+       // —— 用 HTML 自定义一条状态栏 ——
+       //   在设置里给这条的「HTML」粘贴完整 HTML；用 {{content}} 标记每轮内容要填的位置、{{name}} 放名字：
+       //     <div class="nano-status" data-status="着装">
+       //       <div class="nano-status-head"><span class="nano-status-title">着装</span>
+       //         <svg class="nano-status-arrow" viewBox="0 0 24 24" ...><polyline points="6 9 12 15 18 9"/></svg></div>
+       //       <div class="nano-status-body">{{content}}</div>
+       //     </div>
+       //   带 nano-status 结构 = 自动可折叠；不带结构时，会自动帮你包成可折叠「条目」。
+       //   不写 {{content}} 时，AI 内容会追加到 HTML 末尾。
        // —— 插入位置（状态栏放在卡片哪一段）——
        //   在 @status-bars 里给那行标位置即可（不标 = 正文后）：
        //     [着装@顶部] 写穿着          // 位置写在名字里
@@ -422,24 +432,31 @@ const INITIAL_CSS = `/* ========================================================
    .round-btn{background:url("https://新图标.png") center/20px no-repeat}
    #rerollBtn{position:absolute;left:12px;bottom:14px}          // 想搬去哪就改 left/right/top/bottom
 
-   // ★ 把左侧「菜单按钮」(#composerAvatarBtn) 移出输入行、又不想它乱跑 —— 关键在于选中栏是
-   //   CSS Grid：.composer{display:grid;grid-template-columns:43px 1fr 43px}（菜单 | 输入 | 发送）。
-   //   为什么「乱跑、和输入框不在一行」：只要你把菜单按钮 display:none / 移走，剩下两个自动落进
-   //   第 1、2 列，于是输入框被塞进 43px 窄列、发送键占了大半行 —— 看起来就是错位。
-   //   规则：动了列数，一定要显式指定每列占位（grid-column），别依赖自动排布。
-   //   下面这套 = 菜单按钮浮到输入栏上方左侧，输入栏仍占满、和发送键对齐：
-   .composer{position:relative;grid-template-columns:1fr 43px;gap:7px}
-   .composer .input{grid-column:1}
-   .composer .round-btn.send{grid-column:2}
-   .composer .avatar-btn{position:absolute;left:0;bottom:52px}   // 想搬去屏幕任意位置：改 left/top/right/bottom
-   // 想彻底不用 grid、改用 flex 分区（更直观，不会错位）：
-   .composer{display:flex;align-items:flex-end;gap:7px}
+   // ★ 左侧「菜单按钮」(#composerAvatarBtn) 的移动 / 对齐（常见坑都在这里）
+   //   底栏结构：.bottom > .composer（一行 flex：菜单按钮 | 输入框 textarea | 发送按钮）。
+   //   ① 为什么「按钮和输入框不一样高」：
+   //      输入框 .input 是 min-height:42px 且会随内容长高（最多 126px）；圆形按钮固定 42px。
+   //      只要按钮还在 flex 行里、且 .composer 用默认的 align-items:center，静止时就一样高；
+   //      一旦你给 .composer 加了 align-items:flex-start/flex-end，或把按钮 position:absolute
+   //      移出文档流，它就不再跟输入框对齐了。
+   //      想「永远和输入框一样高」：让按钮跟着输入框高度走 ——
+   //        .composer{align-items:stretch}
+   //        .composer .round-btn{height:auto;min-height:42px;width:42px;border-radius:999px}
+   //   ② 为什么「输入框里的字被遮挡」：
+   //      你把菜单按钮 position:absolute 放到了输入框上面（或输入框左端），圆按钮盖住了左端文字。
+   //      ⇒ 绝不要把按钮叠在输入框上：要么留在输入框「旁边」（仍在 flex 行里），
+   //        要么把它整块移出胶囊、浮到别处（放 .bottom 上，而不是压在输入框上）。
+   //   ③ 正确写法 A：菜单按钮留在行内（最省事，天然对齐）：
+   .composer{align-items:center;gap:7px}
    .composer .input{flex:1;min-width:0;width:auto}
-   .composer .round-btn{flex:0 0 42px}
-   .composer .avatar-btn{position:absolute;left:12px;bottom:54px}
-   // 提示：.bottom 是 position:fixed；把 .composer{position:relative} 后，absolute 的按钮就以
-   //   输入栏这一行为基准，不会再跟着其它元素漂。若按钮跑出可视区，多半是父级没有 position:relative。
-   //   键盘弹起时的轻微跳动属于移动端行为；可给 .bottom 加 padding-bottom:env(safe-area-inset-bottom) 兜底。
+   .composer .round-btn{flex:0 0 42px;height:42px}
+   //   ④ 正确写法 B：把菜单按钮移出胶囊、浮到左上方（不属于输入行，也不遮挡输入框）：
+   .composer{position:relative}
+   .composer .avatar-btn{position:absolute;left:-4px;bottom:calc(100% + 6px)}
+   //      （想放屏幕任意位置：改 left/right/top/bottom；用 .bottom 作参照就给 .bottom{position:relative}）
+   //   ⑤ 若输入框文字被裁：别把 .input 写死成更小的 height；要改就同时改 line-height 与 padding，
+   //      并保持 box-sizing:border-box（本页已全局设置）。例如 .input{height:46px;padding:12px 14px;line-height:22px}
+   //   ⑥ 键盘弹起时轻微跳动属移动端行为；给 .bottom 加 padding-bottom:env(safe-area-inset-bottom) 兜底即可。
    // 纯装饰占位（不可点）：给稳定父元素加 ::before/::after
    .bottom::before{content:"";position:absolute;left:56px;bottom:16px;width:20px;height:20px;pointer-events:none;background:url("https://装饰.png") center/20px no-repeat}
    // 底栏左侧现在是「圆形头像按钮」#composerAvatarBtn，点击弹出竖向菜单(.om-menu)。
@@ -1300,7 +1317,7 @@ document.getElementById('cssPreset').onchange = function() {
   applyCssPreview(cssText.value);
 };
 
-document.getElementById('clearCssBtn').onclick = function() { document.getElementById('cssText').value = ''; applyCssPreview(''); showToast('已清空CSS'); };
+document.getElementById('clearCssBtn').onclick = function() { document.getElementById('cssText').value = ''; applyCssPreview(''); settings.customCSS = ''; saveSettings(); updateSummary(); notifyOfflineChanged(); showToast('已清空CSS'); };
 
 // ===== 线下背景图：上传图片作为页面底色背景（不影响卡片 UI）=====
 function fileToBgImage(file) {
@@ -1501,12 +1518,17 @@ document.getElementById('cssExport').onclick = function() {
   URL.revokeObjectURL(url);
   showToast('已导出预设：' + name);
 };
+// 通知正在运行的线下页面立即重新读取设置（否则要退出再进才生效）
+function notifyOfflineChanged() {
+  try { window.parent.postMessage({ type: 'offlineSettingsChanged' }, '*'); } catch (e) {}
+}
 document.getElementById('applyCss').onclick = function() {
   settings.customCSS = document.getElementById('cssText').value;
   saveSettings();
   updateSummary();
   // 只在预览 iframe 内套用，绝不注入到设置页本身（否则会改掉设置页自己的按钮/顶栏）
   renderCssPreview(settings.customCSS);
+  notifyOfflineChanged();
   showToast('CSS已应用');
 };
 
@@ -1780,7 +1802,12 @@ document.getElementById('cotOpen').onclick = function() {
 };
 
 // 用「真实的线下页面」做实时预览：同一套 offline.html + offline.js，只是走 preview 模式
+let pendingPreviewCss = '';
+function sendPreviewCss(f) {
+  try { f.contentWindow.postMessage({ type: 'offlinePreviewCss', css: pendingPreviewCss }, '*'); } catch (e) {}
+}
 function renderCssPreview(css) {
+  pendingPreviewCss = String(css || '');
   const f = document.getElementById('cssPreviewFrame');
   if (!f) return;
   if (!f.getAttribute('src')) {
@@ -1788,11 +1815,12 @@ function renderCssPreview(css) {
     try { chat = new URLSearchParams(location.search).get('chat') || ''; } catch (e) {}
     f.setAttribute('src', 'offline.html?preview=1' + (chat ? ('&chat=' + encodeURIComponent(chat)) : ''));
   }
-  const send = function () {
-    try { f.contentWindow.postMessage({ type: 'offlinePreviewCss', css: String(css || '') }, '*'); } catch (e) {}
-  };
-  if (f.dataset.ready === '1') send();
-  else f.addEventListener('load', function () { f.dataset.ready = '1'; send(); }, { once: true });
+  // iframe 就绪后立即套用最新 CSS；未就绪则等 load 事件补发
+  if (f.dataset.ready === '1') sendPreviewCss(f);
+  if (f.dataset.bound !== '1') {
+    f.dataset.bound = '1';
+    f.addEventListener('load', function () { f.dataset.ready = '1'; sendPreviewCss(f); });
+  }
 }
 function applyCssPreview(css) { renderCssPreview(css); }
 document.getElementById('beautifyOpen').onclick = function() {
@@ -1816,33 +1844,69 @@ function renderStatusBars() {
   if (!list.length) {
     const empty = document.createElement('div');
     empty.style.cssText = 'font-size:11px;color:var(--sub);line-height:1.6';
-    empty.textContent = '还没有自定义状态栏。点「+ 新增」加一个，例如「着装」：写角色此刻的穿着，随正文更新。';
+    empty.textContent = '还没有自定义状态栏，点上方「+ 新增状态栏」。';
     wrap.appendChild(empty);
     return;
   }
+  function makeSwitch(on, onChange) {
+    const sw = document.createElement('div');
+    sw.className = 'switch' + (on ? ' on' : '');
+    sw.appendChild(document.createElement('i'));
+    sw.onclick = function () { const v = !sw.classList.contains('on'); sw.classList.toggle('on', v); onChange(v); };
+    return sw;
+  }
+  function miniLabel(text) {
+    const l = document.createElement('div');
+    l.style.cssText = 'font-size:12px;color:var(--sub);flex:none';
+    l.textContent = text;
+    return l;
+  }
   list.forEach(function (bar, idx) {
+    if (bar.enabled === undefined) bar.enabled = true;
+    const expanded = bar.expanded === true;
     const item = document.createElement('div');
-    item.style.cssText = 'border:1px solid var(--line2,#eee);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;background:#fff';
+    item.style.cssText = 'border:1px solid var(--line2,#eee);border-radius:12px;background:#fff;overflow:hidden';
+
+    // —— 收起状态：只显示一行（箭头 + 名称 + 启用开关）——
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer';
+    const arrow = document.createElement('span');
+    arrow.textContent = '▶';
+    arrow.style.cssText = 'font-size:10px;color:var(--sub);transition:transform .15s;transform:rotate(' + (expanded ? '90deg' : '0deg') + ')';
+    const title = document.createElement('span');
+    title.style.cssText = 'flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    title.textContent = bar.name || ('状态栏 ' + (idx + 1));
+    const enSw = makeSwitch(bar.enabled !== false, function (v) { bar.enabled = v; saveSettings(); updateSummary(); });
+    enSw.addEventListener('click', function (e) { e.stopPropagation(); });
+    head.appendChild(arrow); head.appendChild(title); head.appendChild(enSw);
+    head.onclick = function () { bar.expanded = !expanded; renderStatusBars(); };
+
+    // —— 展开状态：编辑内容 ——
+    const body = document.createElement('div');
+    body.style.cssText = 'display:' + (expanded ? 'flex' : 'none') + ';flex-direction:column;gap:6px;padding:0 10px 10px';
     const name = document.createElement('input');
     name.className = 'search-input';
-    name.placeholder = '状态栏名，如：着装 / 位置 / 好感度';
+    name.placeholder = '状态栏名，如：着装 / 位置';
     name.maxLength = 12;
     name.value = bar.name || '';
     name.style.height = '34px';
+    const html = document.createElement('textarea');
+    html.className = 'textarea';
+    html.style.minHeight = '76px';
+    html.style.fontSize = '11px';
+    html.style.fontFamily = 'ui-monospace,Menlo,monospace';
+    html.placeholder = '粘贴完整 HTML，用 {{content}} 标记每轮要填的位置（{{name}} 放名字）；留空用默认样式。';
+    html.value = bar.html || '';
     const prompt = document.createElement('textarea');
     prompt.className = 'textarea';
-    prompt.style.minHeight = '60px';
-    prompt.placeholder = '生成要求：写什么、怎么更新，如：一句写角色此刻的穿着，随正文变化';
+    prompt.style.minHeight = '52px';
+    prompt.placeholder = '生成要求：写什么、怎么更新';
     prompt.value = bar.prompt || '';
-    // 位置：决定这条状态栏插在卡片的哪个位置
     const posRow = document.createElement('div');
-    posRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between';
-    const posLbl = document.createElement('div');
-    posLbl.style.cssText = 'font-size:12px;color:var(--sub)';
-    posLbl.textContent = '位置';
+    posRow.style.cssText = 'display:flex;align-items:center;gap:8px';
     const posSel = document.createElement('select');
     posSel.className = 'search-input';
-    posSel.style.cssText = 'height:32px;width:130px';
+    posSel.style.cssText = 'height:32px;flex:1;min-width:0';
     [['top', '顶部（昵称下）'], ['before', '正文前'], ['after', '正文后（默认）'], ['bottom', '底部（操作栏前）']].forEach(function (o) {
       const opt = document.createElement('option');
       opt.value = o[0]; opt.textContent = o[1];
@@ -1850,35 +1914,22 @@ function renderStatusBars() {
     });
     posSel.value = bar.pos || 'after';
     posSel.onchange = function () { bar.pos = posSel.value; saveSettings(); };
-    posRow.appendChild(posLbl); posRow.appendChild(posSel);
+    posRow.appendChild(miniLabel('位置')); posRow.appendChild(posSel);
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between';
-    const lbl = document.createElement('div');
-    lbl.style.cssText = 'font-size:12px;color:var(--sub)';
-    lbl.textContent = '默认折叠';
-    const sw = document.createElement('div');
-    sw.className = 'switch' + (bar.collapsed ? ' on' : '');
-    sw.appendChild(document.createElement('i'));
-    sw.onclick = function () {
-      bar.collapsed = !bar.collapsed;
-      sw.classList.toggle('on', bar.collapsed);
-      saveSettings(); updateSummary();
-    };
-    row.appendChild(lbl); row.appendChild(sw);
+    row.style.cssText = 'display:flex;align-items:center;gap:14px;flex-wrap:wrap';
+    row.appendChild(miniLabel('默认折叠'));
+    row.appendChild(makeSwitch(bar.collapsed === true, function (v) { bar.collapsed = v; saveSettings(); }));
     const del = document.createElement('button');
     del.className = 'sheet-btn danger';
     del.type = 'button';
     del.textContent = '删除';
     del.style.alignSelf = 'flex-end';
-    del.onclick = function () {
-      list.splice(idx, 1);
-      saveSettings();
-      renderStatusBars();
-      updateSummary();
-    };
-    name.addEventListener('input', function () { bar.name = name.value.trim(); saveSettings(); updateSummary(); });
+    del.onclick = function () { list.splice(idx, 1); saveSettings(); renderStatusBars(); updateSummary(); };
+    name.addEventListener('input', function () { bar.name = name.value.trim(); saveSettings(); updateSummary(); title.textContent = bar.name || ('状态栏 ' + (idx + 1)); });
+    html.addEventListener('input', function () { bar.html = html.value; saveSettings(); });
     prompt.addEventListener('input', function () { bar.prompt = prompt.value.trim(); saveSettings(); });
-    item.appendChild(name); item.appendChild(prompt); item.appendChild(posRow); item.appendChild(row); item.appendChild(del);
+    body.appendChild(name); body.appendChild(html); body.appendChild(prompt); body.appendChild(posRow); body.appendChild(row); body.appendChild(del);
+    item.appendChild(head); item.appendChild(body);
     wrap.appendChild(item);
   });
 }
@@ -1890,7 +1941,7 @@ document.getElementById('statusBarsOpen').onclick = function() {
 };
 document.getElementById('statusBarAddBtn').onclick = function() {
   if (!Array.isArray(settings.statusBars)) settings.statusBars = [];
-  settings.statusBars.push({ id: generateId(), name: '', prompt: '', collapsed: false });
+  settings.statusBars.push({ id: generateId(), name: '', html: '', prompt: '', collapsed: false, pos: 'after', enabled: true });
   saveSettings();
   renderStatusBars();
   updateSummary();
@@ -1899,6 +1950,50 @@ document.getElementById('statusBarAddBtn').onclick = function() {
   const last = inputs[inputs.length - 1];
   if (last) last.focus();
 };
+// 状态栏：导出 / 导入（整组）
+document.getElementById('statusBarExport').onclick = function() {
+  const bars = Array.isArray(settings.statusBars) ? settings.statusBars : [];
+  if (!bars.length) { showToast('还没有自定义状态栏'); return; }
+  const text = JSON.stringify({ type: 'offline-status-bars', version: 1, statusBars: bars }, null, 2);
+  if (window.NanoExport) { window.NanoExport.file({ name: 'status-bars.json', text: text }); return; }
+  try {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    a.download = 'status-bars.json'; a.click();
+  } catch (e) { showToast('导出失败'); }
+};
+document.getElementById('statusBarImport').onclick = function() { document.getElementById('statusBarFile').click(); };
+document.getElementById('statusBarFile').addEventListener('change', function(e) {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = function(ev) {
+    try {
+      const obj = JSON.parse(String(ev.target.result || ''));
+      const arr = Array.isArray(obj) ? obj : (obj && Array.isArray(obj.statusBars) ? obj.statusBars : null);
+      if (!arr) { showToast('文件格式不对'); return; }
+      if (!Array.isArray(settings.statusBars)) settings.statusBars = [];
+      arr.forEach(function(b) {
+        if (!b || !b.name) return;
+        settings.statusBars.push({
+          id: generateId(),
+          name: String(b.name),
+          html: String(b.html || ''),
+          prompt: String(b.prompt || ''),
+          collapsed: b.collapsed === true,
+          pos: b.pos || 'after',
+          enabled: b.enabled !== false
+        });
+      });
+      saveSettings();
+      renderStatusBars();
+      updateSummary();
+      showToast('已导入 ' + arr.length + ' 条状态栏');
+    } catch (err) { showToast('导入失败'); }
+  };
+  rd.readAsText(f);
+  e.target.value = '';
+});
 document.getElementById('statusBarTemplateCopy').onclick = function() {
   const txt = (window.NanoStatusBar && window.NanoStatusBar.TEMPLATE) || '';
   try {
@@ -1915,7 +2010,7 @@ document.getElementById('statusBarTemplateCopy').onclick = function() {
   const ta = document.getElementById('cssText');
   if (ta) {
     let t;
-    ta.addEventListener('input', function () { clearTimeout(t); const v = this.value; t = setTimeout(function () { applyCssPreview(v); }, 180); });
+    ta.addEventListener('input', function () { clearTimeout(t); const v = this.value; t = setTimeout(function () { applyCssPreview(v); }, 60); });
   }
   const sel = document.getElementById('cssPreset');
   if (sel) sel.addEventListener('change', function () { setTimeout(function () { applyCssPreview(document.getElementById('cssText').value); }, 0); });

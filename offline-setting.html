@@ -313,14 +313,16 @@
 <div class="sheet-head"><div class="sheet-title">状态栏</div><button class="sheet-close" data-close="statusBarsSheet">完成</button></div>
 <div class="sheet-body">
   <div class="sheet-section">
-    <div style="font-size:11px;color:var(--sub);line-height:1.6">心声 / 思维链 / 剧情推荐 已内置为可折叠状态栏。下面可新增自定义状态栏：AI 每轮会在正文之后按「生成要求」输出内容，并一起跟随正文更新；卡片里以可折叠状态栏展示（点标题栏折叠 / 展开）。</div>
+    <div style="display:flex;gap:8px">
+      <button class="sheet-btn primary" id="statusBarAddBtn" type="button" style="flex:1">+ 新增状态栏</button>
+      <button class="sheet-btn" id="statusBarExport" type="button">导出</button>
+      <button class="sheet-btn" id="statusBarImport" type="button">导入</button>
+    </div>
+    <input type="file" id="statusBarFile" accept=".json,.txt" style="display:none">
+    <div id="statusBarList" style="display:flex;flex-direction:column;gap:8px;margin-top:12px"></div>
   </div>
   <div class="sheet-section">
-    <button class="sheet-btn primary" id="statusBarAddBtn" type="button">+ 新增状态栏</button>
-    <div id="statusBarList" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"></div>
-  </div>
-  <div class="sheet-section">
-    <div class="sheet-label">通用状态栏 HTML 模板（任何状态栏按这个结构写，就自带折叠 / 展开）</div>
+    <div class="sheet-label">HTML 模板（用 {{content}} 标记每轮内容位置）</div>
     <textarea class="textarea" id="statusBarTemplate" readonly style="min-height:130px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.5"></textarea>
     <button class="sheet-btn" id="statusBarTemplateCopy" type="button" style="margin-top:8px">复制模板</button>
   </div>

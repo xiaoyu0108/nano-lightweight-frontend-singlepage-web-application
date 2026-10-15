@@ -114,13 +114,14 @@
     toggle(head.closest('.nano-status'));
   }, false);
 
+  // 通用「条目式」状态栏 HTML 模板：{{content}} 是每轮 AI 内容要填的位置
   var TEMPLATE = [
     '<div class="nano-status" data-status="着装" data-default="open">',
     '  <div class="nano-status-head">',
     '    <span class="nano-status-title">着装</span>',
     '    <svg class="nano-status-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
     '  </div>',
-    '  <div class="nano-status-body">黑卫衣 · 牛仔裤</div>',
+    '  <div class="nano-status-body">{{content}}</div>',
     '</div>'
   ].join('\n');
 

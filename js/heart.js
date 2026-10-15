@@ -787,6 +787,31 @@ function setupThoughtExpand(el) {
       $('ivCustomize').classList.remove('show');
       setCustomizing(false);
     });
+    // 打开「整页美化」（带实时预览的完整页面）
+    if ($('ivFullPage')) $('ivFullPage').addEventListener('click', function() {
+      try {
+        var cid = '', cname = '';
+        try { var sp = new URLSearchParams(location.search); cid = sp.get('chat') || ''; cname = sp.get('name') || ''; } catch (e) {}
+        // 头像 / 名字同步给整页预览
+        try {
+          var av = '';
+          var aimg = document.getElementById('avatarImage');
+          var ivimg = document.getElementById('ivAvatar');
+          if (aimg && aimg.src && aimg.style.display !== 'none') av = aimg.src;
+          else if (ivimg && !ivimg.hidden && ivimg.src) av = ivimg.src;
+          sessionStorage.setItem('nano_heart_preview_avatar', av || '');
+          var snd = document.getElementById('ivSender');
+          if (!cname && snd && snd.textContent) cname = snd.textContent.trim();
+          sessionStorage.setItem('nano_heart_preview_name', cname || '');
+        } catch (e) {}
+        var qs = [];
+        if (cid) qs.push('chat=' + encodeURIComponent(cid));
+        if (cname) qs.push('name=' + encodeURIComponent(cname));
+        var url = 'heart-setting.html' + (qs.length ? ('?' + qs.join('&')) : '');
+        // title 留空 + showBack:false —— 隐藏主框架那层顶栏，避免出现两个顶栏（本页自带顶栏）
+        window.parent.postMessage({ type: 'openFullscreen', url: url, title: '', showBack: false, source: 'chat_inner' }, '*');
+      } catch (e) {}
+    });
 
     // 下拉切换
     $('ivTemplateSelect').addEventListener('change', async function() {

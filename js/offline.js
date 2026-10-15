@@ -1726,7 +1726,7 @@ function parseTemplateStatusBars(css) {
       if (nm) { name = nm[1].trim(); pos = normStatusPos(nm[2]); }
       const pm = prompt.match(/[\s@＠#](顶部|最上|上方|底部|最下|下方|正文前|正文后|最前|top|bottom|before|after)\s*$/i);
       if (pm) { if (!pos) pos = normStatusPos(pm[1]); prompt = prompt.slice(0, pm.index).trim(); }
-      out.push({ name: name, prompt: prompt, pos: pos || 'after', collapsed: false });
+      out.push({ name: name, prompt: prompt, pos: pos || 'after', collapsed: false, html: '', enabled: true });
     });
   }
   return out;
@@ -1771,19 +1771,34 @@ function renderCustomBars(m, pos) {
   const cfg = allStatusBars();
   return bars.map(function (b) {
     const found = cfg.find(function (s) { return s && s.name === b.name; });
+    if (found && found.enabled === false) return '';   // 已关闭：不显示
     const barPos = (found && found.pos) ? found.pos : 'after';
     if (barPos !== pos) return '';
+    const name = b.name;
+    const content = String(b.content == null ? '' : b.content);
+    // 用户粘贴了完整 HTML：用 {{content}} / {{name}} 占位，其余原样插入；每轮用 AI 内容替换
+    if (found && found.html && String(found.html).trim()) {
+      const raw = String(found.html);
+      let rendered = raw
+        .replace(/\{\{\s*content\s*\}\}/g, escapeHTML(content))
+        .replace(/\{\{\s*name\s*\}\}/g, escapeHTML(name));
+      const hasPlaceholder = /\{\{\s*(content|name)\s*\}\}/.test(raw);
+      if (!hasPlaceholder) rendered += '<div class="nano-status-body">' + escapeHTML(content) + '</div>';
+      if (/nano-status/.test(rendered)) return rendered;  // 自带标准结构 → 自动可折叠
+      // 否则自动包成可折叠「条目」
+      return statusBarHTML({ name: name, title: name, bodyHtml: true, body: rendered, defaultCollapsed: found.collapsed === true });
+    }
     return statusBarHTML({
-      name: b.name,
-      title: b.name,
-      body: b.content,
+      name: name,
+      title: name,
+      body: content,
       defaultCollapsed: found ? (found.collapsed === true) : false
     });
   }).join('');
 }
 // 自定义状态栏的提示词：要求 AI 每轮按配置输出 [bar:名称]内容[/bar]
 function statusBarsPromptBlock() {
-  const list = allStatusBars().filter(function (s) { return s && s.name && s.prompt; });
+  const list = allStatusBars().filter(function (s) { return s && s.name && s.prompt && s.enabled !== false; });
   if (!list.length) return '';
   const L = [];
   L.push('【自定义状态栏（每轮都要输出，放在正文之后，和 thinking/heart/plot 并列；内容要跟随本回合正文更新）】');
