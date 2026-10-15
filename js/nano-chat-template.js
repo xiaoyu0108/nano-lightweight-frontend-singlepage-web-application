@@ -5,8 +5,18 @@
    本文件把初始模板字符串挂到 window.NANO_CHAT_TEMPLATE，
    供 js/beautify.js 作为「聊天」初始代码使用（还原 / 复制初始 / 首次进入）。
 
-   作用范围（js/appearance.js）：私聊内页 chat_inner.html、群聊内页 groups.html。
-   注入方式：<style id="nano-beautify-chat">，晚于页面自带 CSS；全局 CSS 最后注入。
+    ★ 最高权限：本模板除了 CSS，还能写脚本块（能造 HTML / 改 DOM / 绑事件）。
+      写法：用英文注释把脚本包起来——开头写「/ * @js」，结尾写「* /」，
+      中间就是 JS，被包住的部分不当作 CSS。示例（全角符号换成英文符号即可）：
+        ／＊ @js
+          mount.appendChild(el('div', { class:'x' }, ['hello']));
+          onCleanup(() => {});
+        ＊／
+      可直接用的名字：mount / $ / $$ / el / on / observe / onCleanup / document / window。
+      点「还原 / 清空」会清空脚本、mount 与所有 onCleanup，回到初始 UI。
+
+    作用范围（js/appearance.js）：私聊内页 chat_inner.html、群聊内页 groups.html。
+    注入方式：<style id="nano-beautify-chat">，晚于页面自带 CSS；全局 CSS 最后注入。
 
    页面作用域（为了不互相覆盖，模板按 body 类名分区）：
      chat_inner.html -> body.nano-chat-inner   （下面写作 .nano-chat-inner）

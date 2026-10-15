@@ -46,6 +46,58 @@
         });
     }
 
+    // ===== 读取「API → TTS 预设」（api.js 存在 nano_api_db/api_data 里）=====
+    var PRESET_DATA_KEY = 'nano_api_presets_data';
+    var PRESET_LIST_KEY = 'nano_api_preset_list';
+    function lsGet(key) { try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+    function idbGetKey(key) {
+        return new Promise(function (resolve) {
+            try {
+                if (!('indexedDB' in window)) { resolve(lsGet(key)); return; }
+                var req = indexedDB.open('nano_api_db', 2);
+                req.onupgradeneeded = function (e) {
+                    try {
+                        var db = e.target.result;
+                        if (!db.objectStoreNames.contains('api_data')) db.createObjectStore('api_data', { keyPath: 'key' });
+                        if (!db.objectStoreNames.contains('emoji_data')) db.createObjectStore('emoji_data', { keyPath: 'key' });
+                    } catch (err) {}
+                };
+                req.onsuccess = function (e) {
+                    try {
+                        var db = e.target.result;
+                        var g = db.transaction('api_data', 'readonly').objectStore('api_data').get(key);
+                        g.onsuccess = function () { resolve((g.result && g.result.value) || lsGet(key)); };
+                        g.onerror = function () { resolve(lsGet(key)); };
+                    } catch (err) { resolve(lsGet(key)); }
+                };
+                req.onerror = function () { resolve(lsGet(key)); };
+            } catch (err) { resolve(lsGet(key)); }
+        });
+    }
+    // 名称 -> TTS 配置（用于「私聊 → 语音音色」给角色绑定音色）
+    function getPresetConfig(name) {
+        var nm = String(name == null ? '' : name).trim();
+        if (!nm) return Promise.resolve(null);
+        return idbGetKey(PRESET_DATA_KEY).then(function (all) {
+            var cfg = all && all['tts_' + nm];
+            if (!cfg) return null;
+            return {
+                ttsUrl: cfg.url || '',
+                ttsKey: cfg.key || '',
+                ttsModel: cfg.modelValue || cfg.modelText || '',
+                ttsGroupId: cfg.groupId || '',
+                ttsType: cfg.type || 'openai',
+                ttsVoice: '' // 用预设里的 model 当音色，不继承全局声音
+            };
+        });
+    }
+    // 所有 TTS 预设名（给设置页下拉用）
+    function listPresets() {
+        return idbGetKey(PRESET_LIST_KEY).then(function (data) {
+            return (data && Array.isArray(data.tts)) ? data.tts.slice() : [];
+        });
+    }
+
     function cleanUrl(u) { return String(u == null ? '' : u).trim().replace(/\/+$/, ''); }
     function toV1(u) {
         var s = cleanUrl(u);
@@ -207,6 +259,8 @@
         stop: stop,
         isConfigured: function (cb) {
             getConfig().then(function (cfg) { try { cb(isConfigured(cfg)); } catch (e) {} });
-        }
+        },
+        getPresetConfig: getPresetConfig,
+        listPresets: listPresets
     };
 })();

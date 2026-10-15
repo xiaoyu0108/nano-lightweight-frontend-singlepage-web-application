@@ -154,6 +154,10 @@
                 try {
                     window.parent.postMessage({ type: 'homeDataUpdated', data: data }, '*');
                 } catch(e) {}
+                // 通知聊天页清掉表情包缓存：否则刚加（尤其"上传图片"添加）的表情包，
+                // 角色在下次刷新前都看不到，也就不会用它们发给你。
+                try { window.parent.postMessage({ type: 'nanoEmojiUpdated' }, '*'); } catch(e) {}
+                try { window.dispatchEvent(new Event('nanoEmojiUpdated')); } catch(e) {}
                 return data;
             })
             .catch(function(err) {
@@ -1085,6 +1089,12 @@
             var reader = new FileReader();
             reader.onload = function(ev) {
                 singleUrlInput.value = ev.target.result;
+                // 名称留空时用文件名兜底：给每个上传的表情一个能叫得出来的名字，
+                // 角色才能用 [emoji:名称] 精确发到这一张（否则一堆「未命名」无法区分）。
+                if (singleNameInput && !singleNameInput.value.trim()) {
+                    var fn = String(file.name || '').replace(/\.[^.]+$/, '').trim();
+                    if (fn) singleNameInput.value = fn.slice(0, 12);
+                }
                 showSinglePreview(ev.target.result, singleNameInput.value || '未命名');
                 imageFileInput.value = '';
             };

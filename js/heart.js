@@ -161,9 +161,19 @@ function setupThoughtExpand(el) {
      [section:板块名] 内容 [/section]
    输出；卡片里就会多渲染一块（有内容才显示）。板块属于模板，复制 / 导出 /
    导入模板时会一起带走。渲染节点： #ivSections > .iv-section >（.iv-section-title + .iv-section-body）。
-   下面是板块定义区（现在为空 = 不生成任何板块）。照着写即可，例如：
+    下面是板块定义区（现在为空 = 不生成任何板块）。照着写即可，例如：
      [评论区] 以粉丝视角写 5 条评论，每条 20 字，围绕本条心声调侃或共鸣
      [穿搭] 写角色此刻的穿着，跟随正文更新
+   ============================================================
+   ---- 最高权限：还能写脚本（造 HTML / 改 DOM / 绑事件）----
+   写法：用英文注释把脚本包起来——开头写「/ * @js」，结尾写「* /」，中间就是 JS，
+   被包住的部分不当作 CSS，心声面板渲染后会执行。示例（全角符号换成英文符号即可）：
+     ／＊ @js
+       mount.appendChild(el('div', { style:{position:'fixed', bottom:'12px'} }, ['DIY']));
+       onCleanup(() => {});
+     ＊／
+   可直接用的名字：mount / $ / $$ / el / on / observe / onCleanup / document / window。
+   点「还原」会清空脚本、mount 与所有 onCleanup，回到初始 UI。
    ============================================================
    ---- 改法大全（复制需要的行，改完点「应用」）----
    【1. 隐藏任意元素】加 display:none !important;
@@ -493,12 +503,22 @@ function setupThoughtExpand(el) {
     return false;
   }
 
-  // ===== 应用CSS到页面 =====
+  // ===== 应用CSS到页面（模板里还可写 /* @js ... */ 脚本块，用 NanoBeautifyRT 执行）=====
+  function runHeartJs(css) {
+    try {
+      if (!window.NanoBeautifyRT) return;
+      var parsed = window.NanoBeautifyRT.parse(css || '');
+      window.NanoBeautifyRT.run('heart', parsed.js, { mountParent: document.body });
+    } catch (e) {}
+  }
   function applyCustomCSS(css) {
+    var raw = (css != null) ? css : ($('ivCss') ? $('ivCss').value : '');
+    var parsed = window.NanoBeautifyRT ? window.NanoBeautifyRT.parse(raw) : { css: raw };
     const styleTag = document.getElementById('nanoVoiceCustomCSS');
     if (styleTag) {
-      styleTag.textContent = css || $('ivCss').value;
+      styleTag.textContent = parsed.css || '';
     }
+    runHeartJs(raw);
   }
 
   // ===== 已应用的 CSS 持久化（默认外观交给 css/heart.css，不再被默认模板覆盖）=====
@@ -862,6 +882,7 @@ function setupThoughtExpand(el) {
       currentTemplateId = '';
       const styleTag = document.getElementById('nanoVoiceCustomCSS');
       if (styleTag) styleTag.textContent = '';
+      if (window.NanoBeautifyRT) window.NanoBeautifyRT.clear('heart');
       saveAppliedCss('');
       // 清空覆盖 → 板块回到默认模板的定义
       (async function () {
@@ -909,6 +930,7 @@ function setupThoughtExpand(el) {
     if ($('ivRestore')) $('ivRestore').addEventListener('click', async function() {
       const styleTag = document.getElementById('nanoVoiceCustomCSS');
       if (styleTag) styleTag.textContent = '';
+      if (window.NanoBeautifyRT) window.NanoBeautifyRT.clear('heart');
       saveAppliedCss('');
       document.querySelector('.iv-thought').style.cssText = '';
       document.querySelector('.nano-voice-modal').style.cssText = '';

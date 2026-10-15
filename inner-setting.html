@@ -101,6 +101,20 @@
                     <input type="checkbox" class="ios-switch" id="timeToggle" checked>
                 </div>
             </div>
+            <div class="list-item" id="voiceItem">
+                <div class="item-left">
+                    <div class="item-icon" style="color: var(--ios-blue);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v1a7 7 0 0 1-14 0v-1"></path><line x1="12" y1="18" x2="12" y2="22"></line></svg>
+                    </div>
+                    <div class="item-text">语音音色</div>
+                </div>
+                <div class="item-right">
+                    <span id="voicePreview">跟随全局</span>
+                    <svg class="chevron-right" viewBox="0 0 8 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1.5 1.5L6.5 6.5L1.5 11.5" stroke="#C6C6C8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+            </div>
             <div class="list-item" id="transItem">
                 <div class="item-left">
                     <div class="item-icon" style="color: var(--ios-blue);">
@@ -561,6 +575,25 @@
         </div>
     </div>
 
+    <!-- ===== 弹窗 8：语音音色（TTS 预设绑定） ===== -->
+    <div class="modal-overlay" id="voiceModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">语音音色</div>
+                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 5px;">给这个角色绑定一个 TTS 预设作为音色：角色发语音时会用这套音色合成。预设来自「API → TTS」里保存的配置。</div>
+            </div>
+            <div class="modal-body">
+                <select class="ios-input" id="voicePresetSelect"></select>
+                <div style="font-size:11px;color:#8e8e93;margin-top:8px;line-height:1.5;">选「跟随全局」则用「API → TTS」当前配置。</div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" id="voiceCancel" data-close>取消</button>
+                <button class="modal-btn bold" id="voiceConfirm">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/nano-tts.js"></script>
     <script src="js/inner-setting.js?v=20261008a"></script>
 
 <script src="js/api-float.js"></script>

@@ -107,7 +107,7 @@
           var r = db.transaction('characters', 'readonly').objectStore('characters').getAll();
           r.onsuccess = function () {
             db.close();
-            resolve((r.result || []).map(function (c) {
+            resolve((r.result || []).filter(function (c) { return c && !c.nanoAssistant; }).map(function (c) {
               return {
                 id: c.id, name: c.name || '角色', avatar: c.avatar || '',
                 gender: c.gender || '', nationality: c.nationality || '',

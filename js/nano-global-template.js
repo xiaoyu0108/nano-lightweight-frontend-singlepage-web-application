@@ -5,8 +5,18 @@
    本文件只做一件事：把初始模板字符串挂到 window.NANO_GLOBAL_TEMPLATE，
    供 js/beautify.js 作为「全局」初始代码使用（还原 / 复制初始 / 首次进入）。
 
-   美化系统怎么工作（务必先读）：
-   1) 这是一个「CSS 注入」系统。你在美化页写的 CSS 会被 <style> 追加到
+    ★ 最高权限：本模板除了 CSS，还能写脚本块（能造 HTML / 改 DOM / 绑事件）。
+      写法：用英文注释把脚本包起来——开头写「/ * @js」，结尾写「* /」，
+      中间就是 JS，被包住的部分不当作 CSS。示例（全角符号换成英文符号即可）：
+        ／＊ @js
+          mount.appendChild(el('div', { style:{position:'fixed',top:'0'} }, ['hello']));
+          onCleanup(() => {});
+        ＊／
+      可直接用的名字：mount / $ / $$ / el / on / observe / onCleanup / document / window。
+      点「还原 / 清空」会清空脚本、mount 与所有 onCleanup，回到初始 UI。
+
+    美化系统怎么工作（务必先读）：
+    1) 这是一个「CSS 注入」系统。你在美化页写的 CSS 会被 <style> 追加到
       各页面 body 末尾，因此天然晚于页面自带样式，绝大多数情况下能直接覆盖。
       覆盖不掉时，加 !important。
    2) 作用页面（js/appearance.js）：index / chat / chat_inner / groups /

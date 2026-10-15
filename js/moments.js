@@ -473,7 +473,7 @@
         if (binds.length === 0 && contactsData && contactsData.length > 0) {
             for (var i = 0; i < contactsData.length; i++) {
                 var c = contactsData[i];
-                if (c && c.bindUser === currentUser.id) binds.push(c.id);
+                if (c && c.bindUser === currentUser.id && !c.nanoAssistant && !c.isNpc) binds.push(c.id);
             }
             if (binds.length > 0 && homeData) {
                 var u = homeData.masks.find(function(m) { return m.id === currentUser.id; });
@@ -700,6 +700,19 @@
             if (raw && raw.trim() !== '') return raw.trim();
         } catch(e) {}
         return TRANSPARENT_PX;
+    }
+    // 保存封面：同时写入「按面具」键 + 全局键，保证朋友圈与个人主页一致、且换面具/重开后仍在
+    function saveCover(url) {
+        var v = String(url || '').trim();
+        if (!v) return;
+        try { localStorage.setItem('nanoMomentsCover', v); } catch (e) {}
+        try { if (coverKey() !== 'nanoMomentsCover') localStorage.setItem(coverKey(), v); } catch (e) {}
+        try {
+            var a = document.getElementById('coverImg');
+            var b = document.getElementById('profileCoverImg');
+            if (a) a.src = v;
+            if (b) b.src = v;
+        } catch (e) {}
     }
 
     function randomPick(arr) {
@@ -1352,11 +1365,11 @@
         var blocks = String(text || '').replace(/```[a-zA-Z]*/g, '').split(/===+\s*MOMENT\s*===+/i).map(function (s) { return s.trim(); }).filter(Boolean);
         var out = [];
         blocks.forEach(function (b) {
-            var post = { author: '', text: '', location: '', likes: [], comments: [] };
+            var post = { author: '', text: '', location: '', likes: [], comments: [], media: '', image: '' };
             b.split(/\n/).forEach(function (line) {
                 line = line.trim();
                 if (!line) return;
-                var m = line.match(/^(AUTHOR|TEXT|LOCATION|LIKES|COMMENT|作者|文案|地点|点赞|评论)\s*[:：]\s*([\s\S]*)$/i);
+                var m = line.match(/^(AUTHOR|TEXT|LOCATION|LIKES|COMMENT|MEDIA|IMAGE|作者|文案|地点|点赞|评论|图片|配图|类型)\s*[:：]\s*([\s\S]*)$/i);
                 if (!m) {
                     var rawLine = line.replace(/^(?:COMMENT|评论)\s*[:：]?\s*/i, '');
                     var c2 = rawLine.match(/^([^：:|｜]{1,20})\s*(?:回复|@)\s*([^：:|｜]{1,20})\s*[：:]\s*([\s\S]+)$/);
@@ -1372,6 +1385,8 @@
                 if (key === 'AUTHOR' || rawKey === '作者') post.author = val;
                 else if (key === 'TEXT' || rawKey === '文案') post.text = val;
                 else if (key === 'LOCATION' || rawKey === '地点') post.location = val;
+                else if (key === 'MEDIA' || rawKey === '类型') post.media = /image|photo|图|照片|图片|配图/i.test(val) ? 'image' : 'text';
+                else if (key === 'IMAGE' || rawKey === '图片' || rawKey === '配图') { post.image = val; if (val) post.media = 'image'; }
                 else if (key === 'LIKES' || rawKey === '点赞') post.likes = val.split(/[,，、;；\/]/).map(function (s) { return s.trim(); }).filter(Boolean);
                 else if (key === 'COMMENT' || rawKey === '评论') {
                     var ci = val.split(/[|｜]/);
@@ -1389,7 +1404,7 @@
                     }
                 }
             });
-            if (post.author && post.text) out.push(post);
+            if (post.author && (post.text || post.image)) out.push(post);
         });
         return out;
     }
@@ -1613,8 +1628,13 @@
         try {
             settings = await getSettings();
 
-            var bound = (boundOverride && boundOverride.length) ? boundOverride : getUserBindChars();
+            var bound = ((boundOverride && boundOverride.length) ? boundOverride : getUserBindChars())
+                .filter(function(c) { return c && c.name && !c.isNpc && !c.nanoAssistant; });
             var npcs = (npcsOverride && npcsOverride.length) ? npcsOverride : generateContextNPCs();
+            // 没有朋友（NPC）花名册时先生成一份，保证评论区能刷出 NPC 互动
+            if (!npcs.length && !(npcsOverride && npcsOverride.length) && bound.length) {
+                try { await generateNpcRoster(bound); npcs = generateContextNPCs(); } catch (e) {}
+            }
             var isUserPost = normName(item.author) === normName(currentUser.name);
             var authorNpc = findNpcByName(npcs, item.author);
             var authorChar = findCharByName(bound, item.author) ||
@@ -1760,18 +1780,19 @@
     function buildPostsPrompt(chars, npcs, wantNpcCount, recent, opts) {
         opts = opts || {};
         var persona = buildPersonaBlock((chars || []).concat(npcs || []));
+        var total = opts.total || (3 + Math.floor(Math.random() * 2)); // 一次生成 3~4 条
         var lines = [];
-        lines.push('请生成朋友圈动态，每条自带评论区互动：');
-        lines.push('- 发布者必须从上面列出的名字里选，名字原样使用；');
-        if (chars && chars.length) {
-            lines.push('- ' + (opts.onlyChars
-                ? '本次只生成这些角色的动态，每位至少 1 条'
-                : ('必须至少覆盖 ' + Math.min(chars.length, 3) + ' 位已选角色，且每位已选角色至少 1 条动态')) + '；');
+        lines.push('请一次性生成 ' + total + ' 条朋友圈动态，每条自带点赞和评论互动，像真人随手发的日常：');
+        if (opts.onlyChars) {
+            lines.push('- 发布者从上面的已选角色里挑，尽量不同的人各发一条，名字原样使用；');
+        } else {
+            lines.push('- 发布者从上面所有名字里挑 ' + total + ' 个尽量不同的人：大部分是已选角色，也可以有朋友（NPC）；不要总是同一个人发；名字原样使用；');
         }
-        if (wantNpcCount > 0) lines.push('- 之后再生成 ' + wantNpcCount + ' 条朋友的动态；');
-        lines.push('- 文案像真人发朋友圈：口语、有生活感、贴合人设与世界观，20~60 字；');
-        lines.push('- 每条动态配 3~5 条评论，评论者只能从上面的名字里选，按各自人设与关系自然互动；');
-        lines.push('- 只有明确认识、有关系的角色才会在同一条动态下互动，不要硬凑；');
+        lines.push('- 内容是活人发的日常，别一板一眼：会有吐槽、碎碎念、吃到好吃的、遇到无语的人、和谁一起的瞬间、路边看到的风景……可以有 emoji、口语、网络用语；长度不一，有的就一句话，有的三五句，20~60 字为主；');
+        lines.push('- 一部分是「配图动态」：MEDIA 写 image，并写 IMAGE 描述这张照片拍的是什么（吃的 / 风景 / 宠物 / 牵手 / 自拍等日常照）；其余是纯文字，MEDIA 写 text；这 ' + total + ' 条里至少 1 条 image、至少 1 条 text（除非只要求 1 条）；');
+        lines.push('- 每条动态配 2~5 条评论，评论者只能从上面的名字里选，按各自人设与关系自然互动（说笑、抬杠、关心、接梗、互相回复都行）；');
+        lines.push('- 只有明确认识、有关系的角色才会在同一条动态下互动，不要硬凑；名字必须原样使用名单里的名字；');
+        lines.push('- 每条动态尽量都有人点赞：LIKES 写名字（从名单里选，不得包含用户）；');
         lines.push('- 评论者回复别人时写成「评论者|回复对象|内容」，不是回复则写成「评论者||内容」；');
         lines.push('- 严禁以用户身份发动态、点赞或评论；');
         lines.push('- 每条评论不超过 25 字。');
@@ -1779,13 +1800,13 @@
             '\n\n【最近的朋友圈（可延续话题，别重复）】\n' + (recent || '（暂无）') +
             '\n\n' + lines.join('\n') +
             '\n\n严格按下面格式输出（不要 markdown、不要编号、不要多余解释）：\n' +
-            '===MOMENT===\nAUTHOR: 名字\nTEXT: 文案\nLOCATION: 地点（可留空）\nLIKES: 名字1,名字2（可留空，不得包含用户）\nCOMMENT: 评论者|回复对象|内容\nCOMMENT: 评论者||内容\n\n（下一条动态重复 ===MOMENT=== 结构）';
+            '===MOMENT===\nAUTHOR: 名字\nMEDIA: image 或 text\nIMAGE: 若 MEDIA=image，写这句照片拍的是什么（如：融化的草莓冰淇淋特写）；纯文字留空\nTEXT: 文案\nLOCATION: 地点（可留空）\nLIKES: 名字1,名字2（可留空，不得包含用户）\nCOMMENT: 评论者|回复对象|内容\nCOMMENT: 评论者||内容\n\n（下一条动态重复 ===MOMENT=== 结构）';
     }
 
     async function requestPosts(chars, npcs, wantNpcCount, recent, opts) {
-        var system = '你是一个真实的人类，请同时扮演下面列出的角色以及他们的朋友，发布朋友圈并自然地互相互动。严格贴合各自人设、彼此关系与世界书，保持活人感，绝不 OOC，禁止 AI 腔，禁止解释，禁止出戏。';
+        var system = '你是一个真实的人类，请同时扮演下面列出的角色以及他们的朋友，发布日常朋友圈并自然地互相点赞、评论互动。严格贴合各自人设、彼此关系与世界书，保持活人感与生活气息，绝不 OOC，禁止 AI 腔，禁止解释，禁止出戏。';
         var userMsg = buildPostsPrompt(chars, npcs, wantNpcCount, recent, opts);
-        var raw = await fetchAIResponse(userMsg, true, { apiPref: 'main', system: system, maxTokens: 1800, temperature: 0.92 });
+        var raw = await fetchAIResponse(userMsg, true, { apiPref: 'main', system: system, maxTokens: 2600, temperature: 0.95 });
         return parseMomentBlocks(raw);
     }
 
@@ -1870,7 +1891,7 @@
                 if (Object.keys(covered).length < Math.min(2, selected.length)) {
                     var missing = selected.filter(function(c) { return !covered[normName(c.name)]; });
                     try {
-                        var more = await requestPosts(missing, [], 0, recent, { onlyChars: true });
+                        var more = await requestPosts(missing, [], 0, recent, { onlyChars: true, total: Math.min(Math.max(missing.length, 1), 2) });
                         parsed = parsed.concat(more);
                     } catch (e) {}
                 }
@@ -1912,6 +1933,8 @@
                     author: cn,
                     avatar: ca,
                     text: p.text,
+                    media: p.media || '',
+                    image: p.image || '',
                     images: [],
                     time: new Date().toISOString(),
                     location: p.location || '',
@@ -1929,18 +1952,41 @@
                 return;
             }
 
-            // 仅「允许朋友圈生图」的角色才生图，并按各自频率（高/中/低）决定是否这一轮生成
+            // 生图：仅「允许朋友圈生图」的 char 参与，且按各自频率（高/中/低）决定本轮到点；
+            // 到点的角色里随机选，不固定同一个人；模型标为配图的动态优先，并保证本轮至少出一张图。
             if (settings.imageEnabled) {
-                for (var gi = 0; gi < newPosts.length; gi++) {
-                    var gch = findCharByName(selected, newPosts[gi].author);
-                    if (!gch) continue; // 朋友/NPC 不生图
-                    var gid = String(gch.id || gch.name);
-                    if (!charMomentImageAllowed(gid)) continue;
-                    if (!momentImageRoundDue(gid)) continue;
-                    try {
-                        var genUrl = await generateImage(newPosts[gi].text, { charId: gid, char: gch });
-                        if (genUrl) { newPosts[gi].images = [genUrl]; newPosts[gi].genPrompt = newPosts[gi].text; }
-                    } catch (e) {}
+                var dueMap = {};   // 本轮到点、可生图的角色：normName -> charId
+                selected.forEach(function(c) {
+                    var cid = String(c.id || c.name);
+                    if (!charMomentImageAllowed(cid)) return;
+                    if (momentImageRoundDue(cid)) dueMap[normName(c.name)] = cid;
+                });
+
+                var duePosts = newPosts.filter(function(p) { return dueMap[normName(p.author)]; });
+                if (duePosts.length) {
+                    // 打乱，避免每次都让同一个人/同一条先出图
+                    for (var si = duePosts.length - 1; si > 0; si--) {
+                        var sj = Math.floor(Math.random() * (si + 1));
+                        var tmp = duePosts[si]; duePosts[si] = duePosts[sj]; duePosts[sj] = tmp;
+                    }
+                    // 模型标了 image 的排前面
+                    duePosts.sort(function(a, b) { return (b.media === 'image' ? 1 : 0) - (a.media === 'image' ? 1 : 0); });
+
+                    var madeCount = 0, maxImages = 1;
+                    var needForce = (duePosts.length > 0); // 有到点角色 → 至少出一张
+                    for (var ci = 0; ci < duePosts.length && madeCount < maxImages; ci++) {
+                        var cp = duePosts[ci];
+                        var wantImg = (cp.media === 'image') || (madeCount === 0 && needForce);
+                        if (!wantImg) continue;
+                        var gch = findCharByName(selected, cp.author);
+                        if (!gch) continue;
+                        var gid = dueMap[normName(cp.author)];
+                        var promptText = cp.image || cp.text;
+                        try {
+                            var genUrl = await generateImage(promptText, { charId: gid, char: gch });
+                            if (genUrl) { cp.images = [genUrl]; cp.genPrompt = promptText; cp.media = 'image'; madeCount++; needForce = false; }
+                        } catch (e) {}
+                    }
                 }
             }
 
@@ -2418,7 +2464,7 @@
         var url = prompt('请输入新背景图的 URL：');
         if (url && url.trim() !== '') {
             var img = new Image();
-            img.onload = function() { try { localStorage.setItem(coverKey(), url.trim()); } catch (e2) {} document.getElementById('coverImg').src = url.trim(); document.getElementById('profileCoverImg').src = url.trim(); };
+            img.onload = function() { saveCover(url.trim()); document.getElementById('coverModal').classList.remove('show'); };
             img.onerror = function() { alert('图片加载失败'); };
             img.src = url.trim();
         }
@@ -2430,9 +2476,7 @@
         var reader = new FileReader();
         reader.onload = function(ev) {
             compressImage(ev.target.result, 400, function(compressed) {
-                try { localStorage.setItem(coverKey(), compressed); } catch (e2) { console.warn('封面保存失败（存储空间不足？）', e2); }
-                document.getElementById('coverImg').src = compressed;
-                document.getElementById('profileCoverImg').src = compressed;
+                saveCover(compressed);
                 document.getElementById('coverModal').classList.remove('show');
             });
         };

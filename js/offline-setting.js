@@ -275,6 +275,16 @@ const INITIAL_CSS = `/* ========================================================
    这个模板 = 「线下」页面样式。下面按「顶栏 / 卡片区 / 底栏 / 其它」
    分区写清能改什么、怎么改；把想用的示例取消注释，改完点「应用 CSS」。
    想回到现在这套初始外观：把「模板」切回「初始 CSS」再应用。
+
+   ★ 最高权限：本模板除了 CSS，还能写脚本块（能造 HTML / 改 DOM / 绑事件）。
+     写法：用英文注释把脚本包起来——开头写「/ * @js」，结尾写「* /」，中间就是 JS，
+     被包住的部分不当作 CSS。示例（全角符号换成英文符号即可）：
+       ／＊ @js
+         mount.appendChild(el('div', { class:'x' }, ['hello']));
+         onCleanup(() => {});
+       ＊／
+     可直接用的名字：mount / $ / $$ / el / on / observe / onCleanup / document / window。
+     点「还原 / 清空」会清空脚本、mount 与所有 onCleanup，回到初始 UI。
    ============================================================ */
 
 /* ── 1. 顶栏 .topbar ──────────────────────────────────────────
@@ -317,24 +327,76 @@ const INITIAL_CSS = `/* ========================================================
        .identity-row .avatar{border:3px solid #e7cdd6;border-radius:20px;box-shadow:0 0 0 4px rgba(231,205,214,.35)}
    (D) 重写卡片样式（颜色/形状/描边）：
        .message{background:#fffdfd;border:1px solid #efe3e6;border-radius:22px;box-shadow:0 8px 24px rgba(120,90,100,.06)}
-   (E) 卡片底栏（编辑/删除/更多）移动 / 美化 / 打包：
-       .actions{position:absolute;right:14px;bottom:14px;gap:4px;background:#f7f0f2;border-radius:999px;padding:4px 6px}
-       .actions .action span{display:none}                    // 只留图标
-       .actions .action{color:#b98a9a}
-       // 想挪到底部中间：.actions{left:0;right:0;justify-content:center}
-   (F) 心声 / 思维链：触发方式 + 单独美化框
-       // 默认触发：点头像切换「心声」；「更多 → 显示/隐藏思维链」切换「思维链」。
-       .heart-state,.thinking{background:#fff7fa;border:1px solid #f0d7e0;border-radius:14px;padding:10px 12px;color:#a87b8b}
-       .message.show-heart .heart-state{display:block}
-       .message.show-thinking .thinking{display:block}
-       .heart-state::before{content:"♥ ";color:#e08fb0}       // 给心声加小图标/标题
+   (E) 卡片底栏（编辑 / 删除 / 更多）—— 位置、样式、排布都能任意 DIY
+       // 结构：.actions > button.action[data-action=edit|delete] + button.action.more-action[data-action=more]
+       // 默认：卡片最底一行、三格平分（display:grid;grid-template-columns:repeat(3,1fr)）。
+       // ① 整体移到任意位置（.message 是 position:relative，可直接绝对定位到卡片任意角落/外面）：
+       .actions{position:absolute;right:14px;bottom:14px;width:auto;height:auto;display:flex;gap:6px;
+                border:none;border-radius:999px;background:#f7f0f2;padding:4px 6px}
+       // ② 只留图标、换配色/尺寸：
+       .actions .action span{display:none}
+       .actions .action{color:#b98a9a;width:38px;height:38px;border-radius:50%;background:#fff}
+       .actions .action:hover{color:#e08fb0}
+       // ③ 竖着排列：
+       .actions{flex-direction:column;right:8px;bottom:8px}
+       // ④ 横条居中：
+       .actions{left:0;right:0;justify-content:center;background:transparent;border:none}
+       // ⑤ 「三个折叠成一个，点一下再展开」——在模板里给 .actions 加这个开关（JS 会自动加一个 ••• 按钮）：
+       .actions{--actions-collapse:1}
+       //   折叠后的位置/样式仍由上面的 CSS 决定；展开状态记为 .actions.open，可自行美化：
+       .actions.actions-collapsible .actions-toggle{background:#f7f0f2}
+       .actions.actions-collapsible.open .action{background:#fff;color:#b98a9a}
+       // ⑥ 换图标：给 .action-icon 设 display:none，再用背景图替换：
+       .actions [data-action=edit] .action-icon{display:none}
+       .actions [data-action=edit]{background:url("https://编辑.png") center/18px no-repeat}
+   (F) 状态栏（心声 / 思维链 / 剧情推荐 / 自定义）—— 都可折叠，都能单独美化
+       // 结构（所有状态栏都一样，改样式按 data-status 选中对应那一个即可）：
+       //   .nano-status[data-status="心声"]
+       //     ├─ .nano-status-head   标题栏（整行可点，折叠/展开）
+       //     │    ├─ .nano-status-title  名称文字
+       //     │    └─ .nano-status-arrow  右侧箭头
+       //     └─ .nano-status-body   内容（折叠时 display:none）
+       // 剧情推荐那栏额外带 data-kind="plot"，里面是 .plot-options > .plot-opt 选项按钮。
+       // 心声默认展开、思维链与剧情推荐默认折叠；点标题栏即可折叠/展开（状态按名字记住）。
+       // 新增自定义状态栏：推荐直接写在本模板底部的 @status-bars 定义块里（每行 [名称] 生成要求）。
+       // 「线下设置 → 状态栏」里也能加（可选，等价；适合不想改模板时用）。
+       //   AI 每轮用 [bar:名称]内容[/bar] 输出，会自动变成同结构的可折叠状态栏，
+       //   用 .nano-status[data-status="你的名字"] 单独美化。
+       // —— 插入位置（状态栏放在卡片哪一段）——
+       //   在 @status-bars 里给那行标位置即可（不标 = 正文后）：
+       //     [着装@顶部] 写穿着          // 位置写在名字里
+       //     [位置] 写地点 @底部          // 或写在要求末尾
+       //   位置取值：顶部(昵称下) / 正文前 / 正文后(默认) / 底部(操作栏前)。
+       //   「线下设置 → 状态栏」里每条也有「位置」下拉可选。
+       //   想更自由的排版（和正文/时间/操作栏互换顺序），卡片是纵向 flex，
+       //   直接对任意子元素用 order 即可，例如把着装栏拉到操作栏下面：
+       //     .nano-status[data-status="着装"]{order:9}
+       //     .actions{order:5}   .content{order:1}   .time-row{order:2}
+       // —— 通用美化（所有状态栏）——
+       .nano-status{margin:9px 18px 0;border:1px solid #f0d7e0;border-radius:16px;background:#fff7fa}
+       .nano-status-head{padding:12px 14px}
+       .nano-status-title{font-size:12px;color:#a87b8b;letter-spacing:1px}
+       .nano-status-body{color:#a87b8b;font-size:12.5px}
+       .nano-status-arrow{width:15px;height:15px;color:#d9b6c3}
+       // —— 只改某一个 ——
+       .nano-status[data-status="心声"]{background:linear-gradient(135deg,#fff3f7,#fde9f0)}
+       .nano-status[data-status="心声"] .nano-status-title::before{content:"♥ "}
+       .nano-status[data-status="思维链"]{background:#f6f6fb}
+       // 注意：状态栏默认 overflow:hidden（为了圆角）。如果你给 .nano-status 写死 height 或
+       // overflow:hidden，会把里面的内容（尤其剧情选项）裁掉——想让它「长出来」就别锁高度。
        .message{cursor:pointer}                                 // 让整卡看起来可点
-       // 注意：点击「触发逻辑」是 JS，纯 CSS 改不了；要换触发点/新按键需加 JS（可让纳米帮你加）。
-   (G) 推荐剧情样式 / 颜色：
-       .plot-toggle{background:#f6eef1;color:#a87b8b;border-radius:999px;padding:6px 14px}
-       .plot-options{gap:8px}
-       .plot-opt{background:#fff;border:1px solid #f0d7e0;border-radius:12px;color:#7a6a70}
-       .plot-opt:hover{background:#fbeef3}
+       // 触发逻辑是 JS：点头像切换「心声」、「更多 → 显示/隐藏思维链」切换「思维链」。
+   (G) 剧情推荐状态栏 + 选项（选项框完全可自定义，别被标题栏遮住）
+       // 结构：.nano-status[data-kind="plot"] > .nano-status-body > .plot-options > .plot-opt
+       .nano-status[data-kind="plot"]{background:#fff}
+       .nano-status[data-kind="plot"] .nano-status-body{white-space:normal;padding:8px 12px 12px}
+       .plot-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}   // 想单列改 1fr
+       .plot-opt{background:#fff;border:1px solid #f0d7e0;border-radius:12px;color:#7a6a70;padding:10px 12px}
+       .plot-opt:active{background:#fbeef3}
+       // ⚠️ 若之前美化时选项被挡住/裁掉，检查三点：
+       //   1) 别给 .nano-status 或 .nano-status-body 写死 height / max-height / overflow:hidden；
+       //   2) 别把 .nano-status-body 设成 position:absolute（会脱离文档流被后面的卡片盖住）；
+       //   3) 选项是 grid，容器宽度不够时两列会挤，改成单列或加 .plot-options{grid-template-columns:1fr}。
    */
 
 /* ── 3. 底栏 .bottom ──────────────────────────────────────────
@@ -359,6 +421,25 @@ const INITIAL_CSS = `/* ========================================================
    .round-btn > svg{display:none}
    .round-btn{background:url("https://新图标.png") center/20px no-repeat}
    #rerollBtn{position:absolute;left:12px;bottom:14px}          // 想搬去哪就改 left/right/top/bottom
+
+   // ★ 把左侧「菜单按钮」(#composerAvatarBtn) 移出输入行、又不想它乱跑 —— 关键在于选中栏是
+   //   CSS Grid：.composer{display:grid;grid-template-columns:43px 1fr 43px}（菜单 | 输入 | 发送）。
+   //   为什么「乱跑、和输入框不在一行」：只要你把菜单按钮 display:none / 移走，剩下两个自动落进
+   //   第 1、2 列，于是输入框被塞进 43px 窄列、发送键占了大半行 —— 看起来就是错位。
+   //   规则：动了列数，一定要显式指定每列占位（grid-column），别依赖自动排布。
+   //   下面这套 = 菜单按钮浮到输入栏上方左侧，输入栏仍占满、和发送键对齐：
+   .composer{position:relative;grid-template-columns:1fr 43px;gap:7px}
+   .composer .input{grid-column:1}
+   .composer .round-btn.send{grid-column:2}
+   .composer .avatar-btn{position:absolute;left:0;bottom:52px}   // 想搬去屏幕任意位置：改 left/top/right/bottom
+   // 想彻底不用 grid、改用 flex 分区（更直观，不会错位）：
+   .composer{display:flex;align-items:flex-end;gap:7px}
+   .composer .input{flex:1;min-width:0;width:auto}
+   .composer .round-btn{flex:0 0 42px}
+   .composer .avatar-btn{position:absolute;left:12px;bottom:54px}
+   // 提示：.bottom 是 position:fixed；把 .composer{position:relative} 后，absolute 的按钮就以
+   //   输入栏这一行为基准，不会再跟着其它元素漂。若按钮跑出可视区，多半是父级没有 position:relative。
+   //   键盘弹起时的轻微跳动属于移动端行为；可给 .bottom 加 padding-bottom:env(safe-area-inset-bottom) 兜底。
    // 纯装饰占位（不可点）：给稳定父元素加 ::before/::after
    .bottom::before{content:"";position:absolute;left:56px;bottom:16px;width:20px;height:20px;pointer-events:none;background:url("https://装饰.png") center/20px no-repeat}
    // 底栏左侧现在是「圆形头像按钮」#composerAvatarBtn，点击弹出竖向菜单(.om-menu)。
@@ -466,7 +547,20 @@ body{color:var(--ink)}
 .round-btn.send{background:var(--pink-deep);color:#fff}
 /* 场景切换 */
 .scene-tabs{background:transparent}
-`;
+
+/* ============================================================
+   ---- 自定义状态栏定义区（新增状态栏写这里）----
+   每行一个状态栏：[状态栏名] 生成要求
+   AI 每轮回复会在正文后用 [bar:状态栏名]内容[/bar] 输出，
+   卡片里就多出一个可折叠状态栏（点标题栏折叠/展开）。
+   不写任何以 [ 开头的行 = 不生成状态栏。
+   例（想用就把行首的“例”字去掉、照格式写）：
+   例 [着装] 一句话写角色此刻的穿着，随正文变化
+   例 [位置] 写角色此刻所在的地点，简短
+   —— 下面这个块就是定义区（现在为空）——
+   ============================================================ */
+/* @status-bars
+*/`;
 
 const BUILTIN_CSS = {
   soft: `:root{--page:#f7f4f5;--card:#fffdfd;--header:#fbf6f7;--line:#f1e7e9;--line-strong:#ead9dc;--ink:#40393b;--muted:#b5a8aa;--pink:#f3cdd4;--pink-deep:#e6b3bb;--gray-pink:#f1e6e8}.message{background:var(--card);border-color:var(--line-strong);box-shadow:0 5px 20px rgba(105,82,100,.06)}.topbar{background:rgba(251,246,247,.92)}`,
@@ -1740,6 +1834,23 @@ function renderStatusBars() {
     prompt.style.minHeight = '60px';
     prompt.placeholder = '生成要求：写什么、怎么更新，如：一句写角色此刻的穿着，随正文变化';
     prompt.value = bar.prompt || '';
+    // 位置：决定这条状态栏插在卡片的哪个位置
+    const posRow = document.createElement('div');
+    posRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between';
+    const posLbl = document.createElement('div');
+    posLbl.style.cssText = 'font-size:12px;color:var(--sub)';
+    posLbl.textContent = '位置';
+    const posSel = document.createElement('select');
+    posSel.className = 'search-input';
+    posSel.style.cssText = 'height:32px;width:130px';
+    [['top', '顶部（昵称下）'], ['before', '正文前'], ['after', '正文后（默认）'], ['bottom', '底部（操作栏前）']].forEach(function (o) {
+      const opt = document.createElement('option');
+      opt.value = o[0]; opt.textContent = o[1];
+      posSel.appendChild(opt);
+    });
+    posSel.value = bar.pos || 'after';
+    posSel.onchange = function () { bar.pos = posSel.value; saveSettings(); };
+    posRow.appendChild(posLbl); posRow.appendChild(posSel);
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;justify-content:space-between';
     const lbl = document.createElement('div');
@@ -1767,7 +1878,7 @@ function renderStatusBars() {
     };
     name.addEventListener('input', function () { bar.name = name.value.trim(); saveSettings(); updateSummary(); });
     prompt.addEventListener('input', function () { bar.prompt = prompt.value.trim(); saveSettings(); });
-    item.appendChild(name); item.appendChild(prompt); item.appendChild(row); item.appendChild(del);
+    item.appendChild(name); item.appendChild(prompt); item.appendChild(posRow); item.appendChild(row); item.appendChild(del);
     wrap.appendChild(item);
   });
 }

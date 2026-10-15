@@ -89,6 +89,8 @@ button:active{opacity:.55}
   max-width:760px;margin:0 auto 16px;background:var(--card);
   border:1px solid var(--line-strong);border-radius:24px;
   box-shadow:var(--shadow);overflow:visible;position:relative;
+  /* 做成纵向 flex：状态栏 / 正文 / 操作栏等都能用 order 任意调整位置（见模板说明） */
+  display:flex;flex-direction:column;
 }
 .message.selected{box-shadow:0 0 0 2px #dcc8cb, var(--shadow)}
 
@@ -229,6 +231,28 @@ button:active{opacity:.55}
 .action-icon{width:24px;height:20px;display:block}
 .more-action{gap:0}
 .action:hover{color:#8a797c}
+/* 底栏折叠：仅在模板里给 .actions 设了 --actions-collapse:1 时（JS 会加 .actions-collapsible）生效 */
+.actions-toggle{display:none}
+.actions.actions-collapsible{
+  position:absolute;right:10px;bottom:10px;left:auto;z-index:13;
+  display:flex;flex-direction:column;gap:6px;height:auto;width:auto;
+  border:none;border-radius:0;overflow:visible;background:transparent;
+}
+.actions.actions-collapsible .action,
+.actions.actions-collapsible .action + .action{
+  border:none;width:42px;height:42px;border-radius:50%;
+  background:var(--card,#fff);border:1px solid var(--line,#e5ddde);
+  box-shadow:0 4px 14px rgba(80,60,64,.12);padding:0;
+}
+.actions.actions-collapsible .action span{display:none}
+.actions.actions-collapsible .action{display:none}
+.actions.actions-collapsible.open .action{display:flex}
+.actions.actions-collapsible .actions-toggle{
+  display:flex;width:42px;height:42px;border-radius:50%;align-items:center;justify-content:center;
+  background:var(--card,#fff);border:1px solid var(--line,#e5ddde);
+  box-shadow:0 4px 14px rgba(80,60,64,.12);color:#a89094;
+}
+.actions.actions-collapsible .actions-toggle svg{width:20px;height:20px}
 
 .edit-bar{
   display:none;height:45px;border-top:1px solid var(--line);

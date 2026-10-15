@@ -7,6 +7,126 @@
 //   4. 监听来自父框架(beautify)的实时消息，立即生效
 // beautify 编辑页自身不加载本文件（由 beautify.js 管理自己的编辑器样式与字体）。
 // ============================================================
+
+// ============================================================
+// NanoBeautifyRT — 美化模板的「最高权限」运行时（CSS + JS；JS 也能造 HTML）
+// ------------------------------------------------------------
+// 美化模板里除了 CSS，还能写脚本块（被脚本包住的部分不当作 CSS）：
+//   /* @js
+//     // 直接用 mount / $ / $$ / on / observe / el / onCleanup / document / window
+//     const box = el('div', { style: { position:'fixed', top:'0' } }, ['你好']);
+//     mount.appendChild(box);
+//     onCleanup(() => box.remove());          // 还原时自动执行
+//   */
+// 点「还原 / 清空」时：清空该区域样式、清空 mount、执行所有 onCleanup，回到初始 UI。
+// 区域：global / chat / heart / offline。
+// ============================================================
+(function () {
+    'use strict';
+    if (window.NanoBeautifyRT) return;
+    var registry = {};
+
+    function parse(text) {
+        var t = String(text == null ? '' : text);
+        var js = '';
+        var re = /\/\*\s*@js([\s\S]*?)\*\//gi;
+        var m;
+        while ((m = re.exec(t))) js += '\n' + m[1];
+        var css = t.replace(/\/\*\s*@js[\s\S]*?\*\//gi, '');
+        return { css: css, js: js };
+    }
+
+    function ensureMount(area, parent) {
+        var id = 'nb-mount-' + area;
+        var el = document.getElementById(id);
+        if (!el) {
+            el = document.createElement('div');
+            el.id = id;
+            el.className = 'nb-mount';
+            (parent || document.body || document.documentElement).appendChild(el);
+        }
+        return el;
+    }
+
+    function runCleanups(area) {
+        var rec = registry[area];
+        if (!rec || !rec.cleanups) return;
+        rec.cleanups.forEach(function (fn) { try { fn(); } catch (e) {} });
+        rec.cleanups = [];
+    }
+
+    function makeEl(tag, props, kids) {
+        var el = document.createElement(tag);
+        if (props) Object.keys(props).forEach(function (k) {
+            var v = props[k];
+            if (k === 'style' && v && typeof v === 'object') { try { Object.assign(el.style, v); } catch (e) {} }
+            else if (k === 'html') el.innerHTML = v;
+            else if (k.indexOf('on') === 0 && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+            else if (v != null) el.setAttribute(k, v);
+        });
+        (Array.isArray(kids) ? kids : (kids != null ? [kids] : [])).forEach(function (c) {
+            if (c == null) return;
+            el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+        });
+        return el;
+    }
+
+    // js 为空 = 清空该区域（清 mount + 跑清理）
+    function run(area, js, opts) {
+        opts = opts || {};
+        runCleanups(area);
+        var mount = ensureMount(area, opts.mountParent);
+        try { mount.innerHTML = ''; } catch (e) {}
+        registry[area] = registry[area] || { cleanups: [] };
+        registry[area].mount = mount;
+        var code = String(js == null ? '' : js);
+        if (!code.trim()) return false;
+        var ctx = {
+            area: area,
+            mount: mount,
+            document: document,
+            window: window,
+            root: document,
+            body: document.body,
+            onCleanup: function (fn) { if (typeof fn === 'function') registry[area].cleanups.push(fn); },
+            on: function (target, ev, fn, o) {
+                try {
+                    target.addEventListener(ev, fn, o);
+                    registry[area].cleanups.push(function () { try { target.removeEventListener(ev, fn, o); } catch (e) {} });
+                } catch (e) {}
+            },
+            $: function (sel, root) { return (root || mount).querySelector(sel); },
+            $$: function (sel, root) { return Array.prototype.slice.call((root || mount).querySelectorAll(sel || '*')); },
+            el: makeEl,
+            observe: function (target, cb, o) {
+                try {
+                    var mo = new MutationObserver(cb);
+                    mo.observe(target, o || { childList: true, subtree: true });
+                    registry[area].cleanups.push(function () { try { mo.disconnect(); } catch (e) {} });
+                    return mo;
+                } catch (e) { return null; }
+            },
+            log: function () { try { console.log.apply(console, ['[Beautify:' + area + ']'].concat([].slice.call(arguments))); } catch (e) {} }
+        };
+        try {
+            (new Function('ctx', 'with(ctx){\n' + code + '\n}'))(ctx);
+            return true;
+        } catch (e) {
+            try { console.warn('[Beautify:' + area + '] JS 出错：', e && e.message ? e.message : e); } catch (e2) {}
+            return false;
+        }
+    }
+
+    function clear(area) {
+        runCleanups(area);
+        var mount = document.getElementById('nb-mount-' + area);
+        if (mount) { try { mount.innerHTML = ''; } catch (e) {} }
+    }
+
+    window.NanoBeautifyRT = { parse: parse, run: run, clear: clear, mountId: function (a) { return 'nb-mount-' + a; } };
+})();
+
+// ============================================================
 (function() {
     'use strict';
 
@@ -64,6 +184,20 @@
         // 放到 body 末尾，保证晚于各页面自身样式（含 body 内的 style），从而能覆盖原 UI
         var host = document.body || document.head || document.documentElement;
         host.appendChild(st);
+    }
+
+    // 运行美化模板里的 @js 脚本块（模板文本里除脚本外的部分仍按 CSS 处理）
+    function runBeautifyJs(area, raw) {
+        try {
+            if (!window.NanoBeautifyRT) return;
+            var parsed = window.NanoBeautifyRT.parse(raw || '');
+            window.NanoBeautifyRT.run(area, parsed.js, { mountParent: document.body });
+        } catch (e) {}
+    }
+    // 只取模板里的 CSS 部分（去掉 @js 脚本块），避免脚本内容被 CSS 迁移规则误改
+    function cssOnly(raw) {
+        try { return window.NanoBeautifyRT ? window.NanoBeautifyRT.parse(raw || '').css : (raw || ''); }
+        catch (e) { return raw || ''; }
     }
 
     // 统一隐藏滚动条（保留滚动能力），避免右侧出现"侧边栏"
@@ -659,14 +793,14 @@
             jobs.push(readBeautyAppliedFromIDB('applied_chat').then(function (v) {
                 if (!v) return;
                 try { localStorage.setItem('beautify_chat_v2', v); localStorage.setItem('beautify_chat', v); } catch (e) {}
-                try { applyChatCss(migrateChatCss(v)); } catch (e) {}
+                try { applyChatCss(migrateChatCss(cssOnly(v))); runBeautifyJs('chat', v); } catch (e) {}
             }));
         }
         if (!readCss('beautify_global_v2')) {
             jobs.push(readBeautyAppliedFromIDB('applied_global').then(function (v) {
                 if (!v) return;
                 try { localStorage.setItem('beautify_global_v2', v); localStorage.setItem('beautify_global', v); } catch (e) {}
-                try { applyGlobalCss(unlockScrollCss(migrateGlobalCss(v))); } catch (e) {}
+                try { applyGlobalCss(unlockScrollCss(migrateGlobalCss(cssOnly(v)))); runBeautifyJs('global', v); } catch (e) {}
             }));
         }
         Promise.all(jobs).catch(function () {}).then(function () { _appliedSyncing = false; });
@@ -677,7 +811,8 @@
     function applySaved() {
         // 先聊天后全局：全局样式永远最后注入，保证“全局”能覆盖所有页面（含聊天）
         try {
-            applyChatCss(migrateChatCss(readCss('beautify_chat_v2')));
+            applyChatCss(migrateChatCss(cssOnly(readCss('beautify_chat_v2'))));
+            runBeautifyJs('chat', readCss('beautify_chat_v2'));
         } catch (e) {}
         try {
             // 配置里有头像框就用「原始配置重建」（避免美化页存下来的旧 CSS 字符串/旧选择器不生效）；
@@ -690,7 +825,8 @@
             applyChatAvatarCss(_avCss);
         } catch (e) {}
         try {
-            applyGlobalCss(unlockScrollCss(migrateGlobalCss(readCss('beautify_global_v2'))));
+            applyGlobalCss(unlockScrollCss(migrateGlobalCss(cssOnly(readCss('beautify_global_v2')))));
+            runBeautifyJs('global', readCss('beautify_global_v2'));
         } catch (e) {}
         try {
             applyBottomShift(readCss('nanoBottomShift'));
@@ -822,8 +958,8 @@
         applyMessage: function(data) {
             if (!data || !data.type) return;
             if (data.type === 'beautify:apply') {
-                if (data.target === 'global') applyGlobalCss(unlockScrollCss(data.css || ''));
-                else if (data.target === 'chat') applyChatCss(data.css || '');
+                if (data.target === 'global') { applyGlobalCss(unlockScrollCss(cssOnly(data.css || ''))); runBeautifyJs('global', data.css || ''); }
+                else if (data.target === 'chat') { applyChatCss(cssOnly(data.css || '')); runBeautifyJs('chat', data.css || ''); }
                 else if (data.target === 'chat-avatar') applyChatAvatarCss(data.css || '');
             } else if (data.type === 'beautify:font') {
                 applyFontCfg(data.cfg || null);

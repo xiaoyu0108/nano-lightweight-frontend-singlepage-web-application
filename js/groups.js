@@ -1323,6 +1323,8 @@
                 prompt += '\n【当前时间】' + now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 星期' + weekdays[now.getDay()] + ' ' +
                     String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + '。\n';
             }
+        } else if (window.NanoHoliday && window.NanoHoliday.buildVagueTimeBlock) {
+            prompt += '\n' + window.NanoHoliday.buildVagueTimeBlock(new Date()) + '\n';
         }
         try {
             var __gbp = (localStorage.getItem('nano_builtin_prompt') || '').trim();
@@ -2598,7 +2600,7 @@
                     if (x && x.status === 'pending' && x.direction === 'user' && x.groupId === chatId) pendingIds[x.toCharId] = true;
                 });
             } catch(e){}
-            var pool = (allChars || []).filter(function(c){ return c && c.id && !inIds[c.id] && !(c.name && inIds[c.name]) && !pendingIds[c.id]; });
+            var pool = (allChars || []).filter(function(c){ return c && c.id && !c.nanoAssistant && !inIds[c.id] && !(c.name && inIds[c.name]) && !pendingIds[c.id]; });
             var html = '<div style="max-height:320px;overflow-y:auto;">';
             if (!pool.length) {
                 html += '<div style="padding:18px 0;text-align:center;color:#8e8e93;font-size:13px;">没有可邀请的角色</div>';

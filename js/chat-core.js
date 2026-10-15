@@ -777,7 +777,8 @@
         if (__emojiNames.length) {
             prompt += '\n【表情包 · 按意思主动发】\n';
             prompt += '你会在合适的时候主动发用户表情包里的表情：[emoji:名称]（独占一行），平均每 2~3 轮至少发一次。看懂当前这句话的意思和情绪，从列表里挑最贴切的一个（开心、无语、委屈、调侃、害羞、生气、赞同等）；不要连着几轮都不发，也不要同一轮发好几张。\n';
-            prompt += '【表情包的定位 · 千万别较真】表情包只是你此刻心境、情绪的一种“表示/投射”，不代表你现实里真的做了那个表情或动作，也不代表真实发生的事。对方发表情包时，只读它传达的心情，绝对不能当成对方的现实行为去追问、质疑或当真——例如对方发“喝酒/干杯”的表情包，往往只是无语、烦闷、烦躁、想借酒消愁的心情，并不是真的在喝酒，你绝不能问“你怎么还去喝酒/你又喝酒了”；对方发“发誓/哭哭/流泪”的表情包，可能只是激动、感动、委屈、撒娇，不是真的在哭，别问“你怎么哭了”“谁欺负你了”。自己发表情包也只是顺手表达心情，不必解释“我真的在笑/真的在做那个动作”。\n';
+            prompt += '【怎么看表情包】对方发表情包时，先看它的画面本身（画的是什么、什么表情/动作），再看备注/名称，两者结合起来理解 TA 此刻的情绪和态度；同一张表情在不同语境里意思可以完全不同，灵活理解就好，别抠字面、别死认备注。\n';
+    prompt += '【表情包的定位 · 千万别较真】表情包只是你此刻心境、情绪的一种“表示/投射”，不代表你现实里真的做了那个表情或动作，也不代表真实发生的事。对方发表情包时，只读它传达的心情，绝对不能当成对方的现实行为去追问、质疑或当真——例如对方发“喝酒/干杯”的表情包，往往只是无语、烦闷、烦躁、想借酒消愁的心情，并不是真的在喝酒，你绝不能问“你怎么还去喝酒/你又喝酒了”；对方发“发誓/哭哭/流泪”的表情包，可能只是激动、感动、委屈、撒娇，不是真的在哭，别问“你怎么哭了”“谁欺负你了”。自己发表情包也只是顺手表达心情，不必解释“我真的在笑/真的在做那个动作”。\n';
         }
         try {
             const myGroups = getGroupsForChar();
@@ -966,8 +967,12 @@
                 const timeStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 星期' + weekdays[now.getDay()] + ' ' +
                     String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
                 prompt += '\n【当前时间】现在是 ' + timeStr + '。请务必以这个真实日期/时间为准，不要把它当成昨天或更早——跨天、跨周都要按上面的日期判断。\n';
+                prompt += '【时间以系统为准 · 不可乱改】这个时间就是真的，**绝对不要自行更改、编造或推进时间**（不要凭空说"已经第二天了""过了好几天了"），除非对方明确说明过了多久或发生了跨越时间的事。\n';
                 prompt += '【时间感知】你清楚自己隔了多久没和对方聊：如果隔了几天甚至更久，你心里有数，但不要反复强调、不要一直埋怨或追问对方为什么这么久才来；最多自然地带一句（例如“好久不见”），然后正常继续。若对方主动说出经过的时间，以对方说的为准。\n';
             }
+        } else if (window.NanoHoliday && window.NanoHoliday.buildVagueTimeBlock) {
+            // 关闭时间观念：只知道大致时段，不知道确切时间/日期，跟对方说的走
+            prompt += '\n' + window.NanoHoliday.buildVagueTimeBlock(new Date()) + '\n';
         }
 
         if (wbBack) prompt += wbBack + '\n';
@@ -1915,6 +1920,30 @@
         try { if (typeof localforage !== 'undefined') localforage.setItem('chat_setting_' + key + '_' + chatId, val).catch(function(){}); } catch(e) {}
     }
 
+    // 用「当前私聊绑定的 TTS 预设」朗读；没绑定就回落到全局 TTS 配置。
+    // presetName 存在 chat_setting_ttsPreset_<角色id>（私聊设置里选）。
+    function speakWithChatVoice(text, onDone, onNa) {
+        var done = function (r) { try { if (onDone) onDone(r); } catch (e) {} };
+        var na = function () { try { if (onNa) onNa(); } catch (e) {} };
+        if (!window.NanoTTS) { na(); return; }
+        var presetName = '';
+        try { presetName = String(getChatSetting('ttsPreset', '') || '').trim(); } catch (e) {}
+        var runGlobal = function () {
+            window.NanoTTS.isConfigured(function (ok) {
+                if (!ok) { na(); return; }
+                window.NanoTTS.speak(text).then(function () { done(true); }, function () { done(false); });
+            });
+        };
+        if (presetName && window.NanoTTS.getPresetConfig) {
+            window.NanoTTS.getPresetConfig(presetName).then(function (cfg) {
+                if (!cfg) { runGlobal(); return; }
+                window.NanoTTS.speak(text, { config: cfg }).then(function () { done(true); }, function () { done(false); });
+            }, runGlobal);
+        } else {
+            runGlobal();
+        }
+    }
+
     // 朋友圈生图频率：高=每条都生；中=2~3条一次；低=6~8条一次（按角色独立计数）
     function momentImageRoundDue() {
         const FREQ = { high: [1, 1], medium: [2, 3], low: [6, 8] };
@@ -2077,14 +2106,9 @@
                     }, Math.max(1000, (duration || 3) * 1000));
                 };
                 if (speakText && window.NanoTTS) {
-                    window.NanoTTS.isConfigured(function (ok) {
-                        if (!ok) { animateOnly(); return; }
-                        window.NanoTTS.speak(speakText).then(function () {
-                            if (self.dataset.playing === 'true') setPlaying(self, false);
-                        }).catch(function () {
-                            if (self.dataset.playing === 'true') setPlaying(self, false);
-                        });
-                    });
+                    speakWithChatVoice(speakText, function () {
+                        if (self.dataset.playing === 'true') setPlaying(self, false);
+                    }, animateOnly);
                 } else {
                     animateOnly();
                 }
@@ -2328,7 +2352,11 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'msg-think-toggle';
-        btn.textContent = '💭 思维链';
+        // 用 SVG 灯泡图标（不用 emoji）
+        btn.innerHTML = '<svg class="msg-think-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M9.5 18h5"/><path d="M10.2 21h3.6"/>'
+            + '<path d="M12 3a6 6 0 0 0-3.7 10.7c.6.4 1 1 1.2 1.6l.2.7h4.6l.2-.7c.2-.6.6-1.2 1.2-1.6A6 6 0 0 0 12 3z"/>'
+            + '</svg><span>思维链</span>';
         const body = document.createElement('div');
         body.className = 'msg-think-body';
         body.textContent = thinkText;
@@ -3067,7 +3095,7 @@
         if (isVoice && type === 'left' && !recalled && window.NanoTTS) {
             try {
                 const speakText = (voiceData && voiceData.ttsText) || transcript;
-                if (speakText && String(speakText).trim()) window.NanoTTS.speak(speakText);
+                if (speakText && String(speakText).trim()) speakWithChatVoice(speakText);
             } catch (e) {}
         }
         if (type === 'left' && !recalled) {
@@ -5420,6 +5448,13 @@
             return '';
         }
         if (m.isImage) {
+            // 表情包：既要看备注/名称，也要看画面本身，综合理解情绪，别按字面较真
+            if (m.imageData && m.imageData.isEmoji) {
+                const who = (m.type === 'right') ? '用户' : '角色';
+                const en = (m.imageData.emojiName || m.imageData.desc || '').trim();
+                const nameTxt = (en && en !== '表情包' && en !== '表情') ? '（备注「' + en + '」）' : '';
+                return who + '发来一个表情包' + nameTxt + '：结合它的画面和备注，理解' + who + '此刻的情绪/态度就行，别按字面当真。';
+            }
             if (m.text && m.text.trim()) return m.text;
             if (m.imageData) {
                 if (m.imageData.textImage) return '用户发送了文字图片：' + (m.text || m.imageData.desc || '');

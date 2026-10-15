@@ -251,6 +251,12 @@
     var timeToggle = document.getElementById('timeToggle');
     var timeStatus = document.getElementById('timeStatus');
 
+    var voicePreview = document.getElementById('voicePreview');
+    var voiceModal = document.getElementById('voiceModal');
+    var voicePresetSelect = document.getElementById('voicePresetSelect');
+    var voiceConfirm = document.getElementById('voiceConfirm');
+    var voiceCancel = document.getElementById('voiceCancel');
+
     var searchInput = document.getElementById('searchInput');
     var searchResults = document.getElementById('searchResults');
     var searchModal = document.getElementById('searchModal');
@@ -345,6 +351,9 @@
         var timeAware = getSetting('timeAware', true);
         timeToggle.checked = timeAware;
         timeStatus.textContent = timeAware ? '开启' : '关闭';
+
+        var voiceSaved = getSetting('ttsPreset', '');
+        if (voicePreview) voicePreview.textContent = voiceSaved ? voiceSaved : '跟随全局';
 
         loadBackground();
 
@@ -1250,6 +1259,45 @@
     applyBlockState();
 
     // ===== 事件绑定 =====
+    // ===== 语音音色（TTS 预设绑定） =====
+    function openVoiceModal() {
+        if (!voiceModal || !voicePresetSelect) return;
+        var current = getSetting('ttsPreset', '');
+        voicePresetSelect.innerHTML = '';
+        var optGlobal = document.createElement('option');
+        optGlobal.value = '';
+        optGlobal.textContent = '跟随全局（API → TTS 当前配置）';
+        voicePresetSelect.appendChild(optGlobal);
+        var fill = function (names) {
+            (names || []).forEach(function (n) {
+                var o = document.createElement('option');
+                o.value = n; o.textContent = n;
+                voicePresetSelect.appendChild(o);
+            });
+            voicePresetSelect.value = current || '';
+            if (voicePresetSelect.value !== (current || '')) voicePresetSelect.value = '';
+        };
+        if (window.NanoTTS && window.NanoTTS.listPresets) {
+            window.NanoTTS.listPresets().then(fill, function () { fill([]); });
+        } else {
+            fill([]);
+        }
+        voiceModal.classList.add('active');
+    }
+    function saveVoice() {
+        var val = (voicePresetSelect && voicePresetSelect.value) || '';
+        setSetting('ttsPreset', val);
+        if (voicePreview) voicePreview.textContent = val ? val : '跟随全局';
+        if (window.parent !== window) {
+            try { window.parent.postMessage({ type: 'ttsVoiceChanged', chatId: chatId, ttsPreset: val }, '*'); } catch (e) {}
+        }
+        if (voiceModal) voiceModal.classList.remove('active');
+    }
+    var voiceItemEl = document.getElementById('voiceItem');
+    if (voiceItemEl) voiceItemEl.addEventListener('click', openVoiceModal);
+    if (voiceConfirm) voiceConfirm.addEventListener('click', saveVoice);
+    if (voiceCancel) voiceCancel.addEventListener('click', function() { if (voiceModal) voiceModal.classList.remove('active'); });
+
     document.getElementById('remarkItem').addEventListener('click', openRemarkModal);
     remarkCancel.addEventListener('click', function() { remarkModal.classList.remove('active'); });
     remarkConfirm.addEventListener('click', saveRemark);

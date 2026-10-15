@@ -1045,9 +1045,11 @@ function render() {
         </div>
       </div>
 
+      ${renderCustomBars(m, 'top')}
       ${m.showHeart ? statusBarHTML({ name: '心声', title: '心声', body: m.heart || '此刻没有可展示的心声。', defaultCollapsed: false }) : ''}
       ${(m.showThinking && m.thinking) ? statusBarHTML({ name: '思维链', title: '思维链', body: m.thinking, defaultCollapsed: true }) : ''}
 
+      ${renderCustomBars(m, 'before')}
       <div class="content" data-role="content">${parsedContent}</div>
       <div class="time-row">
         <svg class="clock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
@@ -1056,7 +1058,7 @@ function render() {
         </svg>
       </div>
 
-      ${renderCustomBars(m)}
+      ${renderCustomBars(m, 'after')}
       ${showPlot ? statusBarHTML({
         name: '剧情推荐',
         title: '剧情推荐',
@@ -1072,6 +1074,7 @@ function render() {
         </div>`
       }) : ''}
 
+      ${renderCustomBars(m, 'bottom')}
       <div class="actions">
         <button class="action" data-action="edit">
           <svg class="action-icon" viewBox="0 0 24 24" fill="currentColor">
@@ -1104,6 +1107,7 @@ function render() {
       </div>
     `;
     chat.appendChild(card);
+    maybeEnhanceActions(card);
   });
 
   document.querySelectorAll('[data-plot-options]').forEach(el => {
@@ -1691,13 +1695,84 @@ function statusBarHTML(o) {
     '<div class="nano-status-head"><span class="nano-status-title">' + escapeHTML(o && o.title || o && o.name || '') + '</span></div>' +
     '<div class="nano-status-body">' + body + '</div></div>';
 }
-// 自定义状态栏（在「线下设置 → 状态栏」里配置；AI 每轮输出 [bar:名称]…[/bar] 跟随正文更新）
-function renderCustomBars(m) {
+// 位置关键字 → top / before / after / bottom（默认 after = 正文之后、剧情之前）
+function normStatusPos(tok) {
+  var t = String(tok || '').trim().toLowerCase();
+  if (!t) return '';
+  if (/顶部|最上|上方|^top$/.test(t)) return 'top';
+  if (/正文前|最前|^before$/.test(t)) return 'before';
+  if (/正文后|^after$/.test(t)) return 'after';
+  if (/底部|最下|下方|^bottom$/.test(t)) return 'bottom';
+  return '';
+}
+// 从「线下模板 CSS」里的 /* @status-bars ... */ 块解析自定义状态栏：
+//   每行 [名称] 生成要求
+//   可选位置：写进名字 [名称@顶部]，或写在要求末尾  要求 @底部
+//   位置取值：顶部 / 正文前 / 正文后(默认) / 底部
+function parseTemplateStatusBars(css) {
+  const out = [];
+  const re = /\/\*\s*@status-bars([\s\S]*?)\*\//gi;
+  let m;
+  while ((m = re.exec(String(css || '')))) {
+    m[1].split(/\r?\n/).forEach(function (line) {
+      const t = String(line).replace(/^\s*\*?\s?/, '').trim();
+      if (!t) return;
+      const mm = t.match(/^[\[【]\s*([^\]】]+?)\s*[\]】]\s*[:：]?\s*([\s\S]*)$/);
+      if (!mm || !mm[1]) return;
+      let name = mm[1].trim();
+      let prompt = (mm[2] || '').trim();
+      let pos = '';
+      const nm = name.match(/^(.*?)\s*[@＠#]\s*(\S+)\s*$/);
+      if (nm) { name = nm[1].trim(); pos = normStatusPos(nm[2]); }
+      const pm = prompt.match(/[\s@＠#](顶部|最上|上方|底部|最下|下方|正文前|正文后|最前|top|bottom|before|after)\s*$/i);
+      if (pm) { if (!pos) pos = normStatusPos(pm[1]); prompt = prompt.slice(0, pm.index).trim(); }
+      out.push({ name: name, prompt: prompt, pos: pos || 'after', collapsed: false });
+    });
+  }
+  return out;
+}
+// 合并「模板里声明的」+「设置页里加的」状态栏（模板优先，按名字去重）
+function allStatusBars() {
+  const ui = Array.isArray(settings.statusBars) ? settings.statusBars : [];
+  const tpl = parseTemplateStatusBars(settings.customCSS || '');
+  const seen = {}, out = [];
+  tpl.concat(ui).forEach(function (s) {
+    if (!s || !s.name || seen[s.name]) return;
+    seen[s.name] = 1; out.push(s);
+  });
+  return out;
+}
+// 卡片底栏（编辑/删除/更多）DIY：默认是卡片底部的三格。若在模板里给 .actions 设了
+//   .actions{--actions-collapse:1}
+// 就自动加一个「•••」按钮，默认收成一颗，点开才展开那几个按钮（位置/样式仍由你的 CSS 决定）。
+// 想完全自定义（移到任意位置、竖排、换图标/配色）都只需写 CSS，见模板说明。
+function maybeEnhanceActions(card) {
+  try {
+    const acts = card.querySelector('.actions');
+    if (!acts || acts.dataset.diyReady === '1') return;
+    const v = (getComputedStyle(acts).getPropertyValue('--actions-collapse') || '').trim();
+    if (!v || v === '0' || v === 'none') return;
+    acts.dataset.diyReady = '1';
+    acts.classList.add('actions-collapsible');
+    const toggle = document.createElement('button');
+    toggle.className = 'actions-toggle';
+    toggle.type = 'button';
+    toggle.setAttribute('aria-label', '操作');
+    toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>';
+    toggle.addEventListener('click', function (e) { e.stopPropagation(); acts.classList.toggle('open'); });
+    acts.appendChild(toggle);
+  } catch (e) {}
+}
+// 自定义状态栏（模板 @status-bars 或「线下设置 → 状态栏」里配置；AI 每轮输出 [bar:名称]…[/bar] 跟随正文更新）
+function renderCustomBars(m, pos) {
+  pos = pos || 'after';
   const bars = Array.isArray(m && m.bars) ? m.bars : [];
   if (!bars.length) return '';
-  const cfg = Array.isArray(settings.statusBars) ? settings.statusBars : [];
+  const cfg = allStatusBars();
   return bars.map(function (b) {
     const found = cfg.find(function (s) { return s && s.name === b.name; });
+    const barPos = (found && found.pos) ? found.pos : 'after';
+    if (barPos !== pos) return '';
     return statusBarHTML({
       name: b.name,
       title: b.name,
@@ -1708,8 +1783,7 @@ function renderCustomBars(m) {
 }
 // 自定义状态栏的提示词：要求 AI 每轮按配置输出 [bar:名称]内容[/bar]
 function statusBarsPromptBlock() {
-  const cfg = Array.isArray(settings.statusBars) ? settings.statusBars : [];
-  const list = cfg.filter(function (s) { return s && s.name && s.prompt; });
+  const list = allStatusBars().filter(function (s) { return s && s.name && s.prompt; });
   if (!list.length) return '';
   const L = [];
   L.push('【自定义状态栏（每轮都要输出，放在正文之后，和 thinking/heart/plot 并列；内容要跟随本回合正文更新）】');
@@ -2094,6 +2168,8 @@ async function callMainAPI(history) {
           else if (rights.length === 1 && (Date.now() - rights[0]) > 3600000) lastUserMs = rights[0];
         } catch (e) {}
         timeBlock = window.NanoHoliday.buildTimeBlock(new Date(), { lastUserMs: lastUserMs }) + '\n\n';
+      } else if (!taOn && window.NanoHoliday && window.NanoHoliday.buildVagueTimeBlock) {
+        timeBlock = window.NanoHoliday.buildVagueTimeBlock(new Date()) + '\n\n';
       }
     } catch (e) {}
     let wb = { front: '', middle: '', back: '' };
@@ -2487,12 +2563,26 @@ function omClearFrame() {
   showToast('已清空头像框');
 }
 
+// 美化模板里的 @js 脚本块（最高权限：JS/HTML 都能做）；空则清空该区域
+function runOfflineJs(css) {
+  try {
+    if (!window.NanoBeautifyRT) return;
+    var parsed = window.NanoBeautifyRT.parse(css || '');
+    window.NanoBeautifyRT.run('offline', parsed.js, { mountParent: document.body });
+  } catch (e) {}
+}
+function offlineCssOnly(css) {
+  try { return window.NanoBeautifyRT ? window.NanoBeautifyRT.parse(css || '').css : (css || ''); }
+  catch (e) { return css || ''; }
+}
+
 // ===== 头像菜单 → 美化弹窗：切换美化预设 / 切换头像框预设 / 还原美化 / 还原头像框 =====
 function omSaveCustomCss(css) {
   settings.customCSS = String(css || '');
   let tag = document.getElementById('offline-custom-css');
   if (!tag) { tag = document.createElement('style'); tag.id = 'offline-custom-css'; document.head.appendChild(tag); }
-  tag.textContent = settings.customCSS;
+  tag.textContent = offlineCssOnly(settings.customCSS);
+  runOfflineJs(settings.customCSS);
   try {
     openDB().then(function (db) {
       try {
@@ -2988,12 +3078,12 @@ async function init() {
     if (stamped) await saveMessages(messages);
   }
 
-  if (settings.customCSS) {
-    const tag = document.getElementById('offline-custom-css') || document.createElement('style');
-    tag.id = 'offline-custom-css';
-    tag.textContent = settings.customCSS;
-    if (!document.getElementById('offline-custom-css')) document.head.appendChild(tag);
+  {
+    let tag = document.getElementById('offline-custom-css');
+    if (!tag) { tag = document.createElement('style'); tag.id = 'offline-custom-css'; document.head.appendChild(tag); }
+    tag.textContent = offlineCssOnly(settings.customCSS || '');
   }
+  runOfflineJs(settings.customCSS || '');
 
   render();
   try { omUpdateAvatar(); } catch (e) {}
@@ -3038,11 +3128,12 @@ async function reloadSettings() {
     await syncGlobalIdentity();
     const dbSettings = await loadSettingsFromDB();
     settings = { ...dbSettings, userName: settings.userName || dbSettings.userName, charName: settings.charName || dbSettings.charName, userAvatar: settings.userAvatar || dbSettings.userAvatar, charAvatar: settings.charAvatar || dbSettings.charAvatar };
-    if (settings.customCSS) {
+    {
       let tag = document.getElementById('offline-custom-css');
       if (!tag) { tag = document.createElement('style'); tag.id = 'offline-custom-css'; document.head.appendChild(tag); }
-      tag.textContent = settings.customCSS;
+      tag.textContent = offlineCssOnly(settings.customCSS || '');
     }
+    runOfflineJs(settings.customCSS || '');
     try { applyBackgroundImage(settings.bgImage); } catch (e) {}
     render();
     try { omUpdateAvatar(); } catch (e) {}
@@ -3060,7 +3151,8 @@ window.addEventListener('message', function (e) {
     try {
       let tag = document.getElementById('offline-preview-css');
       if (!tag) { tag = document.createElement('style'); tag.id = 'offline-preview-css'; document.head.appendChild(tag); }
-      tag.textContent = String(d.css || '');
+      tag.textContent = offlineCssOnly(String(d.css || ''));
+      runOfflineJs(String(d.css || ''));
     } catch (err) {}
   }
   // 美化预览：背景图变化

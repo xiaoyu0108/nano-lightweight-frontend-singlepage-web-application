@@ -2662,8 +2662,9 @@ async function getChars(){
   try{ chars = await loadCharsFromDB(); }catch(e){ chars = []; }
   chars = (chars || []).filter(c => c && (c.name || c.id));
   const uid = getCurrentUserId();
-  let list = chars.filter(c => (c.bindUser === uid || c.isNpc) && !c.nanoAssistant);
-  if(!list.length) list = chars.filter(c => !c.nanoAssistant).slice();
+  // 用户隔离：只看绑定到「当前人设」的角色（含本人小号/名下 NPC），不再把别人的 NPC/小号算进来；
+  // 纳米是助手不是角色，永远不出现。
+  let list = chars.filter(c => c && !c.nanoAssistant && String(c.bindUser || '') === String(uid || ''));
 
   const lastId = getLastChatId();
   if(lastId){

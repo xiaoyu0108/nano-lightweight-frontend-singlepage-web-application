@@ -144,6 +144,7 @@
     if (lastUserGap) lines.push('【隔了多久没联系】对方上一次给你发消息大约是在 ' + lastUserGap + '前，你心里清楚隔了多久，不必装作一直在线。');
     if (lastAiGap) lines.push('【你上次开口】你上一次和对方说话大约是在 ' + lastAiGap + '前。');
     lines.push('【时间感知的用法】你清楚彼此隔了多久没聊：如果隔了几天甚至更久，你心里有数，但**不要反复强调、不要一直埋怨或追问对方为什么这么久才来**；最多自然地带一句（例如"好久不见""你终于理我了"），然后正常继续。不要每轮都报时间、报日期、报节日。');
+    lines.push('【时间以系统为准 · 不可乱改】上面的日期/时间就是真实时间，请以此为准判断。**绝对不要自行更改、编造或"推进"时间**——例如不能凭自己说成"已经是第二天了""都过了一星期了""现在是半夜"；也不要自己编造日期、星期、几点几分。除非对方明确说明过了多久、或发生了明确跨越时间的事件，否则时间就按上面这个走。');
     lines.push('【以对方说的为准】如果对方主动提到经过的时间（例如"过了三天""我们半个月没见了""都一个月了"），一律以对方说的为准，顺着对方的说法走，绝不用系统时间反驳或纠正他。');
 
     // 日历/节假日感知
@@ -157,10 +158,34 @@
     return lines.join('\n');
   }
 
+  // 关闭「时间感知」时用：只知道大致时段，不知道确切时间/日期，一律跟对方说的走
+  function vaguePeriod(now) {
+    var h = now.getHours();
+    if (h < 5) return '深夜';
+    if (h < 8) return '清晨';
+    if (h < 11) return '上午';
+    if (h < 13) return '中午';
+    if (h < 17) return '下午';
+    if (h < 19) return '傍晚';
+    if (h < 23) return '晚上';
+    return '深夜';
+  }
+  function buildVagueTimeBlock(now) {
+    now = now || new Date();
+    var p = vaguePeriod(now);
+    var clock = pad(now.getHours()) + ':' + pad(now.getMinutes());
+    return [
+      '【时间 · 参考】你大概知道现在差不多是 ' + clock + ' 前后（' + p + '），但**不确定日期、星期，也记不清具体隔了多久**。',
+      '没被特意提及时，说话可以带一点自然的时间感（如"这么晚还没睡？""中午了记得吃饭"），但**不要报具体的日期、星期几**，也别把参考时间说得太死。',
+      '【以对方 / 剧情为准】一旦对方强调或提到了时间（几点、过了多久、几天后…），或剧情里明确推进了时间（"天亮了""第二天""过了一周"），就**以对方和剧情的时间为准**，顺着往后走，绝不用这个参考时间去纠正或反驳。'
+    ].join('\n');
+  }
+
   window.NanoHoliday = {
     info: info,
     describe: describe,
     buildTimeBlock: buildTimeBlock,
+    buildVagueTimeBlock: buildVagueTimeBlock,
     fmtGap: fmtGap,
     pad: pad
   };

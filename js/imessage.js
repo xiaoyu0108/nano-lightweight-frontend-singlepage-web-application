@@ -265,6 +265,7 @@ function currentNs() {
 // 判断角色是否属于当前人设：绑定角色，或本人生成的「小号」（isAltProbe 且 origin 属于当前人设）
 function isCharOfUser(ch, all) {
   if (!ch) return false;
+  if (typeof isAssistantChar === 'function' && isAssistantChar(ch)) return false; // 纳米不在社交软件里
   const ns = currentNs();
   if (ch.bindUser != null && String(ch.bindUser) === ns) return true;
   if (ch.isAltProbe && ch.altOriginId) {
