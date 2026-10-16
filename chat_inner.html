@@ -459,8 +459,10 @@
 <script src="js/family-card-store.js?v=20261006a"></script>
     <script src="js/mem-link.js?v=20261006a"></script>
     <script src="js/nano-holiday.js?v=20261012a"></script>
-    <script src="js/builtin-worldbook.js?v=20261013a"></script>
-    <script src="js/chat-core.js?v=20261013u"></script>
+<script src="js/builtin-worldbook.js?v=20261013a"></script>
+<script src="js/nano-mcp-runtime.js?v=20261016c"></script>
+<script src="js/nano-mcp-chat.js?v=20261016c"></script>
+<script src="js/chat-core.js?v=20261016d"></script>
     <script src="js/roleplay-prompt.js?v=20261013c"></script>
 <script src="js/chat-transfer.js?v=20261006a"></script>
 <script src="js/chat-gift.js"></script>
@@ -636,20 +638,8 @@
 <style id="nanoVoiceCustomCSS"></style>
 
 <script>
-(function(){
-  // 点顶部“灵动岛”标题 = 返回聊天列表（主框架收到后关闭内页）
-  var t = document.getElementById('chatTitle');
-  if (t) {
-    t.style.cursor = 'pointer';
-    t.addEventListener('click', function(){
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'nanoCloseOverlay' }, '*');
-        }
-      } catch (e) {}
-    });
-  }
-})();
+// 顶栏昵称（#chatTitle）的点击由 js/chat-core.js 绑定：打开心声弹窗，
+// 没有可展示的心声时回退为「返回聊天列表」。这里不再重复绑定，避免冲突。
 </script>
     <script src="js/api-float.js?v=20261013a"></script>
 <script src="js/avatar-frame.js?v=20261010a"></script>

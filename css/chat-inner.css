@@ -1742,6 +1742,29 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     display: block;
 }
 
+/* ===== MCP 工具调用块（复用思维链样式，内联在气泡上方，不悬空） ===== */
+.msg-tools .msg-tool {
+    padding: 6px 0;
+    border-top: 1px solid rgba(120, 120, 128, 0.16);
+}
+.msg-tools .msg-tool:first-child { border-top: none; padding-top: 0; }
+.msg-tool-name { font-size: 11px; font-weight: 700; color: #3a3a40; }
+.msg-tool.fail .msg-tool-name { color: #c0392b; }
+.msg-tool-args {
+    font-size: 10px; color: #8a8a8a; margin-top: 2px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all;
+}
+.msg-tool-res {
+    font-size: 10.5px; color: #444; margin-top: 3px;
+    white-space: pre-wrap; word-break: break-word;
+}
+/* MCP 工具调用胶囊：单独占一行、居中显示（在消息气泡上方） */
+.message-row .msg-tools {
+    align-self: center;
+    margin: 0 auto 4px auto;
+    max-width: 100%;
+}
+
 /* ===== 语音转写 / 翻译气泡：不许超出屏幕；一行超过 20 字自动换行 ===== */
 .bubble { max-width: 100%; }
 .bubble.voice-transcript-bubble { max-width: min(88vw, 20em); }

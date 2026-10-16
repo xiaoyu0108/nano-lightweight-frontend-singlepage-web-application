@@ -89,7 +89,7 @@ const CSS_PRESETS_ID = 'css_presets';
 const COT_PRESETS_ID = 'cot_presets';
 const MESSAGES_STORE = 'messages';
 
-let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', predictUser: 'forbid', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '', timeAware: true, statusBars: [] };
+let settings = { id: SETTINGS_ID, style: '', cot: '', wordCount: '', person: 'auto', predictUser: 'forbid', customCSS: '', bgImage: '', autoSummary: true, memThreshold: 5, nsfw: false, maxTokens: '', timeAware: true, builtinBody: false, statusBars: [] };
 let ruleGroups = [];
 let stylePresets = [];
 let cssPresets = [];
@@ -363,15 +363,29 @@ const INITIAL_CSS = `/* ========================================================
        //   ② 「线下设置 → 状态栏」：可粘贴**完整 HTML**做条目，支持每条的 开启/关闭、位置、默认折叠，
        //      以及整组「导出 / 导入」（status-bars.json）。
        //   AI 每轮用 [bar:名称]内容[/bar] 输出，每轮都会刷新这一条；用 .nano-status[data-status="名字"] 美化。
-       // —— 用 HTML 自定义一条状态栏 ——
-       //   在设置里给这条的「HTML」粘贴完整 HTML；用 {{content}} 标记每轮内容要填的位置、{{name}} 放名字：
+       // —— 样式是「分开」的，互不影响 ——
+       //   · 心声 / 思维链 / 剧情推荐 这三个内置栏：样式写在本模板里（下面 .nano-status[data-status="心声"] 等），
+       //     名字固定，改它们不会影响你新增的栏。
+       //   · 新增的自定义栏：用 .nano-status[data-status="你的名字"] 单独美化，也不会改到那三个。
+       //   · 所有状态栏共用 .nano-status 这套「外壳」（圆角/折叠），但每个栏的配色/排版各写各的。
+       // —— 自定义栏的内容支持 HTML（会渲染成美化格式，而不是当代码显示）——
+       //   AI 在 [bar:名称] 里写 HTML（如 <b> / <span style> / <div>）时，会先做安全清洗再按 HTML 渲染；
+       //   写纯文字时按纯文本展开。想完全自己掌控结构：在设置里给这条的「HTML」粘贴完整 HTML，
+       //   用 {{content}} 标记每轮内容要填的位置、{{name}} 放名字：
        //     <div class="nano-status" data-status="着装">
        //       <div class="nano-status-head"><span class="nano-status-title">着装</span>
        //         <svg class="nano-status-arrow" viewBox="0 0 24 24" ...><polyline points="6 9 12 15 18 9"/></svg></div>
        //       <div class="nano-status-body">{{content}}</div>
        //     </div>
        //   带 nano-status 结构 = 自动可折叠；不带结构时，会自动帮你包成可折叠「条目」。
-       //   不写 {{content}} 时，AI 内容会追加到 HTML 末尾。
+       //   不写 {{content}} 时，AI 内容会注入到 .nano-status-body 内部（没有 body 才追加到末尾），
+       //   所以每轮刷新都在状态栏里面，不会跑到状态栏外面变成一行纯文字。
+       //   ✅ 可以在状态栏「HTML」里直接写 <style>：它会自动只作用于这一条状态栏
+       //      （会被加上 .nano-status[data-status="名字"] 作用域），不会影响心声 / 思维链 / 剧情推荐。
+       // —— 心声 / 思维链：可分开，也可合并 ——
+       //   默认「分开」：.nano-status[data-status="心声"] 与 .nano-status[data-status="思维链"] 两栏各自独立，各改各的。
+       //   想合并成一栏：在模板里「单独一行」写 @merge-status think+heart（可用注释包起来），
+       //   就会渲染成单个「心声 · 思维链」栏，用 .nano-status[data-status="心声思维链"] 美化。
        // —— 插入位置（状态栏放在卡片哪一段）——
        //   在 @status-bars 里给那行标位置即可（不标 = 正文后）：
        //     [着装@顶部] 写穿着          // 位置写在名字里
@@ -388,6 +402,14 @@ const INITIAL_CSS = `/* ========================================================
        .nano-status-title{font-size:12px;color:#a87b8b;letter-spacing:1px}
        .nano-status-body{color:#a87b8b;font-size:12.5px}
        .nano-status-arrow{width:15px;height:15px;color:#d9b6c3}
+       // —— 内置「身体状态」栏（线下设置 → 状态栏 → 身体状态栏 开关）——
+       //   展示 心跳(频率) / 好感度 / 生理状态，每轮跟随正文更新；默认白底波点 + 报纸标题风。
+       //   结构与其它栏一样，只是多了 data-kind="body"，行内容在 .bio-list > .bio-item(.bio-k/.bio-v)：
+       //     .nano-status[data-kind="body"]{/* 白底波点 / 边框 / 圆角 */}
+       //     .nano-status[data-kind="body"] .nano-status-head{border-top:1px solid #2b2621;border-bottom:2px solid #2b2621}
+       //     .nano-status[data-kind="body"] .nano-status-title{font-family:Georgia,serif;letter-spacing:4px;text-transform:uppercase}
+       //     .nano-status[data-kind="body"] .bio-k{color:#8a7f78}   // 部位名
+       //     .nano-status[data-kind="body"] .bio-meter i{background:#c9607a}   // 好感度进度条
        // —— 只改某一个 ——
        .nano-status[data-status="心声"]{background:linear-gradient(135deg,#fff3f7,#fde9f0)}
        .nano-status[data-status="心声"] .nano-status-title::before{content:"♥ "}
@@ -571,9 +593,13 @@ body{color:var(--ink)}
    AI 每轮回复会在正文后用 [bar:状态栏名]内容[/bar] 输出，
    卡片里就多出一个可折叠状态栏（点标题栏折叠/展开）。
    不写任何以 [ 开头的行 = 不生成状态栏。
+   位置：在名字后写 @顶部 / @正文前 / @正文后 / @底部，不写默认「正文后」。
    例（想用就把行首的“例”字去掉、照格式写）：
    例 [着装] 一句话写角色此刻的穿着，随正文变化
-   例 [位置] 写角色此刻所在的地点，简短
+   例 [位置@底部] 写角色此刻所在的地点，简短
+   内容可以是纯文字，也可以是 HTML：AI 写 HTML 时会先清洗再按 HTML 渲染（不会当代码显示）。
+   样式与其他状态栏互不影响：用 .nano-status[data-status="着装"] 单独美化。
+   心声 / 思维链 想合并成一栏：在模板里「单独一行」写 @merge-status think+heart。
    —— 下面这个块就是定义区（现在为空）——
    ============================================================ */
 /* @status-bars
@@ -1758,8 +1784,13 @@ function updateSummary() {
   if (nsfwSwitch) nsfwSwitch.classList.toggle('on', settings.nsfw === true);
   const timeAwareSwitch = document.getElementById('timeAwareSwitch');
   if (timeAwareSwitch) timeAwareSwitch.classList.toggle('on', settings.timeAware !== false);
+  const builtinBodySwitch = document.getElementById('builtinBodySwitch');
+  if (builtinBodySwitch) builtinBodySwitch.classList.toggle('on', settings.builtinBody === true);
   const sbVal = document.getElementById('statusBarsValue');
-  if (sbVal) sbVal.textContent = (Array.isArray(settings.statusBars) && settings.statusBars.length) ? (settings.statusBars.length + ' 个') : '未设置';
+  if (sbVal) {
+    const n = Array.isArray(settings.statusBars) ? settings.statusBars.length : 0;
+    sbVal.textContent = (settings.builtinBody ? '身体状态 · ' : '') + (n ? (n + ' 个') : (settings.builtinBody ? '已开启' : '未设置'));
+  }
 }
 
 function fillSettings() {
@@ -1895,8 +1926,15 @@ function renderStatusBars() {
     html.style.minHeight = '76px';
     html.style.fontSize = '11px';
     html.style.fontFamily = 'ui-monospace,Menlo,monospace';
-    html.placeholder = '粘贴完整 HTML，用 {{content}} 标记每轮要填的位置（{{name}} 放名字）；留空用默认样式。';
+    html.placeholder = 'HTML 结构（{{content}} = 每轮内容位置，{{name}} = 名字；不写 {{content}} 会自动放进 .nano-status-body）。';
     html.value = bar.html || '';
+    const css = document.createElement('textarea');
+    css.className = 'textarea';
+    css.style.minHeight = '96px';
+    css.style.fontSize = '11px';
+    css.style.fontFamily = 'ui-monospace,Menlo,monospace';
+    css.placeholder = 'CSS（只作用在这一条状态栏上，会自动加作用域）：\n.nano-status{background:#fff}\n.nano-status-title{letter-spacing:3px}\n.nano-status-body{color:#333}';
+    css.value = bar.css || '';
     const prompt = document.createElement('textarea');
     prompt.className = 'textarea';
     prompt.style.minHeight = '52px';
@@ -1927,8 +1965,9 @@ function renderStatusBars() {
     del.onclick = function () { list.splice(idx, 1); saveSettings(); renderStatusBars(); updateSummary(); };
     name.addEventListener('input', function () { bar.name = name.value.trim(); saveSettings(); updateSummary(); title.textContent = bar.name || ('状态栏 ' + (idx + 1)); });
     html.addEventListener('input', function () { bar.html = html.value; saveSettings(); });
+    css.addEventListener('input', function () { bar.css = css.value; saveSettings(); });
     prompt.addEventListener('input', function () { bar.prompt = prompt.value.trim(); saveSettings(); });
-    body.appendChild(name); body.appendChild(html); body.appendChild(prompt); body.appendChild(posRow); body.appendChild(row); body.appendChild(del);
+    body.appendChild(name); body.appendChild(html); body.appendChild(css); body.appendChild(prompt); body.appendChild(posRow); body.appendChild(row); body.appendChild(del);
     item.appendChild(head); item.appendChild(body);
     wrap.appendChild(item);
   });
@@ -1941,7 +1980,7 @@ document.getElementById('statusBarsOpen').onclick = function() {
 };
 document.getElementById('statusBarAddBtn').onclick = function() {
   if (!Array.isArray(settings.statusBars)) settings.statusBars = [];
-  settings.statusBars.push({ id: generateId(), name: '', html: '', prompt: '', collapsed: false, pos: 'after', enabled: true });
+  settings.statusBars.push({ id: generateId(), name: '', html: '', css: '', prompt: '', collapsed: false, pos: 'after', enabled: true });
   saveSettings();
   renderStatusBars();
   updateSummary();
@@ -2006,6 +2045,68 @@ document.getElementById('statusBarTemplateCopy').onclick = function() {
     }
   } catch (e) { showToast('复制失败'); }
 };
+// ===== 内置「身体状态」：查看代码 / 一键复制为自定义状态栏 =====
+const BODY_BAR_HTML = `<div class="nano-status" data-status="身体状态" data-default="open">
+  <div class="nano-status-head">
+    <span class="nano-status-title">身体状态</span>
+    <svg class="nano-status-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+  <div class="nano-status-body">{{content}}</div>
+</div>`;
+const BODY_BAR_CSS = `/* 白底波点 + 报纸标题风；只会作用在这一条状态栏上（渲染时自动加作用域） */
+.nano-status{background-color:#fff;background-image:radial-gradient(rgba(180,150,160,.30) 1.1px, transparent 1.3px);background-size:12px 12px;border:1px solid #e4dcda;border-radius:14px}
+.nano-status-head{background:rgba(255,255,255,.86);border-top:1px solid #2b2621;border-bottom:2px solid #2b2621;padding:9px 14px}
+.nano-status-title{font-family:Georgia,"Times New Roman","Songti SC","STSong",serif;font-weight:700;letter-spacing:4px;color:#2b2621;font-size:12.5px}
+.nano-status-arrow{color:#2b2621}
+.nano-status-body{white-space:normal;color:#3b352f;padding:10px 14px 12px}
+.bio-list{display:flex;flex-direction:column}
+.bio-item{display:flex;gap:10px;align-items:baseline;padding:4px 0;border-bottom:1px dotted #ded4d1}
+.bio-item:last-child{border-bottom:0}
+.bio-k{flex:none;min-width:3.4em;font-weight:700;color:#8a7f78;font-size:11.5px;letter-spacing:.5px}
+.bio-v{flex:1;min-width:0;font-size:12.5px;line-height:1.5}
+.bio-meter{display:inline-block;width:64px;height:6px;border-radius:999px;background:#efe8e6;vertical-align:middle;margin-right:6px;overflow:hidden}
+.bio-meter i{display:block;height:100%;background:linear-gradient(90deg,#e7a9b6,#c9607a);border-radius:999px}`;
+const BODY_BAR_PROMPT = '每轮输出本回合的身体状态：①心跳（给出具体频率，如 88 次/分，随情绪变化）②好感度（0~100 的整数，可带一句短评）③再随机挑 1~3 个最相关的身体部位（手/眼睛/脸/呼吸/心脏/肩/腿/私密处…）写细微状态。用 HTML 行输出，每行一个部位：<div class="bio-item"><span class="bio-k">部位</span><span class="bio-v">状态</span></div>；好感度那行可加进度条：<div class="bio-item"><span class="bio-k">好感度</span><span class="bio-v"><span class="bio-meter"><i style="width:63%"></i></span>63 还在嘴硬</span></div>';
+(function bindBuiltinBodyCode() {
+  const htmlEl = document.getElementById('builtinBodyHtml');
+  const cssEl = document.getElementById('builtinBodyCss');
+  if (htmlEl) htmlEl.value = BODY_BAR_HTML;
+  if (cssEl) cssEl.value = BODY_BAR_CSS;
+  function copyText(txt, ok) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(function () { showToast(ok); }, function () { showToast('复制失败'); });
+      } else {
+        const ta = document.createElement('textarea'); ta.value = txt;
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+        showToast(ok);
+      }
+    } catch (e) { showToast('复制失败'); }
+  }
+  const cpH = document.getElementById('builtinBodyCopyHtml');
+  if (cpH) cpH.onclick = function () { copyText(BODY_BAR_HTML, 'HTML 已复制'); };
+  const cpC = document.getElementById('builtinBodyCopyCss');
+  if (cpC) cpC.onclick = function () { copyText(BODY_BAR_CSS, 'CSS 已复制'); };
+  const clone = document.getElementById('builtinBodyClone');
+  if (clone) clone.onclick = function () {
+    if (!Array.isArray(settings.statusBars)) settings.statusBars = [];
+    settings.statusBars.push({
+      id: generateId(),
+      name: '身体状态·副本',
+      html: BODY_BAR_HTML,
+      css: BODY_BAR_CSS,
+      prompt: BODY_BAR_PROMPT,
+      collapsed: false,
+      pos: 'after',
+      enabled: true,
+      expanded: true
+    });
+    saveSettings();
+    renderStatusBars();
+    updateSummary();
+    showToast('已新建一条自定义状态栏，去下面改名字 / 样式');
+  };
+})();
 (function bindCssPreview() {
   const ta = document.getElementById('cssText');
   if (ta) {
@@ -2047,6 +2148,19 @@ if (timeAwareSwitch) {
     saveSettings();
     timeAwareSwitch.classList.toggle('on', settings.timeAware);
     showToast(settings.timeAware ? '时间感知已开启' : '时间感知已关闭');
+  });
+}
+
+// ===== 内置状态栏「身体状态」（心跳 / 好感度 / 生理）=====
+const builtinBodySwitch = document.getElementById('builtinBodySwitch');
+if (builtinBodySwitch) {
+  builtinBodySwitch.addEventListener('click', function() {
+    settings.builtinBody = !builtinBodySwitch.classList.contains('on');
+    saveSettings();
+    builtinBodySwitch.classList.toggle('on', settings.builtinBody);
+    notifyOfflineChanged();
+    updateSummary();
+    showToast(settings.builtinBody ? '身体状态栏已开启' : '身体状态栏已关闭');
   });
 }
 document.getElementById('memorySummaryOpen').onclick = function() {

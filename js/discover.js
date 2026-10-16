@@ -187,6 +187,8 @@
     music:   { url: 'music.html', title: 'Music' },
     memorypalace: { url: 'memory palace.html', title: 'Memory Palace', showBack: true },
     imessage: { url: 'imessage.html', title: 'iMessage', showBack: true },
+    market:   { url: 'market.html', title: '共享集市', showBack: true },
+    mcp:      { url: 'mcp.html', title: 'MCP', showBack: true },
     appstore: { url: 'appstore.html', title: 'App Store', showBack: true },
     screenpeek: { url: 'ios-setting.html', title: '窥屏', showBack: true }
   };

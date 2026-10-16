@@ -10,6 +10,11 @@
     function $(id) { return document.getElementById(id); }
     function enc(s) { return encodeURIComponent(String(s == null ? '' : s)); }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function maskKey(k) {
+        k = String(k || '');
+        if (k.length <= 10) return k ? '••••••' : '';
+        return k.slice(0, 5) + '••••••' + k.slice(-4);
+    }
 
     var toastEl = $('isToast'), toastTimer = null;
     function toast(msg) {
@@ -88,6 +93,7 @@
     }
     /* ---------------- 屏幕速聊（快捷指令 + 服务端） ---------------- */
     var PEEK_URL_KEY = 'nano_peek_url', PEEK_TOKEN_KEY = 'nano_peek_token', PEEK_CHAT_KEY = 'nano_peek_chat';
+    var PEEK_DEFAULT_URL = 'https://nanopush.nano315.online';
     function getPeekToken() {
         var t = '';
         try { t = localStorage.getItem(PEEK_TOKEN_KEY) || ''; } catch (e) {}
@@ -100,6 +106,7 @@
     function renderPeek() {
         var url = '';
         try { url = localStorage.getItem(PEEK_URL_KEY) || ''; } catch (e) {}
+        if (!url) url = PEEK_DEFAULT_URL;
         if ($('isPeekUrl')) $('isPeekUrl').value = url;
         if ($('isPeekToken')) $('isPeekToken').textContent = getPeekToken();
         var base = String(url).trim().replace(/\/+$/, '');
@@ -156,6 +163,15 @@
         $('isLinkA').textContent = base + 'index.html?nanoScreen={{识别文本}}&nanoChat=' + enc(id) + '&nanoName=' + enc(name);
         $('isUrl2').textContent = endpoint((apiCfg && apiCfg.mainUrl) || '') || '（主 API 未配置）';
 
+        var __k = (apiCfg && apiCfg.mainKey) || '';
+        var __kEl = $('isApiKey');
+        if (__kEl) {
+            __kEl.dataset.raw = __k;
+            __kEl.dataset.shown = '';
+            __kEl.textContent = __k ? maskKey(__k) : '（主 API 未配置）';
+            var __rv = $('isApiKeyReveal'); if (__rv) __rv.textContent = '显示';
+        }
+
         var body = {
             model: model,
             messages: [
@@ -211,6 +227,27 @@
         renderGenerated();
         renderGuide();
         renderPeek();
+        pushPersona();
+    }
+
+    // 把当前所选角色的人设同步到服务端，快捷指令就不需要内置人设（切角色后即时生效）
+    function pushPersona() {
+        try {
+            var c = currentChar();
+            if (!c) return;
+            var url = '';
+            try { url = localStorage.getItem(PEEK_URL_KEY) || ''; } catch (e) {}
+            if (!url) url = PEEK_DEFAULT_URL;
+            var base = String(url).trim().replace(/\/+$/, '');
+            if (/\/peek$/i.test(base)) base = base.replace(/\/peek$/i, '');
+            if (!base) return;
+            var sys = '你是「' + charName() + '」。' + (persona() || '');
+            fetch(base + '/peek/persona', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: getPeekToken(), chatId: String(selectedId || ''), system: sys })
+            }).catch(function () {});
+        } catch (e) {}
     }
 
     /* ---------------- 事件 ---------------- */
@@ -242,8 +279,19 @@
         document.querySelectorAll('[data-copy]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var el = $(btn.getAttribute('data-copy'));
-                if (el) copy(el.textContent);
+                if (el) copy((el.dataset && el.dataset.raw) ? el.dataset.raw : el.textContent);
             });
+        });
+        var reveal = $('isApiKeyReveal');
+        if (reveal) reveal.addEventListener('click', function () {
+            var el = $('isApiKey');
+            if (!el) return;
+            var raw = el.dataset.raw || '';
+            var shown = el.dataset.shown === '1';
+            if (!raw) return;
+            el.textContent = shown ? maskKey(raw) : raw;
+            el.dataset.shown = shown ? '' : '1';
+            reveal.textContent = shown ? '显示' : '隐藏';
         });
     }
 

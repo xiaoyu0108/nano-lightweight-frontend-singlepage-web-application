@@ -13,7 +13,7 @@ html, body {
     padding: 0;
     overflow: hidden;
     overscroll-behavior: none;
-    background: #ffffff;
+    background: transparent;
 }
 
 .app-container {
@@ -21,8 +21,12 @@ html, body {
     height: 100vh;
     max-width: 430px;
     margin: 0 auto;
-    background: #ffffff;
-    padding: 0 16px 0 16px;
+    background: linear-gradient(to bottom,
+        #ffffff 0,
+        #ffffff calc(100% - 180px),
+        rgba(255, 255, 255, 0.82) calc(100% - 110px),
+        rgba(255, 255, 255, 0) 100%);
+    padding: 0 16px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -420,7 +424,7 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 0;
-    padding: 4px 0 8px 0;
+    padding: 4px 0 calc(96px + var(--nano-safe-bottom, env(safe-area-inset-bottom, 0px))) 0;
     overflow-y: auto;
     min-height: 0;
     scrollbar-width: thin;

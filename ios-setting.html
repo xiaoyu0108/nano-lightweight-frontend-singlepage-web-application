@@ -60,6 +60,11 @@
         <div class="sk-copy"><code id="isUrl2"></code><button class="sk-copy-btn" data-copy="isUrl2">复制</button></div>
 
         <div class="sk-line">
+          <span class="sk-line-label">主 API Key（方式 B 的 Authorization 头部用）</span>
+        </div>
+        <div class="sk-copy"><code id="isApiKey"></code><button class="sk-copy-btn" data-copy="isApiKey">复制</button><button class="sk-copy-btn" id="isApiKeyReveal" type="button">显示</button></div>
+
+        <div class="sk-line">
           <span class="sk-line-label">请求体 JSON（请求体选「文件」引用它）</span>
         </div>
         <div class="sk-copy"><pre id="isBody"></pre><button class="sk-copy-btn" data-copy="isBody">复制</button></div>
@@ -79,7 +84,7 @@
         <div class="sk-note">在任意 App 里双击「辅助触控」运行快捷指令：截屏 → 发到你的服务端 → 回复直接弹在系统窗口里、可继续打字；等你回到小手机后，这几轮会按顺序自动合并进该角色的聊天。Key 只存在服务端，不进快捷指令。</div>
 
         <div class="sk-line" style="margin-top:12px"><span class="sk-line-label">服务端地址（Cloudflare Worker 根地址）</span></div>
-        <input id="isPeekUrl" class="sk-textarea" style="min-height:40px;height:42px" placeholder="https://nano-push.xxx.workers.dev" autocomplete="off">
+        <input id="isPeekUrl" class="sk-textarea" style="min-height:40px;height:42px" placeholder="https://nanopush.nano315.online" autocomplete="off">
 
         <div class="sk-line" style="margin-top:12px"><span class="sk-line-label">令牌（与 Worker 的 PEEK_TOKEN 一致）</span></div>
         <div class="sk-copy"><code id="isPeekToken"></code><button class="sk-copy-btn" data-copy="isPeekToken">复制</button></div>
@@ -88,6 +93,7 @@
         <div class="sk-copy"><code id="isPeekEndpoint"></code><button class="sk-copy-btn" data-copy="isPeekEndpoint">复制</button></div>
 
         <div class="sk-line" style="margin-top:12px"><span class="sk-line-label">人设 / system（填进快捷指令的文本里）</span></div>
+        <div class="sk-note">现在<b>人设会自动从 App 同步到服务端</b>：你在 Nano 里切换角色后即时生效，快捷指令里 <b>system 可以直接不填</b>（留空即用当前角色人设）。下面这段是给你需要手动填（方式 B / 自定义）时用的。</div>
         <div class="sk-copy"><pre id="isPeekSystem"></pre><button class="sk-copy-btn" data-copy="isPeekSystem">复制</button></div>
 
         <button class="sk-copy-btn" id="isPeekSave" style="margin-top:12px">保存配置</button>
@@ -124,7 +130,7 @@
   </main>
 
   <div class="sk-toast" id="isToast"></div>
-  <script src="js/ios-setting.js?v=20261013f"></script>
+  <script src="js/ios-setting.js?v=20261016c"></script>
   <script src="swipe-back.js"></script>
 </body>
 </html>

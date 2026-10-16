@@ -1056,6 +1056,7 @@
     let quoteTargetId = null;
     let currentTurn = 0;
     let pendingTurnThink = '';
+    let pendingTurnTools = null;   // 本轮 char 调用过的 MCP 工具记录 [{name,args,ok,result}]
     let isPageVisible = true;
     let isStorageReady = false;
     let collapseExpanded = 0;
@@ -1230,9 +1231,11 @@
                             url: (typeof msg.imageData.url === 'string' && msg.imageData.url.indexOf('data:') !== 0) ? msg.imageData.url : null,
                             urls: (Array.isArray(msg.imageData.urls) && msg.imageData.urls.length) ? msg.imageData.urls.filter(function (u) { return typeof u === 'string' && u.indexOf('data:') !== 0; }) : undefined,
                             desc: msg.imageData.desc,
-                            emojiName: msg.imageData.emojiName
+                            emojiName: msg.imageData.emojiName,
+                            isEmoji: msg.imageData.isEmoji || false
                         } : null,
                         think: msg.think || null,
+                        tools: (msg.tools && msg.tools.length) ? msg.tools : null,
                         heart: msg.heart || null,
                         recalled: msg.recalled || false,
                         nanoActions: (msg.nanoActions && msg.nanoActions.length) ? msg.nanoActions : null
@@ -1251,7 +1254,10 @@
                             isCard: msg.isCard || false,
                             isVoice: msg.isVoice || false,
                             cardData: msg.cardData ? { cardType: msg.cardData.cardType, missed: msg.cardData.missed, claimed: msg.cardData.claimed, status: msg.cardData.status, response: msg.cardData.response, amount: msg.cardData.amount, issuer: msg.cardData.issuer, holder: msg.cardData.holder, familyId: msg.cardData.familyId, limit: msg.cardData.limit, food: msg.cardData.food, shop: msg.cardData.shop, price: msg.cardData.price, note: msg.cardData.note, place: msg.cardData.place, lat: msg.cardData.lat, lng: msg.cardData.lng, distance: msg.cardData.distance, eta: msg.cardData.eta, paidBy: msg.cardData.paidBy, action: msg.cardData.action, altName: msg.cardData.altName, altSetting: msg.cardData.altSetting, altFirst: msg.cardData.altFirst, title: msg.cardData.title, sub: msg.cardData.sub, footer: msg.cardData.footer, callId: msg.cardData.callId, video: msg.cardData.video, duration: msg.cardData.duration, direction: msg.cardData.direction, toName: msg.cardData.toName, systemNotice: msg.cardData.systemNotice, coupleKind: msg.cardData.coupleKind, coupleSummary: msg.cardData.coupleSummary, coupleDetail: msg.cardData.coupleDetail, shareId: msg.cardData.shareId } : null,
+                            // 兜底副本也要保留「表情包」标记，否则 localStorage 满时聊天列表里表情包会变成「图片」
+                            imageData: msg.imageData ? { textImage: msg.imageData.textImage, desc: msg.imageData.desc, emojiName: msg.imageData.emojiName, isEmoji: msg.imageData.isEmoji || false } : null,
                             think: msg.think || null,
+                        tools: (msg.tools && msg.tools.length) ? msg.tools : null,
                             heart: msg.heart || null,
                             recalled: msg.recalled || false,
                             nanoActions: (msg.nanoActions && msg.nanoActions.length) ? msg.nanoActions : null
@@ -2049,6 +2055,45 @@
   }
 }
 
+    // 顶栏昵称点击 → 打开心声弹窗（多一个入口：有些美化会隐藏消息头像，此时可点昵称看心声）
+    // 昵称元素位置随美化变化，这里直接绑定元素本身，触发位置自然跟着昵称走。
+    function openHeartFromTopbar() {
+        try {
+            let msg = null;
+            // 优先取最近一条带心声的角色消息
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const m = messages[i];
+                if (m && m.type === 'left' && !m.recalled && m.heart) { msg = m; break; }
+            }
+            // 没有带心声的，就取最近一条角色消息（心声弹窗会显示占位）
+            if (!msg) {
+                for (let i = messages.length - 1; i >= 0; i--) {
+                    const m = messages[i];
+                    if (m && m.type === 'left' && !m.recalled) { msg = m; break; }
+                }
+            }
+            if (!msg) return false;
+            handleAvatarClick({ stopPropagation: function () {}, preventDefault: function () {} }, msg.id);
+            return true;
+        } catch (e) { return false; }
+    }
+    window.__openHeartFromTopbar = openHeartFromTopbar;
+    // 顶栏昵称自己绑定一份（不依赖 chat_inner.html 里的内联脚本），
+    // 点击就在昵称所在处触发心声弹窗；没有可展示的心声时才回退「返回聊天列表」。
+    try {
+        const __titleEl = document.getElementById('chatTitle');
+        if (__titleEl) {
+            __titleEl.style.cursor = 'pointer';
+            __titleEl.addEventListener('click', function (e) {
+                if (openHeartFromTopbar()) {
+                    try { e.stopPropagation(); e.preventDefault(); } catch (err) {}
+                    return;
+                }
+                try { if (window.parent !== window) window.parent.postMessage({ type: 'nanoCloseOverlay' }, '*'); } catch (err) {}
+            });
+        }
+    } catch (e) {}
+
     function updateTime() {
         const now = new Date();
         const h = String(now.getHours()).padStart(2, '0');
@@ -2369,6 +2414,45 @@
         return wrap;
     }
 
+    // ===== MCP 工具调用（可折叠，展示在气泡上方，样式同思维链） =====
+    function buildToolsBlock(tools) {
+        const wrap = document.createElement('div');
+        wrap.className = 'msg-think msg-tools';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'msg-think-toggle';
+        btn.innerHTML = '<svg class="msg-think-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M14.5 6.5a4 4 0 0 0-5.2 5.2l-6 6a1.4 1.4 0 0 0 2 2l6-6a4 4 0 0 0 5.2-5.2l-2.1 2.1-2-2 2.1-2.1z"/>'
+            + '</svg><span>工具调用 · ' + tools.length + '</span>';
+        const body = document.createElement('div');
+        body.className = 'msg-think-body';
+        tools.forEach(function (t) {
+            const item = document.createElement('div');
+            item.className = 'msg-tool' + (t.ok ? '' : ' fail');
+            const nm = document.createElement('div');
+            nm.className = 'msg-tool-name';
+            nm.textContent = (t.ok ? '✓ ' : '✕ ') + (t.name || 'tool');
+            item.appendChild(nm);
+            if (t.args && Object.keys(t.args).length) {
+                const a = document.createElement('div');
+                a.className = 'msg-tool-args';
+                a.textContent = JSON.stringify(t.args);
+                item.appendChild(a);
+            }
+            if (t.result) {
+                const r = document.createElement('div');
+                r.className = 'msg-tool-res';
+                r.textContent = String(t.result).slice(0, 1500);
+                item.appendChild(r);
+            }
+            body.appendChild(item);
+        });
+        btn.addEventListener('click', function (e) { e.stopPropagation(); wrap.classList.toggle('open'); });
+        wrap.appendChild(btn);
+        wrap.appendChild(body);
+        return wrap;
+    }
+
     // 译文显示模式：true=独立气泡（在原文气泡外），false=与原文同一气泡
     function translationSeparate() {
         try { return localStorage.getItem('nano_trans_separate') !== '0'; } catch (e) { return true; }
@@ -2435,8 +2519,18 @@
                 pendingTurnThink = '';
             }
         }
+        // MCP 工具调用块：与思维链同样的消费方式
+        let toolsList = null;
+        if (type === 'left') {
+            toolsList = (existingThinkMsg && existingThinkMsg.tools) || null;
+            if (!toolsList && isNewRow && pendingTurnTools && pendingTurnTools.length) {
+                toolsList = pendingTurnTools;
+                pendingTurnTools = null;
+            }
+        }
 
         if (!recalled) {
+        if (toolsList && toolsList.length) content.appendChild(buildToolsBlock(toolsList));
         if (thinkText) content.appendChild(buildThinkBlock(thinkText));
         if (isCard) {
             const card = document.createElement('div');
@@ -2647,12 +2741,14 @@
                 favorite: false,
                 turn: null,
                 ts: Date.now(),
-                think: thinkText || null
+                think: thinkText || null,
+                tools: (toolsList && toolsList.length) ? toolsList : null
             });
         } else {
             if (transcript !== undefined) existing.transcript = transcript;
             if (translation !== undefined) existing.translation = translation;
             if (thinkText && !existing.think) existing.think = thinkText;
+            if (toolsList && toolsList.length && !existing.tools) existing.tools = toolsList;
         }
 
         // 纳米助手确认卡：跟随消息持久化，重渲染（新消息/刷新）后依然显示
@@ -4726,9 +4822,13 @@
                 try { url = await generateImage(buildImagePrompt(prompt)); } catch (e) {}
             }
             if (!url) return;
-            // 不孤零零甩一张图：先把想说的话发出来
-            const capText = String((obj.message || obj.caption) || '').slice(0, 160);
-            if (capText) addMessage('left', capText, nowHHMM(), null, false, false, null, null, null, null);
+            // 不孤零零甩一张图：先把想说的话拆成几条发出来
+            const capText = String((obj.message || obj.caption) || '').slice(0, 240);
+            const capBubbles = splitMessages(capText).slice(0, 3);
+            for (let i = 0; i < capBubbles.length; i++) {
+                if (i > 0) await new Promise(function (r) { setTimeout(r, 420); });
+                addMessage('left', capBubbles[i], nowHHMM(), null, false, false, null, null, null, null);
+            }
             addMessage('left', '', nowHHMM(), null, false, false, null, null, null, null, false, null, true, { url: url, desc: prompt, genPrompt: prompt });
             saveMessages();
             bumpChatPhotoCount();
@@ -4785,18 +4885,20 @@
             recent = messages.filter(function (m) { return m && !m.recalled && (m.text || m.isImage); }).slice(-8)
                 .map(function (m) { return (m.type === 'right' ? uName : (displayName || '我')) + '：' + (m.text || (m.isImage ? '[图片]' : '')); }).join('\n');
         } catch (e) {}
-        const sys = '你是「' + (displayName || charName || '角色') + '」，一个真实的人。你想在聊天时随手给对方分享一张照片（像现实里的情侣/好朋友那样：可能是此刻的你、你眼前看到的东西、日常的一角）。'
-            + '照片必须和你们最近的聊天、此刻的时间与情境强相关；绝不能发一张和上下文毫无关系、没有信息量的图。'
-            + '如果你此刻并没有真正值得分享、且和最近聊天强相关的东西，就把 imagePrompt 留空——**不要为了发图而发图**（系统看到 imagePrompt 为空就不会发送）。'
+        const sys = '你是「' + (displayName || charName || '角色') + '」，一个真实的人，正在过自己的生活。'
+            + '只有当你此刻真的在做某件值得分享的事（例如在看电影、在外面吃饭、和朋友玩、在逛街、在家做饭、看到好看的风景或有趣的东西…），才顺手拍一张发给对方分享，像现实里的情侣/好朋友那样。'
+            + '照片必须和你正在做的事、你们最近的聊天以及此刻的时间情境强相关；绝不能凭空发一张和上下文无关、没有信息量的图。'
+            + '重要：大多数普通的聊天（对方只是随口找你说句话、你也没在做什么特别的事）就不要发照片。只有少数情况下，你确实身处一个具体场景、并且真的很想分享时，才发。把 imagePrompt 留空也没关系——**绝对不要为了发图而发图**（系统看到 imagePrompt 为空就不会发送）。'
+            + 'message 要像真人发微信：拆成 1~3 条很短的句子，每条独占一行（先说你正在做什么/看到了什么，再自然带出照片），不要堆成一大段。'
             + '只输出一个 JSON，不要多余内容：'
-            + '{"think":"先想清楚对方此刻在聊什么、你要发什么、为什么发（一句话即可）",'
+            + '{"think":"先想清楚你现在在做什么、对方在聊什么、你要发什么、为什么发（一句话即可）",'
             + '"heart":"此刻印象||心声独白（第一人称、平实口语、90字以上的真实念头，禁止煽情浮夸）",'
-            + '"message":"随照片一起说出口的话，1~2 句，和照片及最近聊天强相关，禁止“给你看”“在干嘛”这类口水话",'
+            + '"message":"随照片一起说出口的话，1~3 条短句，用\\n分隔每条，和照片及最近聊天强相关，禁止“给你看”“在干嘛”这类口水话",'
             + '"caption":"可留空的短配文",'
-            + '"imagePrompt":"照片画面描述，具体、有画面感，适合直接用来生成图片"}';
+            + '"imagePrompt":"照片画面描述，具体、有画面感；若此刻并没有值得分享的具体场景则留空"}';
         const userMsg = (setting ? ('【你的人设】\n' + setting.slice(0, 500) + '\n\n') : '')
             + (recent ? ('【最近的聊天】\n' + recent + '\n\n') : '')
-            + '【现在】' + nowHHMM() + '。请自然想一张现在就想发给' + uName + '的照片。';
+            + '【现在】' + nowHHMM() + '。如果你此刻正好在做值得分享的事，就自然分享一张现在想发给' + uName + '的照片；没有的话就把 imagePrompt 留空，不必勉强。';
         suppressApiAlerts = true;
         let content = null;
         try { content = await callMainApiRaw([{ role: 'system', content: sys }, { role: 'user', content: userMsg }], 300, 0.95); }
@@ -4819,15 +4921,20 @@
             try { url = await generateImage(buildImagePrompt(prompt)); } catch (e) {}
             if (!url) return;
             const caption = String(obj.caption || '').slice(0, 60);
-            const msgText = String(obj.message || '').slice(0, 160) || caption;
+            const msgText = String(obj.message || '').slice(0, 240) || caption;
+            // 拆成多条短气泡发送：真人分享照片时是一句句说的，不会全塞进一个气泡里
+            const bubbles = splitMessages(msgText).slice(0, 3);
             // 本轮新加的消息 id：用于把心声挂到新消息上
             const beforeIds = {}; messages.forEach(function (m) { if (m && m.id) beforeIds[m.id] = 1; });
             // 思维链（开关开启才展示）
             let cotOn = false;
             try { const p = getChatSetting('cotPrompt', ''); const s = getChatSetting('cotEnabled', null); cotOn = (s === null || s === undefined) ? !!p : !!s; } catch (e) {}
             if (cotOn && obj.think && String(obj.think).trim()) pendingTurnThink = String(obj.think).trim();
-            // 先发一句和照片强相关的话，再发照片——不再只丢一张孤零零的图
-            if (msgText) addMessage('left', msgText, nowHHMM(), null, false, false, null, null, null, null);
+            // 先发几条和照片强相关的话，再发照片——不再只丢一张孤零零的图
+            for (let i = 0; i < bubbles.length; i++) {
+                if (i > 0) await new Promise(function (r) { setTimeout(r, 420); });
+                addMessage('left', bubbles[i], nowHHMM(), null, false, false, null, null, null, null);
+            }
             addMessage('left', '', nowHHMM(), null, false, false, null, null, null, null, false, null, true, { url: url, desc: prompt, genPrompt: prompt });
             // 心声挂到本轮新加的消息
             let heartObj = null;
@@ -5061,17 +5168,28 @@
 
     // 纳米助手新增表情包后，清掉缓存，下次打开表情面板即可看到
     try {
-        window.addEventListener('nanoEmojiUpdated', function () { emojiData = null; });
+        // 强制重新读取（不清空现有缓存，读到新值才替换），避免出现「短暂为空」的窗口
+        window.addEventListener('nanoEmojiUpdated', function () { try { getEmojiData(true); } catch (e) {} });
         window.addEventListener('message', function (e) {
             var d = e.data;
-            if (d && (d.type === 'nanoEmojiUpdated' || d.type === 'emojiDataUpdated')) emojiData = null;
+            if (!d) return;
+            if (d.type === 'nanoEmojiUpdated' || d.type === 'emojiDataUpdated') {
+                try { getEmojiData(true); } catch (e) {}
+                return;
+            }
+            // 表情页保存后，父页面会把最新表情数据随 homeDataUpdated 广播过来：
+            // 直接刷新缓存。否则刚添加（尤其「上传图片」添加）的表情包，角色在当前会话里
+            // 看不到、也就不会用它发给你（表现为"只发通过链接添加的表情包"）。
+            if (d.type === 'homeDataUpdated' && d.data && Array.isArray(d.data.emojiGroups)) {
+                emojiData = d.data;
+            }
         });
     } catch (e) {}
 
-    function getEmojiData() {
+    function getEmojiData(force) {
         return new Promise(function(resolve) {
             try {
-                if (emojiData) { resolve(emojiData); return; }
+                if (emojiData && !force) { resolve(emojiData); return; }
                 if (typeof indexedDB === 'undefined') { resolve(null); return; }
                 const req = indexedDB.open('nano_api_db', 2);
                 req.onupgradeneeded = function(e) {
@@ -5909,6 +6027,9 @@
             } catch (e) {}
 
             const history = [];
+            // 每次回复前强制从 IndexedDB 重读一次表情包数据：这样无论用户何时、以何种方式
+            // （链接 / 上传图片 / 纳米助手 / 其它页面）新加的表情包，角色这一轮都能读到并使用。
+            try { await getEmojiData(true); } catch (e) {}
             let __sys = buildSystemPrompt();
             if (offlineRoundHint && (offlineRoundHint.user || offlineRoundHint.char || (offlineRoundHint.rounds && offlineRoundHint.rounds.length))) {
                 let roundText = '';
@@ -6115,6 +6236,8 @@
             return t;
         });
         s = s.replace(/```/g, '');
+        // MCP 工具调用块：连同里面的 JSON 一起删掉，避免花括号漏进气泡
+        s = s.replace(/<\s*(tool|mcp)\s*>[\s\S]*?<\s*\/\s*\1\s*>/gi, ' ');
         // 思维链标签归一化：模型可能写成 <think>、<thinking>、[thinking]、［think］、【思考】、(thought)、[reasoning] 等，
         // 统一成 [think]/[/think] 再解析，避免各种变体漏进正文气泡。
         s = s.replace(/[<\[（【［]\s*\/?\s*(?:think(?:ing)?|thought|reasoning|analysis|cot|思考|思维链)\s*[>\]）】］]/gi, function (m) {
@@ -7340,6 +7463,26 @@
         }
     }
 
+    // 把「当前角色的人设」同步到窥屏服务端，快捷指令就不需要内置人设，切人设后自动生效
+    function pushPeekPersona() {
+        try {
+            var base = '';
+            try { base = (localStorage.getItem('nano_push_endpoint') || '').trim(); } catch (e) {}
+            if (!base) base = 'https://nanopush.nano315.online';
+            var token = '';
+            try { token = localStorage.getItem('nano_peek_token') || ''; } catch (e) {}
+            var cid = '';
+            try { cid = new URLSearchParams(location.search).get('chat') || ''; } catch (e) {}
+            var setting = (characterData && (characterData.setting || characterData.desc || characterData.persona)) || '';
+            var sys = '你是「' + (displayName || '角色') + '」。' + String(setting);
+            fetch(base.replace(/\/+$/, '') + '/peek/persona', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: token, chatId: cid, system: sys })
+            }).catch(function () {});
+        } catch (e) {}
+    }
+
     async function triggerReply() {
         if (isProcessingApi) return;
 
@@ -7404,7 +7547,22 @@
                 return;
             }
 
-            const reply = await callApi(describeMsgForAI(lastUserMsg) || lastUserMsg.text);
+            let __mcpCtx = '';
+            try { if (window.NanoMcpChat && window.NanoMcpChat.hasTools()) __mcpCtx = window.NanoMcpChat.toolInstruction(); } catch (e) {}
+            try { pushPeekPersona(); } catch (e) {}
+            let reply = await callApi(describeMsgForAI(lastUserMsg) || lastUserMsg.text, __mcpCtx || undefined);
+            if (genCancelled) return;
+            if (!reply) return;
+            // char 主动调用 MCP：解析 <tool> 标签 → 执行 → 继续生成最终回复
+            if (window.NanoMcpChat && (__mcpCtx || /<\s*(tool|mcp)\s*>/i.test(reply))) {
+                try {
+                    const r = await window.NanoMcpChat.runFromReply(reply, function (ctx) { return callApi('', ctx); }, { foreign: isForeignChar() || isCantoneseChar() });
+                    if (r) {
+                        if (r.text) reply = r.text;
+                        if (r.tools && r.tools.length) pendingTurnTools = r.tools;
+                    }
+                } catch (e) { console.warn('[MCP] 工具调用失败', e); }
+            }
             if (genCancelled) return;
             if (!reply) return;
             await processReply(reply, lastUserMsg);
