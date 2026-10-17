@@ -702,6 +702,12 @@
         return TRANSPARENT_PX;
     }
     // 保存封面：同时写入「按面具」键 + 全局键，保证朋友圈与个人主页一致、且换面具/重开后仍在
+    function syncProfileCover() {
+        try {
+            var b = document.getElementById('profileCoverImg');
+            if (b) b.src = getCoverUrl();
+        } catch (e) {}
+    }
     function saveCover(url) {
         var v = String(url || '').trim();
         if (!v) return;
@@ -709,9 +715,8 @@
         try { if (coverKey() !== 'nanoMomentsCover') localStorage.setItem(coverKey(), v); } catch (e) {}
         try {
             var a = document.getElementById('coverImg');
-            var b = document.getElementById('profileCoverImg');
             if (a) a.src = v;
-            if (b) b.src = v;
+            syncProfileCover();
         } catch (e) {}
     }
 
@@ -2021,7 +2026,8 @@
         if (normName(authorName) === normName(currentUser.name)) avatarSrc = currentUser.avatar || avatarSrc;
         document.getElementById('profileUserName').textContent = authorName;
         document.getElementById('profileUserAvatar').src = avatarSrcFor(authorName, avatarSrc);
-        document.getElementById('profileCoverImg').src = getCoverUrl();
+        // 个人主页封面始终跟朋友圈顶部封面共用同一份数据，打开时强制重取一次。
+        syncProfileCover();
         var tl = document.getElementById('profileTimeline');
         var userPosts = momentsData.filter(function(m) { return m.author === authorName; });
         if (userPosts.length === 0) {
@@ -2290,6 +2296,7 @@
         document.querySelectorAll('.page-view').forEach(function(e) { e.classList.remove('active'); });
         var target = document.getElementById(vid);
         if (target) target.classList.add('active');
+        if (vid === 'viewProfile') syncProfileCover();
         document.getElementById('detailMoreMenu').classList.remove('show');
         var pop = document.getElementById('detailActionPopover');
         if (pop) pop.classList.remove('show');
@@ -2581,7 +2588,7 @@
             contextNPCs = generateContextNPCs();
             allAvailableChars = boundChars.concat(contextNPCs);
         }
-        if (e.key && e.key.indexOf('nanoMomentsCover') === 0) { document.getElementById('coverImg').src = getCoverUrl(); document.getElementById('profileCoverImg').src = getCoverUrl(); }
+        if (e.key && e.key.indexOf('nanoMomentsCover') === 0) { document.getElementById('coverImg').src = getCoverUrl(); syncProfileCover(); }
     });
 
     window.addEventListener('message', function(e) {
@@ -2643,7 +2650,7 @@
         refreshCurrentUserFromMask();
         try { switchView('viewFeed'); } catch (e) {}
         document.getElementById('coverImg').src = getCoverUrl();
-        document.getElementById('profileCoverImg').src = getCoverUrl();
+        syncProfileCover();
         openDB(function() {
             loadMomentsData(function(items) {
                 momentsData = items || [];
@@ -2655,7 +2662,7 @@
     function init() {
         refreshCurrentUserFromMask();
         document.getElementById('coverImg').src = getCoverUrl();
-        document.getElementById('profileCoverImg').src = getCoverUrl();
+        syncProfileCover();
 
         getSettings().then(function (s) {
             settings = s;

@@ -299,6 +299,7 @@
         p += '这是视频通话，结合你能看到/听到的内容自然回应；如果看不到画面就正常聊天，不要反复提"你没开摄像头"。\n';
         p += '如果你用外语说话，每一句都必须紧跟中文翻译，格式为：外文（中文翻译），一句一行；例如 do you love me（你爱我吗？）。不要只写外文，也不要只写中文，翻译要完整。\n';
         p += '每条消息单独一行，不同气泡之间用换行分隔；不要把多句话挤进同一段。\n';
+        p += '如果你确实要结束这通视频电话（例如要去忙、手机快没电、话题自然结束、想休息了），可以在回复最后单独一行写 [hangup:简短理由]；这个标记不会显示给对方。不要每轮都挂断，只在真的想结束时用。\n';
         p += '不要每轮都重复描述你看到的外貌/穿着/环境细节（例如眼镜、发型、灯光）；只在有变化或确有必要时才提，别反复强调。\n';
         if (charPersona) p += '\n【你的人设】\n' + charPersona + '\n';
         if (wbText) p += '\n【世界书】\n' + wbText + '\n';
@@ -438,6 +439,36 @@
         });
     }
 
+    // 角色主动挂断：解析回复里的 [hangup:原因] 标记
+    function extractHangup(text) {
+        var s = String(text == null ? '' : text);
+        var re = /[\[【]\s*(?:hangup|挂断)\s*(?:[:：]\s*([^\]】]*?))?\s*[\]】]/i;
+        var m = s.match(re);
+        if (!m) return { text: s, hangup: false, reason: '' };
+        return {
+            text: s.replace(re, '').replace(/\n{3,}/g, '\n\n').trim(),
+            hangup: true,
+            reason: String(m[1] || '').trim()
+        };
+    }
+
+    function endCallByChar(reason) {
+        if (ended) return;
+        clearInterval(timer);
+        stopRing();
+        try {
+            if (mediaStream) mediaStream.getTracks().forEach(function (t) { t.stop(); });
+            if (window.NanoTTS) window.NanoTTS.stop();
+        } catch (e) {}
+        // sendCallCard 会置 ended=true，并把挂断理由带到聊天里
+        sendCallCard(false, reason);
+        toast(reason ? ('对方挂断了：' + reason) : '对方挂断了通话');
+        setTimeout(function () {
+            if (window.parent !== window) window.parent.postMessage({ type: 'voiceCallEnded' }, '*');
+            else history.back();
+        }, 1200);
+    }
+
     function updateReplyMode() {
         var has = !!(messageInput.value && messageInput.value.trim());
         replyBtn.classList.toggle('reply-mode', !has);
@@ -459,12 +490,17 @@
         isWaiting = true;
         replyBtn.classList.add('loading');
         showTyping();
-        callApi(text).then(function (reply) {
+        callApi(text).then(function (rawReply) {
             hideTyping();
+            var parsed = extractHangup(rawReply);
+            var reply = parsed.text;
             if (window.nanoStripThink) reply = window.nanoStripThink(reply);
             splitBubbles(reply).forEach(function (line) { addMessage(line, false); });
             isWaiting = false;
             replyBtn.classList.remove('loading');
+            if (parsed.hangup) {
+                setTimeout(function () { endCallByChar(parsed.reason); }, 900);
+            }
         });
     }
 
@@ -510,10 +546,21 @@
         if (flipBtn) flipBtn.style.display = on ? '' : 'none';
     }
 
+    function notifyCallState(active) {
+        try {
+            if (active) localStorage.setItem('nano_call_active_' + chatId, String(Date.now()));
+            else localStorage.removeItem('nano_call_active_' + chatId);
+        } catch (e) {}
+        try {
+            if (window.parent !== window) window.parent.postMessage({ type: 'nanoCallState', chatId: chatId, active: !!active }, '*');
+        } catch (e) {}
+    }
+
     // ===== 通话卡片 =====
     function sendCallCard(missed, rejectReason) {
         if (ended) return;
         ended = true;
+        notifyCallState(false);
         var out = [];
         for (var i = 0; i < messages.length; i++) {
             var m = messages[i];
@@ -673,6 +720,9 @@
         }
     });
 
+    window.addEventListener('pagehide', function () { notifyCallState(false); });
+    window.addEventListener('beforeunload', function () { notifyCallState(false); });
+
     // ===== 初始化 =====
     loadInfos().then(function () {
         if (userAvatar) return;
@@ -685,6 +735,7 @@
         localOff.style.display = 'flex';
         setCameraUI(false);
         updateReplyMode();
+        notifyCallState(true);
         // 接通前：居中头像 + 提示音，输入栏与三个按钮先隐藏（和语音通话一致）
         var connectingEl = $('vcConnecting');
         var inputArea = document.querySelector('.vc-input-area');

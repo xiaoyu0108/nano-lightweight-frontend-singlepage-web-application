@@ -3242,7 +3242,30 @@ async function restoreFontToBeautifyPage() {
     if (window.parent !== window) {
       window.parent.postMessage({ type: 'beautify:loaded' }, '*');
     }
-    
+
+    // 从集市导入 / 其他页面应用后，预设库可能已经变化：
+    // 页面被重新打开、聚焦或收到同步消息时，重新拉取聊天/全局/字体预设。
+    async function refreshBeautifyListsFromStore() {
+      try {
+        await refreshPresets('global');
+        await refreshPresets('chat');
+        await refreshFontPresets();
+        await renderFontQuickBar();
+      } catch (e) {}
+    }
+    window.addEventListener('message', function (e) {
+      var t = e && e.data && e.data.type;
+      if (!t) return;
+      if (['nanoOverlayReopen', 'nano:pageShown', 'beautify:apply', 'beautify:font',
+           'marketResourceImported', 'contactsDataUpdated'].indexOf(t) !== -1) {
+        refreshBeautifyListsFromStore();
+      }
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') refreshBeautifyListsFromStore();
+    });
+    window.addEventListener('focus', refreshBeautifyListsFromStore);
+
     toast("美化已加载");
   } catch (e) {
     console.error(e);

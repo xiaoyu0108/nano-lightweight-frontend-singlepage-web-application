@@ -204,12 +204,15 @@
     }
 
     function saveData(data) {
+        // 打上更新时间：启动时用它判断 localStorage 和 IndexedDB 哪份更新。
+        try { data.updatedAt = Date.now(); } catch(e) {}
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             try {
                 window.parent.postMessage({ type: 'homeDataUpdated', data: data }, '*');
             } catch(e) {}
         } catch(e) {
+            // localStorage 写满时不阻断保存：IndexedDB 仍会写入，启动时以它为准恢复。
             console.error('saveData error:', e);
         }
         // 写入 IndexedDB（人设数据本体）
@@ -760,19 +763,67 @@
     renderAll();
 
     // ===== 人设数据本体同步到 IndexedDB / 从 IndexedDB 恢复（不清除现有数据） =====
-    if (data && Array.isArray(data.masks) && data.masks.length > 0) {
-        maskIdbPut(data);
-    }
+    // 注意：不能先把 localStorage 里的旧数据写进 IndexedDB 再读，
+    // 否则 localStorage 写满导致新用户没存进去时，会把 IndexedDB 里正确的新数据覆盖掉，
+    // 表现就是“刚添加的人设一刷新就没了”。
     maskIdbGet().then(function(idbData) {
-        if (idbData && Array.isArray(idbData.masks)) {
-            const idbCount = idbData.masks.length;
-            const localCount = (data && Array.isArray(data.masks)) ? data.masks.length : 0;
-            // 取数量更多的一边（防误清空：只要一边还有人设数据就用一边）
-            if (idbCount > localCount || (idbCount > 0 && localCount === 0)) {
-                data = idbData;
-                saveData(data);
-                renderAll();
-            }
+        const localMasks = (data && Array.isArray(data.masks)) ? data.masks : [];
+        const idbMasks = (idbData && Array.isArray(idbData.masks)) ? idbData.masks : [];
+        const localTs = Number(data && data.updatedAt) || 0;
+        const idbTs = Number(idbData && idbData.updatedAt) || 0;
+
+        if (!idbData || !idbMasks.length) {
+            if (localMasks.length > 0) maskIdbPut(data);
+            return;
+        }
+
+        // 按 id 合并两边，而不是整份覆盖：
+        //  · 页面刚打开、IndexedDB 还没读完时，用户可能已经新增了人设；
+        //  · 如果直接拿 IDB 覆盖，会把刚加的人设冲掉（看起来又“加不上”）。
+        // 同 id 时，更新时间较新的一边优先。
+        const mergedMap = {};
+        const order = [];
+        function addMask(m) {
+            if (!m || !m.id) return;
+            if (!mergedMap[m.id]) order.push(m.id);
+            mergedMap[m.id] = m;
+        }
+        if (idbTs >= localTs) {
+            localMasks.forEach(addMask);
+            idbMasks.forEach(addMask);
+        } else {
+            idbMasks.forEach(addMask);
+            localMasks.forEach(addMask);
+        }
+        const merged = order.map(function (id) { return mergedMap[id]; });
+        if (!merged.length) return;
+
+        let current = '';
+        if (data && data.currentMaskId && mergedMap[data.currentMaskId]) current = data.currentMaskId;
+        else if (idbData.currentMaskId && mergedMap[idbData.currentMaskId]) current = idbData.currentMaskId;
+        else current = merged[0].id;
+
+        function sig(list) {
+            try {
+                return JSON.stringify(list.slice().sort(function (a, b) {
+                    return String(a && a.id || '').localeCompare(String(b && b.id || ''));
+                }));
+            } catch (e) { return ''; }
+        }
+        const changed = merged.length !== localMasks.length ||
+            merged.length !== idbMasks.length ||
+            current !== (data && data.currentMaskId) ||
+            sig(localMasks) !== sig(merged);
+
+        if (changed) {
+            // 以较新的一边为底，避免其它字段被旧数据覆盖。
+            data = Object.assign({}, (idbTs > localTs ? idbData : data));
+            data.masks = merged;
+            data.currentMaskId = current;
+            saveData(data);
+            renderAll();
+        } else {
+            maskIdbPut(data);
         }
     });
 })();

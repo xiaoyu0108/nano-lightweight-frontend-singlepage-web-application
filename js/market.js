@@ -480,19 +480,27 @@
   }
 
   // ---- 美化类 ----
-  function applyBeautify(target, css) {
+  async function applyBeautify(target, css, name) {
     try {
       localStorage.setItem('beautify_' + target, css);
       localStorage.setItem('beautify_' + target + '_v2', css);
       localStorage.setItem('beautify_' + target + '_time', String(Date.now()));
     } catch (e) {}
+    // 同时写入美化 App 的预设库与 applied_* 设置，预设下拉里立刻可见。
+    try {
+      await putBeautifyPreset({
+        category: target, name: name || '集市美化', code: css,
+        createdAt: Date.now(), source: 'market'
+      });
+      await putBeautifySetting('applied_' + target, css);
+    } catch (e) { console.warn('[market] save beautify preset failed', e); }
     postToShell({ type: 'beautify:apply', target: target, css: css });
-    return Promise.resolve();
   }
-  function applyHeart(css) {
+  async function applyHeart(css, name) {
     try { localStorage.setItem('nano_voice_applied_css', css); } catch (e) {}
+    // 心声模板库（NanoVoiceDB/templates）也写一份，心声美化页的预设列表能看到。
+    try { await putHeartTemplate(name || '集市心声', css); } catch (e) { console.warn('[market] save heart template failed', e); }
     postToShell({ type: 'nanoVoiceCss', css: css });
-    return Promise.resolve();
   }
   function applyOffline(css) {
     return new Promise(function (res, rej) {
@@ -514,12 +522,76 @@
       req.onerror = function () { rej(req.error); };
     });
   }
-  async function runBeautify(areaKey, file) {
+  // 把导入的样式同时写进对应 App 的「预设库」，
+  // 这样在「聊天美化 / 全局美化 / 心声美化」里能直接看到并使用，
+  // 而不是只改了已应用样式、预设列表里什么都没有。
+  function openBeautifyDb() {
+    return new Promise(function (res, rej) {
+      var req = indexedDB.open('BeautifyAppDB');
+      req.onupgradeneeded = function (e) {
+        var d = e.target.result;
+        if (!d.objectStoreNames.contains('presets')) d.createObjectStore('presets', { keyPath: 'id', autoIncrement: true });
+        if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'key' });
+      };
+      req.onsuccess = function () { res(req.result); };
+      req.onerror = function () { rej(req.error); };
+    });
+  }
+  function putBeautifyPreset(rec) {
+    return openBeautifyDb().then(function (d) {
+      return new Promise(function (res, rej) {
+        try {
+          var tx = d.transaction('presets', 'readwrite');
+          tx.objectStore('presets').add(rec);
+          tx.oncomplete = function () { d.close(); res(); };
+          tx.onerror = function () { d.close(); rej(tx.error); };
+        } catch (e) { try { d.close(); } catch (e2) {} rej(e); }
+      });
+    });
+  }
+  function putBeautifySetting(key, value) {
+    return openBeautifyDb().then(function (d) {
+      return new Promise(function (res, rej) {
+        try {
+          var tx = d.transaction('settings', 'readwrite');
+          tx.objectStore('settings').put({ key: key, value: value });
+          tx.oncomplete = function () { d.close(); res(); };
+          tx.onerror = function () { d.close(); rej(tx.error); };
+        } catch (e) { try { d.close(); } catch (e2) {} rej(e); }
+      });
+    });
+  }
+  function openHeartDb() {
+    return new Promise(function (res, rej) {
+      var req = indexedDB.open('NanoVoiceDB');
+      req.onupgradeneeded = function (e) {
+        var d = e.target.result;
+        if (!d.objectStoreNames.contains('templates')) d.createObjectStore('templates', { keyPath: 'id' });
+      };
+      req.onsuccess = function () { res(req.result); };
+      req.onerror = function () { rej(req.error); };
+    });
+  }
+  function putHeartTemplate(name, css) {
+    return openHeartDb().then(function (d) {
+      return new Promise(function (res, rej) {
+        try {
+          var tx = d.transaction('templates', 'readwrite');
+          tx.objectStore('templates').put({ id: 'tpl_' + Date.now() + '_' + rand(4), name: name || '集市心声', css: css || '', createdAt: Date.now() });
+          tx.oncomplete = function () { d.close(); res(); };
+          tx.onerror = function () { d.close(); rej(tx.error); };
+        } catch (e) { try { d.close(); } catch (e2) {} rej(e); }
+      });
+    });
+  }
+
+  async function runBeautify(areaKey, file, post) {
     var text = extractCss(await dataURLToText(file.data), file.name);
-    if (areaKey === 'online') await applyBeautify('chat', text);
-    else if (areaKey === 'global') await applyBeautify('global', text);
+    var name = (post && post.title) || (file.name || '集市资源').replace(/\.[^.]+$/, '');
+    if (areaKey === 'online') await applyBeautify('chat', text, name);
+    else if (areaKey === 'global') await applyBeautify('global', text, name);
     else if (areaKey === 'offline') await applyOffline(text);
-    else if (areaKey === 'thought') await applyHeart(text);
+    else if (areaKey === 'thought') await applyHeart(text, name);
   }
 
   // ---- 世界书 ----
@@ -757,8 +829,10 @@
     }
     var card = parseCardData(cardObj);
     if (!card) throw new Error('角色卡字段缺失');
+    var isPngCard = /^image\/png/i.test(file.mime || '') || /\.png$/i.test(file.name || '');
     var rec = {
-      id: 'c' + Date.now(), name: card.name, avatar: file.data, gender: card.gender,
+      // 只有 PNG 角色卡的文件本体才是头像；JSON 卡不能把 JSON 文本当头像。
+      id: 'c' + Date.now(), name: card.name, avatar: isPngCard ? file.data : '', gender: card.gender,
       nationality: card.nationality, setting: card.setting, bindUser: currentMaskId(),
       isNpc: false, nanoAssistant: false, greetings: card.greetings, worldbookBindings: []
     };
@@ -782,7 +856,7 @@
       } catch (e) {}
     }
     postToShell({ type: 'contactsDataUpdated' });
-    postToShell({ type: 'nanoCharUpdated', data: { id: rec.id, name: rec.name, avatar: rec.avatar } });
+    postToShell({ type: 'nanoCharUpdated', chatId: rec.id, name: rec.name, avatar: rec.avatar });
   }
 
   // ---- 字体 ----
@@ -816,6 +890,9 @@
         req.onerror = function () { rej(req.error); };
       });
       try { localStorage.removeItem('beautify_font'); } catch (e) {}
+      try {
+        await putBeautifyPreset({ category: 'font', name: file.name, font: state, createdAt: Date.now(), source: 'market' });
+      } catch (e) { console.warn('[market] save font preset failed', e); }
       postToShell({ type: 'beautify:font', cfg: { family: 'NanoBeautifyFont', name: file.name, source: file.name, type: 'file', size: 16, format: fontFormat(file.name), data: ab } });
       return;
     }
@@ -826,6 +903,10 @@
     if (!/^https?:\/\/|^data:/i.test(url)) throw new Error('不是有效的字体文件或字体链接');
     var cfg = { family: 'NanoBeautifyFont', name: file.name, source: url, type: 'url', size: 16, format: fontFormat(url) };
     try { localStorage.setItem('beautify_font', JSON.stringify(cfg)); } catch (e) {}
+    try { await putBeautifySetting('appliedFont', cfg); } catch (e) {}
+    try {
+      await putBeautifyPreset({ category: 'font', name: file.name, font: cfg, createdAt: Date.now(), source: 'market' });
+    } catch (e) { console.warn('[market] save font preset failed', e); }
     postToShell({ type: 'beautify:font', cfg: cfg });
   }
 
@@ -885,6 +966,8 @@
       totalImports++;
       try { if (db) await idbPut('settings', { key: 'imports', value: totalImports }); } catch (e) {}
       countRemote(p.id, 'imports', 1);
+      // 通知外壳广播给美化 / 储存等页面，让它们立刻重新读取最新预设与占用。
+      postToShell({ type: 'marketResourceImported', category: p.category || '' });
       renderHome(); updateProfile();
       toast('已导入到「' + (OPEN_IMPORT[p.category] || catName(p.category)) + '」并生效');
     } catch (e) {
@@ -978,6 +1061,9 @@
   function showPage(id) {
     document.querySelectorAll('.page').forEach(function (p) { p.classList.toggle('active', p.id === id); });
     document.querySelectorAll('.nav-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.page === id); });
+    // 返回键放在顶栏里：首页隐藏，其他页面显示（不再挂在顶栏下面）。
+    var back = $('topBackBtn');
+    if (back) back.hidden = (id === 'page-home');
     if (id === 'page-profile') updateProfile();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1040,6 +1126,8 @@
   $('topProfileBtn').onclick = function () { showPage('page-profile'); };
   $('brandBtn').onclick = function () {
     if ($('detailPage').classList.contains('show')) { closeDetail(); return; }
+    var active = document.querySelector('.page.active');
+    if (active && active.id !== 'page-home') { showPage('page-home'); return; }
     try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'nanoCloseOverlay' }, '*'); else history.back(); } catch (e) {}
   };
   $('homeSearch').addEventListener('input', function () { renderPosts('homePosts', filtered('all', $('homeSearch').value)); });
@@ -1049,7 +1137,10 @@
     $('categorySearch').value = q;
     renderPosts('categoryPosts', filtered('all', q));
   };
-  $('backFromCategory').onclick = function () { showPage('page-home'); };
+  if ($('topBackBtn')) $('topBackBtn').onclick = function () {
+    if ($('detailPage').classList.contains('show')) { closeDetail(); return; }
+    showPage('page-home');
+  };
   $('categorySearch').addEventListener('input', function () { renderPosts('categoryPosts', filtered(selectedCategory, $('categorySearch').value)); });
 
   // 图片上传

@@ -4,14 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MCP</title>
-<link rel="stylesheet" href="css/mcp.css">
+<link rel="stylesheet" href="css/mcp.css?v=20261017b">
 </head>
 <body>
 <div class="app">
   <header class="topbar">
-    <div class="brand" id="brandBtn">
-      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M17.5 14v7M14 17.5h7"/></svg>
-      MCP
+    <div class="topbar-left">
+      <button class="topbar-btn topbar-back" id="mcpBackBtn" type="button" aria-label="返回">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" id="brandBtn">
+        MCP
+        <small>TOOLS</small>
+      </div>
     </div>
     <div class="topbar-actions">
       <button class="topbar-btn" id="addServerBtn" aria-label="添加服务器">
@@ -22,7 +27,8 @@
 
   <main>
     <div class="hero">
-      <h1>连接 MCP 工具</h1>
+      <span class="eyebrow">MODEL CONTEXT PROTOCOL</span>
+      <h1>连接 <em>MCP</em> 工具</h1>
       <p>已内置几个公开免费的 MCP 和本地「陪伴型」工具，点开即可用；也可以自己添加服务器。开启开关后，聊天里的角色就能主动调用它们。</p>
     </div>
 
@@ -38,6 +44,12 @@
       <ol>
         <li><b>服务器令牌</b>：填在「＋添加服务器」弹窗的「令牌」框里，就是该 MCP 服务商给你的 API Key（<code>Authorization: Bearer ...</code>）。</li>
         <li><b>代理安全锁（可选）</b>：想让代理只允许你自己用，就在 Worker 端执行 <code>npx wrangler secret put MCP_TOKEN</code> 设一个值；再在浏览器控制台执行 <code>localStorage.setItem('nano_mcp_token','同一个值')</code>。两处一致才放行；不设则代理对访问者开放。</li>
+      </ol>
+      <h4 style="margin-top:10px">MCP 里还有什么</h4>
+      <ol>
+        <li><b>Nano 原生工具</b>：天气、时间、定位、地图、打开网页、打开 App，本地直接执行，不需要服务器。</li>
+        <li><b>远程 MCP</b>：DeepWiki / GitMCP / Microsoft Learn / Cloudflare Docs，也可以添加自己的服务器。</li>
+        <li><b>那个 JSON</b>：点开任意工具后，文本框里是调用这个工具要传的参数（JSON 对象）。没有参数就保留 <code>{}</code>，改好点「运行」即可测试。</li>
       </ol>
       <h4 style="margin-top:10px">限制</h4>
       <ol>
@@ -87,9 +99,11 @@
       <h3 id="toolModalTitle">调用工具</h3>
       <button class="modal-close" id="closeToolModal">×</button>
     </div>
+    <p class="tool-desc" id="toolDesc"></p>
     <div class="field">
       <label>参数（JSON）</label>
       <textarea class="textarea" id="toolArgs" spellcheck="false"></textarea>
+      <div class="tool-hint" id="toolHint">参数是这个工具需要的 JSON 输入；没有参数就保留 <code>{}</code>。</div>
     </div>
     <div id="toolResultWrap" style="display:none">
       <label style="display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:8px">结果</label>
@@ -103,7 +117,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="js/nano-mcp-runtime.js?v=20261016b"></script>
-<script src="js/mcp.js?v=20261016e"></script>
+<script src="js/nano-mcp-runtime.js?v=20261017b"></script>
+<script src="js/mcp.js?v=20261017b"></script>
 </body>
 </html>

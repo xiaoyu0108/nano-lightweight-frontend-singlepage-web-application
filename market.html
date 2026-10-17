@@ -4,15 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>共享集市</title>
-<link rel="stylesheet" href="css/market.css">
+<link rel="stylesheet" href="css/market.css?v=20261017b">
 </head>
 <body>
 
 <div class="app" id="app">
   <header class="topbar">
-    <div class="brand" id="brandBtn">
-      <svg viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2h5.5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-9Z"/><path d="M4 11h16"/></svg>
-      共享集市
+    <div class="topbar-left">
+      <button class="topbar-btn topbar-back" id="topBackBtn" type="button" aria-label="返回" hidden>
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="brand" id="brandBtn">
+        共享集市
+        <small>MARKET</small>
+      </div>
     </div>
     <div class="topbar-actions">
       <button class="topbar-btn" id="topSearchBtn" aria-label="搜索">
@@ -55,10 +60,7 @@
     <!-- 分类页 -->
     <section class="page" id="page-category">
       <div class="page-header">
-        <button class="detail-back" id="backFromCategory" style="margin-bottom:16px;">
-          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-          返回首页
-        </button>
+        <span class="page-kicker">COLLECTION</span>
         <h1 id="categoryTitle">全部资源</h1>
         <p id="categorySub">浏览集市内的用户分享。</p>
       </div>
@@ -168,10 +170,11 @@
 <!-- 详情页 -->
 <div class="detail-page" id="detailPage">
   <div class="detail-header">
-    <button class="detail-back" id="detailBack">
+    <button class="detail-back" id="detailBack" aria-label="返回">
       <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-      返回
     </button>
+    <span class="detail-header-title">资源详情</span>
+    <span class="detail-header-spacer"></span>
   </div>
   <div class="detail-content" id="detailContent"></div>
 </div>
@@ -215,6 +218,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/market.js?v=20261016d"></script>
+<script src="js/market.js?v=20261017b"></script>
 </body>
 </html>

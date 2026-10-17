@@ -1452,7 +1452,7 @@
             'music.html', 'voice-call.html', 'video-call.html', 'storage.html', 'backup.html', 'other.html', 'more.html',
             'discover.html', 'api.html', 'moments.html', 'ins.html', 'inner-setting.html', 'beautify.html',
             'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
-            'heart-setting.html',
+            'heart-setting.html', 'market.html', 'mcp.html',
             'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html', 'appstore.html',
             'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html'];
         // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
@@ -1498,7 +1498,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-10-01';
+        var BUILD = 'nano-2026-10-17-05';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -2791,6 +2791,12 @@
                 }
             }
 
+            if (data.type === 'marketResourceImported') {
+                document.querySelectorAll('iframe').forEach(function(f) {
+                    try { if (f && f.contentWindow) f.contentWindow.postMessage(data, '*'); } catch (e) {}
+                });
+            }
+
             if (data.type === 'beautify:apply' || data.type === 'beautify:font') {
                 if (window.__nanoAppearance) {
                     try { window.__nanoAppearance.applyMessage(data); } catch (e) {}
@@ -3081,6 +3087,7 @@
 
             if (data.type === 'notifyOpen') {
                 try { openNotifyTarget(data.target || ''); } catch (e) {}
+                setTimeout(function () { try { if (window.AutoPushBridge) AutoPushBridge.pull(true); } catch (e) {} }, 1500);
                 return;
             }
 
@@ -3521,6 +3528,7 @@
 <script src="js/char-takeover.js?v=20261009a"></script>
 <script src="js/screen-share.js?v=20261013e"></script>
 <script src="js/ios-bridge.js?v=20261013b"></script>
+<script src="js/auto-push-bridge.js?v=20261017d"></script>
 <script src="js/online-catchup.js?v=20261013a"></script>
 </div>
     <!-- 小号试探：居中弹窗（不暴露是谁）-->

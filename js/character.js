@@ -106,11 +106,15 @@
             const bestByName = {};
             chars.forEach(c => {
                 const bindUser = c.bindUser || '';
-                // 没有 bindUser 的 NPC（含小号）：归到当前人设名下，避免串到别的 user。
+                // 没有 bindUser 的角色统一归到当前人设名下：
+                // 旧逻辑会直接删除「未绑定的普通角色」，导致新建的角色（尤其先建角色、后建人设）
+                // 下次打开角色页就消失，看起来像“添加不了”。
                 // 纳米助手不参与（它用 nanoAssistant 标记、bindUser 留空）。
-                if (bindUser === '' && c.isNpc && !c.nanoAssistant) { toBind.push(c); return; }
-                if (bindUser === '' && !c.isNpc) { del.push(c.id); return; }
-                if (bindUser === '') return;
+                if (bindUser === '') {
+                    if (c.nanoAssistant) return;
+                    toBind.push(c);
+                    return;
+                }
                 if (bindUser !== maskId) return;
                 const name = c.name || '';
                 if (bestByName[name] === undefined) {
@@ -301,11 +305,15 @@
 
     function getCurrentUser() {
         const homeData = readHomeData();
-        if (homeData && homeData.currentMaskId) {
-            const masks = homeData.masks || [];
-            return masks.find(m => m.id === homeData.currentMaskId) || null;
+        if (!homeData) return null;
+        const masks = homeData.masks || [];
+        if (homeData.currentMaskId) {
+            const cur = masks.find(m => m.id === homeData.currentMaskId);
+            if (cur) return cur;
         }
-        return null;
+        // 旧数据可能只有 masks、没有 currentMaskId：回退到第一个人设，
+        // 否则新建角色时拿不到 bindUser，保存后会看不到。
+        return masks[0] || null;
     }
 
     // 世界书：从 nano_worldbook_db IndexedDB 读取真实条目（与 worldbook.js 一致）
@@ -1093,7 +1101,10 @@
         const nationality = inputNationality.value.trim() || '中国';
         const setting = inputSetting.value.trim() || '';
         const avatar = tempAvatar || '';
-        const bindUser = inputBindUser.value || '';
+        // 新建角色时如果没选人设，自动绑定当前人设，避免保存后因 bindUser 为空
+        // 被角色页过滤掉（表现为“点了添加但列表里没有”）。
+        const curUser = getCurrentUser();
+        const bindUser = inputBindUser.value || (curUser ? curUser.id : '');
 
         const existingItem = editingId ? (data.chars || []).find(c => c.id === editingId) : null;
         const newItem = {

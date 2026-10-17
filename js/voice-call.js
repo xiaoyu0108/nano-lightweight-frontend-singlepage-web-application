@@ -182,6 +182,7 @@
         prompt += '\n\n你正在和用户进行语音通话，保持自然、简洁、真实的回复风格，不要使用 emoji。';
         prompt += '\n如果你用外语说话，每一句都必须紧跟中文翻译，格式为：外文（中文翻译），一句一行；例如 do you love me（你爱我吗？）。不要只写外文或只写中文，翻译要完整。';
         prompt += '\n每条消息单独一行，不同气泡之间用换行分隔；不要把多句话挤进同一段。';
+        prompt += '\n如果你确实要结束这通电话（例如要去忙、手机快没电、话题自然结束、想休息了），可以在回复最后单独一行写 [hangup:简短理由]；这个标记不会显示给对方。不要每轮都挂断，只在真的想结束时用。';
         if (wbText) prompt += '\n【世界书】\n' + wbText;
         if (memText) prompt += '\n【长期记忆】\n' + memText;
         return prompt;
@@ -206,6 +207,7 @@
 
     // ===== 状态 =====
     let isWaiting = false;
+    let callClosed = false;
     let callSeconds = getStoredSeconds();
     let callTimer = null;
     let messages = [];
@@ -427,9 +429,20 @@ function hideInputArea() {
         try { if (ringCtx) { ringCtx.close(); ringCtx = null; } } catch (e) { ringCtx = null; }
     }
 
+    function notifyCallState(active) {
+        try {
+            if (active) localStorage.setItem('nano_call_active_' + chatId, String(Date.now()));
+            else localStorage.removeItem('nano_call_active_' + chatId);
+        } catch (e) {}
+        try {
+            if (window.parent !== window) window.parent.postMessage({ type: 'nanoCallState', chatId: chatId, active: !!active }, '*');
+        } catch (e) {}
+    }
+
     function startConnecting() {
         if (isConnected) return;
         isConnecting = true;
+        notifyCallState(true);
         connectStartTime = Date.now();
         callStatus.textContent = '接通中...';
         document.body.classList.add('connecting');
@@ -448,6 +461,7 @@ function hideInputArea() {
             const d = arr[0];
             if (d && d.answer === false) {
                 // 角色拒接（太晚/在忙/不方便等）
+                callClosed = true;
                 isConnecting = false;
                 stopRing();
                 document.body.classList.remove('connecting');
@@ -949,9 +963,40 @@ function showToast(text) {
         chatArea.scrollTop = chatArea.scrollHeight;
     }
 
+    // 角色主动挂断：解析回复里的 [hangup:原因] 标记。
+    // 标记只用于控制通话，不会出现在聊天气泡里。
+    function extractHangup(text) {
+        var s = String(text == null ? '' : text);
+        var re = /[\[【]\s*(?:hangup|挂断)\s*(?:[:：]\s*([^\]】]*?))?\s*[\]】]/i;
+        var m = s.match(re);
+        if (!m) return { text: s, hangup: false, reason: '' };
+        return {
+            text: s.replace(re, '').replace(/\n{3,}/g, '\n\n').trim(),
+            hangup: true,
+            reason: String(m[1] || '').trim()
+        };
+    }
+
+    function endCallByChar(reason) {
+        if (callClosed) return;
+        callClosed = true;
+        stopRing();
+        if (callTimer) { clearInterval(callTimer); callTimer = null; }
+        if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
+        isConnecting = false;
+        isConnected = false;
+        sendVoiceCallCard(false, reason);
+        try { localStorage.removeItem('voice_call_seconds_' + chatId); } catch (e) {}
+        showToast(reason ? ('对方挂断了：' + reason) : '对方挂断了通话');
+        setTimeout(function() {
+            if (window.parent !== window) window.parent.postMessage({ type: 'voiceCallEnded' }, '*');
+            else history.back();
+        }, 1200);
+    }
+
     // ===== 点击回复按钮 - 调用 API =====
     function triggerReply() {
-        if (isWaiting) return;
+        if (isWaiting || callClosed) return;
 
         const userMsgs = getUserMessagesForTurn();
 
@@ -959,13 +1004,19 @@ function showToast(text) {
         replyBtn.classList.add('loading');
         showTyping();
 
-        callApi(userMsgs, messages).then(function(reply) {
+        callApi(userMsgs, messages).then(function(rawReply) {
             hideTyping();
+            var parsed = extractHangup(rawReply);
+            var reply = parsed.text;
             // 分句拆成多条独立气泡（先清掉可能漏出的思维链标记）
             if (window.nanoStripThink) reply = window.nanoStripThink(reply);
             splitBubbles(reply).forEach(function(line) { addMessage(line, false); });
             isWaiting = false;
             replyBtn.classList.remove('loading');
+            // 角色说完最后一句后主动挂断
+            if (parsed.hangup) {
+                setTimeout(function() { endCallByChar(parsed.reason); }, 900);
+            }
         }).catch(function(err) {
             hideTyping();
             addMessage('出错了：' + err.message, false);
@@ -1057,6 +1108,7 @@ function showToast(text) {
 
     // ===== 发送语音通话卡片 =====
     function sendVoiceCallCard(missed, rejectReason) {
+        notifyCallState(false);
         var messagesForCard = [];
         for (var i = 0; i < messages.length; i++) {
             var m = messages[i];
@@ -1088,6 +1140,7 @@ function showToast(text) {
 
     // ===== 来电界面 =====
     function startIncomingUI() {
+        notifyCallState(true);
         if (incomingActions) incomingActions.classList.add('active');
         if (hangupWrapper) hangupWrapper.style.display = 'none';
     }
@@ -1155,6 +1208,8 @@ init();
 
     // ===== 挂断按钮 =====
     hangupBtn.addEventListener('click', function() {
+        if (callClosed) return;
+        callClosed = true;
         // 停止计时器
         stopRing();
         clearInterval(callTimer);
@@ -1374,6 +1429,9 @@ init();
     });
 
     // ===== 暴露 API =====
+    window.addEventListener('pagehide', function () { notifyCallState(false); });
+    window.addEventListener('beforeunload', function () { notifyCallState(false); });
+
     window.__voiceCall = {
         addMessage: addMessage,
         sendUserMessage: sendUserMessage,

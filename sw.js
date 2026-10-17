@@ -8,7 +8,7 @@
    “后台回复”依赖页面常驻 + 音频保活；真正的“关闭也能收到”需要服务端配合（见 push 事件）。 */
 'use strict';
 
-var CACHE = 'nano-static-v71';
+var CACHE = 'nano-static-v76';
 var STATIC_RE = /\.(css|js|png|jpg|jpeg|webp|svg|gif|ico|woff2?|ttf|mp3)$/i;
 var HTML_FRESH_MS = 0;                // 0：每次打开都联网取最新 HTML（断网/超时再用缓存）
 var NET_TIMEOUT_MS = 1500;            // 有缓存时，网络最多等 1.5 秒，超时先上缓存
@@ -109,7 +109,7 @@ self.addEventListener('fetch', function (event) {
 
 // 真正的「应用已关闭也能收到」推送需要服务端配合（Web Push）：
 // 服务端拿 VAPID 私钥向这里的订阅端点发 push，下面的 push 事件就会弹系统通知。
-// 生成内容仍然发生在客户端（用的是你自己的 API Key），所以服务端只负责“到点提醒”。
+// 主动消息 / 朋友圈可由 Worker cron 到点生成后推送；内容暂存在服务端，App 打开后再合并。
 self.addEventListener('push', function (event) {
     var data = { title: 'Nano', body: '你有一条新消息', target: '' };
     try {

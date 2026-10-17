@@ -964,4 +964,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') updateStorageUI();
     });
+    // 页面被复用/重新打开、导入资源、字体或美化变化后，都重新统计最新占用。
+    window.addEventListener('focus', updateStorageUI);
+    window.addEventListener('pageshow', updateStorageUI);
+    window.addEventListener('message', (e) => {
+        const t = e && e.data && e.data.type;
+        if (!t) return;
+        if (['nanoOverlayReopen', 'nano:pageShown', 'beautify:apply', 'beautify:font',
+             'marketResourceImported', 'momentsDataUpdated', 'contactsDataUpdated'].indexOf(t) !== -1) {
+            updateStorageUI();
+        }
+    });
 });

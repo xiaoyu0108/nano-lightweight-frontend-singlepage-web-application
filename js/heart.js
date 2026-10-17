@@ -919,21 +919,18 @@ function setupThoughtExpand(el) {
       })();
     });
 
-    // 复制模板：把「DIY 配方 + 当前编辑器/预设的 CSS」一起复制到剪贴板，方便交给 AI 改造
+    // 复制初始模板：始终复制内置的「完整初始模板」+ DIY 配方，而不是当前编辑过的内容。
+    // 这样用户想从头改、或交给 AI 重构时，拿到的是干净的初始模板。
     if ($('ivCopyTemplate')) $('ivCopyTemplate').addEventListener('click', async function() {
-      let css = $('ivCss').value || '';
-      if (!css) {
-        try {
-          const all = await getAllTemplates();
-          const id = $('ivTemplateSelect').value;
-          const tpl = all.find(t => t.id === id) || all.find(t => t.id === 'default');
-          if (tpl) css = tpl.css || '';
-        } catch (e) {}
-      }
-      if (!css) css = DEFAULT_CSS;
-      const text = (window.NANO_HEART_RECIPE || '') + '\n\n/* ===== 当前心声模板 ===== */\n' + css;
+      let css = DEFAULT_CSS;
+      try {
+        const all = await getAllTemplates();
+        const def = all.find(t => t.id === 'default');
+        if (def && def.css) css = def.css;
+      } catch (e) {}
+      const text = (window.NANO_HEART_RECIPE || '') + '\n\n/* ===== 心声初始模板 ===== */\n' + css;
       copyText(text).then(function () {
-        alert('已复制「模板 + DIY 配方」，粘贴给 AI 即可任意重构。');
+        alert('已复制「心声初始模板 + DIY 配方」，粘贴给 AI 即可任意重构。');
       });
     });
 

@@ -4455,15 +4455,35 @@
         updateAutoStatus('msg', enabled, window.__autoMsgMins);
         if (!enabled) {
             try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel('nano_auto_msg:' + chatId); } catch (e) {}
+            try { syncAutoPushConfig({ reset: !!(opts && opts.reset) }); } catch (e) {}
             return;
         }
         scheduleNextAutoMsg(!!(opts && opts.first));
+        try { syncAutoPushConfig({ reset: !!(opts && opts.reset) }); } catch (e) {}
     }
     let lastAutoMsgRunAt = 0;      // 去重：本地定时器与外壳广播同时到点时不重复生成
     let lastAutoMomentRunAt = 0;
     function autoMsgTaskId() { return 'nano_auto_msg:' + chatId; }
     // 真正执行一次主动发消息（本地定时器到点、或外壳统一调度到点都会走到这里）
     function runScheduledAutoMsg() {
+        // 已交给 Worker 无后台推送：本机不再生成，避免重复主动消息。
+        if (window.__serverAutoPushActive) {
+            if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
+            return;
+        }
+        // 正在和这个角色通话：不要在本机插一条“睡了吗”之类的主动消息。
+        try {
+            const callKey = 'nano_call_active_' + chatId;
+            const callVal = localStorage.getItem(callKey);
+            if (callVal) {
+                const callTs = Number(callVal);
+                if (callVal === '1' || (callTs && Date.now() - callTs < 3 * 3600 * 1000)) {
+                    scheduleNextAutoMsg();
+                    return;
+                }
+                try { localStorage.removeItem(callKey); } catch (e) {}
+            }
+        } catch (e) {}
         lastAutoMsgRunAt = Date.now();
         if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
         try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel(autoMsgTaskId()); } catch (e) {}
@@ -4494,6 +4514,7 @@
     function scheduleNextAutoMsg(first) {
         if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
         if (!window.__autoMsgEnabled) return;
+        if (window.__serverAutoPushActive) return;
         const base = window.__autoMsgMins || 8;
         // 严格按设定间隔（50%~150% 随机）发送，不再在开启时插一条「立即触发」，
         // 避免用户没到点就被多扣一次 API。
@@ -4652,7 +4673,9 @@
             + '【拒绝流水账】严禁把动态写成日程记录或流水账：不要“早上…中午…晚上…”地罗列作息，也不要“今天天气不错 / 吃了三明治 / 上班好累 / 晚安”这种谁都能发的空话。每条都要落到一件具体的事或一个具体的细节（一个地点、一个人、一句话、刚发生的一个小插曲，或一种有来由的情绪），要有只有这个人此刻才会发的东西。宁少勿滥。\n'
             + '【重要 · 朋友圈不是聊天】这是发在朋友圈的动态，不是私聊：不要对任何人说话，不要提问，不要出现「你要不要/你去吗/在吗/一起吃吗」这类约人或聊天的语气；'
             + '只分享自己的日常与心情，像真人随手发的一条动态。禁止 AI 腔、禁止解释、禁止出戏。\n'
-            + '只输出一个 JSON 数组，不要多余内容：[{"author":"发动态的人名（必须是：' + authorNames + '之一）","text":"动态文案","wantImage":true 或 false,"imagePrompt":"若想配图，描述这张照片的画面；不配图则留空","location":"地点或空字符串"}]';
+            + '【必须带互动】每条动态都要像真实朋友圈一样有点赞和评论：1~3 个人点赞，1~3 条评论；'
+            + '点赞者和评论者只能从上文的名单里选（不能是动态作者本人，也绝对不能是用户本人），评论要贴合评论者与作者的关系，可以互相接话、调侃、关心。\n'
+            + '只输出一个 JSON 数组，不要多余内容：[{"author":"发动态的人名（必须是：' + authorNames + '之一）","text":"动态文案","wantImage":true 或 false,"imagePrompt":"若想配图，描述这张照片的画面；不配图则留空","location":"地点或空字符串","likes":["点赞者名字"],"comments":[{"user":"评论者名字","toUser":"回复对象名字，没有就留空","text":"评论内容"}]}]';
         const userMsg = '【朋友圈成员与人设】\n' + authorInfo + '\n\n'
             + (mem ? ('【最近发生的事】\n' + mem + '\n\n') : '')
             + '【现在】' + timeStr + '（' + uName + '在他们的好友里，但朋友圈动态不是说给 ' + uName + ' 听的，只是他们各自的日常分享）。'
@@ -4673,6 +4696,60 @@
         arr = arr.filter(function (o) { return o && o.text; }).slice(0, 4);
         return arr.length ? { items: arr, authors: authors } : null;
     }
+    // 兜底：如果模型没在朋友圈 JSON 里写互动，再单独补一次点赞/评论。
+    // 只在整批动态都没有评论时触发，避免额外浪费 API。
+    async function fillAutoMomentInteractions(posts, authors) {
+        try {
+            if (!posts || !posts.length || posts.some(function (p) { return p.comments && p.comments.length; })) return;
+            const names = authors.map(function (a) { return a.name; }).filter(Boolean);
+            if (!names.length) return;
+            const sys = '你是朋友圈互动生成器。根据每条动态的作者和内容，生成像真人一样的点赞和评论。\n'
+                + '只输出一个 JSON 数组，不要多余内容：[{"index":0,"likes":["点赞者名字"],"comments":[{"user":"评论者名字","toUser":"回复对象名字，没有就留空","text":"评论内容"}]}]\n'
+                + '评论者/点赞者只能从这些名字里选：' + names.join('、') + '；不要用动态作者本人点赞，绝对不能出现用户本人。每条 1~3 个赞、1~3 条评论。';
+            const userMsg = posts.map(function (p, i) {
+                return (i + 1) + '. 作者：' + p.author + '\n内容：' + String(p.text || '').slice(0, 220);
+            }).join('\n\n') + '\n\n请为每一段生成互动（index 从 0 开始）。';
+            suppressApiAlerts = true;
+            let content = null;
+            try { content = await callMainApiRaw([{ role: 'system', content: sys }, { role: 'user', content: userMsg }], 900, 0.9); }
+            catch (e) {} finally { suppressApiAlerts = false; }
+            if (!content) return;
+            let arr = null;
+            const ai = content.indexOf('['), aj = content.lastIndexOf(']');
+            if (ai > -1 && aj > ai) { try { arr = JSON.parse(content.slice(ai, aj + 1)); } catch (e) {} }
+            if (!Array.isArray(arr)) return;
+            const pick = function (raw) {
+                const n = String(raw == null ? '' : raw).trim();
+                if (!n) return '';
+                if (names.indexOf(n) > -1) return n;
+                return names.find(function (x) { return x && (x.indexOf(n) > -1 || n.indexOf(x) > -1); }) || '';
+            };
+            const changed = [];
+            arr.forEach(function (o, fallbackIndex) {
+                const idx = Number.isInteger(o && o.index) ? o.index : fallbackIndex;
+                const p = posts[idx];
+                if (!p || !o) return;
+                const likes = [];
+                (Array.isArray(o.likes) ? o.likes : []).forEach(function (raw) {
+                    const n = pick(raw);
+                    if (n && n !== p.author && likes.indexOf(n) < 0) likes.push(n);
+                });
+                const comments = [];
+                (Array.isArray(o.comments) ? o.comments : []).forEach(function (c) {
+                    if (!c || typeof c !== 'object') return;
+                    const u = pick(c.user || c.name || c.author);
+                    const txt = String(c.text || c.content || '').trim();
+                    if (!u || !txt) return;
+                    comments.push({ user: u, toUser: pick(c.toUser || c.replyTo || c.to), text: txt.slice(0, 120) });
+                });
+                if (likes.length) p.likes = likes;
+                if (comments.length) p.comments = comments.slice(0, 8);
+                if (likes.length || comments.length) changed.push(p);
+            });
+            for (let i = 0; i < changed.length; i++) await saveMomentPost(changed[i]);
+        } catch (e) {}
+    }
+
     // 批量写入朋友圈：一次 API 调用让 3~4 位角色/NPC 各发一条，时间错开
     async function postAutoMomentBatch() {
         if (isProcessingApi) return;
@@ -4683,11 +4760,47 @@
             const arr = batch.items, authors = batch.authors;
             const allowMomentImage = getChatSetting('allowMomentImage', false);
             const nowMs = Date.now();
+            const authorNames = authors.map(function (a) { return a.name; });
+            const authorSet = {};
+            authorNames.forEach(function (n) { authorSet[n] = true; });
+            const pickName = function (raw) {
+                var n = String(raw == null ? '' : raw).trim();
+                if (!n) return '';
+                if (authorSet[n]) return n;
+                return authorNames.find(function (x) { return x && (x.indexOf(n) > -1 || n.indexOf(x) > -1); }) || '';
+            };
+            const created = [];
             for (let k = 0; k < arr.length; k++) {
                 const obj = arr[k];
                 const au = momentAuthorByName(obj.author, authors);
                 const wantImage = !!obj.wantImage;
                 const imgPrompt = String(obj.imagePrompt || obj.text || '').trim();
+                // 点赞 / 评论：只接受本次朋友圈成员，绝不把用户本人写进互动。
+                const likes = [];
+                const rawLikes = Array.isArray(obj.likes) ? obj.likes : (Array.isArray(obj.likedBy) ? obj.likedBy : String(obj.likes || obj.likedBy || '').split(/[,，、;；\/]/));
+                rawLikes.forEach(function (raw) {
+                    var n = pickName(raw);
+                    if (n && n !== au.name && likes.indexOf(n) < 0) likes.push(n);
+                });
+                const comments = [];
+                const rawComments = Array.isArray(obj.comments) ? obj.comments : (Array.isArray(obj.commentList) ? obj.commentList : []);
+                rawComments.forEach(function (c) {
+                    if (!c) return;
+                    if (typeof c === 'string') {
+                        var parts = c.split(/[|｜]/);
+                        if (parts.length >= 2) c = { user: parts[0], toUser: parts.length >= 3 ? parts[1] : '', text: parts.length >= 3 ? parts.slice(2).join('|') : parts[1] };
+                    }
+                    var u = pickName(c.user || c.name || c.author);
+                    var txt = c.text || c.content || c.comment || c.message || '';
+                    if (!u || !String(txt).trim()) return;
+                    var to = pickName(c.toUser || c.replyTo || c.to || c.target);
+                    comments.push({ user: u, toUser: to, text: String(txt).trim().slice(0, 120) });
+                });
+                // 模型偶尔漏写点赞：用其他成员补 1~2 个，保证动态至少有点赞。
+                if (!likes.length) {
+                    var pool = authorNames.filter(function (n) { return n !== au.name; });
+                    for (var li = 0; li < Math.min(2, pool.length); li++) likes.push(pool[li]);
+                }
                 const post = {
                     id: 'auto_' + (nowMs + k) + '_' + Math.random().toString(36).slice(2, 5),
                     author: au.name,
@@ -4697,8 +4810,8 @@
                     // 时间错开：最后一条是现在，往前每条间隔约 1.5~3 小时
                     time: new Date(nowMs - (arr.length - 1 - k) * (1.5 + Math.random() * 1.5) * 3600 * 1000).toISOString(),
                     location: obj.location || '',
-                    likes: [],
-                    comments: []
+                    likes: likes,
+                    comments: comments.slice(0, 8)
                 };
                 // 只给当前角色（有锁脸/头像参照）真正生图，其他角色用文字照片兜底
                 const isCurrent = String(au.id) === String(chatId);
@@ -4711,7 +4824,10 @@
                 if (wantImage && (!post.images || !post.images.length)) post.imageText = imgPrompt;
                 post.maskId = getCurrentMaskId();
                 await saveMomentPost(post);
+                created.push(post);
             }
+            // 模型没给评论时，补一次互动生成，保证主动朋友圈有点赞/评论。
+            try { await fillAutoMomentInteractions(created, authors); } catch (e) {}
             recordAutoMomentTime();
             try { if (window.parent !== window) window.parent.postMessage({ type: 'momentsDataUpdated' }, '*'); } catch (e) {}
             // 通知只弹一条
@@ -4981,9 +5097,11 @@
         updateAutoStatus('moment', enabled, Math.round(window.__autoMomentHours * 60));
         if (!enabled) {
             try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel('nano_auto_moment:' + chatId); } catch (e) {}
+            try { syncAutoPushConfig({ reset: !!(opts && opts.reset) }); } catch (e) {}
             return;
         }
         scheduleNextAutoMoment(!!(opts && opts.first));
+        try { syncAutoPushConfig({ reset: !!(opts && opts.reset) }); } catch (e) {}
     }
     function autoMomentTaskId() { return 'nano_auto_moment:' + chatId; }
     // 记录最近一次真正发出主动动态/照片的时间（用于避免每次打开聊天都立刻补发）
@@ -5003,6 +5121,11 @@
         } catch (e) { return true; }
     }
     async function runScheduledAutoMoment() {
+        // 已交给 Worker 无后台推送：本机不再生成朋友圈。
+        if (window.__serverAutoPushActive) {
+            if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
+            return;
+        }
         lastAutoMomentRunAt = Date.now();
         if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
         try { if (window.NanoKeepAlive && NanoKeepAlive.cancel) NanoKeepAlive.cancel(autoMomentTaskId()); } catch (e) {}
@@ -5024,6 +5147,7 @@
     function scheduleNextAutoMoment(first) {
         if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
         if (!window.__autoMomentEnabled) return;
+        if (window.__serverAutoPushActive) return;
         const baseH = window.__autoMomentHours || 24;
         // 0.85x ~ 1.2x：两次主动动态之间至少间隔约一个「间隔」，避免一天多次触发。
         const randH = baseH * (0.85 + Math.random() * 0.35);
@@ -7483,6 +7607,158 @@
         } catch (e) {}
     }
 
+    // ===== 无后台主动消息 / 朋友圈：把开关、间隔、角色人设和模型配置同步到 Worker =====
+    // Worker 的 cron 到点随机挑 2 个角色生成消息，App 关闭也能推送；
+    // App 打开后再拉取 pending 合并进聊天/朋友圈。
+    let autoPushSyncing = false;
+    function autoPushBase() {
+        var b = '';
+        try { b = (localStorage.getItem('nano_push_endpoint') || '').trim(); } catch (e) {}
+        if (!b) b = 'https://nanopush.nano315.online';
+        return b.replace(/\/+$/, '');
+    }
+    function autoPushToken() {
+        var t = '';
+        try { t = localStorage.getItem('nano_peek_token') || ''; } catch (e) {}
+        if (!t) { try { t = localStorage.getItem('nano_push_token') || ''; } catch (e) {} }
+        return t || '';
+    }
+    function autoPeekTokenOnly() {
+        try { return localStorage.getItem('nano_peek_token') || ''; } catch (e) { return ''; }
+    }
+    function autoPushTokenOnly() {
+        try { return localStorage.getItem('nano_push_token') || ''; } catch (e) { return ''; }
+    }
+    function readAutoPushGlobals() {
+        // 主动消息/朋友圈开关是「按聊天」存的；服务端只能有一套全局配置，
+        // 所以扫描所有聊天：任意一个开启就继续，间隔优先用当前聊天，否则用第一个开启的。
+        const out = {
+            msgEnabled: false,
+            momentEnabled: false,
+            intervalMinutes: Math.max(1, parseInt(getChatSetting('autoMsgInterval', 8), 10) || 8),
+            momentIntervalHours: Math.max(0.5, parseFloat(getChatSetting('autoMomentInterval', 24)) || 24)
+        };
+        let msgCurrent = false, momentCurrent = false;
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i) || '';
+                let val = null;
+                try { val = JSON.parse(localStorage.getItem(key)); } catch (e) { continue; }
+                if (key.indexOf('chat_setting_autoMsg_') === 0) {
+                    const cid = key.slice('chat_setting_autoMsg_'.length);
+                    if (val) {
+                        out.msgEnabled = true;
+                        let mins = 8;
+                        try { mins = parseInt(JSON.parse(localStorage.getItem('chat_setting_autoMsgInterval_' + cid)), 10) || 8; } catch (e) {}
+                        if (cid === chatId) { msgCurrent = true; out.intervalMinutes = Math.max(1, mins); }
+                        else if (!msgCurrent) out.intervalMinutes = Math.max(1, mins);
+                    }
+                } else if (key.indexOf('chat_setting_autoMoment_') === 0 || key.indexOf('chat_setting_autoSocial_') === 0) {
+                    const prefix = key.indexOf('chat_setting_autoMoment_') === 0 ? 'chat_setting_autoMoment_' : 'chat_setting_autoSocial_';
+                    const cid = key.slice(prefix.length);
+                    if (val) {
+                        out.momentEnabled = true;
+                        let hrs = 24;
+                        try { hrs = parseFloat(JSON.parse(localStorage.getItem('chat_setting_autoMomentInterval_' + cid))) || 24; } catch (e) {}
+                        if (cid === chatId) { momentCurrent = true; out.momentIntervalHours = Math.max(0.5, hrs); }
+                        else if (!momentCurrent) out.momentIntervalHours = Math.max(0.5, hrs);
+                    }
+                }
+            }
+        } catch (e) {}
+        return out;
+    }
+
+    async function syncAutoPushConfig(opts) {
+        if (autoPushSyncing) return;
+        if (!allCharacters || !allCharacters.length) return;
+        autoPushSyncing = true;
+        try {
+            const globals = readAutoPushGlobals();
+            const msgEnabled = globals.msgEnabled;
+            const momentEnabled = globals.momentEnabled;
+            let cfg = null;
+            try { cfg = await getApiConfig(); } catch (e) { cfg = null; }
+            let curUser = currentUser;
+            try {
+                const hd = JSON.parse(localStorage.getItem('nano_mask_data') || 'null');
+                if (hd) {
+                    const list = Array.isArray(hd.masks) ? hd.masks : [];
+                    curUser = list.find(function (m) { return m && String(m.id) === String(hd.currentMaskId); }) || list[0] || curUser;
+                }
+            } catch (e) {}
+            const uid = curUser ? String(curUser.id) : '';
+            const chars = allCharacters.filter(function (c) {
+                if (!c || !c.id || !c.name || c.nanoAssistant) return false;
+                return !uid || !c.bindUser || String(c.bindUser) === uid;
+            }).map(function (c) {
+                return {
+                    id: String(c.id), name: String(c.name),
+                    avatar: String(c.avatar || ''),
+                    setting: String(c.setting || c.desc || c.persona || ''),
+                    isNpc: !!c.isNpc
+                };
+            });
+            if (!chars.length) return;
+            const payload = {
+                token: autoPushToken(),
+                enabled: msgEnabled || momentEnabled,
+                msgEnabled: msgEnabled,
+                momentEnabled: momentEnabled,
+                intervalMinutes: globals.intervalMinutes,
+                momentIntervalHours: globals.momentIntervalHours,
+                user: { id: uid, name: (curUser && curUser.name) || currentUserName || '我' },
+                chars: chars,
+                api: (cfg && cfg.mainKey) ? { url: cfg.mainUrl || '', key: cfg.mainKey || '', model: cfg.mainModel || '' } : null,
+                reset: !!(opts && opts.reset)
+            };
+            const resp = await fetch(autoPushBase() + '/auto/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Push-Token': autoPushTokenOnly(),
+                    'X-Peek-Token': autoPeekTokenOnly()
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json().catch(function () { return {}; });
+            if (!resp.ok || !data.ok) throw new Error('auto config failed');
+            window.__serverAutoPushActive = !!data.enabled;
+            if (window.__serverAutoPushActive) {
+                // 交给服务端后，停掉本机的定时生成，避免重复主动消息。
+                if (autoMsgTimer) { clearTimeout(autoMsgTimer); autoMsgTimer = null; }
+                if (autoMomentTimer) { clearTimeout(autoMomentTimer); autoMomentTimer = null; }
+                try {
+                    if (window.NanoKeepAlive && NanoKeepAlive.cancel) {
+                        NanoKeepAlive.cancel(autoMsgTaskId());
+                        NanoKeepAlive.cancel(autoMomentTaskId());
+                    }
+                } catch (e) {}
+            }
+        } catch (e) {
+            // 服务端不可用时回退到本机定时器，保证至少还能主动发消息。
+            window.__serverAutoPushActive = false;
+            try { if (getChatSetting('autoMsg', false)) scheduleNextAutoMsg(); } catch (e2) {}
+            try { if (getChatSetting('autoMoment', false) || getChatSetting('autoSocial', false)) scheduleNextAutoMoment(); } catch (e2) {}
+        } finally {
+            autoPushSyncing = false;
+        }
+    }
+
+    let lastAutoPushSyncAt = 0;
+    function scheduleAutoPushSync(delay) {
+        try {
+            const wait = Math.max(0, Number(delay) || 0);
+            setTimeout(function () { syncAutoPushConfig(); }, wait);
+        } catch (e) {}
+    }
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState !== 'visible') return;
+        if (Date.now() - lastAutoPushSyncAt < 60000) return;
+        lastAutoPushSyncAt = Date.now();
+        scheduleAutoPushSync(800);
+    });
+
     async function triggerReply() {
         if (isProcessingApi) return;
 
@@ -8630,6 +8906,20 @@ if (callCard) {
                 sarr.forEach(function (t) { if (t) addCharSaid(String(t)); });
             }
         } catch (e) {}
+        // 无后台推送暂存的主动消息：进入该角色聊天时按顺序补发
+        try {
+            var autoRaw = localStorage.getItem('nano_auto_pending_msgs') || '{}';
+            var autoMap = JSON.parse(autoRaw);
+            var autoList = autoMap && autoMap[chatId];
+            if (Array.isArray(autoList) && autoList.length) {
+                delete autoMap[chatId];
+                try { localStorage.setItem('nano_auto_pending_msgs', JSON.stringify(autoMap)); } catch (e) {}
+                autoList.forEach(function (item) {
+                    var bubbles = (item && Array.isArray(item.bubbles)) ? item.bubbles : [item && item.text];
+                    bubbles.forEach(function (t) { if (t) addCharSaid(String(t)); });
+                });
+            }
+        } catch (e) {}
         let p = null;
         try { p = JSON.parse(sessionStorage.getItem('nano_pending_char_say') || 'null'); } catch (e) {}
         if (!p || !p.text) return;
@@ -8772,6 +9062,11 @@ if (callCard) {
                 if (!data.silent) { try { isWaitingForReply = true; triggerReply(); } catch (e) {} }
             }
             return;
+        }
+
+        // 角色/人设变化后，把最新的角色列表同步给无后台推送服务
+        if (data.type === 'contactsDataUpdated' || data.type === 'currentMaskChanged' || data.type === 'nanoCharUpdated') {
+            try { syncAutoPushConfig(); } catch (e) {}
         }
 
         // 线下返回线上：系统提示「已退出线下」+ 带回线下最新一轮作为衔接上下文
@@ -8953,17 +9248,15 @@ if (callCard) {
         } else if (data.type === 'messagesCleared') {
             clearAllMessages();
         } else if (data.type === 'autoMsgChanged') {
-            setAutoMsgState(!!data.enabled, data.interval, { first: true });
+            setAutoMsgState(!!data.enabled, data.interval, { first: true, reset: true });
         } else if (data.type === 'autoMsgIntervalChanged') {
-            if (autoMsgTimer) {
-                setAutoMsgState(getChatSetting('autoMsg', false), data.interval);
-            }
+            setAutoMsgState(getChatSetting('autoMsg', false), data.interval, { reset: true });
         } else if (data.type === 'autoMomentChanged') {
-            setAutoMomentState(!!data.enabled || getChatSetting('autoSocial', false), data.interval, { first: true });
+            setAutoMomentState(!!data.enabled || getChatSetting('autoSocial', false), data.interval, { first: true, reset: true });
         } else if (data.type === 'autoSocialChanged') {
-            setAutoMomentState(getChatSetting('autoMoment', false) || !!data.enabled, data.interval || getChatSetting('autoMomentInterval', 24), { first: true });
+            setAutoMomentState(getChatSetting('autoMoment', false) || !!data.enabled, data.interval || getChatSetting('autoMomentInterval', 24), { first: true, reset: true });
         } else if (data.type === 'autoMomentIntervalChanged') {
-            if (autoMomentTimer || getChatSetting('autoSocial', false)) setAutoMomentState(getChatSetting('autoMoment', false) || getChatSetting('autoSocial', false), data.interval);
+            setAutoMomentState(getChatSetting('autoMoment', false) || getChatSetting('autoSocial', false), data.interval, { reset: true });
         } else if (data.type === 'timeAwareChanged' || data.type === 'allowImageChanged' || data.type === 'allowMomentImageChanged') {
             // 无需实时处理（构建提示词/生图时读取设置）
         }

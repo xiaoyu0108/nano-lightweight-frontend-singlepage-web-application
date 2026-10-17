@@ -140,6 +140,18 @@
     if (!t) return;
     curTool = { serverId: serverId, tool: t };
     $('toolModalTitle').textContent = t.name;
+    $('toolDesc').textContent = t.description || '这个工具暂无描述。';
+    var props = (t.inputSchema && t.inputSchema.properties) || {};
+    var keys = Object.keys(props);
+    if (!keys.length) {
+      $('toolHint').innerHTML = '这个工具不需要参数，保留 <code>{}</code> 直接运行即可。';
+    } else {
+      var tip = keys.map(function (k) {
+        var p = props[k] || {};
+        return '<code>' + esc(k) + '</code>' + (p.type ? ' (' + esc(p.type) + ')' : '') + (p.description ? '：' + esc(p.description) : '');
+      }).join('<br>');
+      $('toolHint').innerHTML = 'JSON 里的字段就是工具参数，可保留默认值或自行修改：<br>' + tip;
+    }
     $('toolArgs').value = JSON.stringify(defaultArgs(t.inputSchema), null, 2);
     $('toolResultWrap').style.display = 'none';
     $('toolResult').textContent = '';
@@ -210,9 +222,11 @@
     if (hb) { var tgt = $(hb.getAttribute('data-help')); if (tgt) tgt.hidden = !tgt.hidden; return; }
   });
 
-  $('brandBtn').onclick = function () {
+  function goBack() {
     try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'nanoCloseOverlay' }, '*'); else history.back(); } catch (e) {}
-  };
+  }
+  $('brandBtn').onclick = goBack;
+  if ($('mcpBackBtn')) $('mcpBackBtn').onclick = goBack;
   $('addServerBtn').onclick = function () { openServerModal(null); };
   $('closeServerModal').onclick = $('cancelServerModal').onclick = closeServerModal;
   $('serverModal').addEventListener('click', function (e) { if (e.target === $('serverModal')) closeServerModal(); });

@@ -42,6 +42,224 @@ async function peekSave(env, chatId, turns) {
   try { await env.PUSH_KV.put('peek:' + chatId, JSON.stringify(turns.slice(-40)), { expirationTtl: 60 * 60 * 24 * 7 }); } catch (e) {}
 }
 
+// ===== 无后台主动消息 / 朋友圈 =====
+// 客户端把「人设 + 设置 + 模型配置」同步上来，Worker 的 cron 到点生成内容并推送；
+// 内容先暂存在 KV，App 回到前台后拉取合并，所以不需要网页一直开着。
+function autoOk(request, env, body) {
+  const tokens = [env.PUSH_TOKEN, env.PEEK_TOKEN].filter(Boolean);
+  if (!tokens.length) return true;
+  let h = '';
+  try { h = request.headers.get('X-Push-Token') || request.headers.get('X-Peek-Token') || ''; } catch (e) {}
+  let q = '';
+  try { q = new URL(request.url).searchParams.get('token') || ''; } catch (e) {}
+  const b = body && body.token ? String(body.token) : '';
+  return tokens.indexOf(h) >= 0 || tokens.indexOf(q) >= 0 || tokens.indexOf(b) >= 0;
+}
+function clampNum(n, min, max, dflt) {
+  n = Number(n);
+  if (!isFinite(n) || n <= 0) n = dflt;
+  return Math.max(min, Math.min(max, n));
+}
+function sanitizeAutoConfig(body) {
+  body = body || {};
+  const chars = Array.isArray(body.chars) ? body.chars.slice(0, 30).map(function (c) {
+    const av = String((c && c.avatar) || '');
+    return {
+      id: String((c && c.id) || '').slice(0, 80),
+      name: String((c && c.name) || '').slice(0, 40),
+      // 头像只在不是超长 dataURL 时保存，避免把配置撑大
+      avatar: av.length > 4000 ? '' : av,
+      setting: String((c && c.setting) || '').slice(0, 6000),
+      isNpc: !!(c && c.isNpc)
+    };
+  }).filter(function (c) { return c.id && c.name; }) : [];
+  const api = body.api && typeof body.api === 'object' ? {
+    url: String(body.api.url || '').slice(0, 500),
+    key: String(body.api.key || '').slice(0, 500),
+    model: String(body.api.model || '').slice(0, 120)
+  } : null;
+  return {
+    enabled: !!(body.enabled || body.msgEnabled || body.momentEnabled),
+    msgEnabled: !!body.msgEnabled,
+    momentEnabled: !!body.momentEnabled,
+    intervalMinutes: clampNum(body.intervalMinutes, 1, 1440, 8),
+    momentIntervalHours: clampNum(body.momentIntervalHours, 0.5, 720, 24),
+    user: {
+      id: String((body.user && body.user.id) || 'default').slice(0, 80),
+      name: String((body.user && body.user.name) || '我').slice(0, 40)
+    },
+    chars: chars,
+    api: api,
+    updatedAt: Date.now()
+  };
+}
+async function autoChat(env, cfg, messages, maxTokens, temperature) {
+  const url = modelEndpoint(env.AUTO_API_URL || env.PEEK_API_URL || (cfg.api && cfg.api.url) || '');
+  const key = env.AUTO_API_KEY || env.PEEK_API_KEY || (cfg.api && cfg.api.key) || '';
+  const model = env.AUTO_MODEL || env.PEEK_MODEL || (cfg.api && cfg.api.model) || '';
+  if (!url || !key || !model) return null;
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        max_tokens: maxTokens || 500,
+        temperature: (typeof temperature === 'number' ? temperature : 0.95)
+      })
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const c = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    return c ? String(c).trim() : null;
+  } catch (e) { return null; }
+}
+function pickRandom(arr, n) {
+  const copy = arr.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = copy[i]; copy[i] = copy[j]; copy[j] = t;
+  }
+  return copy.slice(0, n);
+}
+function splitAutoBubbles(text) {
+  return String(text || '').split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 3);
+}
+async function generateAutoMessages(env, cfg, busyChatId) {
+  const pool = cfg.chars.filter(function (c) { return c.id !== busyChatId && !c.isNpc; });
+  const source = pool.length >= 2 ? pool : cfg.chars.filter(function (c) { return c.id !== busyChatId; });
+  if (!source.length) return [];
+  const picked = pickRandom(source, Math.min(2, source.length));
+  const out = [];
+  const now = Date.now();
+  for (const c of picked) {
+    const system = '你是「' + c.name + '」，现在主动给「' + cfg.user.name + '」发消息。\n'
+      + (c.setting ? ('【你的人设】\n' + c.setting + '\n\n') : '')
+      + '现在是 ' + new Date(now + 8 * 3600 * 1000).toISOString().slice(0, 16).replace('T', ' ') + '（北京时间）。\n'
+      + '要求：像平时微信聊天一样主动说 1~2 句，自然、有生活感，符合你们的关系；不要解释、不要提系统/推送；不要每次都用“睡了吗/在吗”开头。只输出消息正文。';
+    const text = await autoChat(env, cfg, [
+      { role: 'system', content: system },
+      { role: 'user', content: '发一条主动消息。' }
+    ], 350, 1.0);
+    const bubbles = splitAutoBubbles(text);
+    if (!bubbles.length) continue;
+    out.push({
+      id: 'm_' + now + '_' + c.id,
+      chatId: c.id, charId: c.id, name: c.name, avatar: c.avatar || '',
+      text: bubbles.join('\n'), bubbles: bubbles, ts: now
+    });
+  }
+  return out;
+}
+async function generateAutoMoments(env, cfg, busyChatId) {
+  const pool = cfg.chars.filter(function (c) { return c.id !== busyChatId && !c.isNpc; });
+  const source = pool.length ? pool : cfg.chars.filter(function (c) { return c.id !== busyChatId; });
+  if (!source.length) return [];
+  const picked = pickRandom(source, Math.min(3, source.length));
+  const names = picked.map(function (c) { return c.name; });
+  const sys = '你们是彼此认识的朋友，在同一个朋友圈里。请让以下角色各发一条朋友圈动态：' + names.join('、') + '。\n'
+    + '要求：像真人随手发的日常，具体、有细节，不要流水账，不要对任何人说话，不要提问，禁止 AI 腔。\n'
+    + '每条动态都要带 1~3 个点赞和 1~3 条评论；点赞/评论者只能从这些名字里选：' + names.join('、') + '，不能是动态作者本人，也不能出现「' + cfg.user.name + '」。\n'
+    + '只输出 JSON 数组：[{"author":"名字","text":"动态文案","location":"地点或空","likes":["名字"],"comments":[{"user":"名字","toUser":"","text":"评论"}]}]';
+  const content = await autoChat(env, cfg, [
+    { role: 'system', content: sys },
+    { role: 'user', content: '生成 ' + picked.length + ' 条朋友圈动态。' }
+  ], 1400, 1.0);
+  if (!content) return [];
+  let arr = null;
+  const a = content.indexOf('['), b = content.lastIndexOf(']');
+  if (a > -1 && b > a) { try { arr = JSON.parse(content.slice(a, b + 1)); } catch (e) {} }
+  if (!Array.isArray(arr)) return [];
+  const nameSet = {};
+  names.forEach(function (n) { nameSet[n] = true; });
+  const pickName = function (raw) {
+    const n = String(raw == null ? '' : raw).trim();
+    if (!n) return '';
+    if (nameSet[n]) return n;
+    return names.find(function (x) { return x && (x.indexOf(n) > -1 || n.indexOf(x) > -1); }) || '';
+  };
+  const out = [];
+  const now = Date.now();
+  arr.slice(0, 4).forEach(function (o, i) {
+    if (!o || !o.text) return;
+    const au = pickName(o.author) || names[Math.min(i, names.length - 1)];
+    if (!au) return;
+    const likes = [];
+    (Array.isArray(o.likes) ? o.likes : []).forEach(function (raw) {
+      const n = pickName(raw);
+      if (n && n !== au && likes.indexOf(n) < 0) likes.push(n);
+    });
+    if (!likes.length) names.forEach(function (n) { if (n !== au && likes.length < 2) likes.push(n); });
+    const comments = [];
+    (Array.isArray(o.comments) ? o.comments : []).forEach(function (c) {
+      if (!c || typeof c !== 'object') return;
+      const u = pickName(c.user || c.name || c.author);
+      const txt = String(c.text || c.content || '').trim();
+      if (!u || !txt) return;
+      comments.push({ user: u, toUser: pickName(c.toUser || c.replyTo || c.to), text: txt.slice(0, 120) });
+    });
+    const char = picked.find(function (c) { return c.name === au; }) || {};
+    out.push({
+      id: 'srv_' + now + '_' + i + '_' + Math.random().toString(36).slice(2, 5),
+      author: au, avatar: char.avatar || '', text: String(o.text).slice(0, 500),
+      images: [], time: new Date(now - (arr.length - 1 - i) * 1800 * 1000).toISOString(),
+      location: String(o.location || '').slice(0, 60), likes: likes, comments: comments.slice(0, 8),
+      maskId: cfg.user.id
+    });
+  });
+  return out;
+}
+async function runAutoPush(env) {
+  const raw = await env.PUSH_KV.get('auto:config');
+  if (!raw) return;
+  let cfg;
+  try { cfg = JSON.parse(raw); } catch (e) { return; }
+  if (!cfg || !cfg.enabled) return;
+  let state = {};
+  try { const s = await env.PUSH_KV.get('auto:state'); state = s ? JSON.parse(s) : {}; } catch (e) { state = {}; }
+  const now = Date.now();
+  const subs = await getSubs(env);
+  let busyChatId = '';
+  try { busyChatId = String(await env.PUSH_KV.get('auto:call:' + cfg.user.id) || ''); } catch (e) {}
+  if (cfg.msgEnabled && now >= (Number(state.nextMsgAt) || 0)) {
+    const msgs = await generateAutoMessages(env, cfg, busyChatId);
+    if (msgs.length) {
+      const key = 'auto:msg:' + cfg.user.id;
+      let list = [];
+      try { const old = await env.PUSH_KV.get(key); list = old ? JSON.parse(old) : []; } catch (e) { list = []; }
+      list = list.concat(msgs).slice(-20);
+      await env.PUSH_KV.put(key, JSON.stringify(list));
+      if (subs.length) {
+        for (const m of msgs) {
+          await pushAll(subs, {
+            title: m.name, body: m.bubbles[0] || m.text, target: 'chat:' + m.chatId,
+            tag: 'auto-' + m.chatId
+          }, env);
+        }
+      }
+    }
+    state.nextMsgAt = now + cfg.intervalMinutes * 60 * 1000;
+  }
+  if (cfg.momentEnabled && now >= (Number(state.nextMomentAt) || 0)) {
+    const posts = await generateAutoMoments(env, cfg, busyChatId);
+    if (posts.length) {
+      const key = 'auto:moments:' + cfg.user.id;
+      let list = [];
+      try { const old = await env.PUSH_KV.get(key); list = old ? JSON.parse(old) : []; } catch (e) { list = []; }
+      list = list.concat(posts).slice(-30);
+      await env.PUSH_KV.put(key, JSON.stringify(list));
+      if (subs.length) {
+        await pushAll(subs, {
+          title: '朋友圈', body: posts[0].author + ' 发了新动态', target: 'moments', tag: 'auto-moments'
+        }, env);
+      }
+    }
+    state.nextMomentAt = now + cfg.momentIntervalHours * 3600 * 1000;
+  }
+  await env.PUSH_KV.put('auto:state', JSON.stringify(state));
+}
+
 // 用服务端保存的 key 调主模型（Key 不出服务器），支持纯文本与「截图 + 文本」
 async function peekModel(env, system, text, image, history) {
   const url = modelEndpoint(env.PEEK_API_URL);
@@ -106,6 +324,11 @@ export default {
     // 允许通过自定义域名路径前缀访问：https://nano315.online/nanoapi/xxx -> /xxx
     let pathname = __reqUrl.pathname;
     if (pathname.indexOf('/nanoapi') === 0) pathname = pathname.slice('/nanoapi'.length) || '/';
+
+    // 公开的 VAPID 公钥：App 里一键开启 Web Push 时读取（私钥永远不返回）
+    if (pathname === '/vapid' && request.method === 'GET') {
+      return json({ ok: !!env.VAPID_PUBLIC, key: env.VAPID_PUBLIC || '' });
+    }
 
     // 1) 客户端订阅上报
     if (pathname === '/subscribe' && request.method === 'POST') {
@@ -211,6 +434,91 @@ export default {
       if (!peekOk(request, env, body)) return json({ ok: false, error: 'unauthorized' }, 401);
       const chatId = String(body.chatId || '');
       if (chatId) await peekSave(env, chatId, []);
+      return json({ ok: true });
+    }
+
+    // ============ 无后台主动消息 / 朋友圈 ============
+    // POST /auto/config  同步开关、间隔、角色人设、模型配置
+    if (pathname === '/auto/config' && request.method === 'POST') {
+      let body = {};
+      try { body = await request.json(); } catch (e) {}
+      if (!autoOk(request, env, body)) return json({ ok: false, error: 'unauthorized' }, 401);
+      const cfg = sanitizeAutoConfig(body);
+      await env.PUSH_KV.put('auto:config', JSON.stringify(cfg));
+      const now = Date.now();
+      let state = {};
+      try { const s = await env.PUSH_KV.get('auto:state'); state = s ? JSON.parse(s) : {}; } catch (e) { state = {}; }
+      if (cfg.msgEnabled) {
+        if (!state.nextMsgAt || state.msgMins !== cfg.intervalMinutes || body.reset) {
+          state.nextMsgAt = now + cfg.intervalMinutes * 60 * 1000;
+        }
+        state.msgMins = cfg.intervalMinutes;
+      } else {
+        state.nextMsgAt = 0;
+        state.msgMins = cfg.intervalMinutes;
+      }
+      if (cfg.momentEnabled) {
+        if (!state.nextMomentAt || state.momentHours !== cfg.momentIntervalHours || body.reset) {
+          state.nextMomentAt = now + cfg.momentIntervalHours * 3600 * 1000;
+        }
+        state.momentHours = cfg.momentIntervalHours;
+      } else {
+        state.nextMomentAt = 0;
+        state.momentHours = cfg.momentIntervalHours;
+      }
+      await env.PUSH_KV.put('auto:state', JSON.stringify(state));
+      return json({ ok: true, enabled: cfg.enabled, nextMsgAt: state.nextMsgAt || 0, nextMomentAt: state.nextMomentAt || 0 });
+    }
+
+    // POST /auto/call  正在和某个角色通话时，跳过 TA 的主动消息/朋友圈
+    if (pathname === '/auto/call' && request.method === 'POST') {
+      let body = {};
+      try { body = await request.json(); } catch (e) {}
+      if (!autoOk(request, env, body)) return json({ ok: false, error: 'unauthorized' }, 401);
+      const userId = String(body.userId || 'default');
+      const chatId = String(body.chatId || '');
+      const active = !!body.active && !!chatId;
+      try {
+        if (active) await env.PUSH_KV.put('auto:call:' + userId, chatId, { expirationTtl: 60 * 60 * 3 });
+        else await env.PUSH_KV.delete('auto:call:' + userId);
+      } catch (e) {}
+      return json({ ok: true });
+    }
+
+    // GET /auto/pending?userId=  拉取服务端生成、还没合并进 App 的消息/朋友圈
+    if (pathname === '/auto/pending') {
+      if (!autoOk(request, env, null)) return json({ ok: false, error: 'unauthorized' }, 401);
+      const userId = String(new URL(request.url).searchParams.get('userId') || 'default');
+      let messages = [], moments = [];
+      try { const raw = await env.PUSH_KV.get('auto:msg:' + userId); messages = raw ? JSON.parse(raw) : []; } catch (e) {}
+      try { const raw = await env.PUSH_KV.get('auto:moments:' + userId); moments = raw ? JSON.parse(raw) : []; } catch (e) {}
+      return json({ ok: true, messages: messages, moments: moments });
+    }
+
+    // POST /auto/ack  合并完成后删除已拉取的条目
+    if (pathname === '/auto/ack' && request.method === 'POST') {
+      let body = {};
+      try { body = await request.json(); } catch (e) {}
+      if (!autoOk(request, env, body)) return json({ ok: false, error: 'unauthorized' }, 401);
+      const userId = String(body.userId || 'default');
+      const mIds = Array.isArray(body.messageIds) ? body.messageIds : [];
+      const pIds = Array.isArray(body.momentIds) ? body.momentIds : [];
+      if (mIds.length) {
+        try {
+          const key = 'auto:msg:' + userId;
+          const raw = await env.PUSH_KV.get(key);
+          const list = raw ? JSON.parse(raw) : [];
+          await env.PUSH_KV.put(key, JSON.stringify(list.filter(function (x) { return x && mIds.indexOf(x.id) < 0; })));
+        } catch (e) {}
+      }
+      if (pIds.length) {
+        try {
+          const key = 'auto:moments:' + userId;
+          const raw = await env.PUSH_KV.get(key);
+          const list = raw ? JSON.parse(raw) : [];
+          await env.PUSH_KV.put(key, JSON.stringify(list.filter(function (x) { return x && pIds.indexOf(x.id) < 0; })));
+        } catch (e) {}
+      }
       return json({ ok: true });
     }
 
@@ -327,6 +635,8 @@ export default {
   // 每 5 分钟触发：到点给 Bark 发提醒 + 处理 KV 里的预约任务
   async scheduled(event, env, ctx) {
     try { await sendBarkReminder(env); } catch (e) {}
+    // 无后台主动消息 / 朋友圈：到点生成并推送
+    try { await runAutoPush(env); } catch (e) {}
 
     const now = Date.now();
     const { keys } = await env.PUSH_KV.list({ prefix: 'job:' });

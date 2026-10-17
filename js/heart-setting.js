@@ -64,6 +64,22 @@
     } catch (e) {}
   }
 
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        resolve();
+      } catch (e) { reject(e); }
+    });
+  }
+
   // ---- 模板文本解析 ----
   function cssOnly(text) {
     return window.NanoBeautifyRT ? window.NanoBeautifyRT.parse(text || '').css : String(text || '');
@@ -266,21 +282,21 @@
         toast('已保存');
       } catch (e) { toast('保存失败'); }
     });
-    // 模板：把当前编辑内容「另存为」一个新预设
+    // 「复制初始模板」：复制内置的完整初始模板，而不是把当前内容另存为预设。
     $('hsSaveAsBtn').addEventListener('click', async function () {
-      var name = ($('hsTemplateName').value || '').trim() || prompt('新预设名称', '我的心声') || '';
-      name = name.trim();
-      if (!name) return;
-      var css = $('hsCss').value;
+      var css = '';
       try {
-        var id = 'tpl_' + Date.now();
-        await putTemplate(id, name, css);
-        currentId = id;
-        await renderSelect(id);
-        $('hsTemplateName').value = '';
-        applyLive(css);
-        toast('已另存为预设');
-      } catch (e) { toast('保存失败'); }
+        var all = await allTemplates();
+        var def = all.find(function (t) { return t.id === 'default'; });
+        if (def && def.css) css = def.css;
+      } catch (e) {}
+      if (!css) css = $('hsCss').value || '';
+      if (!css) { toast('还没有可复制的模板'); return; }
+      copyText(css).then(function () {
+        toast('已复制初始模板');
+      }).catch(function () {
+        toast('复制失败，请手动选择');
+      });
     });
 
     $('hsRenameTemplate').addEventListener('click', async function () {

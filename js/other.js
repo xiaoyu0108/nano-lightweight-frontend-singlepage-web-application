@@ -134,6 +134,56 @@
         }
     }
 
+    // ===== 无后台 Web Push：从 Worker 取公钥并一键订阅 =====
+    var webPushBtn = document.getElementById('webPushBtn');
+    var webPushStatus = document.getElementById('webPushStatus');
+    function getNanoPush() {
+        try { return window.parent && window.parent.NanoPush ? window.parent.NanoPush : window.NanoPush; } catch (e) { return window.NanoPush; }
+    }
+    function setWebPushStatus(text) { if (webPushStatus) webPushStatus.textContent = text; }
+    function refreshWebPushStatus() {
+        var NP = getNanoPush();
+        if (!NP) { setWebPushStatus('未加载推送模块（请从主界面打开）'); return; }
+        NP.status().then(function (s) {
+            if (s.subscribed) { setWebPushStatus('已开启 ✓ 关闭 App 也能收到'); if (webPushBtn) webPushBtn.textContent = '重新订阅'; }
+            else if (s.configured) { setWebPushStatus('已配置，点右侧开启订阅'); if (webPushBtn) webPushBtn.textContent = '开启'; }
+            else { setWebPushStatus('未配置：点右侧自动获取 VAPID 并开启'); if (webPushBtn) webPushBtn.textContent = '开启'; }
+        }).catch(function () { setWebPushStatus('检查失败，可直接点开启'); });
+    }
+    if (webPushBtn) {
+        webPushBtn.addEventListener('click', async function () {
+            var NP = getNanoPush();
+            if (!NP) { setWebPushStatus('推送模块未加载'); return; }
+            var endpoint = '';
+            try { endpoint = (localStorage.getItem('nano_push_endpoint') || '').trim(); } catch (e) {}
+            if (!endpoint) endpoint = 'https://nanopush.nano315.online';
+            endpoint = endpoint.replace(/\/+$/, '');
+            var key = '';
+            try { key = (localStorage.getItem('nano_push_vapid') || '').trim(); } catch (e) {}
+            var token = '';
+            try { token = localStorage.getItem('nano_push_token') || localStorage.getItem('nano_peek_token') || ''; } catch (e) {}
+            if (!key) {
+                setWebPushStatus('正在获取服务端公钥…');
+                try {
+                    var r = await fetch(endpoint + '/vapid', { cache: 'no-store' });
+                    var d = await r.json();
+                    key = (d && d.key) || '';
+                } catch (e) {}
+            }
+            if (!key) { setWebPushStatus('服务端未配置 VAPID 公钥，请先在 Worker 设置 VAPID_*'); return; }
+            NP.setup(endpoint, key, token);
+            setWebPushStatus('等待通知权限…');
+            try {
+                await NP.enable();
+                setWebPushStatus('已开启 ✓ 关闭 App 也能收到');
+                if (webPushBtn) webPushBtn.textContent = '重新订阅';
+            } catch (e) {
+                setWebPushStatus(e && e.message ? e.message : '开启失败');
+            }
+        });
+    }
+    refreshWebPushStatus();
+
     function buildSounds() {
         if (!soundSelect || !window.NanoNotify) return;
         soundSelect.innerHTML = '';

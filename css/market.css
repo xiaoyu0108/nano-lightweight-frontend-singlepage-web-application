@@ -583,3 +583,176 @@ main{padding:24px 20px 32px}
 html,body,.app,.detail-page{scrollbar-width:none;-ms-overflow-style:none}
 html::-webkit-scrollbar,body::-webkit-scrollbar,.app::-webkit-scrollbar,.detail-page::-webkit-scrollbar{display:none;width:0;height:0}
 
+
+/* ============================================================
+   2026 韩系极简视觉刷新（覆盖上面的旧样式）
+   关键词：低饱和、留白、细线、悬浮底栏、顶栏返回
+   ============================================================ */
+:root{
+  --bg:#ffffff;
+  --paper:#ffffff;
+  --ink:#171716;
+  --ink-2:#44443f;
+  --muted:#94948c;
+  --line:#ebeae4;
+  --line-2:#f4f3ee;
+  --accent:#171716;
+  --accent-soft:#f3f2ec;
+  --radius-xl:26px;
+  --radius-lg:20px;
+  --radius-md:14px;
+  --radius-sm:10px;
+  --shadow-sm:0 1px 2px rgba(23,23,22,.04);
+  --shadow-md:0 8px 26px rgba(23,23,22,.06);
+  --shadow-lg:0 18px 50px rgba(23,23,22,.10);
+}
+body{background:var(--bg)}
+.app{max-width:720px;padding-bottom:104px}
+main{padding:18px 20px 116px}
+
+/* 顶栏 */
+.topbar{
+  height:auto;min-height:60px;gap:12px;
+  padding:calc(10px + max(var(--safe-top,0px),env(safe-area-inset-top,0px))) 18px 10px;
+  background:rgba(255,255,255,.92);
+  border-bottom:1px solid rgba(235,234,228,.9);
+}
+.topbar-left{display:flex;align-items:center;gap:8px;min-width:0}
+.topbar .brand{
+  font-size:15px;font-weight:680;letter-spacing:-.2px;gap:9px;
+  display:flex;align-items:center;color:var(--ink);
+}
+.topbar .brand small{
+  font-size:8px;font-weight:650;letter-spacing:2.4px;color:var(--muted);
+  margin-left:2px;transform:translateY(1px);
+}
+.topbar .brand .brand-mark{
+  width:9px;height:9px;border-radius:3px;background:var(--ink);display:block;
+}
+.topbar .brand svg{display:none}
+.topbar-btn{
+  width:38px;height:38px;border-radius:50%;
+  background:rgba(255,255,255,.62);border:1px solid var(--line);
+  color:var(--ink-2);transition:transform .15s,background .15s;
+}
+.topbar-btn:active{transform:scale(.92);background:#fff}
+.topbar-back{background:#fff}
+.topbar-back svg{width:18px;height:18px;stroke-width:2.2}
+.topbar-actions{gap:6px}
+
+/* 首页主视觉 */
+.hero{padding:42px 4px 34px;border-bottom:0;margin-bottom:26px}
+.hero .eyebrow{font-size:9px;letter-spacing:3.4px;color:#a6a69e;margin-bottom:18px}
+.hero h1{
+  font-size:36px;font-weight:640;letter-spacing:-1.9px;line-height:1.18;max-width:440px;
+}
+.hero h1 em{
+  font-family:"Iowan Old Style","New York","Songti SC",Georgia,serif;
+  font-style:italic;font-weight:500;letter-spacing:-1.2px;color:#8f8f86;
+}
+
+/* 提示条 */
+.mode-banner{
+  border-radius:18px;background:#f4f3ed;border:1px solid var(--line);
+  padding:13px 16px;font-size:11.5px;color:var(--ink-2);
+}
+.mode-banner.warn{background:#faf6ed;border-color:#efe6d4}
+.mode-banner .set{color:var(--ink-2);text-decoration:none;border-bottom:1px solid #c9c8c0;padding-bottom:1px}
+
+/* 标题行 */
+.section-label{margin:30px 0 16px}
+.section-label h2{font-size:14px;font-weight:680;letter-spacing:-.3px}
+.section-label span{font-size:8px;letter-spacing:2.6px;color:#adada5}
+
+/* 分类：去掉文件夹小舌头，改成干净的圆角信息块 */
+.folder-grid{gap:12px;margin-bottom:8px}
+.folder{border-radius:20px;border-color:var(--line);background:#fff;box-shadow:none;flex-direction:row;align-items:center;padding-right:15px}
+.folder-tab{display:none}
+.folder-body{padding:17px;flex:1;min-width:0;flex-direction:row;align-items:center;gap:13px}
+.folder-icon{
+  width:42px;height:42px;border-radius:14px;background:#f4f3ed;color:var(--ink);
+  flex:none;
+}
+.folder-icon svg{width:19px;height:19px;stroke-width:1.6}
+.folder-meta{min-width:0;flex:1}
+.folder-meta strong{font-size:12.5px;font-weight:650;letter-spacing:-.2px;margin-bottom:3px}
+.folder-meta small{font-size:10px;color:var(--muted);line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.folder-arrow{position:static;margin-left:2px;color:#c4c3bb;font-size:18px}
+
+/* 搜索 */
+.search-row{gap:8px;margin-bottom:22px}
+.search-box{height:44px;border-radius:16px;background:#f4f3ed;border:1px solid transparent}
+.search-box:focus-within{background:#fff;border-color:var(--line)}
+.search-btn{height:44px;border-radius:16px;background:var(--ink);font-size:11.5px;letter-spacing:.6px}
+
+/* 帖子卡片 */
+.post-list{gap:10px}
+.post{
+  border-radius:20px;border-color:var(--line);padding:19px;background:#fff;
+  box-shadow:none;
+}
+.post-head{margin-bottom:13px}
+.avatar{background:#f1f0ea;color:var(--ink-2);font-weight:650}
+.post-tag{background:#f4f3ed;color:#8c8c84;font-size:9.5px;letter-spacing:.2px}
+.post h3{font-size:15.5px;font-weight:660;letter-spacing:-.35px}
+.post-excerpt{font-size:11.5px;color:#8f8f87;line-height:1.75}
+.post-file{background:#f7f6f1;border:1px solid #f0efe9;border-radius:14px}
+.file-badge{background:#fff;border-color:#e8e7e1}
+.post-foot{gap:18px;color:#a2a29a}
+
+/* 底栏：悬浮胶囊 */
+.bottombar{
+  left:50%;bottom:calc(12px + max(var(--nano-safe-bottom,0px),env(safe-area-inset-bottom,0px)));
+  width:min(430px,calc(100% - 28px));height:64px;
+  padding:0 8px;border:1px solid rgba(235,234,228,.95);border-radius:24px;
+  background:rgba(255,255,255,.92);
+  box-shadow:0 14px 36px rgba(23,23,22,.10);
+}
+.nav-btn{font-size:9.5px;gap:3px;font-weight:550;color:#a2a29a}
+.nav-btn svg{width:20px;height:20px;stroke-width:1.5}
+.nav-btn.active{color:var(--ink);font-weight:700}
+
+/* 分类页标题 */
+.page-header{padding:18px 2px 22px}
+.page-kicker{display:block;font-size:8px;letter-spacing:2.8px;color:#aaa9a1;margin-bottom:10px}
+.page-header h1{font-size:30px;font-weight:660;letter-spacing:-1.2px}
+.page-header p{font-size:12px;color:var(--muted)}
+
+/* 详情页：顶栏返回 + 刘海安全区 */
+.detail-page{background:var(--bg)}
+.detail-header{
+  height:calc(58px + max(var(--safe-top,0px),env(safe-area-inset-top,0px)));
+  padding:max(var(--safe-top,0px),env(safe-area-inset-top,0px)) 14px 0;
+  display:grid;grid-template-columns:40px 1fr 40px;align-items:center;
+  background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);
+}
+.detail-back{
+  width:38px;height:38px;padding:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:#fff;border:1px solid var(--line);color:var(--ink);
+}
+.detail-back svg{width:18px;height:18px;stroke-width:2.2}
+.detail-header-title{text-align:center;font-size:13.5px;font-weight:650;letter-spacing:-.2px;color:var(--ink)}
+.detail-header-spacer{width:40px}
+.detail-content{padding:28px 22px calc(64px + env(safe-area-inset-bottom,0px))}
+.detail-title{font-size:29px;font-weight:680;letter-spacing:-1.3px}
+.detail-desc{font-size:13px;color:#55554f;line-height:1.9}
+.detail-tag{background:#f4f3ed;color:#86867e}
+.detail-gallery-item{border-radius:16px;border-color:var(--line)}
+.detail-file-item{background:#f7f6f1;border:1px solid #f0efe9;border-radius:16px}
+.detail-reaction{border-radius:14px}
+.detail-note{color:#aaa9a1}
+
+/* 表单与弹窗 */
+.form-input,.form-textarea,.form-select{background:#f7f6f1;border-radius:15px}
+.form-input:focus,.form-textarea:focus,.form-select:focus{background:#fff;border-color:var(--ink);box-shadow:0 0 0 3px rgba(23,23,22,.05)}
+.upload-zone{border-radius:18px;border-color:#e3e2dc}
+.btn{border-radius:15px}
+.modal{border-radius:24px}
+
+/* 小屏 */
+@media(max-width:380px){
+  .hero h1{font-size:30px}
+  .topbar .brand small{display:none}
+  .folder-meta small{display:none}
+}
