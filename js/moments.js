@@ -184,6 +184,7 @@
                 }
             });
         }
+        try { hydrateCover(); } catch (e) {}
     }
 
     // 面具头像存在 IndexedDB：MaskAvatarDB / avatars（key = 面具 id）
@@ -694,30 +695,95 @@
     function coverKey() { return 'nanoMomentsCover_' + currentMaskId(); }
     // 不再使用内置占位图；未设置封面时返回透明像素
     var TRANSPARENT_PX = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+    var COVER_DB = 'NanoMomentsCoverDB';
+    var COVER_STORE = 'covers';
+    function openCoverDB(cb) {
+        try {
+            var req = indexedDB.open(COVER_DB, 1);
+            req.onupgradeneeded = function(e) {
+                var d = e.target.result;
+                if (!d.objectStoreNames.contains(COVER_STORE)) d.createObjectStore(COVER_STORE, { keyPath: 'maskId' });
+            };
+            req.onsuccess = function() { cb(req.result); };
+            req.onerror = function() { cb(null); };
+        } catch (e) { cb(null); }
+    }
+    function coverDbKey() { return currentMaskId() || 'global'; }
+    function saveCoverToDB(url) {
+        var key = coverDbKey();
+        openCoverDB(function(d) {
+            if (!d) return;
+            try {
+                var tx = d.transaction(COVER_STORE, 'readwrite');
+                tx.objectStore(COVER_STORE).put({ maskId: key, url: String(url || ''), updatedAt: Date.now() });
+                tx.oncomplete = function() { try { d.close(); } catch (e) {} };
+            } catch (e) { try { d.close(); } catch (e2) {} }
+        });
+    }
+    function getCoverFromDB(cb) {
+        var key = coverDbKey();
+        openCoverDB(function(d) {
+            if (!d) { cb(''); return; }
+            try {
+                var tx = d.transaction(COVER_STORE, 'readonly');
+                var r = tx.objectStore(COVER_STORE).get(key);
+                r.onsuccess = function() { try { d.close(); } catch (e) {} cb(r.result ? String(r.result.url || '') : ''); };
+                r.onerror = function() { try { d.close(); } catch (e) {} cb(''); };
+            } catch (e) { try { d.close(); } catch (e2) {} cb(''); }
+        });
+    }
     function getCoverUrl() {
         try {
-            var raw = localStorage.getItem(coverKey()) || localStorage.getItem('nanoMomentsCover');
+            // 有 User 面具时只读该面具自己的封面，避免不同 user 之间串图。
+            var raw = currentMaskId() ? localStorage.getItem(coverKey()) : localStorage.getItem('nanoMomentsCover');
             if (raw && raw.trim() !== '') return raw.trim();
         } catch(e) {}
         return TRANSPARENT_PX;
     }
-    // 保存封面：同时写入「按面具」键 + 全局键，保证朋友圈与个人主页一致、且换面具/重开后仍在
+    function applyCoverToDom(url) {
+        if (!url) return;
+        try {
+            var a = document.getElementById('coverImg');
+            var b = document.getElementById('profileCoverImg');
+            if (a) a.src = url;
+            if (b) b.src = url;
+        } catch (e) {}
+    }
+    function hydrateCover() {
+        // localStorage 可能写满或清空；封面另存一份 IndexedDB，切换面具/重开后异步补回来。
+        getCoverFromDB(function(url) {
+            if (!url) return;
+            try { localStorage.setItem(coverKey(), url); } catch (e) {}
+            applyCoverToDom(url);
+        });
+    }
+    function migrateLegacyCover() {
+        try {
+            var g = localStorage.getItem('nanoMomentsCover');
+            if (g && currentMaskId() && !localStorage.getItem(coverKey())) {
+                localStorage.setItem(coverKey(), g);
+                saveCoverToDB(g);
+                localStorage.removeItem('nanoMomentsCover');
+            }
+        } catch (e) {}
+    }
+    var profileMaskIsSelf = true;
     function syncProfileCover() {
         try {
             var b = document.getElementById('profileCoverImg');
-            if (b) b.src = getCoverUrl();
+            // 只有「我」的主页用我的朋友圈封面；看别的 char 主页时不能串用我的封面。
+            if (b) b.src = profileMaskIsSelf ? getCoverUrl() : TRANSPARENT_PX;
         } catch (e) {}
+        if (profileMaskIsSelf) hydrateCover();
     }
     function saveCover(url) {
         var v = String(url || '').trim();
         if (!v) return;
-        try { localStorage.setItem('nanoMomentsCover', v); } catch (e) {}
-        try { if (coverKey() !== 'nanoMomentsCover') localStorage.setItem(coverKey(), v); } catch (e) {}
-        try {
-            var a = document.getElementById('coverImg');
-            if (a) a.src = v;
-            syncProfileCover();
-        } catch (e) {}
+        try { localStorage.setItem(coverKey(), v); } catch (e) {}
+        // 旧版本只有全局键；保留它，方便首次升级时迁移到当前面具。
+        try { if (!currentMaskId()) localStorage.setItem('nanoMomentsCover', v); } catch (e) {}
+        saveCoverToDB(v);
+        applyCoverToDom(v);
     }
 
     function randomPick(arr) {
@@ -1995,6 +2061,18 @@
                 }
             }
 
+            // 兜底互动：模型偶尔只写文案不写 LIKES/COMMENT，保证刷新出来的动态不是空评论区。
+            var poolNames = selected.concat(npcs).filter(function(n) { return n && n.name; }).map(function(n) { return n.name; });
+            var canned = ['这条也太真实了', '哈哈哈哈', '我也想去', '注意休息呀', '好看', '下次带我'];
+            newPosts.forEach(function(p, pi) {
+                var others = poolNames.filter(function(n) { return n !== p.author; });
+                if (!others.length) return;
+                if (!p.likes || !p.likes.length) p.likes = others.slice(0, Math.min(2, others.length));
+                if (!p.comments || !p.comments.length) {
+                    p.comments = [{ user: others[0], toUser: '', text: canned[(pi + String(p.author || '').length) % canned.length] }];
+                }
+            });
+
             momentsData = newPosts.concat(momentsData);
             saveMomentsData(momentsData);
             renderFeed();
@@ -2023,7 +2101,8 @@
 
     // ===== 个人主页 =====
     function openProfile(authorName, avatarSrc) {
-        if (normName(authorName) === normName(currentUser.name)) avatarSrc = currentUser.avatar || avatarSrc;
+        profileMaskIsSelf = normName(authorName) === normName(currentUser.name);
+        if (profileMaskIsSelf) avatarSrc = currentUser.avatar || avatarSrc;
         document.getElementById('profileUserName').textContent = authorName;
         document.getElementById('profileUserAvatar').src = avatarSrcFor(authorName, avatarSrc);
         // 个人主页封面始终跟朋友圈顶部封面共用同一份数据，打开时强制重取一次。
@@ -2588,7 +2667,7 @@
             contextNPCs = generateContextNPCs();
             allAvailableChars = boundChars.concat(contextNPCs);
         }
-        if (e.key && e.key.indexOf('nanoMomentsCover') === 0) { document.getElementById('coverImg').src = getCoverUrl(); syncProfileCover(); }
+        if (e.key && e.key.indexOf('nanoMomentsCover') === 0) { document.getElementById('coverImg').src = getCoverUrl(); syncProfileCover(); hydrateCover(); }
     });
 
     window.addEventListener('message', function(e) {
@@ -2649,6 +2728,7 @@
     function reloadForCurrentMask() {
         refreshCurrentUserFromMask();
         try { switchView('viewFeed'); } catch (e) {}
+        migrateLegacyCover();
         document.getElementById('coverImg').src = getCoverUrl();
         syncProfileCover();
         openDB(function() {
@@ -2661,6 +2741,7 @@
 
     function init() {
         refreshCurrentUserFromMask();
+        migrateLegacyCover();
         document.getElementById('coverImg').src = getCoverUrl();
         syncProfileCover();
 

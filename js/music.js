@@ -2381,15 +2381,7 @@
   }
   function notifyDuoReply(char, text) {
     if (window.parent === window) return;
-    try { if (window.NanoNotify) window.NanoNotify.notify((char && char.name) ? char.name : '一起听', text || '新的回复', { target: 'music', channel: 'music' }); } catch (e) {}
-    try {
-      window.parent.postMessage({
-        type: 'appNotify',
-        app: 'music',
-        title: (char && char.name) ? char.name : '一起听',
-        body: text || ''
-      }, '*');
-    } catch (e) {}
+    try { if (window.NanoNotify) window.NanoNotify.notify((char && char.name) ? char.name : '一起听', text || '新的回复', { target: 'music', channel: 'music', avatar: (char && char.avatar) || '', name: (char && char.name) || '一起听' }); } catch (e) {}
   }
   function addTypingIndicator() {
     var wrap = document.createElement('div');
@@ -2456,6 +2448,13 @@
     var typing = addTypingIndicator();
     try {
       var sys = await duoSystemPrompt(partnerInfo);
+      try {
+        var rr = String(window.__musicRerollReason || '').trim();
+        if (rr) {
+          window.__musicRerollReason = '';
+          sys += (window.NanoReroll && NanoReroll.block) ? NanoReroll.block(rr) : ('\n\n【本次重roll必须修正】' + rr);
+        }
+      } catch (e) {}
       var msgs = [{ role: 'system', content: sys }].concat(duoHistory.slice(-16));
       var raw = await callDuoAi(msgs);
       var directive = handleDuoDirectives(raw);
@@ -2599,7 +2598,12 @@
   listenChatInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); listenChatActionBtn.click(); }
   });
-  listenChatRollBtn.addEventListener('click', function() {
+  listenChatRollBtn.addEventListener('click', async function() {
+    if (window.NanoReroll) {
+      var reason = await NanoReroll.ask({ title: '重roll 一起听', subtitle: '上一版哪里不对？留空也可以直接重写' });
+      if (reason === null) return;
+      window.__musicRerollReason = reason || '';
+    }
     // 重 roll：删掉「本轮」角色的全部气泡（不是历史全部、也不是最新一条），再重新生成
     var nodes = listenChatBody.querySelectorAll('.chat-msg.partner[data-ai-round]');
     if (nodes.length) {

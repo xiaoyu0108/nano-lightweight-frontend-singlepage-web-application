@@ -1037,3 +1037,34 @@ body .bottom-actions { bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !im
 #editModal .form-group:last-child { margin-bottom: 0; }
 /* 编辑页内再打开的弹窗（换头像 / 提示）要盖在编辑页之上 */
 #avatarModal, #infoModal { z-index: 1400; }
+
+/* 人设卡片：显式切换按钮（避免只靠双击） */
+.mask-use-btn {
+    flex: none;
+    margin-left: 6px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ffd3e3;
+    border-radius: 50%;
+    background: #fff5f9;
+    color: #e56d9b;
+    line-height: 1;
+}
+.mask-use-btn svg { width: 16px; height: 16px; }
+.mask-use-btn:active { background: #ffe8f1; transform: scale(.96); }
+.mask-use-main {
+    width: 100%;
+    margin-top: 10px;
+    padding: 13px 0;
+    border: none;
+    border-radius: 16px;
+    background: #fff0f6;
+    color: #e56d9b;
+    font-size: 15px;
+    font-weight: 650;
+}
+.mask-use-main:active { background: #ffe3ef; transform: scale(.99); }

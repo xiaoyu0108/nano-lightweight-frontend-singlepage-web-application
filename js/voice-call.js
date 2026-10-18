@@ -185,6 +185,13 @@
         prompt += '\n如果你确实要结束这通电话（例如要去忙、手机快没电、话题自然结束、想休息了），可以在回复最后单独一行写 [hangup:简短理由]；这个标记不会显示给对方。不要每轮都挂断，只在真的想结束时用。';
         if (wbText) prompt += '\n【世界书】\n' + wbText;
         if (memText) prompt += '\n【长期记忆】\n' + memText;
+        try {
+            const rr = String(window.__voiceRerollReason || '').trim();
+            if (rr) {
+                window.__voiceRerollReason = '';
+                prompt += (window.NanoReroll && NanoReroll.block) ? NanoReroll.block(rr) : ('\n\n【本次重roll必须修正】' + rr);
+            }
+        } catch (e) {}
         return prompt;
     }
 
@@ -1026,8 +1033,13 @@ function showToast(text) {
     }
 
     // ===== 重roll =====
-    function handleReroll() {
+    async function handleReroll() {
         if (isWaiting) return;
+        if (window.NanoReroll) {
+            const reason = await NanoReroll.ask({ title: '重roll 通话', subtitle: '上一句哪里不对？留空也可以直接重说' });
+            if (reason === null) return;
+            window.__voiceRerollReason = reason || '';
+        }
         // 重roll：删除本轮生成的所有 AI 气泡（末尾连续的非用户消息），不动历史消息
         let idx = messages.length - 1;
         while (idx >= 0 && !messages[idx].isUser) idx--;

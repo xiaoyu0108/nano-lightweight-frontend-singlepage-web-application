@@ -381,14 +381,43 @@ function savePending(l) { try { localStorage.setItem(pendingKey(), JSON.stringif
 function addPending(p) { const l = loadPending(); l.push(p); savePending(l); updatePendingIndicator(); }
 function removePending(token) { savePending(loadPending().filter(p => p.token !== token)); updatePendingIndicator(); }
 let busyLabel = '';
+function typingActive() {
+  try {
+    if (busyLabel && busyLabel.indexOf('回复') >= 0) return true;
+    return loadPending().some(p => p.kind === 'reply' || p.kind === 'blocking');
+  } catch (e) { return false; }
+}
+function syncTypingRow() {
+  const box = $('#messages');
+  if (!box) return;
+  let row = $('#imTypingRow');
+  if (!typingActive()) {
+    if (row) row.remove();
+    return;
+  }
+  if (!row) {
+    row = document.createElement('div');
+    row.id = 'imTypingRow';
+    row.className = 'im-typing-row';
+  } else {
+    row.remove();
+  }
+  const c = state.current || {};
+  const initial = String(c.name || '?').slice(0, 1);
+  const av = c.avatar
+    ? `<img src="${esc(c.avatar)}" alt="">`
+    : `<span>${esc(initial)}</span>`;
+  row.innerHTML = `<div class="im-typing-avatar">${av}</div><div class="im-typing-bubble"><i></i><i></i><i></i></div>`;
+  var before = box.scrollHeight;
+  box.appendChild(row);
+  // 内容很少时把「正在输入」压到输入栏上方，而不是飘在消息顶部
+  var gap = box.clientHeight - before - row.offsetHeight;
+  row.style.marginTop = gap > 0 ? gap + 'px' : '8px';
+  box.scrollTop = box.scrollHeight;
+}
 function updatePendingIndicator() {
-  const el = $('#imPending'); if (!el) return;
   const list = loadPending();
-  let text = '';
-  if (list.length) text = list.some(p => p.kind === 'reply' || p.kind === 'blocking') ? '回复中…' : '刷新中…';
-  else if (busyLabel) text = busyLabel;
-  if (text) { const t = $('#imPendingText'); if (t) t.textContent = text; el.hidden = false; }
-  else el.hidden = true;
+  syncTypingRow();
   if (list.length) startPendingWatch();
 }
 function setBusy(label) { busyLabel = label || ''; updatePendingIndicator(); }
@@ -433,9 +462,44 @@ function startPendingWatch() {
 }
 function notifyApp(title, body, opts) {
   opts = opts || {};
-  // 真实后台通知（ServiceWorker / Bark），再兜底应用内通知条
-  try { if (window.NanoNotify) { if (NanoNotify.ensurePermission) NanoNotify.ensurePermission(); NanoNotify.notify(title, body, Object.assign({ target: 'imessage', channel: 'chat' }, opts)); } } catch (e) {}
-  try { if (window.parent !== window) window.parent.postMessage({ type: 'appNotify', title: title, body: body, app: 'imessage' }, '*'); } catch (e) {}
+  // iMessage 只走系统通知，不再经过内置通知栏
+  try {
+    if (!('Notification' in window)) return;
+    const payload = {
+      body: String(body || '').slice(0, 160),
+      tag: 'imessage-' + Date.now(),
+      renotify: true,
+      data: { target: 'imessage' }
+    };
+    if (opts.icon) payload.icon = opts.icon;
+    function legacy() {
+      try {
+        const n = new Notification(title || 'iMessage', payload);
+        n.onclick = function () {
+          try { window.focus(); } catch (e) {}
+          try { if (window.parent !== window) window.parent.postMessage({ type: 'notifyOpen', target: 'imessage' }, '*'); } catch (e) {}
+          try { n.close(); } catch (e) {}
+        };
+      } catch (e) {}
+    }
+    function show() {
+      if (Notification.permission !== 'granted') return;
+      try {
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+          let done = false;
+          const t = setTimeout(function () { if (!done) { done = true; legacy(); } }, 500);
+          navigator.serviceWorker.ready.then(function (reg) {
+            if (done) return;
+            done = true; clearTimeout(t);
+            if (reg && reg.showNotification) { try { reg.showNotification(title || 'iMessage', payload); return; } catch (e) {} }
+            legacy();
+          }).catch(function () { if (!done) { done = true; clearTimeout(t); legacy(); } });
+        } else legacy();
+      } catch (e) { legacy(); }
+    }
+    if (Notification.permission === 'granted') show();
+    else if (Notification.permission === 'default') Notification.requestPermission().then(function (p) { if (p === 'granted') show(); }).catch(function () {});
+  } catch (e) {}
 }
 function extractContent(data) {
   if (!data) return null;
@@ -455,6 +519,19 @@ async function callApi(history, opts, meta) {
     lastApiError = '没有找到主 API 配置（请在 API 小窗填写 地址 / Key / 模型）';
     return null;
   }
+  // 重roll 纠正：只作用于本轮回复，插在系统提示之后
+  try {
+    if (meta && meta.kind === 'reply' && window.__imessageRerollReason) {
+      const rr = String(window.__imessageRerollReason || '').trim();
+      window.__imessageRerollReason = '';
+      if (rr) {
+        const block = (window.NanoReroll && NanoReroll.block) ? NanoReroll.block(rr) : ('\n\n【本次重roll必须修正】' + rr);
+        history = history.slice();
+        if (history.length && history[0].role === 'system') history.splice(1, 0, { role: 'system', content: block.trim() });
+        else history.unshift({ role: 'system', content: block.trim() });
+      }
+    }
+  } catch (e) {}
   const payload = {
     url: apiBase(cfg.mainUrl) + '/chat/completions',
     method: 'POST',
@@ -777,6 +854,7 @@ function renderMessages() {
     return html;
   }).join('');
   box.scrollTop = box.scrollHeight;
+  syncTypingRow();
 }
 
 /* ---------------- 发送 / 回复 ---------------- */
@@ -985,6 +1063,10 @@ async function genCharReply(c) {
   sys += '【表情包】用户可能发来 [表情包：名称]，那代表用户发了一张该含义的表情包，只表达当下的心情/态度（例如“喝酒”=烦躁无语、“哭哭”=感动委屈），不代表用户真的去做了什么；按心情自然回应即可，绝对不要当真去追问“你怎么又喝酒了/你怎么哭了”。（不需要自己也发表情标签）。\n';
   sys += '【短信风格】像真人连发消息那样：把想说的话自然拆成 2-5 条短消息，每条独立成行，每条约 5-25 字；不要把一整段塞进一条，也不要只蹦几个字让意思不完整。\n';
   sys += '【务必完整】每条消息都要是一句完整的话，不要说到一半就断掉；整体意思要表达完。';
+  try {
+    const cyc = window.NanoCycle && NanoCycle.promptBlock(c.charId);
+    if (cyc) sys += '\n\n' + cyc;
+  } catch (e) {}
   const foreign = isForeignChar(ch);
   const history = [{ role: 'system', content: sys }].concat(historyForApi(20, c.history));
   // 即使还没有用户消息，点击“回复”也让 TA 主动发一条，而不是没反应
@@ -1172,6 +1254,11 @@ async function genStrangerReply(c) {
 async function doReroll() {
   const c = state.current;
   if (!c) return;
+  if (window.NanoReroll) {
+    const reason = await NanoReroll.ask({ title: '重roll iMessage', subtitle: '上一版哪里不对？留空也可以直接重写' });
+    if (reason === null) return;
+    window.__imessageRerollReason = reason || '';
+  }
   let lastMe = -1;
   for (let i = state.messages.length - 1; i >= 0; i--) { if (isMine(state.messages[i])) { lastMe = i; break; } }
   // 删除最后一条“我”之后的所有对方消息 = 本轮回复

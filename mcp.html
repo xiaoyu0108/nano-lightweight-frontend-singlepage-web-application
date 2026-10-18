@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MCP</title>
-<link rel="stylesheet" href="css/mcp.css?v=20261017b">
+<link rel="stylesheet" href="css/mcp.css?v=20261018a">
 </head>
 <body>
 <div class="app">
@@ -83,7 +83,7 @@
     </div>
     <div class="field" style="margin-bottom:0">
       <label>令牌（可选，Authorization: Bearer）</label>
-      <input class="input" id="srvToken" placeholder="留空表示不需要" autocomplete="off">
+      <input class="input" id="srvToken" placeholder="留空表示不需要" autocomplete="off" data-masked-key="1">
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="cancelServerModal">取消</button>
@@ -117,7 +117,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<script src="js/nano-mcp-runtime.js?v=20261017b"></script>
-<script src="js/mcp.js?v=20261017b"></script>
+<script src="js/appearance.js?v=20261018a"></script>
+<script src="js/nano-mcp-runtime.js?v=20261018a"></script>
+<script src="js/mcp.js?v=20261018a"></script>
 </body>
 </html>

@@ -541,7 +541,7 @@
     }
 
     // ===== 重roll =====
-    function handleReroll() {
+    async function handleReroll() {
         const chat = window.__chat;
         const messages = chat.messages;
 
@@ -561,6 +561,12 @@
         if (lastAIIndex === -1) {
             chat.showAlert('提示', '没有可重roll的消息');
             return;
+        }
+
+        if (window.NanoReroll) {
+            const reason = await NanoReroll.ask({ title: '重roll 纠正', subtitle: '上一版哪里不对？留空也可以直接重写' });
+            if (reason === null) return;
+            window.__nanoRerollReason = reason;
         }
 
         let startIndex = lastAIIndex;

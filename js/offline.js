@@ -85,6 +85,113 @@ async function saveMessages(msgs) {
   });
 }
 
+// ============================================================
+// 收藏：与「线上聊天 / 更多 → 收藏」共用 nano_api_db.favorite_data
+// ============================================================
+function favoriteUid() {
+  try {
+    var d = JSON.parse(localStorage.getItem('nano_mask_data') || 'null');
+    if (d && d.currentMaskId != null && d.currentMaskId !== '') return String(d.currentMaskId);
+  } catch (e) {}
+  return 'default';
+}
+function favoriteKey() { return 'nano_favorite__' + favoriteUid(); }
+
+function favoriteOpenDb() {
+  return new Promise(function (resolve, reject) {
+    try {
+      var req = indexedDB.open('nano_api_db', 2);
+      req.onupgradeneeded = function (e) {
+        try {
+          var db = e.target.result;
+          if (!db.objectStoreNames.contains('favorite_data')) db.createObjectStore('favorite_data', { keyPath: 'key' });
+        } catch (err) {}
+      };
+      req.onsuccess = function (e) { resolve(e.target.result); };
+      req.onerror = function (e) { reject(e.target.error); };
+    } catch (e) { reject(e); }
+  });
+}
+function favMergeLists(a, b) {
+  var out = [], seen = {};
+  (a || []).concat(b || []).forEach(function (f) {
+    if (!f) return;
+    var k = f.id || ((f.content || '') + '|' + (f.chatId || ''));
+    if (seen[k]) return;
+    seen[k] = 1; out.push(f);
+  });
+  return out;
+}
+async function favoriteReadList() {
+  var list = [];
+  try {
+    var raw = localStorage.getItem(favoriteKey());
+    var local = raw ? JSON.parse(raw) : null;
+    if (local && Array.isArray(local.favorites)) list = local.favorites.slice();
+  } catch (e) {}
+  try {
+    var db = await favoriteOpenDb();
+    var idbVal = await new Promise(function (resolve) {
+      try {
+        var r = db.transaction('favorite_data', 'readonly').objectStore('favorite_data').get(favoriteKey());
+        r.onsuccess = function () { resolve(r.result ? r.result.value : null); };
+        r.onerror = function () { resolve(null); };
+      } catch (e) { resolve(null); }
+    });
+    if (idbVal && Array.isArray(idbVal.favorites)) list = favMergeLists(list, idbVal.favorites);
+  } catch (e) {}
+  return list;
+}
+async function favoriteWriteList(list) {
+  var payload = { favorites: list };
+  try { localStorage.setItem(favoriteKey(), JSON.stringify(payload)); } catch (e) {}
+  try {
+    var db = await favoriteOpenDb();
+    await new Promise(function (resolve) {
+      try {
+        var tx = db.transaction('favorite_data', 'readwrite');
+        tx.objectStore('favorite_data').put({ key: favoriteKey(), value: payload });
+        tx.oncomplete = resolve;
+        tx.onerror = resolve;
+      } catch (e) { resolve(); }
+    });
+  } catch (e) {}
+}
+function offlineMessageTime(m) {
+  var ts = parseInt(String((m && m.id) || '').split('-')[0], 10);
+  if (!ts || ts < 1000000000000) ts = Date.now();
+  try { return new Date(ts).toLocaleString('zh-CN'); } catch (e) { return ''; }
+}
+async function addOfflineFavorite(i) {
+  var m = messages[i];
+  if (!m) return;
+  var content = String(m.content || '').trim();
+  if (!content) { showToast('这条消息没有可收藏的内容'); return; }
+  var isUser = m.role === 'user';
+  var sender = m.name || (isUser ? settings.userName : settings.charName) || '未知';
+  var avatar = m.avatar || (isUser ? settings.userAvatar : settings.charAvatar) || '';
+  var chatId = offlineChatId || '';
+  var msgId = 'off_' + (m.id || (Date.now() + '-' + Math.random().toString(36).slice(2, 6)));
+  var list = await favoriteReadList();
+  if (list.some(function (f) { return f && (f.id === msgId || (f.content === content && f.chatId === chatId)); })) {
+    showToast('这条已经收藏过了');
+    return;
+  }
+  list.unshift({
+    id: msgId,
+    content: content,
+    sender: sender,
+    senderType: isUser ? 'user' : 'char',
+    time: offlineMessageTime(m),
+    chatId: chatId,
+    avatar: avatar,
+    kind: 'text'
+  });
+  await favoriteWriteList(list);
+  try { window.parent.postMessage({ type: 'refreshFavorites' }, '*'); } catch (e) {}
+  showToast('已收藏到「更多 → 收藏」');
+}
+
 async function syncGlobalIdentity() {
   try {
     const keys = ['nano_mask_data', 'nano_home_data', 'peach_home_data'];
@@ -1111,6 +1218,7 @@ function render() {
       </div>
 
       <div class="more-menu">
+        <button data-action="favorite">收藏这条</button>
         <button data-action="thinking">显示 / 隐藏思维链</button>
         <button data-action="select">加入多选</button>
       </div>
@@ -1235,6 +1343,9 @@ chat.addEventListener('click', function(e) {
   else if (action === 'more') {
     document.querySelectorAll('.more-menu.open').forEach(x => x.classList.remove('open'));
     card.querySelector('.more-menu').classList.toggle('open');
+  } else if (action === 'favorite') {
+    addOfflineFavorite(i);
+    document.querySelectorAll('.more-menu.open').forEach(x => x.classList.remove('open'));
   } else if (action === 'thinking') toggleThinking(i);
   else if (action === 'select') enterSelect(i);
   else if (action === 'cancelEdit') cancelEdit(i);
@@ -2475,6 +2586,19 @@ async function callMainAPI(history) {
           .replace(/\{\{user\}\}/g, settings.userName || '对方');
       }
     } catch (e) {}
+    // 重roll 纠正：只作用于这一轮，追加在系统提示最后
+    try {
+      const rr = String(window.__offlineRerollReason || '').trim();
+      if (rr) {
+        window.__offlineRerollReason = '';
+        finalSystemPrompt += (window.NanoReroll && NanoReroll.block) ? NanoReroll.block(rr) : ('\n\n【本次重roll必须修正】' + rr);
+      }
+    } catch (e) {}
+    // 月潮：被授权的角色知道她的经期
+    try {
+      const cyc = window.NanoCycle && NanoCycle.promptBlock(offlineChatId || (settings && settings.chatId));
+      if (cyc) finalSystemPrompt += '\n\n' + cyc;
+    } catch (e) {}
     const promptStr = finalSystemPrompt + '\n\n' + chatText;
 
     // 线下长文按「目标字数」估算输出 token：中文约 1.8 token/字，再加思维链/心声/剧情选项的余量。
@@ -2618,6 +2742,11 @@ async function loadRulesFromDB() {
 async function doReroll() {
   const last = messages[messages.length - 1];
   if (!last || last.role !== 'assistant') { showToast('没有可重roll的回复'); return; }
+  if (window.NanoReroll) {
+    const reason = await NanoReroll.ask({ title: '重roll 线下', subtitle: '上一版哪里不对？留空也可以直接重写' });
+    if (reason === null) return;
+    window.__offlineRerollReason = reason || '';
+  }
   messages.pop();
   saveMessages(messages);
   render();

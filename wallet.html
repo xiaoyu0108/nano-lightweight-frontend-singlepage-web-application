@@ -6,9 +6,10 @@
     <title>钱包 · 记账</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="css/wallet.css?v=20261006c">
+    <link rel="stylesheet" href="css/panel-ui.css?v=20261018o">
     <script src="js/appearance.js"></script>
 </head>
-<body>
+<body class="panel-wallet">
 
     <div class="app" id="app">
 
@@ -51,6 +52,15 @@
                         更换银行卡
                     </button>
                 </div>
+
+                <!-- 支付设置 -->
+                <button class="pay-setting-row" id="paySettingsBtn" type="button">
+                    <span class="pay-setting-main">
+                        <span class="pay-setting-title">支付设置</span>
+                        <span class="pay-setting-sub" id="paySettingsStatus">未设置支付密码</span>
+                    </span>
+                    <svg class="row-chevron" viewBox="0 0 8 13" width="8" height="13"><path d="M1 1.5L6.5 6.5L1 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
 
                 <!-- 交易记录（银行卡流水） -->
                 <div class="section-header">
@@ -189,11 +199,45 @@
         </div>
     </div>
 
+    <!-- ===== 支付设置弹窗 ===== -->
+    <div class="modal-overlay" id="paySettingsModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">支付设置</div>
+                <div class="modal-sub">商城使用银行卡付款时验证</div>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <div class="input-row">
+                        <span class="label">免密支付</span>
+                        <label class="ios-switch"><input type="checkbox" id="freePayToggle"><span class="ios-switch-track"></span></label>
+                    </div>
+                    <div class="input-row">
+                        <span class="label">支付密码</span>
+                        <input type="text" id="payPasswordInput" data-masked-key="1" inputmode="numeric" maxlength="6" placeholder="6 位数字" autocomplete="off">
+                    </div>
+                    <div class="input-row">
+                        <span class="label">确认密码</span>
+                        <input type="text" id="payPasswordConfirm" data-masked-key="1" inputmode="numeric" maxlength="6" placeholder="再次输入" autocomplete="off">
+                    </div>
+                    <button class="pay-clear-btn" id="payPasswordClear" type="button">清除支付密码</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" id="paySettingsCancel" data-close>取消</button>
+                <button class="btn-confirm" id="paySettingsSave">保存</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== Toast ===== -->
     <div class="toast" id="toast"></div>
 
     <script src="js/bank-theme.js?v=20261006a"></script>
-    <script src="js/wallet.js?v=20261006e"></script>
+    <script src="js/family-card-store.js?v=20261006a"></script>
+    <script src="js/nano-pay.js?v=20261018b"></script>
+    <script src="js/wallet.js?v=20261018g"></script>
+    <script src="js/wallet-pay-ui.js?v=20261018a"></script>
 <script src="js/api-float.js"></script>
 <script src="swipe-back.js"></script>
 </body>

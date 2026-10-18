@@ -1231,7 +1231,14 @@ async function callMainAPI(){
   let base=String(runtime.api.mainUrl).trim().replace(/\/+$/,'');
   if(base && !/\/v1$/i.test(base)) base+='/v1';
   const url = base + '/chat/completions';
-  const sys = buildSystemPrompt();
+  let sys = buildSystemPrompt();
+  try {
+    const rr = String(window.__booksRerollReason || '').trim();
+    if (rr) {
+      window.__booksRerollReason = '';
+      sys += (window.NanoReroll && NanoReroll.block) ? NanoReroll.block(rr) : ('\n\n【本次重roll必须修正】' + rr);
+    }
+  } catch (e) {}
   const history = buildHistoryMessages();
   const messages = [{role:'system',content:sys}, ...history];
   markedForNextReply='';   // 标记段落只让角色读一次，后续消息正常聊天
@@ -1367,6 +1374,11 @@ async function replyFromChar(){
 /* 重roll：删掉上一轮 char 的所有气泡，重新调用 API */
 async function retryRound(){
   if(!currentChar){ toast('请先选择角色'); return; }
+  if(window.NanoReroll){
+    const reason = await NanoReroll.ask({ title: '重roll 一起看', subtitle: '上一版哪里不对？留空也可以直接重写' });
+    if(reason === null) return;
+    window.__booksRerollReason = reason || '';
+  }
   const box=document.getElementById('chatWindowBody');
   const msgs=[...box.querySelectorAll('.msg')];
   let rid=null;

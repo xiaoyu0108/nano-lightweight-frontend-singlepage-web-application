@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>群聊</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="css/groups.css?v=20261005d">
+<link rel="stylesheet" href="css/groups.css?v=20261018e">
 <script src="js/appearance.js?v=20261010a"></script>
-<script src="js/nano-notify.js?v=20261006a"></script>
+<script src="js/nano-notify.js?v=20261018b"></script>
+<script src="js/reroll-reason.js?v=20261018a"></script>
 <script src="js/nano-badge.js"></script>
 <script src="js/group-store.js"></script>
 </head>
-<body class="nano-groups">
+<body class="nano-groups nano-chat-inner">
 <div class="chat-container" id="app">
 
     <header class="topbar">
@@ -23,14 +24,17 @@
         <div class="topbar-avatar" id="topbarAvatar">群</div>
     </header>
 
-    <div class="group-notice-bar">
+    <div class="group-notice-bar" id="groupNoticeBar" style="display:none;">
         <div class="notice-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
             </svg>
         </div>
-        <span class="notice-text" id="noticeText">暂无群公告</span>
+        <span class="notice-text" id="noticeText"></span>
         <span class="notice-more" id="noticeMore">详情</span>
+        <button class="notice-close" id="noticeClose" type="button" aria-label="移除群公告">
+            <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+        </button>
     </div>
 
     <div class="multi-select-bar" id="multiSelectBar">
@@ -261,7 +265,7 @@
 <script src="js/chat-emoji.js"></script>
 <script src="js/nano-tts.js"></script>
         <script src="js/nano-holiday.js?v=20261012a"></script>
-        <script src="js/groups.js?v=20261012a"></script>
+        <script src="js/groups.js?v=20261018e"></script>
 <script src="js/api-float.js?v=20261005a"></script>
 <script src="swipe-back.js"></script>
 </body>

@@ -2320,7 +2320,7 @@ const SETTINGS_APPS = [
   {id:"game",name:"游戏"},{id:"mail",name:"邮箱"},{id:"settings",name:"设置"},
   {id:"video",name:"视频"},{id:"diary",name:"日记"},{id:"private",name:"私密"},
   {id:"health",name:"健康"},{id:"chat",name:"聊天"},
-  {id:"doubao",name:"豆包"},{id:"taobao",name:"淘宝"},{id:"mapcal",name:"地图日程"},
+  {id:"doubao",name:"豆包"},{id:"taobao",name:"淘宝"},{id:"store",name:"商城"},{id:"mapcal",name:"地图日程"},
   {id:"album",name:"相册"},{id:"memo",name:"备忘录"},{id:"browser",name:"浏览器"}
 ];
 
@@ -2840,6 +2840,7 @@ const MULTI_SPEC = {
   chat:`"chat":[{"name":"NPC名字","lastMsg":"最后一条","time":"昨天 22:13","unread":0,"messages":[{"side":"left","text":"消息"}]}]`,
   doubao:`"doubao":[{"role":"char","content":"角色问豆包的问题"},{"role":"ai","content":"豆包的回答"}]`,
   taobao:`"taobao":{"cart":[{"name":"商品名","shop":"店铺","spec":"规格","price":"129"}],"orders":[{"shop":"店铺","name":"商品名","spec":"规格","price":"129","status":"交易成功","time":"8月27日"}],"food":[{"restaurant":"店名","dish":"菜品","price":"26.8","status":"已送达","time":"今天 12:18"}]}`,
+  store:`"store":{"cart":[{"name":"商品名","shop":"店铺","spec":"规格","price":"129"}],"orders":[{"shop":"店铺","name":"商品名","spec":"规格","price":"129","status":"交易成功","time":"8月27日"}],"food":[{"restaurant":"店名","dish":"菜品","price":"26.8","status":"已送达","time":"今天 12:18"}]}`,
   mapcal:`"mapcal":{"places":[{"name":"地点名","address":"地址或区域","time":"今天 14:20","note":"搜索或导航备注"}],"events":[{"date":"10月4日","day":"星期六","time":"15:30","title":"安排标题","info":"地点或说明","tag":"工作"}]}`
 };
 const MULTI_COUNT = {
@@ -2848,6 +2849,7 @@ const MULTI_COUNT = {
   private:"private 4 条（轻×2、中×1、重×1）", chat:"chat 3 个会话（每个 5-8 条消息）",
   doubao:"doubao 8-10 条消息（char 与 ai 交替，构成一次完整对话）",
   taobao:"taobao：cart 2-3 件、orders 2-3 单、food 2-3 单",
+  store:"store：cart 2-3 件、orders 2-3 单、food 2-3 单",
   mapcal:"mapcal：places 3 个、events 4 条"
 };
 
@@ -2880,7 +2882,7 @@ ${PERSONA_RULE}
 - chat：每个会话 6-10 条消息，有来有回，单条 5-25 字。
 - album.text：10-30 字，有画面感。
 - doubao：8-10 条，char 提问与 ai 回答交替；问题贴合角色当下生活与困惑，ai 回答口语化、可带分点，单条 20-60 字。
-- taobao：商品名、店铺、规格、价格要像真实电商；外卖写清店名、菜品、时间与配送状态；cart/orders/food 都要有数据。
+- taobao / store：商品名、店铺、规格、价格要像真实电商；外卖写清店名、菜品、时间与配送状态；cart/orders/food 都要有数据。
 - mapcal.places：写角色搜索或导航过的、有真实感的地点；events：写接下来的日程，含时间、地点、类型标签。
 每个 App 的数据格式必须严格符合示例字段名，只输出一个 JSON 对象，不要解释、不要代码块。
 输出必须紧凑：字段之间不要换行、不要缩进，正文尽量简短。`;
@@ -2982,7 +2984,7 @@ async function genMulti(api, char, ids){
       if(!Array.isArray(data) || !data.length){ valid = false; reason = "不是非空数组"; }
     }
     if(id === "health" && (!data || typeof data !== "object" || !data.steps)){ valid = false; reason = "缺少 steps"; }
-    if(id === "taobao" && (!data || typeof data !== "object" || !(Array.isArray(data.cart) || Array.isArray(data.orders) || Array.isArray(data.food)))){ valid = false; reason = "缺少 cart/orders/food"; }
+    if((id === "taobao" || id === "store") && (!data || typeof data !== "object" || !(Array.isArray(data.cart) || Array.isArray(data.orders) || Array.isArray(data.food)))){ valid = false; reason = "缺少 cart/orders/food"; }
     if(id === "mapcal" && (!data || typeof data !== "object" || !(Array.isArray(data.places) || Array.isArray(data.events)))){ valid = false; reason = "缺少 places/events"; }
     if(!valid){ log.push({t:"err", s:`${id}: 校验失败（${reason}）`}); continue; }
     ok[id] = {type:id, data};
@@ -3140,6 +3142,7 @@ async function openHostedApp(appId, file, renderName){
 }
 function openDoubao(){ return openHostedApp("doubao", "doubao.html", "renderDoubaoConversation"); }
 function openTaobao(){ return openHostedApp("taobao", "taobao.html", "renderCharShopping"); }
+function openStore(){ return openHostedApp("store", "taobao.html", "renderCharShopping"); }
 function openMapcal(){ return openHostedApp("mapcal", "mapcal.html", "renderCharMapCalendar"); }
 
 /* 窥屏配置：内嵌在本 App 内，返回时回到「设置」而不是退出手机 */
@@ -3186,11 +3189,16 @@ async function renderAppById(appId){
   else if(appId === "chat")    await openChat();
   else if(appId === "doubao")  await openDoubao();
   else if(appId === "taobao")  await openTaobao();
+  else if(appId === "store")   await openStore();
   else if(appId === "mapcal")  await openMapcal();
   else if(appId === "settings") await openSettings();
 }
 
+let _lastPhoneAppOpen = { id: "", at: 0 };
 async function openApp(appId){
+  const _now = Date.now();
+  if (appHost.classList.contains("show") && currentAppId === appId && _now - _lastPhoneAppOpen.at < 700) return;
+  _lastPhoneAppOpen = { id: appId, at: _now };
   currentAppId = appId;
   appHost.innerHTML = "";
   appHost.classList.add("show");
@@ -3205,7 +3213,7 @@ document.querySelectorAll('#phoneHome .app[data-app], #phoneHome .dock-slot[data
   el.addEventListener("click", e => {
     if(el.dataset.justDragged === "1"){ el.dataset.justDragged = "0"; return; }
     const id = el.dataset.app;
-    if(["video","diary","album","mail","memo","health","browser","game","private","chat","doubao","taobao","mapcal","settings"].includes(id)){
+    if(["video","diary","album","mail","memo","health","browser","game","private","chat","doubao","taobao","store","mapcal","settings"].includes(id)){
       e.preventDefault();
       e.stopPropagation();
       openApp(id);

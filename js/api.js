@@ -827,9 +827,10 @@
             btn.addEventListener('click', function () {
                 var input = document.getElementById(this.dataset.target);
                 if (!input) return;
-                var isMasked = input.type === 'password';
-                if (isMasked) { input.type = 'text'; this.innerHTML = '<i class="fas fa-eye-slash"></i>'; }
-                else { input.type = 'password'; this.innerHTML = '<i class="fas fa-eye"></i>'; }
+                // 用 type=text + CSS 假装圆点：不触发系统安全键盘，同时保留显示/隐藏
+                var isMasked = input.getAttribute('data-masked-key') === '1';
+                if (isMasked) { input.setAttribute('data-masked-key', '0'); this.innerHTML = '<i class="fas fa-eye-slash"></i>'; }
+                else { input.setAttribute('data-masked-key', '1'); this.innerHTML = '<i class="fas fa-eye"></i>'; }
             });
         });
 
@@ -946,30 +947,6 @@
         setupSave('imgSave', 'img_', 'imgPreset', 'imgUrl', 'imgKey', 'imgModelSelect');
         setupSave('ttsSave', 'tts_', 'ttsPreset', 'ttsUrl', 'ttsKey', 'ttsModelSelect', function () {
             return { groupId: document.getElementById('ttsGroupId').value, type: document.getElementById('ttsType').value };
-        });
-
-        // 试听 TTS：直接用当前表单里的配置，不必先保存
-        var ttsTestBtn = document.getElementById('ttsTest');
-        if (ttsTestBtn) ttsTestBtn.addEventListener('click', async function () {
-            var cfg = {
-                ttsUrl: (document.getElementById('ttsUrl') || {}).value || '',
-                ttsKey: (document.getElementById('ttsKey') || {}).value || '',
-                ttsModel: (document.getElementById('ttsModelSelect') || {}).value || '',
-                ttsVoice: (document.getElementById('ttsVoice') || {}).value || '',
-                ttsGroupId: (document.getElementById('ttsGroupId') || {}).value || '',
-                ttsType: (document.getElementById('ttsType') || {}).value || 'openai'
-            };
-            if (!cfg.ttsUrl || !cfg.ttsKey || (!cfg.ttsModel && !cfg.ttsVoice)) {
-                showModal('配置不完整：请填写 地址、Key，以及 音色/模型（或声音 ID）。');
-                return;
-            }
-            if (!window.NanoTTS || !window.NanoTTS.preview) { showModal('TTS 模块未加载'); return; }
-            try {
-                await window.NanoTTS.preview('你好，这是一段语音测试。', { config: cfg });
-                showModal('试听成功。如果没听到声音，请检查浏览器是否拦截了自动播放。');
-            } catch (e) {
-                showModal('TTS 失败：' + ((e && e.message) ? e.message : e));
-            }
         });
 
         // 提示词预设

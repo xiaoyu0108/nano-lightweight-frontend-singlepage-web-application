@@ -637,3 +637,17 @@ body {
 }
 
 .nav-bar { border-top: var(--safe-top, env(safe-area-inset-top, 0px)) solid transparent; }
+
+/* 右上角加号放大 */
+#actionContainer .nav-action {
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 28px !important;
+    line-height: 1 !important;
+    border-radius: 50% !important;
+}
+

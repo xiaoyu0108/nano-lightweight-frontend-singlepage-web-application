@@ -220,3 +220,10 @@ main{padding:18px 20px calc(44px + env(safe-area-inset-bottom,0px))}
   .hero h1{font-size:30px}
   .topbar .brand small{display:none}
 }
+
+/* 密钥输入：用假圆点遮挡，但不触发系统安全键盘 */
+input[data-masked-key="1"] {
+    -webkit-text-security: disc;
+    text-security: disc;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif !important;
+}

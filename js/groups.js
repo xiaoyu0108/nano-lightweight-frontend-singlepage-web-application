@@ -226,7 +226,14 @@
     function renderHeader(){
         $('chatTitle').childNodes[0].nodeValue = (group.name || '群聊') + ' ';
         $('groupMeta').textContent = (group.members.length + 1) + ' 人';
-        $('noticeText').textContent = group.notice || '暂无群公告';
+        var noticeValue = String(group.notice || '').trim();
+        if (noticeValue === '暂无群公告') noticeValue = '';
+        var hasNotice = !!noticeValue;
+        var noticeBar = $('groupNoticeBar');
+        if (noticeBar) noticeBar.style.display = hasNotice ? 'flex' : 'none';
+        if ($('noticeText')) $('noticeText').textContent = hasNotice ? noticeValue : '';
+        if ($('noticeMore')) $('noticeMore').style.display = hasNotice ? '' : 'none';
+        if ($('noticeClose')) $('noticeClose').style.display = hasNotice ? '' : 'none';
         document.title = group.name || '群聊';
         var av = $('topbarAvatar');
         if (group.avatar) av.innerHTML = '<img src="' + group.avatar + '">';
@@ -1786,7 +1793,12 @@
     // ===== 请求的生命周期（通过父页面发起，切页也能后台生成） =====
     function buildGroupRequestPayload(config){
         var baseUrl = toV1Base(resolveApiHost(config.mainUrl));
-        var history = [{ role:'system', content: buildGroupSystemPrompt() }];
+        var sysContent = buildGroupSystemPrompt();
+        if (groupRerollReason) {
+            sysContent += (window.NanoReroll && NanoReroll.block) ? NanoReroll.block(groupRerollReason) : ('\n\n【本次重roll必须修正】' + groupRerollReason);
+            groupRerollReason = '';
+        }
+        var history = [{ role:'system', content: sysContent }];
         pendingNotes = [];
         buildGroupHistory().forEach(function(h){ history.push(h); });
         if (!history.length || history[history.length - 1].role !== 'user') {
@@ -2562,12 +2574,18 @@
     $('rpDetailBack').addEventListener('click', function(){ rpDetailOverlay.classList.remove('active'); });
 
     // ========== 重roll ==========
-    function doReroll(){
+    var groupRerollReason = '';
+    async function doReroll(){
         var lastLeftIdx = -1;
         for (var i = messages.length - 1; i >= 0; i--) {
             if (messages[i].type === 'left') { lastLeftIdx = i; break; }
         }
         if (lastLeftIdx === -1) { showAlert('提示','没有可重roll的回复'); return; }
+        if (window.NanoReroll) {
+            var reason = await NanoReroll.ask({ title: '重roll 群聊', subtitle: '上一版哪里不对？留空也可以直接重写' });
+            if (reason === null) return;
+            groupRerollReason = reason || '';
+        }
         var start = lastLeftIdx;
         for (var j = lastLeftIdx - 1; j >= 0; j--) {
             if (messages[j].type === 'left') start = j; else break;
@@ -2829,6 +2847,13 @@ messageContainer.addEventListener('click', function(e){
     }
     $('topbarAvatar').addEventListener('click', openGroupSetting);
     $('noticeMore').addEventListener('click', openGroupSetting);
+    if ($('noticeClose')) $('noticeClose').addEventListener('click', function(){
+        group.notice = '';
+        saveGroup(group);
+        renderHeader();
+        applyChatInsets();
+        showAlert('提示', '群公告已移除');
+    });
 
     // ========== 监听变化 ==========
     window.addEventListener('storage', function(e){

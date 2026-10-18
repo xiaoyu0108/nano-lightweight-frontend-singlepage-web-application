@@ -304,6 +304,13 @@
         if (charPersona) p += '\n【你的人设】\n' + charPersona + '\n';
         if (wbText) p += '\n【世界书】\n' + wbText + '\n';
         if (memText) p += '\n【长期记忆】\n' + memText + '\n';
+        try {
+            var rr = String(window.__videoRerollReason || '').trim();
+            if (rr) {
+                window.__videoRerollReason = '';
+                p += (window.NanoReroll && NanoReroll.block) ? NanoReroll.block(rr) : ('\n\n【本次重roll必须修正】' + rr);
+            }
+        } catch (e) {}
         return p;
     }
 
@@ -644,8 +651,13 @@
     replyBtn.addEventListener('click', triggerReply);
     messageInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') triggerReply(); });
 
-    rerollBtn.addEventListener('click', function () {
+    rerollBtn.addEventListener('click', async function () {
         if (isWaiting) return;
+        if (window.NanoReroll) {
+            var reason = await NanoReroll.ask({ title: '重roll 视频通话', subtitle: '上一句哪里不对？留空也可以直接重说' });
+            if (reason === null) return;
+            window.__videoRerollReason = reason || '';
+        }
         // 重roll：删除「本轮」生成的所有气泡（末尾连续的 AI 消息），不动历史消息
         var idx = messages.length - 1;
         while (idx >= 0 && !messages[idx].isUser) idx--;

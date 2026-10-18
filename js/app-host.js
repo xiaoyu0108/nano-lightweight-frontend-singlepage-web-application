@@ -444,7 +444,7 @@
         break;
       // 系统 / 应用内通知
       case 'notify':
-        try { parent.postMessage({ type: 'appNotify', title: args[0] || '应用', body: args[1] || '', app: appId }, '*'); } catch (e) {}
+        try { parent.postMessage({ type: 'appNotify', title: args[0] || '应用', body: args[1] || '', app: appId, avatar: args[2] || '', name: args[0] || '应用' }, '*'); } catch (e) {}
         task = Promise.resolve(true);
         break;
       case 'user':
@@ -492,7 +492,8 @@
   /* ---------------- 启动 ---------------- */
   function injectBridge(html, id) {
     var tag = '<script>window.__NANO_APP_ID__=' + JSON.stringify(String(id)) + ';<\/script>' +
-              '<script src="js/nano-app-bridge.js?v=20261002a"><\/script>';
+              '<script src="js/nano-app-bridge.js?v=20261002a"><\/script>' +
+              '<script src="js/appearance.js?v=20261018a"><\/script>';
     if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, function (m) { return m + tag; });
     if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, function (m) { return m + '<head>' + tag + '</head>'; });
     return tag + html;

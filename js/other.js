@@ -145,6 +145,11 @@
         var NP = getNanoPush();
         if (!NP) { setWebPushStatus('未加载推送模块（请从主界面打开）'); return; }
         NP.status().then(function (s) {
+            if (s.permission === 'denied') {
+                setWebPushStatus('通知权限被拒绝：请到系统/浏览器设置里允许 Nano 的通知');
+                if (webPushBtn) webPushBtn.textContent = '重试';
+                return;
+            }
             if (s.subscribed) { setWebPushStatus('已开启 ✓ 关闭 App 也能收到'); if (webPushBtn) webPushBtn.textContent = '重新订阅'; }
             else if (s.configured) { setWebPushStatus('已配置，点右侧开启订阅'); if (webPushBtn) webPushBtn.textContent = '开启'; }
             else { setWebPushStatus('未配置：点右侧自动获取 VAPID 并开启'); if (webPushBtn) webPushBtn.textContent = '开启'; }
@@ -170,11 +175,20 @@
                     key = (d && d.key) || '';
                 } catch (e) {}
             }
-            if (!key) { setWebPushStatus('服务端未配置 VAPID 公钥，请先在 Worker 设置 VAPID_*'); return; }
+            if (!key) { setWebPushStatus('服务端暂时没返回 VAPID 公钥，请确认最新 Worker 已部署'); return; }
             NP.setup(endpoint, key, token);
             setWebPushStatus('等待通知权限…');
             try {
+                // 某些安卓浏览器只在顶层页面弹权限框；这里先直接在点击手势里请求一次。
+                if ('Notification' in window && Notification.permission === 'default') {
+                    try { await Notification.requestPermission(); } catch (e) {}
+                }
+                if ('Notification' in window && Notification.permission !== 'granted') {
+                    setWebPushStatus('通知权限未开启：请在浏览器/系统设置里允许 Nano 的通知，然后重试');
+                    return;
+                }
                 await NP.enable();
+                try { localStorage.setItem('nano_notify_enabled', '1'); } catch (e) {}
                 setWebPushStatus('已开启 ✓ 关闭 App 也能收到');
                 if (webPushBtn) webPushBtn.textContent = '重新订阅';
             } catch (e) {
@@ -425,8 +439,8 @@
             if (v === '1') return true;
             if (v === '0') return false;
         } catch (e) {}
-        // 未设置过：iPhone 全面屏默认开启，其余（安卓等）默认关闭，避免顶栏多出空白
-        try { return /iPhone/.test(navigator.userAgent); } catch (e) { return false; }
+        // 未设置过：iPhone / 安卓全面屏默认开启；如果顶栏多出空白可以手动关闭
+        try { return /iPhone|Android/i.test(navigator.userAgent); } catch (e) { return false; }
     }
     function postInset(enabled, value) {
         if (window.parent === window) return;

@@ -320,6 +320,42 @@
             if (Object.keys(notify._seen).length > 60) notify._seen = {};
         } catch (e) {}
         playSound(soundFor(opts));
+        // 前台统一走内置通知栏：头像 + 昵称 + 具体信息（后台仍走系统通知 / Bark）
+        try {
+            if (!document.hidden) {
+                var inAppPayload = {
+                    type: 'appNotify',
+                    title: title,
+                    body: body,
+                    app: opts.app || opts.channel || '',
+                    icon: opts.icon || '',
+                    avatar: opts.avatar || '',
+                    name: opts.name || title,
+                    target: opts.target || '',
+                    action: opts.action || '',
+                    url: opts.url || ''
+                };
+                if (window.top && window.top !== window && window.top.__nanoAppNotify) {
+                    window.top.__nanoAppNotify(title, body, inAppPayload.app, inAppPayload);
+                    return;
+                }
+                if (window.parent !== window) {
+                    window.parent.postMessage(inAppPayload, '*');
+                    return;
+                }
+                if (window.__nanoAppNotify) {
+                    window.__nanoAppNotify(title, body, inAppPayload.app, inAppPayload);
+                    return;
+                }
+            }
+        } catch (e) {
+            try {
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'appNotify', title: title, body: body, app: opts.app || opts.channel || '', icon: opts.icon || '', name: opts.name || title, target: opts.target || '' }, '*');
+                    return;
+                }
+            } catch (err) {}
+        }
         // 头像作为大图标（icon），Nano 图标作为右下角角标（badge）
         var defIcon = nanoIconUrl();
         var icon = opts.icon || defIcon;
@@ -340,7 +376,10 @@
         var payload = {
             body: String(body || '').slice(0, 120),
             tag: opts.tag || ('nano-' + Date.now()),
-            silent: true,
+            // silent:true 在部分安卓机型上会只进通知中心、不弹顶部；改成普通通知。
+            silent: false,
+            renotify: true,
+            vibrate: [90, 50, 90],
             data: { target: opts.target || '' }
         };
         if (icon) payload.icon = icon;

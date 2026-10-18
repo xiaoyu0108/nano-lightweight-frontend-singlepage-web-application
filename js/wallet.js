@@ -664,14 +664,28 @@
 
     function renderWalletTx() {
         var c = _cards[_activeCard];
+        var isFamily = !!(c && c.kind === 'family');
         var txs = [];
-        if (c && c.kind === 'family') {
-            var own = _cards[0] || { txs: [] };
-            var nm = (c.raw && c.raw.name) || '';
-            txs = (own.txs || []).filter(function (t) {
-                var d = (t && t.desc) || '';
-                return d.indexOf('亲属卡') >= 0 && (!nm || d.indexOf(nm) >= 0);
-            });
+        if (isFamily) {
+            var f = c.raw || {};
+            if (f.issuer === 'char') {
+                // 对方出资的亲属卡：消费实际记在对方的银行卡上
+                try {
+                    var cw = (window.NanoFamilyCardStore && NanoFamilyCardStore.readCharWallet) ? NanoFamilyCardStore.readCharWallet(c._chatId) : { transactions: [] };
+                    txs = (cw.transactions || []).filter(function (t) {
+                        var d = (t && t.desc) || '';
+                        return d.indexOf('亲属卡') >= 0;
+                    });
+                } catch (e) { txs = []; }
+            } else {
+                // 我出资、对方使用的亲属卡：消费记在我的银行卡上
+                var own = _cards[0] || { txs: [] };
+                var nm = f.name || '';
+                txs = (own.txs || []).filter(function (t) {
+                    var d = (t && t.desc) || '';
+                    return d.indexOf('亲属卡') >= 0 && (!nm || d.indexOf(nm) >= 0);
+                });
+            }
         } else {
             txs = (c && c.txs) || [];
         }
@@ -700,13 +714,15 @@
                     '</div>' +
                     '<div class="entry-amount ' + amountClass + '">' + sign + formatMoneyRaw(tx.amount) + '</div>' +
                     '</div>' +
-                    '<button class="entry-delete-btn"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>删除</button>' +
+                    (isFamily ? '' : '<button class="entry-delete-btn"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>删除</button>') +
                     '</div>';
             });
             walletTxList.innerHTML = html;
-            setupSwipeDelete(walletTxList, function(id) {
-                deleteWalletTransaction(id);
-            });
+            if (!isFamily) {
+                setupSwipeDelete(walletTxList, function(id) {
+                    deleteWalletTransaction(id);
+                });
+            }
     }
 
     function renderLedger() {

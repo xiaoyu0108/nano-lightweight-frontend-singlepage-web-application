@@ -539,20 +539,32 @@ button,input,textarea{font:inherit}button{border:0;background:none;color:inherit
 .im-banner.info{background:rgba(10,132,255,.10);color:#0a6ed1}
 .im-banner[hidden]{display:none}
 
-/* 顶部下方常驻“回复中/刷新中”提示（不遮挡返回按钮） */
-.im-pending{
- position:absolute;left:50%;top:120px;transform:translateX(-50%);
- z-index:260;display:flex;align-items:center;gap:7px;
- background:rgba(255,255,255,.94);backdrop-filter:blur(20px) saturate(180%);
- -webkit-backdrop-filter:blur(20px) saturate(180%);
- border:0.5px solid rgba(255,255,255,.95);border-radius:16px;
- box-shadow:0 6px 20px rgba(0,0,0,.12);padding:6px 14px;
- font-size:13px;color:#3a3a3c;pointer-events:none;white-space:nowrap;
+/* 底部左侧「对方正在输入」：头像 + 三个跳动的点 */
+.im-typing-row{
+ display:flex;align-items:flex-end;gap:7px;margin:8px 0 2px;padding-left:2px;
 }
-.im-pending[hidden]{display:none}
-.im-pending-dot{width:7px;height:7px;border-radius:50%;background:#0a84ff;flex:none;
- animation:imPendingPulse 1s ease-in-out infinite}
-@keyframes imPendingPulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1.1)}}
+.im-typing-avatar{
+ width:26px;height:26px;border-radius:50%;overflow:hidden;flex:none;
+ background:linear-gradient(145deg,#e8ecf5,#c8d2e6);
+ display:flex;align-items:center;justify-content:center;
+ font-size:11px;font-weight:600;color:#fff;
+}
+.im-typing-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.im-typing-bubble{
+ display:flex;align-items:center;gap:4px;
+ padding:9px 12px;border-radius:17px 17px 17px 5px;
+ background:rgba(233,233,235,.95);
+}
+.im-typing-bubble i{
+ width:6px;height:6px;border-radius:50%;background:#8e8e93;display:block;
+ animation:imTypingBounce 1.25s infinite ease-in-out;
+}
+.im-typing-bubble i:nth-child(2){animation-delay:.16s}
+.im-typing-bubble i:nth-child(3){animation-delay:.32s}
+@keyframes imTypingBounce{
+ 0%,60%,100%{transform:translateY(0);opacity:.35}
+ 30%{transform:translateY(-4px);opacity:1}
+}
 .thread-unread{
  min-width:20px;height:20px;border-radius:10px;background:#0a84ff;color:#fff;
  font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;

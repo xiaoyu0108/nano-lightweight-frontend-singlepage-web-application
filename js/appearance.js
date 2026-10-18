@@ -920,9 +920,18 @@
         'html.keyboard-open footer.bottom{' +
         'transform:translateY(calc(var(--nano-bottom-shift,0px) - var(--nano-kb,0px))) !important;' +
         'transition:transform .18s ease;}';
-    function nanoApplyKeyboard(kb) {
+    var __nanoKbBaseH = 0;
+    try { __nanoKbBaseH = Math.max(0, window.innerHeight || 0); } catch (e) {}
+    function nanoApplyKeyboard(kb, fromParent) {
         try {
             var v = Math.max(0, Math.round(Number(kb) || 0));
+            // 安卓部分 WebView 会同时缩短布局视口：独立打开（非 iframe）时，
+            // 100% 已经等于键盘上沿，再整体上移一次就会多出一条空白。
+            // iframe 里父页面传下来的值已经处理过，这里不再重复扣。iOS 保持原样。
+            if (!fromParent && /Android/i.test(navigator.userAgent || '') && __nanoKbBaseH > 0) {
+                var layoutKb = Math.max(0, Math.round(__nanoKbBaseH - (window.innerHeight || 0)));
+                v = Math.max(0, v - Math.min(v, layoutKb));
+            }
             document.documentElement.style.setProperty('--nano-kb', v + 'px');
             document.documentElement.classList.toggle('keyboard-open', v > 0.5);
         } catch (e) {}
@@ -930,7 +939,7 @@
     try { applyStyle('nano-keyboard-style', KEYBOARD_CSS); } catch (e) {}
     window.addEventListener('message', function (e) {
         var d = e.data;
-        if (d && d.type === 'nanoKeyboard') nanoApplyKeyboard(d.kb);
+        if (d && d.type === 'nanoKeyboard') nanoApplyKeyboard(d.kb, true);
     });
     // 独立打开（不在外壳里）时自行检测，iframe 内以父页面同步的值为准
     if (window.parent === window) {
@@ -942,7 +951,8 @@
                     try {
                         // iOS 弹键盘时 innerHeight 会一起变小，用无键盘基准高度相减才准
                         _kbBaseH = Math.max(_kbBaseH, window.innerHeight || 0, _vv.height || 0);
-                        nanoApplyKeyboard(_kbBaseH - _vv.height - _vv.offsetTop);
+                        __nanoKbBaseH = Math.max(__nanoKbBaseH, _kbBaseH);
+                        nanoApplyKeyboard(_kbBaseH - _vv.height - _vv.offsetTop, false);
                     } catch (e) {}
                 };
                 _vv.addEventListener('resize', _kbUpd);

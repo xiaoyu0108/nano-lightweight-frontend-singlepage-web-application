@@ -3083,6 +3083,18 @@ async function generateChatReply(id, info) {
       emojiNames.slice(0, 120).join('、') + `。名称必须与列表完全一致。`;
   }
 
+  try {
+    const rr = String(window.__insRerollReason || '').trim();
+    if (rr) {
+      window.__insRerollReason = '';
+      sys += (window.NanoReroll && NanoReroll.block) ? NanoReroll.block(rr) : ('\n\n【本次重roll必须修正】' + rr);
+    }
+  } catch (e) {}
+  try {
+    const cyc = window.NanoCycle && NanoCycle.promptBlock(u.contactId || u.charId || u.id);
+    if (cyc) sys += '\n\n' + cyc;
+  } catch (e) {}
+
   const history = (chatHistories[id] || []).slice(-12).map(m => ({
     role: m.from === 'out' ? 'user' : 'assistant',
     content: chatHistoryContent(m)
@@ -3156,6 +3168,11 @@ async function rerollLastReply() {
     if (msgs[i].from === 'out') { lastOut = i; break; }
   }
   if (lastOut === -1) { showToast('还没有可重roll的回复'); return; }
+  if (window.NanoReroll) {
+    const reason = await NanoReroll.ask({ title: '重roll 私信', subtitle: '上一版哪里不对？留空也可以直接重写' });
+    if (reason === null) return;
+    window.__insRerollReason = reason || '';
+  }
   // 去掉角色本轮发送的所有消息（最后一条我方消息之后的所有内容）
   msgs.splice(lastOut + 1);
   saveInsChatState();
@@ -3439,11 +3456,6 @@ document.addEventListener('visibilitychange', function () { if (document.hidden)
 function notifyInsDone(title, body) {
   if (!insBackground) return;
   try { if (window.NanoNotify) window.NanoNotify.notify(title, body, { target: 'ins', channel: 'ins' }); } catch (e) {}
-  try {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'appNotify', app: 'ins', title: title, body: body }, '*');
-    }
-  } catch (e) {}
 }
 
 // 暴露给 HTML 内联 onclick

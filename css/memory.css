@@ -523,3 +523,10 @@ input:checked + .slider:before { transform: translateX(20px); }
 
 .memory-topbar { padding-top: calc(10px + var(--safe-top, 0px)); }
 
+
+/* 密钥输入：用假圆点遮挡，但不触发系统安全键盘 */
+input[data-masked-key="1"] {
+    -webkit-text-security: disc;
+    text-security: disc;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif !important;
+}

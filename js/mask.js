@@ -272,6 +272,7 @@
     const importBtn = document.getElementById('importBtn');
     const editCancel = document.getElementById('editCancel');
     const editSave = document.getElementById('editSave');
+    const useMaskBtn = document.getElementById('useMaskBtn');
 
     // ===== 新版头像弹窗 DOM =====
     const avatarModal = document.getElementById('avatarModal');
@@ -296,8 +297,42 @@
 
     const importFileInput = document.getElementById('importFileInput');
 
+    // 旧版本/多端同步可能把同一个人设写成两条；渲染前按 id + 内容去重。
+    function dedupeMasks(list, currentId) {
+        const out = [];
+        const seenId = {};
+        const seenSig = {};
+        (Array.isArray(list) ? list : []).forEach(function (m) {
+            if (!m || !m.id) return;
+            const id = String(m.id);
+            if (seenId[id]) return;
+            const sig = [m.name || '', m.wechat || '', m.gender || '', m.setting || ''].join('\u0001');
+            if (seenSig[sig]) {
+                if (id === currentId) {
+                    const idx = out.findIndex(function (x) { return String(x.id) === String(seenSig[sig]); });
+                    if (idx > -1) out[idx] = m;
+                    seenSig[sig] = id;
+                }
+                return;
+            }
+            seenId[id] = 1;
+            seenSig[sig] = id;
+            out.push(m);
+        });
+        return out;
+    }
+
     // ===== 渲染 =====
     async function renderAll() {
+        const before = (data.masks || []).length;
+        const deduped = dedupeMasks(data.masks, data.currentMaskId);
+        if (deduped.length !== before) {
+            data.masks = deduped;
+            if (data.currentMaskId && !deduped.some(function (m) { return String(m.id) === String(data.currentMaskId); })) {
+                data.currentMaskId = deduped.length ? deduped[0].id : null;
+            }
+            saveData(data);
+        }
         const masks = data.masks || [];
         maskList.innerHTML = '';
 
@@ -348,6 +383,20 @@
             wechat.textContent = '微信号：' + (item.wechat || '未设置');
             info.appendChild(wechat);
             div.appendChild(info);
+
+            if (!isCurrent) {
+                const useBtn = document.createElement('button');
+                useBtn.className = 'mask-use-btn';
+                useBtn.type = 'button';
+                useBtn.setAttribute('aria-label', '切换到此 User');
+                useBtn.title = '切换到此 User';
+                useBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/></svg>';
+                useBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    setCurrentMask(item.id);
+                });
+                div.appendChild(useBtn);
+            }
 
             const dot = document.createElement('span');
             dot.className = 'dot' + (isCurrent ? '' : ' hidden');
@@ -412,7 +461,9 @@
         saveData(data);
         renderAll();
         try {
-            window.parent.postMessage({ type: 'currentMaskChanged', maskId: id }, '*');
+            // 同时广播完整数据：聊天列表的「状态栏」/头像/名字立即同步，不用等下一次轮询。
+            window.parent.postMessage({ type: 'currentMaskChanged', maskId: id, data: data }, '*');
+            window.parent.postMessage({ type: 'homeDataUpdated', data: data }, '*');
         } catch(e) {}
     }
 
@@ -444,6 +495,7 @@
 
         if (item) {
             editTitle.textContent = '编辑人设';
+            if (useMaskBtn) useMaskBtn.style.display = (String(item.id) === String(data.currentMaskId)) ? 'none' : 'block';
             tempAvatar = '';
             inputName.value = item.name || '';
             inputWechat.value = item.wechat || '';
@@ -459,6 +511,7 @@
             });
         } else {
             editTitle.textContent = '新增人设';
+            if (useMaskBtn) useMaskBtn.style.display = 'none';
             tempAvatar = '';
             inputName.value = '';
             inputWechat.value = '';
@@ -473,6 +526,7 @@
 
     function closeEditModal() {
         editModal.classList.remove('show');
+        if (useMaskBtn) useMaskBtn.style.display = 'none';
         editingId = null;
     }
 
@@ -722,6 +776,12 @@
 
     editSave.onclick = saveMask;
     editCancel.onclick = closeEditModal;
+    if (useMaskBtn) useMaskBtn.onclick = function () {
+        if (!editingId) return;
+        var id = editingId;
+        closeEditModal();
+        setCurrentMask(id);
+    };
     editModal.onclick = function(e) {
         if (e.target === editModal) closeEditModal();
     };
@@ -802,6 +862,15 @@
         if (data && data.currentMaskId && mergedMap[data.currentMaskId]) current = data.currentMaskId;
         else if (idbData.currentMaskId && mergedMap[idbData.currentMaskId]) current = idbData.currentMaskId;
         else current = merged[0].id;
+
+        const cleaned = dedupeMasks(merged, current);
+        if (cleaned.length !== merged.length) {
+            merged.length = 0;
+            cleaned.forEach(function (m) { merged.push(m); });
+            if (!merged.some(function (m) { return String(m.id) === String(current); })) {
+                current = merged.length ? merged[0].id : '';
+            }
+        }
 
         function sig(list) {
             try {

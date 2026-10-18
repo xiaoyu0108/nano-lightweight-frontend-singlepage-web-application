@@ -371,6 +371,9 @@
     function wrapChatItem(itemDiv, item) {
         const wrap = document.createElement('div');
         wrap.className = 'chat-item-wrap';
+        try {
+            if (getPinnedIds().indexOf(item.id) !== -1) wrap.classList.add('pinned');
+        } catch (e) {}
         const actions = document.createElement('div');
         actions.className = 'chat-swipe-actions';
         const pin = document.createElement('button');

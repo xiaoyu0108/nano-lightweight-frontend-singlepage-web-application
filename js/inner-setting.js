@@ -1239,7 +1239,7 @@
                 appendIMessage(rec, msgs).then(function(){
                     try{ localStorage.setItem('chat_setting_blockedContacted_'+chatId, String(Date.now())); }catch(e){}
                     notifyIMessageRefresh();
-                    try{ if(window.parent!==window) window.parent.postMessage({type:'appNotify',title:(rec&&rec.name)||chatName||'角色',body:(msgs[0]&&msgs[0].text)||'',app:'imessage'},'*'); }catch(e){}
+                    try{ if(window.parent!==window) window.parent.postMessage({type:'appNotify',title:(rec&&rec.name)||chatName||'角色',body:(msgs[0]&&msgs[0].text)||'',app:'imessage',avatar:(rec&&rec.avatar)||'',name:(rec&&rec.name)||chatName||'角色'},'*'); }catch(e){}
                 });
             }
             proxyFetch(payload, blkToken).then(function(d){

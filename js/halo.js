@@ -2897,8 +2897,7 @@ function haloGoDiscover(){
   else { try{ location.href='discover.html'; }catch(e){} }
 }
 function notifyHalo(title,body,app){
-  try{if(window.NanoNotify&&NanoNotify.enabled())NanoNotify.notify(title,body,{app:'halo'})}catch(e){}
-  haloPost({type:'appNotify',app:app||'halo',title:title,body:body});
+  try{if(window.NanoNotify&&NanoNotify.enabled())NanoNotify.notify(title,body,{app:'halo',channel:'halo',target:'halo'})}catch(e){}
 }
 function installHaloInterop(){
   if(window.__haloInteropInstalled)return;

@@ -12,6 +12,66 @@ function subId(endpoint) {
   return 'sub:' + btoa(endpoint).replace(/[^a-zA-Z0-9]/g, '').slice(-48);
 }
 
+// ===== VAPID：优先用 secrets；没配置就自动生成一对存进 KV，用户不需要自己生成 =====
+function b64urlEncode(bytes) {
+  let s = '';
+  const arr = new Uint8Array(bytes || []);
+  for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+function b64urlDecode(str) {
+  const s = String(str || '').replace(/-/g, '+').replace(/_/g, '/');
+  const pad = s.length % 4 ? new Array(5 - (s.length % 4)).join('=') : '';
+  const raw = atob(s + pad);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+async function ensureVapid(env) {
+  if (env.VAPID_PUBLIC && env.VAPID_PRIVATE) {
+    return {
+      subject: env.VAPID_SUBJECT || 'https://nanopush.nano315.online',
+      publicKey: String(env.VAPID_PUBLIC),
+      privateKey: String(env.VAPID_PRIVATE)
+    };
+  }
+  try {
+    const raw = await env.PUSH_KV.get('vapid:keys');
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && o.publicKey && o.privateKey) {
+        return {
+          subject: o.subject || env.VAPID_SUBJECT || 'https://nanopush.nano315.online',
+          publicKey: o.publicKey,
+          privateKey: o.privateKey
+        };
+      }
+    }
+  } catch (e) {}
+  try {
+    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const pub = await crypto.subtle.exportKey('jwk', pair.publicKey);
+    const priv = await crypto.subtle.exportKey('jwk', pair.privateKey);
+    const x = b64urlDecode(pub.x);
+    const y = b64urlDecode(pub.y);
+    const point = new Uint8Array(65);
+    point[0] = 4;
+    point.set(x, 1);
+    point.set(y, 33);
+    const o = {
+      subject: env.VAPID_SUBJECT || 'https://nanopush.nano315.online',
+      publicKey: b64urlEncode(point),
+      privateKey: String(priv.d || ''),
+      createdAt: Date.now()
+    };
+    if (!o.privateKey) return null;
+    await env.PUSH_KV.put('vapid:keys', JSON.stringify(o));
+    return o;
+  } catch (e) {
+    return null;
+  }
+}
+
 function tokenOk(request, env) {
   // 如果设置了 PUSH_TOKEN secret，则 /schedule 和 /send 必须带 X-Push-Token 头
   if (!env.PUSH_TOKEN) return true;
@@ -70,7 +130,22 @@ function sanitizeAutoConfig(body) {
       // 头像只在不是超长 dataURL 时保存，避免把配置撑大
       avatar: av.length > 4000 ? '' : av,
       setting: String((c && c.setting) || '').slice(0, 6000),
-      isNpc: !!(c && c.isNpc)
+      isNpc: !!(c && c.isNpc),
+      nationality: String((c && c.nationality) || '').slice(0, 40),
+      language: String((c && c.language) || '').slice(0, 40),
+      foreign: !!(c && c.foreign),
+      // 月潮：只有用户开放权限的角色才会带这份数据
+      cycle: (function () {
+        const cy = c && c.cycle;
+        if (!cy || !/^\d{4}-\d{2}-\d{2}$/.test(String(cy.lastStart || ''))) return null;
+        return {
+          lastStart: String(cy.lastStart),
+          nextStart: /^\d{4}-\d{2}-\d{2}$/.test(String(cy.nextStart || '')) ? String(cy.nextStart) : '',
+          cycleLength: Math.max(18, Math.min(60, parseInt(cy.cycleLength, 10) || 28)),
+          periodLength: Math.max(2, Math.min(14, parseInt(cy.periodLength, 10) || 5)),
+          remindDays: Math.max(0, Math.min(14, parseInt(cy.remindDays, 10) || 0))
+        };
+      })()
     };
   }).filter(function (c) { return c.id && c.name; }) : [];
   const api = body.api && typeof body.api === 'object' ? {
@@ -82,7 +157,8 @@ function sanitizeAutoConfig(body) {
     enabled: !!(body.enabled || body.msgEnabled || body.momentEnabled),
     msgEnabled: !!body.msgEnabled,
     momentEnabled: !!body.momentEnabled,
-    intervalMinutes: clampNum(body.intervalMinutes, 1, 1440, 8),
+    // 客户端设置里最小是 1 小时；这里再兜底，防止旧缓存把 8 当成分钟导致每 8 分钟发一次
+    intervalMinutes: clampNum(body.intervalMinutes, 30, 1440, 480),
     momentIntervalHours: clampNum(body.momentIntervalHours, 0.5, 720, 24),
     user: {
       id: String((body.user && body.user.id) || 'default').slice(0, 80),
@@ -126,17 +202,92 @@ function pickRandom(arr, n) {
 function splitAutoBubbles(text) {
   return String(text || '').split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 3);
 }
+function beijingToday() {
+  return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+}
+function parseYmd(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+  if (!m) return 0;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+function addDaysMs(ms, n) { return ms + n * 86400000; }
+function fmtCn(ms) {
+  const d = new Date(ms);
+  return (d.getUTCMonth() + 1) + '月' + d.getUTCDate() + '日';
+}
+function autoLangName(c) {
+  if (!c) return '';
+  const given = String(c.language || '').trim();
+  // 外国人即使语言字段是「中文」，主动消息也强制用国籍对应的母语
+  if (given && !/中文|汉语|漢語|chinese/i.test(given)) return given;
+  const nat = String(c.nationality || '');
+  const map = {
+    '美国': '英文', '英国': '英文', '澳大利亚': '英文', '加拿大': '英文', '新西兰': '英文', '印度': '英文', '新加坡': '英文',
+    '法国': '法文', '德国': '德文', '奥地利': '德文', '西班牙': '西班牙文', '墨西哥': '西班牙文', '阿根廷': '西班牙文',
+    '巴西': '葡萄牙文', '葡萄牙': '葡萄牙文', '意大利': '意大利文', '日本': '日文', '韩国': '韩文', '俄罗斯': '俄文',
+    '泰国': '泰文', '越南': '越南文', '荷兰': '荷兰文', '瑞典': '瑞典文', '挪威': '挪威文', '丹麦': '丹麦文',
+    '芬兰': '芬兰文', '波兰': '波兰文', '土耳其': '土耳其文', '沙特阿拉伯': '阿拉伯文', '阿联酋': '阿拉伯文', '埃及': '阿拉伯文'
+  };
+  for (const k of Object.keys(map)) if (nat.indexOf(k) > -1) return map[k];
+  return '英文';
+}
+function autoIsForeign(c) {
+  if (!c) return false;
+  if (c.foreign) return true;
+  const nat = String(c.nationality || '').trim();
+  return !!(nat && nat !== '未知' && nat !== '未设定' && !/(中国|中國|china|chinese|香港|澳门|澳門|台湾|台灣)/i.test(nat));
+}
+function autoLangBlock(c) {
+  if (!autoIsForeign(c)) return '';
+  const lang = autoLangName(c);
+  return '【语言 · 最高优先级】你是' + (c.nationality || '外国') + '人，母语是' + lang + '。'
+    + '本轮主动消息的正文必须只用' + lang + '写，绝不能用中文当正文；即使人设或上面的说明是中文，也不要改变。'
+    + '每行一条气泡，严格按「' + lang + '原文||中文翻译」的格式输出，用 || 分隔；中文只能出现在 || 右边作为翻译，翻译要自然口语化。\n';
+}
+function cycleBlock(c) {
+  const cy = c && c.cycle;
+  if (!cy || !cy.lastStart) return '';
+  const todayMs = parseYmd(beijingToday());
+  let last = parseYmd(cy.lastStart);
+  if (!last) return '';
+  let next = addDaysMs(last, cy.cycleLength);
+  let guard = 0;
+  while (next <= todayMs && guard < 400) {
+    last = next;
+    next = addDaysMs(last, cy.cycleLength);
+    guard++;
+  }
+  const daysUntil = Math.max(0, Math.round((next - todayMs) / 86400000));
+  const periodEnd = addDaysMs(last, cy.periodLength - 1);
+  const inPeriod = todayMs >= last && todayMs <= periodEnd;
+  const periodDay = inPeriod ? Math.round((todayMs - last) / 86400000) + 1 : 0;
+  const ovulation = addDaysMs(next, -14 * 86400000);
+  const fertileStart = addDaysMs(ovulation, -5 * 86400000);
+  const fertileEnd = addDaysMs(ovulation, 86400000);
+  let s = '\n\n【月潮 · 她的经期（她只对你开放了这份记录）】\n';
+  if (inPeriod) s += '她现在正在经期，今天是第 ' + periodDay + ' 天（预计持续约 ' + cy.periodLength + ' 天）。\n';
+  s += '预计下次经期：' + fmtCn(next) + '（还有 ' + daysUntil + ' 天），预计持续 ' + cy.periodLength + ' 天。\n';
+  s += '预计排卵日：' + fmtCn(ovulation) + '；排卵期：' + fmtCn(fertileStart) + '–' + fmtCn(fertileEnd) + '。\n';
+  s += '这是她自己的私密记录，推算不一定完全准确。你知道就好，不要生硬播报日期或“系统推算”。\n';
+  if (cy.remindDays > 0 && daysUntil <= cy.remindDays) {
+    s += '【本轮提醒时机】她预计 ' + (daysUntil === 0 ? '今天' : (daysUntil + ' 天后')) + ' 来经期。这一轮必须自然关心她，提醒她注意休息、别太累、备好用品；语气像你本人，不要像提醒机器人，也不要提“记录/推算/提醒设置”。\n';
+  }
+  return s;
+}
 async function generateAutoMessages(env, cfg, busyChatId) {
   const pool = cfg.chars.filter(function (c) { return c.id !== busyChatId && !c.isNpc; });
   const source = pool.length >= 2 ? pool : cfg.chars.filter(function (c) { return c.id !== busyChatId; });
   if (!source.length) return [];
-  const picked = pickRandom(source, Math.min(2, source.length));
+  // 每个周期只让 1 个角色发消息：避免一次生成 2~3 条、成倍消耗 API
+  const picked = pickRandom(source, 1);
   const out = [];
   const now = Date.now();
   for (const c of picked) {
     const system = '你是「' + c.name + '」，现在主动给「' + cfg.user.name + '」发消息。\n'
       + (c.setting ? ('【你的人设】\n' + c.setting + '\n\n') : '')
       + '现在是 ' + new Date(now + 8 * 3600 * 1000).toISOString().slice(0, 16).replace('T', ' ') + '（北京时间）。\n'
+      + autoLangBlock(c)
+      + cycleBlock(c)
       + '要求：像平时微信聊天一样主动说 1~2 句，自然、有生活感，符合你们的关系；不要解释、不要提系统/推送；不要每次都用“睡了吗/在吗”开头。只输出消息正文。';
     const text = await autoChat(env, cfg, [
       { role: 'system', content: system },
@@ -156,7 +307,7 @@ async function generateAutoMoments(env, cfg, busyChatId) {
   const pool = cfg.chars.filter(function (c) { return c.id !== busyChatId && !c.isNpc; });
   const source = pool.length ? pool : cfg.chars.filter(function (c) { return c.id !== busyChatId; });
   if (!source.length) return [];
-  const picked = pickRandom(source, Math.min(3, source.length));
+  const picked = pickRandom(source, Math.min(2 + Math.floor(Math.random() * 2), source.length));
   const names = picked.map(function (c) { return c.name; });
   const sys = '你们是彼此认识的朋友，在同一个朋友圈里。请让以下角色各发一条朋友圈动态：' + names.join('、') + '。\n'
     + '要求：像真人随手发的日常，具体、有细节，不要流水账，不要对任何人说话，不要提问，禁止 AI 腔。\n'
@@ -181,6 +332,7 @@ async function generateAutoMoments(env, cfg, busyChatId) {
   };
   const out = [];
   const now = Date.now();
+  const canned = ['这条也太真实了', '哈哈哈哈', '我也想去', '注意休息呀', '好看', '下次带我'];
   arr.slice(0, 4).forEach(function (o, i) {
     if (!o || !o.text) return;
     const au = pickName(o.author) || names[Math.min(i, names.length - 1)];
@@ -199,6 +351,11 @@ async function generateAutoMoments(env, cfg, busyChatId) {
       if (!u || !txt) return;
       comments.push({ user: u, toUser: pickName(c.toUser || c.replyTo || c.to), text: txt.slice(0, 120) });
     });
+    // 模型漏写评论时也要有互动，不能只发一条光秃秃的动态。
+    if (!comments.length) {
+      const other = names.find(function (n) { return n !== au; });
+      if (other) comments.push({ user: other, toUser: '', text: canned[(i + au.length) % canned.length] });
+    }
     const char = picked.find(function (c) { return c.name === au; }) || {};
     out.push({
       id: 'srv_' + now + '_' + i + '_' + Math.random().toString(36).slice(2, 5),
@@ -233,7 +390,7 @@ async function runAutoPush(env) {
       if (subs.length) {
         for (const m of msgs) {
           await pushAll(subs, {
-            title: m.name, body: m.bubbles[0] || m.text, target: 'chat:' + m.chatId,
+            title: m.name, body: String(m.bubbles[0] || m.text || '').split('||')[0], target: 'chat:' + m.chatId,
             tag: 'auto-' + m.chatId
           }, env);
         }
@@ -326,8 +483,10 @@ export default {
     if (pathname.indexOf('/nanoapi') === 0) pathname = pathname.slice('/nanoapi'.length) || '/';
 
     // 公开的 VAPID 公钥：App 里一键开启 Web Push 时读取（私钥永远不返回）
+    // 没配置 VAPID_* secrets 时自动生成并存入 KV，用户不需要手动生成。
     if (pathname === '/vapid' && request.method === 'GET') {
-      return json({ ok: !!env.VAPID_PUBLIC, key: env.VAPID_PUBLIC || '' });
+      const v = await ensureVapid(env);
+      return json({ ok: !!v, key: v ? v.publicKey : '' });
     }
 
     // 1) 客户端订阅上报
@@ -468,6 +627,32 @@ export default {
       }
       await env.PUSH_KV.put('auto:state', JSON.stringify(state));
       return json({ ok: true, enabled: cfg.enabled, nextMsgAt: state.nextMsgAt || 0, nextMomentAt: state.nextMomentAt || 0 });
+    }
+
+    // POST /auto/cycle  只更新角色的月潮权限数据，不动其它主动消息配置
+    if (pathname === '/auto/cycle' && request.method === 'POST') {
+      let body = {};
+      try { body = await request.json(); } catch (e) {}
+      if (!autoOk(request, env, body)) return json({ ok: false, error: 'unauthorized' }, 401);
+      try {
+        const raw = await env.PUSH_KV.get('auto:config');
+        if (raw) {
+          const cfg = JSON.parse(raw);
+          const cycles = body.cycles && typeof body.cycles === 'object' ? body.cycles : {};
+          (cfg.chars || []).forEach(function (c) {
+            const cy = cycles[c.id];
+            c.cycle = (cy && /^\d{4}-\d{2}-\d{2}$/.test(String(cy.lastStart || ''))) ? {
+              lastStart: String(cy.lastStart),
+              nextStart: /^\d{4}-\d{2}-\d{2}$/.test(String(cy.nextStart || '')) ? String(cy.nextStart) : '',
+              cycleLength: Math.max(18, Math.min(60, parseInt(cy.cycleLength, 10) || 28)),
+              periodLength: Math.max(2, Math.min(14, parseInt(cy.periodLength, 10) || 5)),
+              remindDays: Math.max(0, Math.min(14, parseInt(cy.remindDays, 10) || 0))
+            } : null;
+          });
+          await env.PUSH_KV.put('auto:config', JSON.stringify(cfg));
+        }
+      } catch (e) {}
+      return json({ ok: true });
     }
 
     // POST /auto/call  正在和某个角色通话时，跳过 TA 的主动消息/朋友圈
@@ -681,12 +866,14 @@ async function getSubs(env) {
 }
 
 async function pushAll(subs, payload, env) {
+  const vapid = await ensureVapid(env);
+  if (!vapid) return;
   for (const sub of subs) {
     try {
       const init = await buildPushPayload(
         { data: JSON.stringify(payload), options: { ttl: 3600 } },
         sub,
-        { subject: env.VAPID_SUBJECT, publicKey: env.VAPID_PUBLIC, privateKey: env.VAPID_PRIVATE }
+        { subject: vapid.subject, publicKey: vapid.publicKey, privateKey: vapid.privateKey }
       );
       await fetch(sub.endpoint, init);
     } catch (e) { /* 单个失败不影响其他 */ }

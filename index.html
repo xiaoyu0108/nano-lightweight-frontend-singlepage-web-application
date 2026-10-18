@@ -454,62 +454,103 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
         }
 
+        /* 统一内置通知栏：椭圆形透明白玻璃，左侧头像 + 昵称 + 具体信息 */
         .app-notify {
             position: absolute;
             left: 50%;
-            top: calc(10px + var(--safe-inset-top));
-            transform: translate(-50%, -140%);
+            top: calc(8px + var(--safe-inset-top));
+            transform: translate(-50%, -150%) scale(0.96);
             z-index: 100000;
-            width: min(92vw, 420px);
+            width: min(92vw, 430px);
             display: flex;
-            gap: 10px;
-            align-items: flex-start;
-            padding: 12px 14px;
-            border-radius: 16px;
-            background: rgba(28, 28, 30, 0.96);
-            color: #fff;
-            box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
+            align-items: center;
+            gap: 12px;
+            padding: 9px 16px 9px 10px;
+            border-radius: 26px;
+            background: rgba(255, 255, 255, 0.58);
+            color: #111;
+            border: 1px solid rgba(255, 255, 255, 0.75);
+            box-shadow:
+                0 12px 34px rgba(0, 0, 0, 0.12),
+                0 2px 8px rgba(0, 0, 0, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
             transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.32s;
             opacity: 0;
             cursor: pointer;
         }
-        .app-notify.show { transform: translate(-50%, 0); opacity: 1; }
-        .app-notify .an-icon { font-size: 18px; line-height: 1.2; }
-        .app-notify .an-main { min-width: 0; flex: 1; }
-        .app-notify .an-title { font-size: 13px; font-weight: 700; }
+        .app-notify.show { transform: translate(-50%, 0) scale(1); opacity: 1; }
+        .app-notify .an-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            overflow: hidden;
+            flex: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.055);
+            color: #1c1c1e;
+            font-size: 15px;
+            font-weight: 700;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+        }
+        .app-notify .an-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            border-radius: 50%;
+        }
+        .app-notify .an-main {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .app-notify .an-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #111;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .app-notify .an-body {
             font-size: 12px;
-            color: #d2d2d6;
-            margin-top: 3px;
-            line-height: 1.4;
+            color: #555;
+            line-height: 1.38;
             display: -webkit-box;
-            -webkit-line-clamp: 3;
+            -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-        .app-notify .an-actions { margin-top: 8px; }
+        .app-notify .an-actions { margin-top: 4px; }
         .app-notify .an-action {
             display: inline-block;
-            padding: 5px 14px;
+            padding: 4px 11px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.22);
-            color: #fff;
-            font-size: 12px;
+            background: rgba(0, 0, 0, 0.065);
+            color: #111;
+            font-size: 11px;
             font-weight: 600;
         }
-        .app-notify .an-action:active { background: rgba(255, 255, 255, 0.36); }
-        /* 生成类通知：淡淡粉色系，不用黑色、不用 emoji */
+        .app-notify .an-action:active { background: rgba(0, 0, 0, 0.12); }
+        /* 旧 pink 样式统一收进白玻璃，不再出现粉色横幅 */
         .app-notify.pink {
-            background: #ffe9f2;
-            color: #a63b63;
-            box-shadow: 0 12px 30px rgba(214, 51, 108, 0.18);
+            background: rgba(255, 255, 255, 0.58);
+            color: #111;
+            box-shadow:
+                0 12px 34px rgba(0, 0, 0, 0.12),
+                0 2px 8px rgba(0, 0, 0, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.85);
         }
-        .app-notify.pink .an-title { color: #a63b63; }
-        .app-notify.pink .an-body { color: #c86f90; }
-        .app-notify.pink .an-action { background: rgba(214, 51, 108, 0.12); color: #c2185b; }
-        .app-notify.pink .an-action:active { background: rgba(214, 51, 108, 0.2); }
+        .app-notify.pink .an-title { color: #111; }
+        .app-notify.pink .an-body { color: #555; }
+        .app-notify.pink .an-action { background: rgba(0, 0, 0, 0.065); color: #111; }
 
         .music-float-ball {
             position: absolute;
@@ -1065,7 +1106,7 @@
                 if (v === '1') return true;
                 if (v === '0') return false;
             } catch (e) {}
-            try { return /iPhone/.test(navigator.userAgent); } catch (e) { return false; }
+            try { return /iPhone|Android/i.test(navigator.userAgent); } catch (e) { return false; }
         }
         // 是否处于「已安装的全屏 PWA」：只有这时才需要用 48px 兜底（因为这种模式下 env() 可能报 0）
         function isStandalonePWA() {
@@ -1079,6 +1120,9 @@
         function isIOSDevice() {
             try { return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); } catch (e) { return false; }
         }
+        function isAndroidDevice() {
+            try { return /Android/i.test(navigator.userAgent); } catch (e) { return false; }
+        }
         function applyTopInset() {
             var custom = NaN;
             try { custom = parseFloat(localStorage.getItem('nano_top_inset')); } catch (e) {}
@@ -1086,9 +1130,12 @@
                 var val;
                 if (topInsetEnabled() && isFinite(custom) && custom >= 0) {
                     val = custom + 'px';                         // 用户自定义，优先
-                } else if (isStandalonePWA() && isIOSDevice()) {
+                } else if (topInsetEnabled() && isStandalonePWA() && isIOSDevice()) {
                     // 已安装全屏 PWA（iOS）：env 报 0 时兜底 48px（刚好越过灵动岛），报得再大也夹到 54px
                     val = 'max(min(env(safe-area-inset-top, 0px), 54px), 48px)';
+                } else if (topInsetEnabled() && isStandalonePWA() && isAndroidDevice()) {
+                    // 安卓全屏 PWA 的 env 经常报 0；兜底 40px，避免顶栏按钮钻进刘海/状态栏
+                    val = 'max(env(safe-area-inset-top, 0px), 40px)';
                 } else {
                     // 普通浏览器 / 非 iOS：直接用浏览器给的真实安全区（通常为 0），不凭空加一条空白
                     val = 'env(safe-area-inset-top, 0px)';
@@ -1129,6 +1176,7 @@
         let overlayActive = false;
         let isChatInnerActive = false;
         let currentOverlaySource = null;
+        let lastFullscreenOpen = { url: '', at: 0 };
         let pendingJumpMsgId = null;
         let voiceCallKeptAlive = false;
         let isMusicFrameActive = false;
@@ -1356,7 +1404,9 @@
             'wallet.html', 'appstore.html', 'family-card.html'];
         function reuseOrLoadOverlayFrame(url) {
             const base = baseName(url);
-            const loadedExact = overlayFrame.getAttribute('data-loaded-url') === url;
+            // data-loaded-url 可能残留，但 iframe 已经被重置为 about:blank；
+            // 必须同时确认当前 src 仍是目标页面，否则返回后会白屏。
+            const loadedExact = overlayFrame.getAttribute('data-loaded-url') === url && frameBase(overlayFrame) === base;
             if (loadedExact && REUSE_SAFE_PAGES.indexOf(base) !== -1) {
                 try { overlayFrame.contentWindow.postMessage({ type: 'nanoOverlayReopen' }, '*'); } catch (e) {}
                 return;
@@ -1442,6 +1492,7 @@
                 if (isFinite(_customTop) && _customTop >= 0) { top = _customTop; }
                 else if (top > 0) { top = Math.min(top, 54); }                 // 真实安全区（全屏 PWA）→ 直接用，封顶 54
                 else if (topInsetEnabled() && isStandalonePWA() && isIOSDevice()) { top = 48; }  // 全屏 PWA(iOS) 却报 0 → 兜底 48
+                else if (topInsetEnabled() && isStandalonePWA() && isAndroidDevice()) { top = 40; } // 安卓全屏 PWA 的 env 常报 0 → 兜底 40
                 else { top = 0; }                                              // 非全屏 / 非 iOS / 无安全区 → 0，不凭空留白
                 return { top: top, bottom: bottom };
             } catch (e) { return { top: 0, bottom: 0 }; }
@@ -1454,7 +1505,7 @@
             'books.html', 'couple-spaces.html', 'halo.html', 'offline.html', 'offline-setting.html',
             'heart-setting.html', 'market.html', 'mcp.html',
             'phone.html', 'assistant.html', 'nano-setting.html', 'family-card.html', 'wallet.html', 'appstore.html',
-            'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html'];
+            'cycle.html', 'fanfic.html', 'fanfic-create.html', 'fanfic-read.html', 'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html', 'mall.html'];
         // 其余页面（发现/更多/API/moments/ins/…）兜底：内容整体让到灵动岛下面
         function applySafeFallback(f) {
             try {
@@ -1498,7 +1549,7 @@
         setTimeout(applySafeTopToFrames, 300);
 
         // 构建版本号（改这里即可让所有同源页面刷新缓存）
-        var BUILD = 'nano-2026-10-17-05';
+        var BUILD = 'nano-2026-10-18-05';
 
         // 给同源页面 URL 追加构建版本号，避免浏览器/Service Worker 缓存到旧 HTML
         function withBuild(u) {
@@ -1511,6 +1562,15 @@
         }
         function openFullscreen(url, title, showBack, source) {
             url = withBuild(url);
+            // 防止双击同一个入口时连续设置 iframe.src，导致加载被中断成白屏
+            try {
+                const now = Date.now();
+                if (overlayActive && lastFullscreenOpen.url === url && now - lastFullscreenOpen.at < 700) {
+                    showOverlayFrame();
+                    return;
+                }
+                lastFullscreenOpen = { url: url, at: now };
+            } catch (e) {}
             voiceCallKeptAlive = false;
             try { urlSourceMap[baseName(url)] = source || ''; } catch (e) {}
             if (url.indexOf('voice-call.html') === 0 || url.indexOf('video-call.html') === 0) {
@@ -1569,9 +1629,9 @@
                 showOverlayFrame();
                 // 同一个页面且已加载过 → 直接复用（切换更快）；正在后台生成 → 也必须复用（否则中断生成）
                 reuseOrLoadOverlayFrame(url);
-                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'ios-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html', 'market.html', 'mcp.html', 'heart-setting.html', 'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html'];
+                const ownNavPages = ['worldbook.html', 'emoji.html', 'favorite.html', 'offline.html', 'offline-setting.html', 'moments.html', 'groups.html', 'group-setting.html', 'other.html', 'storage.html', 'backup.html', 'phone.html', 'ins.html', 'couple-spaces.html', 'halo.html', 'books.html', 'mask.html', 'character.html', 'inner-setting.html', 'nano-setting.html', 'ios-setting.html', 'assistant.html', 'family-card.html', 'wallet.html', 'appstore.html', 'cycle.html', 'fanfic.html', 'fanfic-create.html', 'fanfic-read.html', 'market.html', 'mcp.html', 'heart-setting.html', 'imessage.html', 'memory palace.html', 'app-host.html', 'meet.html', 'mall.html'];
                 const hasOwnNav = ownNavPages.some(function(p) { return url.indexOf(p) === 0; });
-                const noOuterHeader = hasOwnNav || (showBack === false && !(title || ''));
+                const noOuterHeader = hasOwnNav || url.indexOf('mall.html') !== -1 || (showBack === false && !(title || ''));
                 if (noOuterHeader) {
                     overlay.classList.add('no-header');
                     overlayTitle.textContent = '';
@@ -2025,15 +2085,30 @@
                 });
                 document.body.appendChild(el);
             }
+            // 短时间内同一条通知只弹一次，避免多个通道重复触发
+            const notifyName = String(opts.name || title || app || '通知').trim();
+            const dedupeKey = notifyName + '|' + String(body || '') + '|' + String(opts.target || '');
+            const now = Date.now();
+            if (el._lastKey === dedupeKey && now - (el._lastAt || 0) < 1200) return;
+            el._lastKey = dedupeKey;
+            el._lastAt = now;
+
             el._app = app || '';
             el._action = (opts.action && opts.url) ? { label: opts.action, url: opts.url, title: opts.title || '' } : null;
             el._target = opts.target || '';
-            el.classList.toggle('pink', !!opts.pink);
-            const _iconHtml = opts.pink
-                ? ''
-                : '<div class="an-icon">' + escapeNotifyHtml(opts.icon || ((app === 'music') ? '🎧' : '🔔')) + '</div>';
-            el.innerHTML = _iconHtml +
-                '<div class="an-main"><div class="an-title">' + escapeNotifyHtml(title) + '</div>' +
+            el.classList.remove('pink');
+
+            // 头像：优先 opts.avatar；其次 icon（仅当它是图片地址）；否则用昵称首字
+            const avatarUrl = String(opts.avatar || '');
+            const iconValue = String(opts.icon || '');
+            const usableAvatar = avatarUrl || (/^(https?:|data:image|blob:)/i.test(iconValue) ? iconValue : '');
+            const initial = notifyName.charAt(0) || 'N';
+            const avatarHtml = usableAvatar
+                ? '<div class="an-avatar"><img src="' + escapeNotifyHtml(usableAvatar) + '" alt=""></div>'
+                : '<div class="an-avatar">' + escapeNotifyHtml(initial) + '</div>';
+
+            el.innerHTML = avatarHtml +
+                '<div class="an-main"><div class="an-title">' + escapeNotifyHtml(notifyName) + '</div>' +
                 '<div class="an-body">' + escapeNotifyHtml(body) + '</div>' +
                 (el._action ? '<div class="an-actions"><span class="an-action">' + escapeNotifyHtml(el._action.label) + '</span></div>' : '') +
                 (!el._action && el._target ? '<div class="an-actions"><span class="an-action">点击查看</span></div>' : '') +
@@ -2044,6 +2119,8 @@
                 if (window.NanoNotify && document.hidden) {
                     window.NanoNotify.notify(title, body, {
                         icon: opts.icon,
+                        avatar: opts.avatar,
+                        name: opts.name,
                         target: opts.target || ((opts.action && opts.url) || ''),
                         tag: app ? ('nano-app-' + app) : ''
                     });
@@ -2172,6 +2249,7 @@
             } catch (e) {}
             overlayFrame.style.display = 'none';
             hideOtherGenericFrame();
+            try { overlayFrame.removeAttribute('data-loaded-url'); } catch (e) {}
             overlayFrame.setAttribute('src', 'about:blank');
         }
         function handleNanoRefresh(data, fromWin) {
@@ -2894,6 +2972,15 @@
                 } catch (e) {}
                 return;
             }
+            if (data.type === 'listenEnd') {
+                try {
+                    if (musicFrame && musicFrame.contentWindow) {
+                        musicFrame.contentWindow.postMessage({ type: 'endDuo' }, '*');
+                    }
+                } catch (e) {}
+                return;
+            }
+
             if (data.type === 'listenAccepted') {
                 try {
                     openFullscreen('music.html', '', false, 'more');
@@ -2943,9 +3030,17 @@
             }
 
             if (data.type === 'appNotify') {
-                if (!(data.app === 'music' && isMusicFrameActive)) {
-                    showAppNotify(data.title || '', data.body || '', data.app || '', { target: data.target || '', icon: data.icon || '' });
-                }
+                // 所有应用通知统一走内置玻璃通知栏（头像 + 昵称 + 具体信息）
+                try {
+                    showAppNotify(data.title || 'Nano', data.body || '', data.app || '', {
+                        icon: data.icon || '',
+                        avatar: data.avatar || '',
+                        name: data.name || data.title || '',
+                        target: data.target || '',
+                        action: data.action || '',
+                        url: data.url || ''
+                    });
+                } catch (e) {}
                 return;
             }
 
@@ -2959,6 +3054,13 @@
                     mode: data.mode || ''
                 };
                 try { syncMusicBall(); } catch (e) {}
+                return;
+            }
+
+            if (data.type === 'nanoHideOuterHeader') {
+                overlay.classList.add('no-header');
+                overlayTitle.textContent = '';
+                overlayBack.classList.add('hidden');
                 return;
             }
 
@@ -3179,10 +3281,16 @@
                 }
             }
 
-            // 生成类通知（朋友圈/照片/社交等）：淡淡粉色通知栏，不用黑色/emoji
+            // 生成类 / 主动消息通知：统一走内置玻璃通知栏
             if (data.type === 'NANO_GEN_NOTIFY') {
                 try {
-                    if (window.__nanoAppNotify) window.__nanoAppNotify(data.title || '生成成功', data.body || '', 'social', { pink: true });
+                    showAppNotify(data.title || 'Nano', data.body || '', data.channel || data.app || '', {
+                        avatar: data.avatar || data.icon || '',
+                        name: data.name || data.title || '',
+                        target: data.target || '',
+                        action: data.action || '',
+                        url: data.url || ''
+                    });
                 } catch (e) {}
                 return;
             }
@@ -3349,16 +3457,23 @@
             if (!window.visualViewport) return;
             const vv = window.visualViewport;
             function propagate(kb) {
-                // 把键盘高度同步给所有同源 iframe，让内部输入栏整体上移
+                // 把键盘高度同步给所有同源 iframe，让内部输入栏整体上移。
+                // 安卓部分 WebView 会同时缩短布局视口：这时 100% 已经在键盘上沿，
+                // 再同步完整键盘高度会重复上移，底栏和键盘之间就会空一条。iOS 保持原样。
+                let eff = kb;
+                if (/Android/i.test(navigator.userAgent || '')) {
+                    const layoutKb = Math.max(0, Math.round(kbBaseH - (window.innerHeight || 0)));
+                    eff = Math.max(0, kb - Math.min(kb, layoutKb));
+                }
                 let frames = [];
                 try { frames = Array.prototype.slice.call(document.querySelectorAll('iframe')); } catch (e) {}
                 frames.forEach(function (fr) {
                     try {
                         const doc = fr.contentDocument;
                         if (!doc) return;
-                        doc.documentElement.style.setProperty('--nano-kb', kb + 'px');
-                        doc.documentElement.classList.toggle('keyboard-open', kb > 0.5);
-                        try { fr.contentWindow.postMessage({ type: 'nanoKeyboard', kb: kb }, '*'); } catch (e) {}
+                        doc.documentElement.style.setProperty('--nano-kb', eff + 'px');
+                        doc.documentElement.classList.toggle('keyboard-open', eff > 0.5);
+                        try { fr.contentWindow.postMessage({ type: 'nanoKeyboard', kb: eff }, '*'); } catch (e) {}
                     } catch (e) {}
                 });
             }
@@ -3433,7 +3548,7 @@
                 'inner-setting.html', 'groups.html', 'group-setting.html', 'music.html', 'ins.html',
                 'moments.html', 'halo.html', 'books.html', 'character.html', 'mask.html', 'favorite.html',
                 'emoji.html', 'worldbook.html', 'memory.html', 'phone.html', 'offline.html',
-                'offline-setting.html', 'couple-spaces.html', 'voice-call.html', 'video-call.html', 'api.html',
+                'offline-setting.html', 'couple-spaces.html', 'voice-call.html', 'video-call.html', 'api.html', 'cycle.html', 'fanfic.html', 'fanfic-create.html', 'fanfic-read.html',
                 'discover.html', 'more.html'];
             var i = 0;
             function next() {
@@ -3508,28 +3623,24 @@
             try {
                 __pushCfg = !!(localStorage.getItem('nano_push_endpoint') && localStorage.getItem('nano_push_vapid'));
             } catch (e) {}
-            if (__pushCfg) {
-                navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () {});
-            } else {
-                navigator.serviceWorker.getRegistrations().then(function (rs) {
-                    return Promise.all(rs.map(function (r) { return r.unregister(); }));
-                }).catch(function () {});
-            }
+            // 即使没配 Web Push，也要注册 SW：系统通知（new Notification 在部分安卓 WebView 不可用）
+            // 依赖 ServiceWorkerRegistration.showNotification 才能稳定出现在顶部通知栏。
+            navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () {});
         }
     } catch (e) {}
 </script>
     <script src="js/api-float.js?v=20261013a"></script>
 <script src="js/mem-link.js?v=20261006a"></script>
 <script src="js/aux-memory.js"></script>
-<script src="js/nano-notify.js?v=20261013a"></script>
+<script src="js/nano-notify.js?v=20261018b"></script>
 <script src="js/nano-push.js"></script>
 <script src="swipe-back.js"></script>
 <script src="js/keep-alive.js?v=20261013b"></script>
 <script src="js/char-takeover.js?v=20261009a"></script>
 <script src="js/screen-share.js?v=20261013e"></script>
-<script src="js/ios-bridge.js?v=20261013b"></script>
+<script src="js/ios-bridge.js?v=20261018a"></script>
 <script src="js/auto-push-bridge.js?v=20261017d"></script>
-<script src="js/online-catchup.js?v=20261013a"></script>
+<script src="js/online-catchup.js?v=20261018c"></script>
 </div>
     <!-- 小号试探：居中弹窗（不暴露是谁）-->
     <div class="alt-probe-overlay" id="altProbeOverlay">
@@ -3646,14 +3757,14 @@
         document.getElementById('altProbeAccept').addEventListener('click', function () {
             if (current) addFriend(current);
             clearPending(); close(); tellFramesDone();
-            try { if (window.__nanoAppNotify) window.__nanoAppNotify('已添加好友', (current && current.name ? current.name : '新好友') + ' 已加入聊天列表', 'social', { pink: true }); } catch (err) {}
+            try { if (window.__nanoAppNotify) window.__nanoAppNotify('已添加好友', (current && current.name ? current.name : '新好友') + ' 已加入聊天列表', 'social', { avatar: (current && current.avatar) || '', name: (current && current.name) || '新好友' }); } catch (err) {}
         });
         document.getElementById('altProbeReject').addEventListener('click', function () { clearPending(); close(); tellFramesDone(); });
         window.addEventListener('message', function (e) {
             var d = e.data;
             if (d && d.type === 'NANO_ALT_PROBE' && d.alt) {
                 open(d.alt);
-                try { if (window.__nanoAppNotify) window.__nanoAppNotify('好友申请', '有个陌生人想加你为好友', 'social', { pink: true }); } catch (err) {}
+                try { if (window.__nanoAppNotify) window.__nanoAppNotify('好友申请', '有个陌生人想加你为好友', 'social', { avatar: (d.alt && d.alt.avatar) || '', name: (d.alt && d.alt.name) || '好友申请' }); } catch (err) {}
             }
         });
         // 刷新后仍显示未处理的小号

@@ -22,7 +22,7 @@ function utf16Bytes(str) { return str ? str.length * 2 : 0; }
 const APP_CATEGORIES = [
     {
         id: 'chat', label: '单聊', color: '#007aff',
-        ls: ['chat_messages_', 'chat_setting_', 'chat_reply_pending_', 'chat_req_', 'chat_api_result_', 'chat_cleared_', 'nano_pinned_data', 'nano_cot_presets', 'nano_moment_img_round_'],
+        ls: ['chat_messages_', 'chat_setting_', 'chat_reply_pending_', 'chat_req_', 'chat_api_result_', 'chat_cleared_', 'nano_pinned_data', 'nano_cot_presets', 'nano_moment_img_round_', 'nano_auto_pending_msgs'],
         idb: [
             { db: 'localforage', store: 'keyvaluepairs', key: ['chat_messages_', 'chat_setting_'] },
             { db: 'nano_vector_memory_db', store: 'chat_messages' },
@@ -42,7 +42,7 @@ const APP_CATEGORIES = [
     {
         id: 'moments', label: '朋友圈', color: '#5856d6',
         ls: ['nano_moments_data', 'nanoMomentsCover', 'nano_moments_npcs_'],
-        idb: [{ db: 'NanoMomentsDB' }]
+        idb: [{ db: 'NanoMomentsDB' }, { db: 'NanoMomentsCoverDB' }]
     },
     {
         id: 'worldbook', label: '世界书', color: '#af52de',
@@ -90,7 +90,7 @@ const APP_CATEGORIES = [
     },
     {
         id: 'call', label: '通话', color: '#5ac8fa',
-        ls: ['voice_call_seconds_'],
+        ls: ['voice_call_seconds_', 'nano_call_active_'],
         idb: [{ db: 'voice_call_records_db' }, { dbPrefix: 'voice_call_', store: 'messages' }]
     },
     {
@@ -112,6 +112,46 @@ const APP_CATEGORIES = [
         id: 'beautify', label: '美化', color: '#bf5af2',
         ls: ['beautify_'],
         idb: [{ db: 'BeautifyAppDB' }]
+    },
+    {
+        id: 'market', label: '共享集市', color: '#ff9f0a',
+        ls: ['market_owned', 'market_liked', 'market_user', 'nano_market_'],
+        idb: [{ db: 'NanoMarketDB' }]
+    },
+    {
+        id: 'mcp', label: 'MCP', color: '#5e5ce6',
+        ls: ['nano_mcp_', 'nano_peek_', 'nano_push_'],
+        idb: []
+    },
+    {
+        id: 'fanfic', label: '同人文', color: '#8b5cf6',
+        ls: ['nano_fanfic_'],
+        idb: []
+    },
+    {
+        id: 'cycle', label: '月潮', color: '#e05a7a',
+        ls: ['nano_cycle_'],
+        idb: []
+    },
+    {
+        id: 'friend', label: '好友申请', color: '#2f9e8f',
+        ls: ['nano_friend_requests', 'nano_meet_', 'nano_chat_inject_'],
+        idb: []
+    },
+    {
+        id: 'family', label: '亲属卡', color: '#f08a3c',
+        ls: ['nano_family_cards_'],
+        idb: []
+    },
+    {
+        id: 'appstore', label: 'App Store', color: '#4a6cf7',
+        ls: [],
+        idb: [{ db: 'nano_appstore_db' }]
+    },
+    {
+        id: 'mall', label: '商城', color: '#111111',
+        ls: ['nano_mall_data_'],
+        idb: []
     },
     {
         id: 'halo', label: 'Halo', color: '#5e5ce6',

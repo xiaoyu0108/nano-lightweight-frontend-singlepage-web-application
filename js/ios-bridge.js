@@ -29,8 +29,7 @@
 
     function notify(info, text) {
         var body = String(text || '').replace(/\s*\n+\s*/g, '  ').slice(0, 120);
-        try { if (window.__nanoAppNotify) window.__nanoAppNotify((info.name || 'TA'), body, 'social', { pink: true }); } catch (e) {}
-        try { if (window.NanoNotify && NanoNotify.notify) NanoNotify.notify((info.name || 'TA'), body, { channel: 'chat', force: true }); } catch (e) {}
+        try { if (window.NanoNotify && NanoNotify.notify) NanoNotify.notify((info.name || 'TA'), body, { channel: 'chat', force: true, target: 'chat:' + info.id }); } catch (e) {}
     }
 
     // 读取角色库里的第一个普通角色（兜底目标）

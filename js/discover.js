@@ -189,7 +189,10 @@
     imessage: { url: 'imessage.html', title: 'iMessage', showBack: true },
     market:   { url: 'market.html', title: '共享集市', showBack: true },
     mcp:      { url: 'mcp.html', title: 'MCP', showBack: true },
-    appstore: { url: 'appstore.html', title: 'App Store', showBack: true },
+    cycle:    { url: 'cycle.html', title: 'Moon Tide', showBack: true },
+    fanfic:   { url: 'fanfic.html', title: 'Fanfic', showBack: true },
+    mall:     { url: 'mall.html', title: 'Store 商城', showBack: true },
+  appstore: { url: 'appstore.html', title: 'App Store', showBack: true },
     screenpeek: { url: 'ios-setting.html', title: '窥屏', showBack: true }
   };
 

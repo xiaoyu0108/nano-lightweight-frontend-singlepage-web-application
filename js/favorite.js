@@ -210,6 +210,12 @@
     var infoBody = document.getElementById('infoBody');
     var infoOk = document.getElementById('infoOk');
 
+    var detailModal = document.getElementById('detailModal');
+    var detailSender = document.getElementById('detailSender');
+    var detailTime = document.getElementById('detailTime');
+    var detailContent = document.getElementById('detailContent');
+    var detailClose = document.getElementById('detailClose');
+
     // ============================================================
     // 6. 工具函数
     // ============================================================
@@ -243,7 +249,7 @@
                 <div class="empty-state">
                     <span class="empty-icon">♡</span>
                     <div class="empty-text">暂无收藏</div>
-                    <div class="empty-hint">在聊天中双击消息，点击「收藏」即可保存</div>
+                    <div class="empty-hint">在聊天中双击消息，或在线下消息的「⋮」菜单里收藏</div>
                 </div>
             `;
             return;
@@ -317,6 +323,7 @@
             var startX = 0;
             var currentX = 0;
             var isDragging = false;
+            var moved = false;
             var SWIPE_THRESHOLD = 40;
 
             function onStart(e) {
@@ -324,6 +331,7 @@
                 startX = touch.clientX;
                 currentX = startX;
                 isDragging = true;
+                moved = false;
                 wrapper.classList.remove('swiped');
             }
 
@@ -332,6 +340,7 @@
                 var touch = e.touches ? e.touches[0] : e;
                 currentX = touch.clientX;
                 var diff = startX - currentX;
+                if (diff > 8) moved = true;
                 if (diff > 10) {
                     e.preventDefault();
                     var translate = Math.min(diff, 80);
@@ -362,6 +371,16 @@
             div.addEventListener('touchmove', onMove, { passive: false });
             div.addEventListener('touchend', onEnd, { passive: true });
 
+            // 点击卡片：查看全文（左滑或拖动后不触发）
+            div.addEventListener('click', function(e) {
+                if (moved) { moved = false; return; }
+                if (wrapper.classList.contains('swiped')) {
+                    wrapper.classList.remove('swiped');
+                    return;
+                }
+                openDetail(item);
+            });
+
             // 点击删除按钮（左滑后的删除）
             actions.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -389,6 +408,27 @@
             });
             favoritesList.appendChild(toggle);
         }
+    }
+
+    // ============================================================
+    // 7.5 查看收藏全文
+    // ============================================================
+    function openDetail(item) {
+        if (!item) return;
+        detailSender.textContent = item.sender || '未知';
+        detailTime.textContent = item.time || '';
+        detailContent.textContent = item.content || '（空消息）';
+        detailModal.classList.add('show');
+        try { detailContent.scrollTop = 0; } catch (e) {}
+    }
+    function closeDetail() {
+        detailModal.classList.remove('show');
+    }
+    if (detailClose) detailClose.addEventListener('click', closeDetail);
+    if (detailModal) {
+        detailModal.addEventListener('click', function(e) {
+            if (e.target === detailModal) closeDetail();
+        });
     }
 
     // ============================================================

@@ -5,14 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>聊天</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="css/chat-inner.css?v=20261013j">
+    <link rel="stylesheet" href="css/chat-inner.css?v=20261018b">
     <link rel="stylesheet" href="css/heart.css?v=20261006a">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://unpkg.com">
     <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
     <script src="js/appearance.js?v=20261010a"></script>
-    <script src="js/nano-notify.js?v=20261006a"></script>
-    <script src="js/nano-badge.js"></script>
+<script src="js/nano-notify.js?v=20261018b"></script>
+<script src="js/reroll-reason.js?v=20261018a"></script>
+<script src="js/cycle-store.js?v=20261018c"></script>
+<script src="js/nano-badge.js"></script>
     <script src="js/keep-alive.js?v=20261006a"></script>
 <script src="js/group-store.js"></script>
 </head>
@@ -457,17 +459,18 @@
 <script src="js/nano-assistant-knowledge.js?v=20260929a"></script>
 <script src="js/nano-assistant-tools.js?v=20260929a"></script>
 <script src="js/family-card-store.js?v=20261006a"></script>
+<script src="js/nano-pay.js?v=20261018b"></script>
     <script src="js/mem-link.js?v=20261006a"></script>
     <script src="js/nano-holiday.js?v=20261012a"></script>
 <script src="js/builtin-worldbook.js?v=20261013a"></script>
 <script src="js/nano-mcp-runtime.js?v=20261016c"></script>
 <script src="js/nano-mcp-chat.js?v=20261016c"></script>
-<script src="js/chat-core.js?v=20261017e"></script>
+<script src="js/chat-core.js?v=20261018v"></script>
     <script src="js/roleplay-prompt.js?v=20261013c"></script>
 <script src="js/chat-transfer.js?v=20261006a"></script>
 <script src="js/chat-gift.js"></script>
     <script src="js/chat-image.js?v=20261013a"></script>
-    <script src="js/chat-more.js?v=20261013a"></script>
+    <script src="js/chat-more.js?v=20261018b"></script>
 <script src="js/chat-place.js"></script>
 <script src="js/chat-voice.js"></script>
     <script src="js/nano-export.js?v=20261015a"></script>
@@ -648,10 +651,19 @@
 // iOS 键盘：收缩聊天容器，让输入栏位于键盘上方（父页面也会 postMessage 同步）
 (function () {
   var parentKb = 0, localKb = 0, kbBaseH = 0;
+  var isAndroid = /Android/i.test(navigator.userAgent || '');
   function apply() {
+    // 安卓部分 WebView 在键盘弹出时会把布局视口一起缩短：此时 100% 已经等于
+    // 键盘上沿，再减一次键盘高度就会出现「底栏和键盘之间一条空白」。
+    // iOS 保持原来的行为，不做改动。
+    try { if (window.visualViewport) localKb = computeLocalKb(window.visualViewport); } catch (e) {}
     var kb = Math.max(parentKb, localKb);
+    var layoutKb = Math.max(0, Math.round(kbBaseH - (window.innerHeight || 0)));
+    var effectiveKb = isAndroid ? Math.max(0, kb - Math.min(kb, layoutKb)) : kb;
     document.documentElement.style.setProperty('--nano-kb', kb + 'px');
+    document.documentElement.style.setProperty('--nano-kb-chat', effectiveKb + 'px');
     document.documentElement.classList.toggle('keyboard-open', kb > 0.5);
+    document.documentElement.classList.toggle('nano-android', isAndroid);
   }
   // iOS 弹键盘时 window.innerHeight 会一起变小，必须用「无键盘基准高度」相减，
   // 否则算出来是 0，输入栏就被键盘压住（安卓 innerHeight 不变所以原本正常）。

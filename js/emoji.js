@@ -760,7 +760,11 @@
         var group = data.emojiGroups.find(function(g) { return g.id === targetId; });
         if (group) {
             allEmojis.forEach(function(e) {
-                group.emojis.push({ id: 'e' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), name: e.name, url: e.url });
+                // 同名表情会让角色无法用 [emoji:名称] 精确指定，自动补 2/3/4…
+                var base = String(e.name || '表情').trim() || '表情';
+                var nm = base, n = 2;
+                while ((group.emojis || []).some(function(x) { return x && x.name === nm; })) { nm = base + n; n++; }
+                group.emojis.push({ id: 'e' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), name: nm, url: e.url, addedAt: Date.now() });
             });
             saveData(data).then(function() {
                 renderHome();
@@ -1137,11 +1141,13 @@
         singleAddBtn.addEventListener('click', function() {
             var url = singleUrlInput.value.trim();
             if (!url) { showToast('请选择图片或输入 URL'); return; }
-            var name = singleNameInput.value.trim() || '未命名';
+            var name = singleNameInput.value.trim() || '表情';
             var targetId = targetGroupSelect.value;
             var group = data.emojiGroups.find(function(g) { return g.id === targetId; });
             if (group) {
-                group.emojis.push({ id: 'e' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), name: name, url: url });
+                var base = name, n = 2;
+                while ((group.emojis || []).some(function(x) { return x && x.name === name; })) { name = base + n; n++; }
+                group.emojis.push({ id: 'e' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), name: name, url: url, addedAt: Date.now() });
                 saveData(data).then(function() {
                     renderHome();
                     if (currentGroupId && currentGroupId === targetId) {
